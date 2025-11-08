@@ -1,14 +1,30 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Core types and traits for SimQ quantum computing SDK
+//!
+//! This crate provides the fundamental types for building quantum circuits:
+//! - [`QubitId`]: Type-safe qubit addressing
+//! - [`Gate`]: Trait for quantum operations
+//! - [`Circuit`]: Quantum circuit container
+//!
+//! # Example
+//! ```
+//! use simq_core::{Circuit, QubitId};
+//!
+//! let mut circuit = Circuit::new(2);
+//! let q0 = QubitId::new(0);
+//! // Add gates...
+//! ```
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod qubit;
+pub mod error;
+pub mod gate;
+pub mod circuit;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// Re-exports for convenience
+pub use num_complex::Complex64;
+pub use qubit::QubitId;
+pub use error::QuantumError;
+pub use gate::{Gate, GateOp};
+pub use circuit::Circuit;
+
+/// Type alias for results in SimQ
+pub type Result<T> = std::result::Result<T, QuantumError>;
