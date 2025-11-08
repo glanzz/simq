@@ -1,6 +1,6 @@
 //! Quantum gate definitions and operations
 
-use crate::{QubitId, QuantumError, Result};
+use crate::{QuantumError, QubitId, Result};
 use smallvec::SmallVec;
 use std::fmt;
 use std::sync::Arc;
@@ -186,7 +186,12 @@ mod tests {
         let result = GateOp::new(gate, &[q0]);
         assert!(result.is_err());
 
-        if let Err(QuantumError::InvalidQubitCount { gate, expected, actual }) = result {
+        if let Err(QuantumError::InvalidQubitCount {
+            gate,
+            expected,
+            actual,
+        }) = result
+        {
             assert_eq!(gate, "CNOT");
             assert_eq!(expected, 2);
             assert_eq!(actual, 1);

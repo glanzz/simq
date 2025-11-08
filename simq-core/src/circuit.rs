@@ -1,7 +1,7 @@
 //! Quantum circuit representation
 
 use crate::gate::Gate;
-use crate::{GateOp, QubitId, QuantumError, Result};
+use crate::{GateOp, QuantumError, QubitId, Result};
 use std::sync::Arc;
 
 /// A quantum circuit
@@ -88,10 +88,7 @@ impl Circuit {
         // Validate qubit indices
         for &qubit in qubits {
             if qubit.index() >= self.num_qubits {
-                return Err(QuantumError::invalid_qubit(
-                    qubit.index(),
-                    self.num_qubits,
-                ));
+                return Err(QuantumError::invalid_qubit(qubit.index(), self.num_qubits));
             }
         }
 
@@ -144,12 +141,7 @@ impl Circuit {
 
 impl std::fmt::Display for Circuit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Circuit({} qubits, {} operations)",
-            self.num_qubits,
-            self.len()
-        )?;
+        writeln!(f, "Circuit({} qubits, {} operations)", self.num_qubits, self.len())?;
         for (i, op) in self.operations.iter().enumerate() {
             writeln!(f, "  {}: {}", i, op)?;
         }
