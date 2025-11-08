@@ -1,0 +1,65 @@
+# SimQ Rust formatting configuration
+
+# Edition
+edition = "2021"
+
+# Line width
+max_width = 100
+
+# Use field init shorthand
+use_field_init_shorthand = true
+
+# Use try shorthand
+use_try_shorthand = true
+
+# Reorder imports
+reorder_imports = true
+reorder_modules = true
+
+# Format code in doc comments
+format_code_in_doc_comments = true
+
+# Merge imports
+imports_granularity = "Crate"
+
+# Newline style
+newline_style = "Unix"
+
+# Trailing comma
+trailing_comma = "Vertical"
+
+# Match block trailing comma
+match_block_trailing_comma = true
+
+# Format strings
+format_strings = true
+
+# Normalize comments
+normalize_comments = true
+
+# Wrap comments
+wrap_comments = true
+comment_width = 80
+
+# Struct field alignment
+struct_field_align_threshold = 20
+
+# Chain width
+chain_width = 60
+
+# Function call width
+fn_call_width = 80
+
+# Single line if-else
+single_line_if_else_max_width = 50
+
+# Control brace style
+control_brace_style = "AlwaysSameLine"
+
+# Indent style
+hard_tabs = false
+tab_spaces = 4
+
+# Blank lines
+blank_lines_upper_bound = 2
+blank_lines_lower_bound = 0

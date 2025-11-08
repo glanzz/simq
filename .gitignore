@@ -1,0 +1,46 @@
+int_*.md
+
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+*.profraw
+*.profdata
+
+# Benchmarks
+criterion/
+flamegraph.svg
+perf.data
+perf.data.old
+
+# Documentation
+/target/doc/
+
+# Python (for future Python bindings)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.venv/
+venv/
+
+# Coverage
+*.lcov
+cobertura.xml
+tarpaulin-report.html
+
+# Temporary files
+*.tmp
+*.temp

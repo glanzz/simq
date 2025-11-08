@@ -1,0 +1,26 @@
+[package]
+name = "simq"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "High-performance quantum computing SDK in Rust"
+
+[dependencies]
+simq-core.workspace = true
+simq-state.workspace = true
+simq-gates.workspace = true
+simq-compiler.workspace = true
+simq-sim.workspace = true
+simq-backend.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "end_to_end"
+harness = false

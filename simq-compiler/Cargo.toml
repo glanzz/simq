@@ -1,0 +1,24 @@
+[package]
+name = "simq-compiler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Circuit optimization and compilation for SimQ"
+
+[dependencies]
+simq-core.workspace = true
+simq-gates.workspace = true
+thiserror.workspace = true
+ahash.workspace = true
+smallvec.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "optimization_passes"
+harness = false

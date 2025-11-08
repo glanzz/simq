@@ -1,0 +1,20 @@
+[package]
+name = "simq-backend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Hardware backend abstraction for SimQ"
+
+[dependencies]
+simq-core.workspace = true
+simq-compiler.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ahash.workspace = true
+
+[dev-dependencies]

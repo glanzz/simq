@@ -1,0 +1,73 @@
+[workspace]
+resolver = "2"
+members = [
+    "simq-core",
+    "simq-state",
+    "simq-gates",
+    "simq-compiler",
+    "simq-sim",
+    "simq-backend",
+    "simq",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["SimQ Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/simq"
+homepage = "https://github.com/yourusername/simq"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Core dependencies
+num-complex = "0.4"
+ndarray = "0.15"
+rayon = "1.8"
+ahash = "0.8"
+parking_lot = "0.12"
+bytemuck = { version = "1.14", features = ["derive"] }
+smallvec = { version = "1.11", features = ["union", "const_generics"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Testing
+proptest = "1.4"
+approx = "0.5"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Internal crates
+simq-core = { path = "simq-core" }
+simq-state = { path = "simq-state" }
+simq-gates = { path = "simq-gates" }
+simq-compiler = { path = "simq-compiler" }
+simq-sim = { path = "simq-sim" }
+simq-backend = { path = "simq-backend" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+
+[profile.dev]
+opt-level = 1  # Faster dev builds with some optimization
+
+[profile.test]
+opt-level = 2  # Optimize tests for faster execution

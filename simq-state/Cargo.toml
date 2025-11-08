@@ -1,0 +1,27 @@
+[package]
+name = "simq-state"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Quantum state representations for SimQ"
+
+[dependencies]
+simq-core.workspace = true
+num-complex.workspace = true
+ahash.workspace = true
+bytemuck.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+criterion.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "state_operations"
+harness = false
