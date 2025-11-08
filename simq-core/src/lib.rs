@@ -63,6 +63,9 @@ pub mod circuit_builder;
 pub mod dynamic_builder;
 pub mod error;
 pub mod gate;
+pub mod parameter;
+pub mod parameter_id;
+pub mod parameter_registry;
 pub mod qubit;
 pub mod qubit_ref;
 
@@ -73,6 +76,9 @@ pub use dynamic_builder::DynamicCircuitBuilder;
 pub use error::QuantumError;
 pub use gate::{Gate, GateOp};
 pub use num_complex::Complex64;
+pub use parameter::Parameter;
+pub use parameter_id::ParameterId;
+pub use parameter_registry::ParameterRegistry;
 pub use qubit::QubitId;
 pub use qubit_ref::Qubit;
 

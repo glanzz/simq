@@ -1,6 +1,6 @@
 //! Type-safe qubit references for circuit builders
 
-use crate::{QubitId, QuantumError, Result};
+use crate::{QuantumError, QubitId, Result};
 use std::marker::PhantomData;
 
 /// A type-safe qubit reference with compile-time circuit size tracking
