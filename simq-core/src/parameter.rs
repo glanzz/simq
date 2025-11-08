@@ -437,6 +437,7 @@ mod tests {
 
     #[test]
     fn test_builder_pattern() {
+        use std::f64::consts::PI;
         let param = Parameter::new(1.0)
             .with_name("alpha")
             .with_bounds(0.0, PI * 2.0)

@@ -69,6 +69,9 @@ pub mod parameter_registry;
 pub mod qubit;
 pub mod qubit_ref;
 
+#[cfg(feature = "serialization")]
+pub mod serialization;
+
 // Re-exports for convenience
 pub use circuit::Circuit;
 pub use circuit_builder::CircuitBuilder;

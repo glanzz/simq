@@ -137,6 +137,213 @@ impl Circuit {
         }
         Ok(())
     }
+
+    #[cfg(feature = "serialization")]
+    /// Serialize circuit to binary format
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let bytes = circuit.to_bytes()?;
+    /// ```
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::{StandardGateRegistry, CIRCUIT_FORMAT_VERSION};
+
+        let registry = StandardGateRegistry::default();
+        let operations: Vec<_> = self
+            .operations
+            .iter()
+            .map(|op| registry.serialize_gate_op(op))
+            .collect::<Result<Vec<_>>>()
+            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+
+        let serialized = SerializedCircuit {
+            version: CIRCUIT_FORMAT_VERSION,
+            num_qubits: self.num_qubits,
+            operations,
+            metadata: None,
+        };
+
+        bincode::serialize(&serialized)
+            .map_err(|e| QuantumError::SerializationError(format!("Binary serialization failed: {}", e)))
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Deserialize circuit from binary format
+    ///
+    /// # Errors
+    /// Returns error if deserialization fails or circuit is invalid
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let bytes = vec![...];
+    /// let circuit = Circuit::from_bytes(&bytes)?;
+    /// ```
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::StandardGateRegistry;
+
+        let serialized: SerializedCircuit = bincode::deserialize(bytes)
+            .map_err(|e| QuantumError::DeserializationError(format!("Binary deserialization failed: {}", e)))?;
+
+        serialized.check_version()?;
+
+        let registry = StandardGateRegistry::default();
+        let mut circuit = Circuit::new(serialized.num_qubits);
+
+        for op in serialized.operations {
+            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            circuit.operations.push(gate_op);
+        }
+
+        circuit.validate()?;
+        Ok(circuit)
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Serialize circuit to JSON format
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let json = circuit.to_json()?;
+    /// ```
+    pub fn to_json(&self) -> Result<String> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::{StandardGateRegistry, CIRCUIT_FORMAT_VERSION};
+
+        let registry = StandardGateRegistry::default();
+        let operations: Vec<_> = self
+            .operations
+            .iter()
+            .map(|op| registry.serialize_gate_op(op))
+            .collect::<Result<Vec<_>>>()
+            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+
+        let serialized = SerializedCircuit {
+            version: CIRCUIT_FORMAT_VERSION,
+            num_qubits: self.num_qubits,
+            operations,
+            metadata: None,
+        };
+
+        serde_json::to_string(&serialized)
+            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Serialize circuit to pretty-printed JSON format
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    pub fn to_json_pretty(&self) -> Result<String> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::{StandardGateRegistry, CIRCUIT_FORMAT_VERSION};
+
+        let registry = StandardGateRegistry::default();
+        let operations: Vec<_> = self
+            .operations
+            .iter()
+            .map(|op| registry.serialize_gate_op(op))
+            .collect::<Result<Vec<_>>>()
+            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+
+        let serialized = SerializedCircuit {
+            version: CIRCUIT_FORMAT_VERSION,
+            num_qubits: self.num_qubits,
+            operations,
+            metadata: None,
+        };
+
+        serde_json::to_string_pretty(&serialized)
+            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Deserialize circuit from JSON format
+    ///
+    /// # Errors
+    /// Returns error if deserialization fails or circuit is invalid
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let json = r#"{"version": 1, "num_qubits": 2, "operations": []}"#;
+    /// let circuit = Circuit::from_json(json)?;
+    /// ```
+    pub fn from_json(json: &str) -> Result<Self> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::StandardGateRegistry;
+
+        let serialized: SerializedCircuit = serde_json::from_str(json)
+            .map_err(|e| QuantumError::DeserializationError(format!("JSON deserialization failed: {}", e)))?;
+
+        serialized.check_version()?;
+
+        let registry = StandardGateRegistry::default();
+        let mut circuit = Circuit::new(serialized.num_qubits);
+
+        for op in serialized.operations {
+            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            circuit.operations.push(gate_op);
+        }
+
+        circuit.validate()?;
+        Ok(circuit)
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Generate cache key from circuit structure
+    ///
+    /// The cache key is based on the circuit structure (gates and qubits),
+    /// not parameter values, allowing parameterized circuits to share cache entries.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let key = circuit.cache_key();
+    /// ```
+    pub fn cache_key(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        self.num_qubits.hash(&mut hasher);
+
+        // Hash gate operations (structure only, not parameters)
+        for op in &self.operations {
+            op.gate().name().hash(&mut hasher);
+            op.gate().num_qubits().hash(&mut hasher);
+            for qubit in op.qubits() {
+                qubit.index().hash(&mut hasher);
+            }
+        }
+
+        hasher.finish()
+    }
 }
 
 impl std::fmt::Display for Circuit {
