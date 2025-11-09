@@ -1,6 +1,7 @@
 //! Quantum gate definitions and operations
 
 use crate::{QuantumError, QubitId, Result};
+use num_complex::Complex64;
 use smallvec::SmallVec;
 use std::fmt;
 use std::sync::Arc;
@@ -44,6 +45,27 @@ pub trait Gate: Send + Sync + fmt::Debug {
     /// Get a description of this gate
     fn description(&self) -> String {
         format!("{}-qubit gate '{}'", self.num_qubits(), self.name())
+    }
+
+    /// Get the unitary matrix for this gate as a flattened vector
+    ///
+    /// The matrix is stored in row-major order. For an n-qubit gate,
+    /// the matrix has dimension 2^n × 2^n, and the returned vector
+    /// has length (2^n)^2.
+    ///
+    /// Returns `None` for gates that don't have a simple matrix representation
+    /// (e.g., measurement operations, custom oracles).
+    ///
+    /// # Example
+    /// ```ignore
+    /// let hadamard = HadamardGate;
+    /// if let Some(matrix) = hadamard.matrix() {
+    ///     // Matrix is 2x2, so length is 4
+    ///     assert_eq!(matrix.len(), 4);
+    /// }
+    /// ```
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        None
     }
 }
 
