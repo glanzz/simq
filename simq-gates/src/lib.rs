@@ -11,8 +11,12 @@
 //! - **Type-safe gate interface**: All gates implement the `Gate` trait from `simq-core`
 //! - **Parameterized gates**: Support for rotation gates (RX, RY, RZ) and phase gates
 //! - **Standard gate library**: Comprehensive set of commonly used quantum gates
+//! - **Lookup tables**: High-performance lookup tables for small-angle rotations
+//! - **Optimized implementations**: Drop-in optimized versions of rotation gates
 //!
 //! # Examples
+//!
+//! ## Basic Gate Usage
 //!
 //! ```
 //! use simq_gates::standard::{Hadamard, CNot, RotationX};
@@ -31,8 +35,28 @@
 //! let pauli_x = &matrices::PAULI_X;
 //! let swap = &matrices::SWAP;
 //! ```
+//!
+//! ## Optimized Small-Angle Rotations
+//!
+//! For circuits with many small-angle rotations (common in VQE and QAOA),
+//! use lookup tables for significant performance improvements:
+//!
+//! ```
+//! use simq_gates::optimized::{create_global_lookup_table, OptimizedRotationX};
+//!
+//! // Create a shared lookup table (do once at program start)
+//! let table = create_global_lookup_table();
+//!
+//! // Use optimized rotation gates
+//! let rx = OptimizedRotationX::new(0.01, &table);
+//! let matrix = rx.compute_matrix(); // Fast lookup
+//! ```
+//!
+//! See the `lookup` and `optimized` modules for more details.
 
+pub mod lookup;
 pub mod matrices;
+pub mod optimized;
 pub mod standard;
 
 // Re-export commonly used items
