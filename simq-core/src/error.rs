@@ -49,6 +49,18 @@ pub enum QuantumError {
     /// Cache error
     #[error("Cache error: {0}")]
     CacheError(String),
+
+    /// Cycle detected in circuit DAG
+    #[error("Circuit contains cycle involving operations: {operations:?}")]
+    CycleDetected { operations: Vec<usize> },
+
+    /// Invalid dependency in circuit
+    #[error("Invalid dependency from operation {from} to {to} via qubit {qubit}")]
+    InvalidDependency { from: usize, to: usize, qubit: usize },
+
+    /// Cannot compute topological order
+    #[error("Cannot compute topological order: {reason}")]
+    TopologicalOrderError { reason: String },
 }
 
 impl QuantumError {

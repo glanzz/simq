@@ -68,6 +68,7 @@ pub mod parameter_id;
 pub mod parameter_registry;
 pub mod qubit;
 pub mod qubit_ref;
+pub mod validation;
 
 #[cfg(feature = "serialization")]
 pub mod serialization;
@@ -84,6 +85,10 @@ pub use parameter_id::ParameterId;
 pub use parameter_registry::ParameterRegistry;
 pub use qubit::QubitId;
 pub use qubit_ref::Qubit;
+pub use validation::{
+    DependencyGraph, ValidationReport, ValidationRule, ValidationResult,
+    ParallelismAnalysis,
+};
 
 /// Type alias for results in SimQ
 pub type Result<T> = std::result::Result<T, QuantumError>;

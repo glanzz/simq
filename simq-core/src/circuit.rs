@@ -115,15 +115,27 @@ impl Circuit {
 
     /// Get the depth of the circuit (longest path through gates)
     ///
-    /// For now, returns the number of operations (sequential execution).
-    /// Will be improved with parallelism analysis later.
+    /// This tries to compute the actual depth using DAG analysis.
+    /// If DAG analysis fails, falls back to sequential depth (number of operations).
+    ///
+    /// For accurate depth computation, use `compute_depth()` which returns an error
+    /// if the circuit cannot be analyzed.
     pub fn depth(&self) -> usize {
+        // Try DAG-based depth computation
+        if let Ok(dag) = crate::validation::dag::DependencyGraph::from_circuit(self) {
+            if let Ok(depth) = dag.depth() {
+                return depth;
+            }
+        }
+
+        // Fallback to sequential depth
         self.operations.len()
     }
 
     /// Validate the circuit
     ///
     /// Checks that all operations are valid for this circuit.
+    /// This performs basic validation (qubit bounds, gate counts).
     pub fn validate(&self) -> Result<()> {
         for (i, op) in self.operations.iter().enumerate() {
             for &qubit in op.qubits() {
@@ -136,6 +148,128 @@ impl Circuit {
             }
         }
         Ok(())
+    }
+
+    /// Validate circuit with DAG consistency checking
+    ///
+    /// This performs comprehensive validation including:
+    /// - Basic validation (qubit bounds, gate counts)
+    /// - DAG consistency (no cycles, valid dependencies)
+    /// - Dependency graph validation
+    ///
+    /// # Errors
+    /// Returns error if validation fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// circuit.validate_dag()?;
+    /// ```
+    pub fn validate_dag(&self) -> crate::Result<crate::ValidationReport> {
+        use crate::validation::dag::DependencyGraph;
+        use crate::validation::rules::{ValidationRule, CycleDetectionRule, DependencyValidationRule, QubitUsageRule};
+        use crate::validation::report::ValidationReport;
+
+        // Basic validation first
+        self.validate()?;
+
+        // Build dependency graph
+        let dag = DependencyGraph::from_circuit(self)?;
+
+        // Run validation rules
+        let mut report = ValidationReport::new();
+        let rules: Vec<Box<dyn ValidationRule>> = vec![
+            Box::new(QubitUsageRule),
+            Box::new(CycleDetectionRule),
+            Box::new(DependencyValidationRule),
+        ];
+
+        for rule in rules {
+            let result = rule.validate(self, &dag);
+            report.add_result(rule.name(), result);
+        }
+
+        if report.has_errors() {
+            return Err(QuantumError::ValidationError(report.format(self)));
+        }
+
+        Ok(report)
+    }
+
+    /// Get circuit depth using DAG analysis
+    ///
+    /// This computes the actual circuit depth considering parallelization,
+    /// not just the number of operations.
+    ///
+    /// # Errors
+    /// Returns error if circuit contains cycles or cannot be analyzed
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let depth = circuit.compute_depth()?;
+    /// ```
+    pub fn compute_depth(&self) -> Result<usize> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        dag.depth()
+    }
+
+    /// Check if circuit is acyclic
+    ///
+    /// # Errors
+    /// Returns error if DAG cannot be constructed
+    pub fn is_acyclic(&self) -> Result<bool> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        Ok(dag.is_acyclic())
+    }
+
+    /// Analyze circuit parallelism
+    ///
+    /// Returns analysis of parallel execution opportunities in the circuit.
+    ///
+    /// # Errors
+    /// Returns error if circuit contains cycles or cannot be analyzed
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(3);
+    /// let analysis = circuit.analyze_parallelism()?;
+    /// println!("Parallelism factor: {}", analysis.parallelism_factor);
+    /// ```
+    pub fn analyze_parallelism(&self) -> Result<crate::ParallelismAnalysis> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        dag.analyze_parallelism()
+    }
+
+    /// Get dependency graph visualization in DOT format
+    ///
+    /// This generates a Graphviz DOT format representation of the circuit's
+    /// dependency graph, which can be used for visualization.
+    ///
+    /// # Errors
+    /// Returns error if DAG cannot be constructed
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let dot = circuit.to_dot()?;
+    /// // Save to file or render with Graphviz
+    /// ```
+    pub fn to_dot(&self) -> Result<String> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        Ok(dag.to_dot())
     }
 
     #[cfg(feature = "serialization")]
