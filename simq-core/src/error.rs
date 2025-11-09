@@ -29,6 +29,38 @@ pub enum QuantumError {
     /// Generic circuit validation error
     #[error("Circuit validation failed: {0}")]
     ValidationError(String),
+
+    /// Serialization error
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    /// Deserialization error
+    #[error("Deserialization error: {0}")]
+    DeserializationError(String),
+
+    /// Unknown gate type during deserialization
+    #[error("Unknown gate type: {0}")]
+    UnknownGateType(String),
+
+    /// Version mismatch in serialized format
+    #[error("Version mismatch: expected {expected}, got {actual}")]
+    VersionMismatch { expected: u32, actual: u32 },
+
+    /// Cache error
+    #[error("Cache error: {0}")]
+    CacheError(String),
+
+    /// Cycle detected in circuit DAG
+    #[error("Circuit contains cycle involving operations: {operations:?}")]
+    CycleDetected { operations: Vec<usize> },
+
+    /// Invalid dependency in circuit
+    #[error("Invalid dependency from operation {from} to {to} via qubit {qubit}")]
+    InvalidDependency { from: usize, to: usize, qubit: usize },
+
+    /// Cannot compute topological order
+    #[error("Cannot compute topological order: {reason}")]
+    TopologicalOrderError { reason: String },
 }
 
 impl QuantumError {

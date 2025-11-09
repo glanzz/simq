@@ -115,15 +115,27 @@ impl Circuit {
 
     /// Get the depth of the circuit (longest path through gates)
     ///
-    /// For now, returns the number of operations (sequential execution).
-    /// Will be improved with parallelism analysis later.
+    /// This tries to compute the actual depth using DAG analysis.
+    /// If DAG analysis fails, falls back to sequential depth (number of operations).
+    ///
+    /// For accurate depth computation, use `compute_depth()` which returns an error
+    /// if the circuit cannot be analyzed.
     pub fn depth(&self) -> usize {
+        // Try DAG-based depth computation
+        if let Ok(dag) = crate::validation::dag::DependencyGraph::from_circuit(self) {
+            if let Ok(depth) = dag.depth() {
+                return depth;
+            }
+        }
+
+        // Fallback to sequential depth
         self.operations.len()
     }
 
     /// Validate the circuit
     ///
     /// Checks that all operations are valid for this circuit.
+    /// This performs basic validation (qubit bounds, gate counts).
     pub fn validate(&self) -> Result<()> {
         for (i, op) in self.operations.iter().enumerate() {
             for &qubit in op.qubits() {
@@ -136,6 +148,335 @@ impl Circuit {
             }
         }
         Ok(())
+    }
+
+    /// Validate circuit with DAG consistency checking
+    ///
+    /// This performs comprehensive validation including:
+    /// - Basic validation (qubit bounds, gate counts)
+    /// - DAG consistency (no cycles, valid dependencies)
+    /// - Dependency graph validation
+    ///
+    /// # Errors
+    /// Returns error if validation fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// circuit.validate_dag()?;
+    /// ```
+    pub fn validate_dag(&self) -> crate::Result<crate::ValidationReport> {
+        use crate::validation::dag::DependencyGraph;
+        use crate::validation::rules::{ValidationRule, CycleDetectionRule, DependencyValidationRule, QubitUsageRule};
+        use crate::validation::report::ValidationReport;
+
+        // Basic validation first
+        self.validate()?;
+
+        // Build dependency graph
+        let dag = DependencyGraph::from_circuit(self)?;
+
+        // Run validation rules
+        let mut report = ValidationReport::new();
+        let rules: Vec<Box<dyn ValidationRule>> = vec![
+            Box::new(QubitUsageRule),
+            Box::new(CycleDetectionRule),
+            Box::new(DependencyValidationRule),
+        ];
+
+        for rule in rules {
+            let result = rule.validate(self, &dag);
+            report.add_result(rule.name(), result);
+        }
+
+        if report.has_errors() {
+            return Err(QuantumError::ValidationError(report.format(self)));
+        }
+
+        Ok(report)
+    }
+
+    /// Get circuit depth using DAG analysis
+    ///
+    /// This computes the actual circuit depth considering parallelization,
+    /// not just the number of operations.
+    ///
+    /// # Errors
+    /// Returns error if circuit contains cycles or cannot be analyzed
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let depth = circuit.compute_depth()?;
+    /// ```
+    pub fn compute_depth(&self) -> Result<usize> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        dag.depth()
+    }
+
+    /// Check if circuit is acyclic
+    ///
+    /// # Errors
+    /// Returns error if DAG cannot be constructed
+    pub fn is_acyclic(&self) -> Result<bool> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        Ok(dag.is_acyclic())
+    }
+
+    /// Analyze circuit parallelism
+    ///
+    /// Returns analysis of parallel execution opportunities in the circuit.
+    ///
+    /// # Errors
+    /// Returns error if circuit contains cycles or cannot be analyzed
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(3);
+    /// let analysis = circuit.analyze_parallelism()?;
+    /// println!("Parallelism factor: {}", analysis.parallelism_factor);
+    /// ```
+    pub fn analyze_parallelism(&self) -> Result<crate::ParallelismAnalysis> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        dag.analyze_parallelism()
+    }
+
+    /// Get dependency graph visualization in DOT format
+    ///
+    /// This generates a Graphviz DOT format representation of the circuit's
+    /// dependency graph, which can be used for visualization.
+    ///
+    /// # Errors
+    /// Returns error if DAG cannot be constructed
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let dot = circuit.to_dot()?;
+    /// // Save to file or render with Graphviz
+    /// ```
+    pub fn to_dot(&self) -> Result<String> {
+        use crate::validation::dag::DependencyGraph;
+        let dag = DependencyGraph::from_circuit(self)?;
+        Ok(dag.to_dot())
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Serialize circuit to binary format
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let bytes = circuit.to_bytes()?;
+    /// ```
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::{StandardGateRegistry, CIRCUIT_FORMAT_VERSION};
+
+        let registry = StandardGateRegistry::default();
+        let operations: Vec<_> = self
+            .operations
+            .iter()
+            .map(|op| registry.serialize_gate_op(op))
+            .collect::<Result<Vec<_>>>()
+            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+
+        let serialized = SerializedCircuit {
+            version: CIRCUIT_FORMAT_VERSION,
+            num_qubits: self.num_qubits,
+            operations,
+            metadata: None,
+        };
+
+        bincode::serialize(&serialized)
+            .map_err(|e| QuantumError::SerializationError(format!("Binary serialization failed: {}", e)))
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Deserialize circuit from binary format
+    ///
+    /// # Errors
+    /// Returns error if deserialization fails or circuit is invalid
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let bytes = vec![...];
+    /// let circuit = Circuit::from_bytes(&bytes)?;
+    /// ```
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::StandardGateRegistry;
+
+        let serialized: SerializedCircuit = bincode::deserialize(bytes)
+            .map_err(|e| QuantumError::DeserializationError(format!("Binary deserialization failed: {}", e)))?;
+
+        serialized.check_version()?;
+
+        let registry = StandardGateRegistry::default();
+        let mut circuit = Circuit::new(serialized.num_qubits);
+
+        for op in serialized.operations {
+            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            circuit.operations.push(gate_op);
+        }
+
+        circuit.validate()?;
+        Ok(circuit)
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Serialize circuit to JSON format
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let json = circuit.to_json()?;
+    /// ```
+    pub fn to_json(&self) -> Result<String> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::{StandardGateRegistry, CIRCUIT_FORMAT_VERSION};
+
+        let registry = StandardGateRegistry::default();
+        let operations: Vec<_> = self
+            .operations
+            .iter()
+            .map(|op| registry.serialize_gate_op(op))
+            .collect::<Result<Vec<_>>>()
+            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+
+        let serialized = SerializedCircuit {
+            version: CIRCUIT_FORMAT_VERSION,
+            num_qubits: self.num_qubits,
+            operations,
+            metadata: None,
+        };
+
+        serde_json::to_string(&serialized)
+            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Serialize circuit to pretty-printed JSON format
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    pub fn to_json_pretty(&self) -> Result<String> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::{StandardGateRegistry, CIRCUIT_FORMAT_VERSION};
+
+        let registry = StandardGateRegistry::default();
+        let operations: Vec<_> = self
+            .operations
+            .iter()
+            .map(|op| registry.serialize_gate_op(op))
+            .collect::<Result<Vec<_>>>()
+            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+
+        let serialized = SerializedCircuit {
+            version: CIRCUIT_FORMAT_VERSION,
+            num_qubits: self.num_qubits,
+            operations,
+            metadata: None,
+        };
+
+        serde_json::to_string_pretty(&serialized)
+            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Deserialize circuit from JSON format
+    ///
+    /// # Errors
+    /// Returns error if deserialization fails or circuit is invalid
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let json = r#"{"version": 1, "num_qubits": 2, "operations": []}"#;
+    /// let circuit = Circuit::from_json(json)?;
+    /// ```
+    pub fn from_json(json: &str) -> Result<Self> {
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::GateRegistry;
+        use crate::serialization::StandardGateRegistry;
+
+        let serialized: SerializedCircuit = serde_json::from_str(json)
+            .map_err(|e| QuantumError::DeserializationError(format!("JSON deserialization failed: {}", e)))?;
+
+        serialized.check_version()?;
+
+        let registry = StandardGateRegistry::default();
+        let mut circuit = Circuit::new(serialized.num_qubits);
+
+        for op in serialized.operations {
+            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            circuit.operations.push(gate_op);
+        }
+
+        circuit.validate()?;
+        Ok(circuit)
+    }
+
+    #[cfg(feature = "serialization")]
+    /// Generate cache key from circuit structure
+    ///
+    /// The cache key is based on the circuit structure (gates and qubits),
+    /// not parameter values, allowing parameterized circuits to share cache entries.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let key = circuit.cache_key();
+    /// ```
+    pub fn cache_key(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        self.num_qubits.hash(&mut hasher);
+
+        // Hash gate operations (structure only, not parameters)
+        for op in &self.operations {
+            op.gate().name().hash(&mut hasher);
+            op.gate().num_qubits().hash(&mut hasher);
+            for qubit in op.qubits() {
+                qubit.index().hash(&mut hasher);
+            }
+        }
+
+        hasher.finish()
     }
 }
 
