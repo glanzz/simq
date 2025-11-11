@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Quantum state representations with SIMD-optimized operations
+//!
+//! This crate provides high-performance quantum state vector implementations
+//! with SIMD-optimized matrix-vector multiplication for efficient simulation.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod state_vector;
+pub mod simd;
+pub mod error;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use state_vector::StateVector;
+pub use error::{StateError, Result};
