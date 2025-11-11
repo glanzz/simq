@@ -56,8 +56,16 @@
 
 pub mod lookup;
 pub mod matrices;
+pub mod matrix_ops;
 pub mod optimized;
 pub mod standard;
 
 // Re-export commonly used items
 pub use standard::*;
+
+// Re-export matrix operations
+pub use matrix_ops::{
+    circuit_matrix, circuit_matrix_with_provider, embed_gate_matrix, embed_gate_matrix_vec,
+    is_hermitian, is_unitary, matrix_adjoint, matrix_multiply, matrix_to_vec, matrix_trace,
+    tensor_product, vec_to_matrix_2x2,
+};
