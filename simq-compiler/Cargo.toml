@@ -12,6 +12,7 @@ description = "Circuit optimization and compilation for SimQ"
 [dependencies]
 simq-core.workspace = true
 simq-gates.workspace = true
+simq-state.workspace = true
 thiserror.workspace = true
 ahash.workspace = true
 smallvec.workspace = true
