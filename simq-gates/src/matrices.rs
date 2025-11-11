@@ -95,6 +95,34 @@ pub const T_GATE_DAGGER: [[Complex64; 2]; 2] = [
     [ZERO, Complex64::new(INV_SQRT2, -INV_SQRT2)], // e^(-iπ/4) = (1-i)/√2
 ];
 
+/// SX gate matrix (√X gate)
+/// SX = 1/2 * [[1+i, 1-i],
+///             [1-i, 1+i]]
+pub const SX_GATE: [[Complex64; 2]; 2] = [
+    [
+        Complex64::new(0.5, 0.5),   // (1+i)/2
+        Complex64::new(0.5, -0.5),  // (1-i)/2
+    ],
+    [
+        Complex64::new(0.5, -0.5),  // (1-i)/2
+        Complex64::new(0.5, 0.5),   // (1+i)/2
+    ],
+];
+
+/// SX† gate matrix (adjoint of √X gate)
+/// SX† = 1/2 * [[1-i, 1+i],
+///              [1+i, 1-i]]
+pub const SX_GATE_DAGGER: [[Complex64; 2]; 2] = [
+    [
+        Complex64::new(0.5, -0.5),  // (1-i)/2
+        Complex64::new(0.5, 0.5),   // (1+i)/2
+    ],
+    [
+        Complex64::new(0.5, 0.5),   // (1+i)/2
+        Complex64::new(0.5, -0.5),  // (1-i)/2
+    ],
+];
+
 // Two-qubit gate matrices (4x4)
 
 /// CNOT gate matrix (Controlled-NOT)
@@ -143,6 +171,78 @@ pub const ISWAP: [[Complex64; 4]; 4] = [
     [ZERO, ZERO, I, ZERO],
     [ZERO, I, ZERO, ZERO],
     [ZERO, ZERO, ZERO, ONE],
+];
+
+/// CY gate matrix (Controlled-Y)
+/// CY = [[1, 0,  0,  0],
+///       [0, 1,  0,  0],
+///       [0, 0,  0, -i],
+///       [0, 0,  i,  0]]
+pub const CY: [[Complex64; 4]; 4] = [
+    [ONE, ZERO, ZERO, ZERO],
+    [ZERO, ONE, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, NEG_I],
+    [ZERO, ZERO, I, ZERO],
+];
+
+/// ECR gate matrix (Echoed Cross-Resonance)
+/// ECR = 1/√2 * [[0,  0, 1,  i],
+///               [0,  0, i,  1],
+///               [1, -i, 0,  0],
+///               [-i, 1, 0,  0]]
+pub const ECR: [[Complex64; 4]; 4] = [
+    [
+        ZERO,
+        ZERO,
+        Complex64::new(INV_SQRT2, 0.0),
+        Complex64::new(0.0, INV_SQRT2),
+    ],
+    [
+        ZERO,
+        ZERO,
+        Complex64::new(0.0, INV_SQRT2),
+        Complex64::new(INV_SQRT2, 0.0),
+    ],
+    [
+        Complex64::new(INV_SQRT2, 0.0),
+        Complex64::new(0.0, -INV_SQRT2),
+        ZERO,
+        ZERO,
+    ],
+    [
+        Complex64::new(0.0, -INV_SQRT2),
+        Complex64::new(INV_SQRT2, 0.0),
+        ZERO,
+        ZERO,
+    ],
+];
+
+// Three-qubit gate matrices (8x8)
+
+/// Toffoli gate matrix (CCNOT - double-controlled NOT)
+/// Only flips target when both control qubits are |1⟩
+pub const TOFFOLI: [[Complex64; 8]; 8] = [
+    [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ONE, ZERO, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ONE, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ONE, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ONE],
+    [ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ZERO],
+];
+
+/// Fredkin gate matrix (CSWAP - controlled SWAP)
+/// Swaps targets when control qubit is |1⟩
+pub const FREDKIN: [[Complex64; 8]; 8] = [
+    [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ONE, ZERO, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ONE, ZERO, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ONE, ZERO, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ZERO, ZERO],
+    [ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ONE],
 ];
 
 // Parameterized gate matrix generators
@@ -216,6 +316,123 @@ pub fn phase(theta: f64) -> [[Complex64; 2]; 2] {
     [
         [ONE, ZERO],
         [ZERO, Complex64::new(theta.cos(), theta.sin())],
+    ]
+}
+
+/// Generate U1 gate matrix (phase gate, equivalent to P gate with global phase)
+/// U1(λ) = [[1, 0      ],
+///          [0, e^(iλ)]]
+#[inline]
+pub fn u1(lambda: f64) -> [[Complex64; 2]; 2] {
+    phase(lambda)
+}
+
+/// Generate U2 gate matrix (Hadamard-like rotation)
+/// U2(φ,λ) = 1/√2 * [[1,        -e^(iλ)    ],
+///                   [e^(iφ),    e^(i(φ+λ))]]
+#[inline]
+pub fn u2(phi: f64, lambda: f64) -> [[Complex64; 2]; 2] {
+    let e_phi = Complex64::new(phi.cos(), phi.sin());
+    let e_lambda = Complex64::new(lambda.cos(), lambda.sin());
+    let e_phi_lambda = Complex64::new((phi + lambda).cos(), (phi + lambda).sin());
+
+    [
+        [
+            Complex64::new(INV_SQRT2, 0.0),
+            -e_lambda * INV_SQRT2,
+        ],
+        [
+            e_phi * INV_SQRT2,
+            e_phi_lambda * INV_SQRT2,
+        ],
+    ]
+}
+
+/// Generate U3 gate matrix (universal single-qubit gate)
+/// U3(θ,φ,λ) = [[cos(θ/2),              -e^(iλ)·sin(θ/2)    ],
+///              [e^(iφ)·sin(θ/2),        e^(i(φ+λ))·cos(θ/2)]]
+#[inline]
+pub fn u3(theta: f64, phi: f64, lambda: f64) -> [[Complex64; 2]; 2] {
+    let half_theta = theta / 2.0;
+    let cos_val = half_theta.cos();
+    let sin_val = half_theta.sin();
+
+    let e_phi = Complex64::new(phi.cos(), phi.sin());
+    let e_lambda = Complex64::new(lambda.cos(), lambda.sin());
+    let e_phi_lambda = Complex64::new((phi + lambda).cos(), (phi + lambda).sin());
+
+    [
+        [
+            Complex64::new(cos_val, 0.0),
+            -e_lambda * sin_val,
+        ],
+        [
+            e_phi * sin_val,
+            e_phi_lambda * cos_val,
+        ],
+    ]
+}
+
+/// Generate controlled-phase gate matrix
+/// CP(θ) = [[1, 0, 0,      0     ],
+///          [0, 1, 0,      0     ],
+///          [0, 0, 1,      0     ],
+///          [0, 0, 0, e^(iθ)]]
+#[inline]
+pub fn controlled_phase(theta: f64) -> [[Complex64; 4]; 4] {
+    [
+        [ONE, ZERO, ZERO, ZERO],
+        [ZERO, ONE, ZERO, ZERO],
+        [ZERO, ZERO, ONE, ZERO],
+        [ZERO, ZERO, ZERO, Complex64::new(theta.cos(), theta.sin())],
+    ]
+}
+
+/// Generate RXX gate matrix (two-qubit XX rotation)
+/// RXX(θ) = exp(-i θ/2 X⊗X)
+#[inline]
+pub fn rxx(theta: f64) -> [[Complex64; 4]; 4] {
+    let half_theta = theta / 2.0;
+    let cos_val = Complex64::new(half_theta.cos(), 0.0);
+    let sin_val = Complex64::new(0.0, -half_theta.sin());
+
+    [
+        [cos_val, ZERO, ZERO, sin_val],
+        [ZERO, cos_val, sin_val, ZERO],
+        [ZERO, sin_val, cos_val, ZERO],
+        [sin_val, ZERO, ZERO, cos_val],
+    ]
+}
+
+/// Generate RYY gate matrix (two-qubit YY rotation)
+/// RYY(θ) = exp(-i θ/2 Y⊗Y)
+#[inline]
+pub fn ryy(theta: f64) -> [[Complex64; 4]; 4] {
+    let half_theta = theta / 2.0;
+    let cos_val = Complex64::new(half_theta.cos(), 0.0);
+    let sin_val = Complex64::new(0.0, half_theta.sin());
+
+    [
+        [cos_val, ZERO, ZERO, sin_val],
+        [ZERO, cos_val, -sin_val, ZERO],
+        [ZERO, -sin_val, cos_val, ZERO],
+        [sin_val, ZERO, ZERO, cos_val],
+    ]
+}
+
+/// Generate RZZ gate matrix (two-qubit ZZ rotation)
+/// RZZ(θ) = exp(-i θ/2 Z⊗Z)
+#[inline]
+pub fn rzz(theta: f64) -> [[Complex64; 4]; 4] {
+    let half_theta = theta / 2.0;
+    let e_neg = Complex64::new(half_theta.cos(), -half_theta.sin());
+    let e_pos = Complex64::new(half_theta.cos(), half_theta.sin());
+
+    [
+        [e_neg, ZERO, ZERO, ZERO],
+        [ZERO, e_pos, ZERO, ZERO],
+        [ZERO, ZERO, e_pos, ZERO],
+        [ZERO, ZERO, ZERO, e_neg],
     ]
 }
 
