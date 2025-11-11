@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Circuit optimization and compilation for SimQ
+//!
+//! This crate provides optimization passes for quantum circuits, including:
+//! - Gate fusion: Combining adjacent single-qubit gates
+//! - Circuit simplification
+//! - Gate decomposition
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod fusion;
+pub mod matrix_utils;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use fusion::{fuse_single_qubit_gates, FusedGate};
