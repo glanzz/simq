@@ -57,6 +57,8 @@
 //! See the `lookup` and `optimized` modules for more details.
 
 pub mod compile_time_cache;
+pub mod custom;
+pub mod gate_registry;
 pub mod generated;
 pub mod lookup;
 pub mod matrices;
@@ -79,3 +81,7 @@ pub use matrix_ops::{
     is_hermitian, is_unitary, matrix_adjoint, matrix_multiply, matrix_to_vec, matrix_trace,
     tensor_product, vec_to_matrix_2x2,
 };
+
+// Re-export custom gates
+pub use custom::{CustomGate, CustomGateBuilder, CustomGateError, ParametricCustomGate, ParametricCustomGateBuilder};
+pub use gate_registry::GateRegistry;
