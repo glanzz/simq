@@ -245,6 +245,50 @@ impl Gate for Identity {
 
 impl_matrix_method!(Identity, &matrices::IDENTITY, 2);
 
+/// SX gate (√X gate)
+///
+/// Square root of X gate: SX·SX = X
+#[derive(Debug, Clone, Copy)]
+pub struct SXGate;
+
+impl Gate for SXGate {
+    fn name(&self) -> &str {
+        "SX"
+    }
+
+    fn num_qubits(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl_matrix_method!(SXGate, &matrices::SX_GATE, 2);
+
+/// SX† gate (adjoint of √X gate)
+///
+/// Adjoint of square root of X gate
+#[derive(Debug, Clone, Copy)]
+pub struct SXGateDagger;
+
+impl Gate for SXGateDagger {
+    fn name(&self) -> &str {
+        "SX†"
+    }
+
+    fn num_qubits(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl_matrix_method!(SXGateDagger, &matrices::SX_GATE_DAGGER, 2);
+
 // ============================================================================
 // Two-Qubit Gates
 // ============================================================================
@@ -345,6 +389,130 @@ impl Gate for ISwap {
 
 impl_matrix_method!(ISwap, &matrices::ISWAP, 4);
 
+/// CY gate (Controlled-Y)
+///
+/// Applies Y gate to target if control qubit is |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct CY;
+
+impl Gate for CY {
+    fn name(&self) -> &str {
+        "CY"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl_matrix_method!(CY, &matrices::CY, 4);
+
+/// ECR gate (Echoed Cross-Resonance)
+///
+/// Native gate for IBM quantum hardware
+#[derive(Debug, Clone, Copy)]
+pub struct ECR;
+
+impl Gate for ECR {
+    fn name(&self) -> &str {
+        "ECR"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl_matrix_method!(ECR, &matrices::ECR, 4);
+
+// ============================================================================
+// Three-Qubit Gates
+// ============================================================================
+
+/// Toffoli gate (CCNOT - Controlled-Controlled-NOT)
+///
+/// Flips target qubit only when both control qubits are |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct Toffoli;
+
+impl Gate for Toffoli {
+    fn name(&self) -> &str {
+        "CCNOT"
+    }
+
+    fn num_qubits(&self) -> usize {
+        3
+    }
+
+    fn description(&self) -> String {
+        "Toffoli (CCNOT)".to_string()
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl Toffoli {
+    /// Returns the pre-computed gate matrix
+    #[inline]
+    pub const fn matrix() -> &'static [[Complex64; 8]; 8] {
+        &matrices::TOFFOLI
+    }
+
+    /// Returns the matrix as a flattened vector (for Gate trait)
+    #[inline]
+    fn matrix_vec() -> Vec<Complex64> {
+        Self::matrix().iter().flatten().copied().collect()
+    }
+}
+
+/// Fredkin gate (CSWAP - Controlled-SWAP)
+///
+/// Swaps target qubits only when control qubit is |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct Fredkin;
+
+impl Gate for Fredkin {
+    fn name(&self) -> &str {
+        "CSWAP"
+    }
+
+    fn num_qubits(&self) -> usize {
+        3
+    }
+
+    fn description(&self) -> String {
+        "Fredkin (CSWAP)".to_string()
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl Fredkin {
+    /// Returns the pre-computed gate matrix
+    #[inline]
+    pub const fn matrix() -> &'static [[Complex64; 8]; 8] {
+        &matrices::FREDKIN
+    }
+
+    /// Returns the matrix as a flattened vector (for Gate trait)
+    #[inline]
+    fn matrix_vec() -> Vec<Complex64> {
+        Self::matrix().iter().flatten().copied().collect()
+    }
+}
+
 // ============================================================================
 // Parameterized Gates
 // ============================================================================
@@ -369,8 +537,19 @@ impl RotationX {
     }
 
     /// Computes the RX matrix for this angle
+    ///
+    /// Uses compile-time caching when available for optimal performance:
+    /// - Common angles (π/4, π/2, etc.): ~0 ns (compile-time constant)
+    /// - VQE range (0 to π/4): ~2-5 ns (array lookup)
+    /// - Other angles: ~20-50 ns (trigonometric computation)
     #[inline]
     pub fn matrix(&self) -> [[Complex64; 2]; 2] {
+        crate::generated::EnhancedUniversalCache::rx(self.theta)
+    }
+
+    /// Computes the RX matrix without caching (for testing/benchmarking)
+    #[inline]
+    pub fn matrix_uncached(&self) -> [[Complex64; 2]; 2] {
         matrices::rotation_x(self.theta)
     }
 }
@@ -413,8 +592,16 @@ impl RotationY {
     }
 
     /// Computes the RY matrix for this angle
+    ///
+    /// Uses compile-time caching when available for optimal performance.
     #[inline]
     pub fn matrix(&self) -> [[Complex64; 2]; 2] {
+        crate::generated::EnhancedUniversalCache::ry(self.theta)
+    }
+
+    /// Computes the RY matrix without caching (for testing/benchmarking)
+    #[inline]
+    pub fn matrix_uncached(&self) -> [[Complex64; 2]; 2] {
         matrices::rotation_y(self.theta)
     }
 }
@@ -457,8 +644,16 @@ impl RotationZ {
     }
 
     /// Computes the RZ matrix for this angle
+    ///
+    /// Uses compile-time caching when available for optimal performance.
     #[inline]
     pub fn matrix(&self) -> [[Complex64; 2]; 2] {
+        crate::generated::EnhancedUniversalCache::rz(self.theta)
+    }
+
+    /// Computes the RZ matrix without caching (for testing/benchmarking)
+    #[inline]
+    pub fn matrix_uncached(&self) -> [[Complex64; 2]; 2] {
         matrices::rotation_z(self.theta)
     }
 }
@@ -518,6 +713,332 @@ impl Gate for Phase {
 
     fn description(&self) -> String {
         format!("P({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// U1 gate (Universal 1-parameter gate)
+///
+/// Applies a phase rotation U1(λ) = P(λ)
+#[derive(Debug, Clone, Copy)]
+pub struct U1 {
+    lambda: f64,
+}
+
+impl U1 {
+    /// Creates a new U1 gate with the given λ parameter
+    pub const fn new(lambda: f64) -> Self {
+        Self { lambda }
+    }
+
+    /// Returns the λ parameter
+    pub const fn lambda(&self) -> f64 {
+        self.lambda
+    }
+
+    /// Computes the U1 matrix for these parameters
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 2]; 2] {
+        matrices::u1(self.lambda)
+    }
+}
+
+impl Gate for U1 {
+    fn name(&self) -> &str {
+        "U1"
+    }
+
+    fn num_qubits(&self) -> usize {
+        1
+    }
+
+    fn description(&self) -> String {
+        format!("U1({:.4})", self.lambda)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// U2 gate (Universal 2-parameter gate)
+///
+/// Applies Hadamard-like rotation U2(φ, λ)
+#[derive(Debug, Clone, Copy)]
+pub struct U2 {
+    phi: f64,
+    lambda: f64,
+}
+
+impl U2 {
+    /// Creates a new U2 gate with the given parameters
+    pub const fn new(phi: f64, lambda: f64) -> Self {
+        Self { phi, lambda }
+    }
+
+    /// Returns the φ parameter
+    pub const fn phi(&self) -> f64 {
+        self.phi
+    }
+
+    /// Returns the λ parameter
+    pub const fn lambda(&self) -> f64 {
+        self.lambda
+    }
+
+    /// Computes the U2 matrix for these parameters
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 2]; 2] {
+        matrices::u2(self.phi, self.lambda)
+    }
+}
+
+impl Gate for U2 {
+    fn name(&self) -> &str {
+        "U2"
+    }
+
+    fn num_qubits(&self) -> usize {
+        1
+    }
+
+    fn description(&self) -> String {
+        format!("U2({:.4}, {:.4})", self.phi, self.lambda)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// U3 gate (Universal 3-parameter gate)
+///
+/// Most general single-qubit unitary gate U3(θ, φ, λ)
+#[derive(Debug, Clone, Copy)]
+pub struct U3 {
+    theta: f64,
+    phi: f64,
+    lambda: f64,
+}
+
+impl U3 {
+    /// Creates a new U3 gate with the given parameters
+    pub const fn new(theta: f64, phi: f64, lambda: f64) -> Self {
+        Self { theta, phi, lambda }
+    }
+
+    /// Returns the θ parameter
+    pub const fn theta(&self) -> f64 {
+        self.theta
+    }
+
+    /// Returns the φ parameter
+    pub const fn phi(&self) -> f64 {
+        self.phi
+    }
+
+    /// Returns the λ parameter
+    pub const fn lambda(&self) -> f64 {
+        self.lambda
+    }
+
+    /// Computes the U3 matrix for these parameters
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 2]; 2] {
+        matrices::u3(self.theta, self.phi, self.lambda)
+    }
+}
+
+impl Gate for U3 {
+    fn name(&self) -> &str {
+        "U3"
+    }
+
+    fn num_qubits(&self) -> usize {
+        1
+    }
+
+    fn description(&self) -> String {
+        format!("U3({:.4}, {:.4}, {:.4})", self.theta, self.phi, self.lambda)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// Controlled-Phase gate
+///
+/// Applies a phase to the |11⟩ state
+#[derive(Debug, Clone, Copy)]
+pub struct CPhase {
+    theta: f64,
+}
+
+impl CPhase {
+    /// Creates a new Controlled-Phase gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the phase angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the CP matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::controlled_phase(self.theta)
+    }
+}
+
+impl Gate for CPhase {
+    fn name(&self) -> &str {
+        "CP"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("CP({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// RXX gate (XX rotation)
+///
+/// Two-qubit rotation around X⊗X axis
+#[derive(Debug, Clone, Copy)]
+pub struct RXX {
+    theta: f64,
+}
+
+impl RXX {
+    /// Creates a new RXX gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the RXX matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::rxx(self.theta)
+    }
+}
+
+impl Gate for RXX {
+    fn name(&self) -> &str {
+        "RXX"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("RXX({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// RYY gate (YY rotation)
+///
+/// Two-qubit rotation around Y⊗Y axis
+#[derive(Debug, Clone, Copy)]
+pub struct RYY {
+    theta: f64,
+}
+
+impl RYY {
+    /// Creates a new RYY gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the RYY matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::ryy(self.theta)
+    }
+}
+
+impl Gate for RYY {
+    fn name(&self) -> &str {
+        "RYY"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("RYY({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// RZZ gate (ZZ rotation)
+///
+/// Two-qubit rotation around Z⊗Z axis
+#[derive(Debug, Clone, Copy)]
+pub struct RZZ {
+    theta: f64,
+}
+
+impl RZZ {
+    /// Creates a new RZZ gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the RZZ matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::rzz(self.theta)
+    }
+}
+
+impl Gate for RZZ {
+    fn name(&self) -> &str {
+        "RZZ"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("RZZ({:.4})", self.theta)
     }
 
     fn matrix(&self) -> Option<Vec<Complex64>> {

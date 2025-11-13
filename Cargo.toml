@@ -7,7 +7,7 @@ members = [
     "simq-compiler",
     "simq-sim",
     "simq-backend",
-    "simq",
+    "simq", "simq-macros",
 ]
 
 [workspace.package]
