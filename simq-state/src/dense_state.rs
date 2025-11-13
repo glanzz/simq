@@ -582,6 +582,117 @@ impl DenseState {
     pub fn should_convert_to_sparse(&self, threshold: f32) -> bool {
         self.sparsity() < threshold
     }
+
+    /// Compute the partial trace (reduced density matrix) over specified qubits
+    ///
+    /// The partial trace operation traces out (discards) all qubits except those
+    /// specified in `qubits_to_keep`, producing a reduced density matrix for the
+    /// remaining subsystem. This is essential for subsystem measurement and
+    /// analyzing entanglement.
+    ///
+    /// Given a pure state |ψ⟩ in the full Hilbert space, the reduced density
+    /// matrix ρ_A for subsystem A is: ρ_A = Tr_B(|ψ⟩⟨ψ|)
+    ///
+    /// For dense states, this implementation uses efficient bit manipulation to
+    /// iterate over all basis states and accumulate density matrix elements.
+    ///
+    /// # Arguments
+    /// * `qubits_to_keep` - Indices of qubits to keep in the reduced system
+    ///
+    /// # Returns
+    /// Reduced density matrix as a flattened vector in row-major order
+    /// (dimension: 2^k × 2^k where k = qubits_to_keep.len())
+    ///
+    /// # Errors
+    /// Returns error if any qubit index is out of bounds
+    ///
+    /// # Example
+    /// ```
+    /// use simq_state::DenseState;
+    /// use num_complex::Complex64;
+    ///
+    /// // Create Bell state (|00⟩ + |11⟩)/√2
+    /// let amplitudes = vec![
+    ///     Complex64::new(0.7071067811865476, 0.0), // |00⟩
+    ///     Complex64::new(0.0, 0.0),                 // |01⟩
+    ///     Complex64::new(0.0, 0.0),                 // |10⟩
+    ///     Complex64::new(0.7071067811865476, 0.0), // |11⟩
+    /// ];
+    /// let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
+    ///
+    /// // Trace out qubit 1, keep qubit 0
+    /// let rho = state.partial_trace(&[0]).unwrap();
+    ///
+    /// // For Bell state, reduced density matrix is maximally mixed: [[0.5, 0], [0, 0.5]]
+    /// assert!((rho[0].re - 0.5).abs() < 1e-10); // ρ_00
+    /// assert!((rho[3].re - 0.5).abs() < 1e-10); // ρ_11
+    /// ```
+    pub fn partial_trace(&self, qubits_to_keep: &[usize]) -> Result<Vec<Complex64>> {
+        // Validate qubit indices
+        for &qubit in qubits_to_keep {
+            if qubit >= self.num_qubits() {
+                return Err(StateError::InvalidQubitIndex {
+                    index: qubit,
+                    num_qubits: self.num_qubits(),
+                });
+            }
+        }
+
+        let reduced_dim = 1 << qubits_to_keep.len();
+        let mut rho = vec![Complex64::new(0.0, 0.0); reduced_dim * reduced_dim];
+
+        // Helper to extract reduced index from full index
+        let extract_reduced_idx = |full_idx: usize| -> usize {
+            let mut reduced_idx = 0usize;
+            for (i, &q) in qubits_to_keep.iter().enumerate() {
+                let bit = (full_idx >> q) & 1;
+                reduced_idx |= bit << i;
+            }
+            reduced_idx
+        };
+
+        // Compute reduced density matrix by tracing out unwanted qubits
+        // ρ_ij = Σ_k ⟨i,k|ψ⟩⟨ψ|j,k⟩ where k ranges over traced-out qubits
+        //
+        // For dense states, we iterate over all basis states
+        let amplitudes = self.amplitudes();
+        for idx_bra in 0..self.dimension() {
+            let amp_bra = amplitudes[idx_bra];
+            if amp_bra.norm_sqr() < 1e-14 {
+                continue; // Skip zero amplitudes for efficiency
+            }
+
+            let reduced_i = extract_reduced_idx(idx_bra);
+
+            for idx_ket in 0..self.dimension() {
+                let amp_ket = amplitudes[idx_ket];
+                if amp_ket.norm_sqr() < 1e-14 {
+                    continue;
+                }
+
+                let reduced_j = extract_reduced_idx(idx_ket);
+
+                // Check if traced-out qubits match
+                let mut traced_match = true;
+                for q in 0..self.num_qubits() {
+                    if !qubits_to_keep.contains(&q) {
+                        if ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
+                            traced_match = false;
+                            break;
+                        }
+                    }
+                }
+
+                if traced_match {
+                    // Contribution: ⟨bra|ket⟩ = amp_bra* × amp_ket
+                    let matrix_element = amp_bra.conj() * amp_ket;
+                    rho[reduced_i * reduced_dim + reduced_j] += matrix_element;
+                }
+            }
+        }
+
+        Ok(rho)
+    }
 }
 
 impl fmt::Debug for DenseState {
@@ -901,5 +1012,130 @@ mod tests {
         // Only 1/16 = 0.0625 sparsity
         assert!(state.should_convert_to_sparse(0.1));
         assert!(!state.should_convert_to_sparse(0.05));
+    }
+
+    #[test]
+    fn test_partial_trace_product_state() {
+        // Product state |0⟩|1⟩
+        let amplitudes = vec![
+            Complex64::new(0.0, 0.0), // |00⟩
+            Complex64::new(1.0, 0.0), // |01⟩
+            Complex64::new(0.0, 0.0), // |10⟩
+            Complex64::new(0.0, 0.0), // |11⟩
+        ];
+        let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
+
+        // Trace out qubit 1, keep qubit 0
+        let rho = state.partial_trace(&[0]).unwrap();
+
+        // Should get |1⟩⟨1| = [[0, 0], [0, 1]]
+        assert_relative_eq!(rho[0].re, 0.0, epsilon = 1e-10); // |0⟩⟨0|
+        assert_relative_eq!(rho[1].re, 0.0, epsilon = 1e-10); // |0⟩⟨1|
+        assert_relative_eq!(rho[2].re, 0.0, epsilon = 1e-10); // |1⟩⟨0|
+        assert_relative_eq!(rho[3].re, 1.0, epsilon = 1e-10); // |1⟩⟨1|
+    }
+
+    #[test]
+    fn test_partial_trace_bell_state() {
+        // Bell state (|00⟩ + |11⟩)/√2
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),  // |00⟩
+            Complex64::new(0.0, 0.0),  // |01⟩
+            Complex64::new(0.0, 0.0),  // |10⟩
+            Complex64::new(val, 0.0),  // |11⟩
+        ];
+        let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
+
+        // Trace out qubit 1, keep qubit 0
+        let rho = state.partial_trace(&[0]).unwrap();
+
+        // Should get maximally mixed state: [[0.5, 0], [0, 0.5]]
+        assert_relative_eq!(rho[0].re, 0.5, epsilon = 1e-10); // |0⟩⟨0|
+        assert_relative_eq!(rho[1].norm(), 0.0, epsilon = 1e-10); // |0⟩⟨1|
+        assert_relative_eq!(rho[2].norm(), 0.0, epsilon = 1e-10); // |1⟩⟨0|
+        assert_relative_eq!(rho[3].re, 0.5, epsilon = 1e-10); // |1⟩⟨1|
+    }
+
+    #[test]
+    fn test_partial_trace_three_qubits() {
+        // GHZ state (|000⟩ + |111⟩)/√2
+        let val = 1.0 / 2.0_f64.sqrt();
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 8];
+        amplitudes[0] = Complex64::new(val, 0.0); // |000⟩
+        amplitudes[7] = Complex64::new(val, 0.0); // |111⟩
+
+        let state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
+
+        // Trace out qubit 2, keep qubits 0 and 1
+        let rho = state.partial_trace(&[0, 1]).unwrap();
+
+        // Should get correlations between qubits 0 and 1
+        assert_relative_eq!(rho[0].re, 0.5, epsilon = 1e-10);   // |00⟩⟨00|
+        assert_relative_eq!(rho[15].re, 0.5, epsilon = 1e-10);  // |11⟩⟨11|
+        assert_relative_eq!(rho[5].norm(), 0.0, epsilon = 1e-10);  // |01⟩⟨01|
+        assert_relative_eq!(rho[10].norm(), 0.0, epsilon = 1e-10); // |10⟩⟨10|
+    }
+
+    #[test]
+    fn test_partial_trace_hermiticity() {
+        // Reduced density matrix must be Hermitian
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
+
+        let rho = state.partial_trace(&[0]).unwrap();
+
+        // Check ρ† = ρ
+        assert_relative_eq!(rho[0].im, 0.0, epsilon = 1e-10); // Diagonal must be real
+        assert_relative_eq!(rho[3].im, 0.0, epsilon = 1e-10);
+        assert_relative_eq!((rho[1] - rho[2].conj()).norm(), 0.0, epsilon = 1e-10); // Off-diagonal conjugate symmetry
+    }
+
+    #[test]
+    fn test_partial_trace_unit_trace() {
+        // Reduced density matrix must have trace = 1
+        let val = 1.0 / 2.0_f64.sqrt();
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 8];
+        amplitudes[0] = Complex64::new(val, 0.0);
+        amplitudes[5] = Complex64::new(val, 0.0);
+
+        let state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
+        let rho = state.partial_trace(&[0]).unwrap();
+
+        // Trace = ρ_00 + ρ_11
+        let trace = rho[0].re + rho[3].re;
+        assert_relative_eq!(trace, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_partial_trace_invalid_qubit() {
+        let state = DenseState::new(2).unwrap();
+        let result = state.partial_trace(&[5]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_partial_trace_keep_all_qubits() {
+        // Keeping all qubits should give density matrix of pure state
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        let state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
+
+        let rho = state.partial_trace(&[0]).unwrap();
+
+        // ρ = |ψ⟩⟨ψ|
+        assert_relative_eq!(rho[0].re, 0.5, epsilon = 1e-10); // |0⟩⟨0|
+        assert_relative_eq!(rho[1].re, 0.5, epsilon = 1e-10); // |0⟩⟨1|
+        assert_relative_eq!(rho[2].re, 0.5, epsilon = 1e-10); // |1⟩⟨0|
+        assert_relative_eq!(rho[3].re, 0.5, epsilon = 1e-10); // |1⟩⟨1|
     }
 }

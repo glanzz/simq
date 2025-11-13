@@ -380,6 +380,59 @@ impl AdaptiveState {
             },
         }
     }
+
+    /// Compute the partial trace (reduced density matrix) over specified qubits
+    ///
+    /// The partial trace operation traces out (discards) all qubits except those
+    /// specified in `qubits_to_keep`, producing a reduced density matrix for the
+    /// remaining subsystem. This is essential for subsystem measurement and
+    /// analyzing entanglement.
+    ///
+    /// Given a pure state |ψ⟩ in the full Hilbert space, the reduced density
+    /// matrix ρ_A for subsystem A is: ρ_A = Tr_B(|ψ⟩⟨ψ|)
+    ///
+    /// This method delegates to the underlying sparse or dense implementation,
+    /// automatically choosing the most efficient algorithm based on the current
+    /// state representation.
+    ///
+    /// # Arguments
+    /// * `qubits_to_keep` - Indices of qubits to keep in the reduced system
+    ///
+    /// # Returns
+    /// Reduced density matrix as a flattened vector in row-major order
+    /// (dimension: 2^k × 2^k where k = qubits_to_keep.len())
+    ///
+    /// # Errors
+    /// Returns error if any qubit index is out of bounds
+    ///
+    /// # Example
+    /// ```
+    /// use simq_state::AdaptiveState;
+    /// use num_complex::Complex64;
+    ///
+    /// // Create Bell state (|00⟩ + |11⟩)/√2
+    /// let val = 1.0 / 2.0_f64.sqrt();
+    /// let amplitudes = vec![
+    ///     Complex64::new(val, 0.0),  // |00⟩
+    ///     Complex64::new(0.0, 0.0),  // |01⟩
+    ///     Complex64::new(0.0, 0.0),  // |10⟩
+    ///     Complex64::new(val, 0.0),  // |11⟩
+    /// ];
+    /// let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+    ///
+    /// // Trace out qubit 1, keep qubit 0
+    /// let rho = state.partial_trace(&[0]).unwrap();
+    ///
+    /// // Should give maximally mixed state on qubit 0
+    /// assert!((rho[0].re - 0.5).abs() < 1e-10); // |0⟩⟨0|
+    /// assert!((rho[3].re - 0.5).abs() < 1e-10); // |1⟩⟨1|
+    /// ```
+    pub fn partial_trace(&self, qubits_to_keep: &[usize]) -> Result<Vec<Complex64>> {
+        match self {
+            Self::Sparse { state, .. } => state.partial_trace(qubits_to_keep),
+            Self::Dense(state) => state.partial_trace(qubits_to_keep),
+        }
+    }
 }
 
 /// Statistics about an adaptive state
