@@ -123,7 +123,7 @@ SimQ consists of several optimized crates:
 - **simq-sim**: High-performance simulator
 - **simq-backend**: Hardware backend abstraction
 
-See [Architecture Documentation](docs/architecture.md) for details.
+
 
 
 
