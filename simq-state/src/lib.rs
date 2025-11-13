@@ -33,6 +33,7 @@ pub mod sparse_state;
 pub mod dense_state;
 pub mod adaptive_state;
 pub mod cow_state;
+pub mod validation;
 pub mod simd;
 pub mod error;
 
