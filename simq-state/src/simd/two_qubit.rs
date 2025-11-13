@@ -5,10 +5,12 @@ use num_complex::Complex64;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-/// Apply a two-qubit gate using scalar operations (fallback)
+/// Cache-friendly two-qubit gate application (scalar implementation)
 ///
-/// This applies a 4×4 matrix to groups of 4 amplitudes corresponding
-/// to the four basis states that can be formed with the two target qubits.
+/// This implementation iterates the state vector in a nested, stride-based
+/// pattern that keeps accesses to the four amplitudes touched by each
+/// 2-qubit block contiguous and cache-friendly. It sorts the qubit indices
+/// so the inner loops operate over the smaller stride, improving locality.
 pub fn apply_gate_scalar(
     state: &mut [Complex64],
     matrix: &[[Complex64; 4]; 4],
@@ -16,47 +18,72 @@ pub fn apply_gate_scalar(
     qubit2: usize,
     num_qubits: usize,
 ) {
-    let dimension = 1 << num_qubits;
-    let mask1 = 1 << qubit1;
-    let mask2 = 1 << qubit2;
-    let mask_both = mask1 | mask2;
+    let dimension = 1usize << num_qubits;
 
-    // Preload matrix for better performance
+    // Order qubits so low < high
+    let (low, high) = if qubit1 < qubit2 {
+        (qubit1, qubit2)
+    } else {
+        (qubit2, qubit1)
+    };
+
+    let stride_low = 1usize << low;
+    let stride_high = 1usize << high;
+    let outer_step = stride_high * 2; // 1 << (high+1)
+    let mid_step = stride_low * 2;    // 1 << (low+1)
+
+    // Flatten matrix to local copy for fast access
     let mut m = [[Complex64::new(0.0, 0.0); 4]; 4];
-    for i in 0..4 {
-        for j in 0..4 {
-            m[i][j] = matrix[i][j];
+    for r in 0..4 {
+        for c in 0..4 {
+            m[r][c] = matrix[r][c];
         }
     }
 
-    for i in 0..dimension {
-        // Skip if either qubit bit is set
-        if i & mask_both != 0 {
-            continue;
-        }
+    // Iterate in a three-level stride pattern:
+    // - outer loop advances by blocks that change the high qubit
+    // - middle loop advances subblocks that align low-qubit groups
+    // - inner loop iterates the smallest stride (stride_low) so the four
+    //   amplitudes (00,01,10,11) are close in memory
+    let mut base = 0usize;
+    while base < dimension {
+        let mut mid = 0usize;
+        while mid < stride_high {
+            let block_base = base + mid;
+            for k in 0..stride_low {
+                let i00 = block_base + k;
+                let i01 = i00 + stride_low;
+                let i10 = i00 + stride_high;
+                let i11 = i10 + stride_low;
 
-        // Compute the four indices
-        let i00 = i;              // both qubits 0
-        let i01 = i | mask2;      // qubit1=0, qubit2=1
-        let i10 = i | mask1;      // qubit1=1, qubit2=0
-        let i11 = i | mask_both;  // both qubits 1
+                // Load amplitudes
+                let a0 = state[i00];
+                let a1 = state[i01];
+                let a2 = state[i10];
+                let a3 = state[i11];
 
-        // Load amplitudes
-        let amp = [state[i00], state[i01], state[i10], state[i11]];
+                // Apply 4x4 matrix
+                let mut r0 = Complex64::new(0.0, 0.0);
+                let mut r1 = Complex64::new(0.0, 0.0);
+                let mut r2 = Complex64::new(0.0, 0.0);
+                let mut r3 = Complex64::new(0.0, 0.0);
 
-        // Apply 4×4 matrix multiplication
-        let mut new_amp = [Complex64::new(0.0, 0.0); 4];
-        for row in 0..4 {
-            for col in 0..4 {
-                new_amp[row] += m[row][col] * amp[col];
+                r0 += m[0][0] * a0; r0 += m[0][1] * a1; r0 += m[0][2] * a2; r0 += m[0][3] * a3;
+                r1 += m[1][0] * a0; r1 += m[1][1] * a1; r1 += m[1][2] * a2; r1 += m[1][3] * a3;
+                r2 += m[2][0] * a0; r2 += m[2][1] * a1; r2 += m[2][2] * a2; r2 += m[2][3] * a3;
+                r3 += m[3][0] * a0; r3 += m[3][1] * a1; r3 += m[3][2] * a2; r3 += m[3][3] * a3;
+
+                // Store back
+                state[i00] = r0;
+                state[i01] = r1;
+                state[i10] = r2;
+                state[i11] = r3;
             }
+
+            mid += mid_step;
         }
 
-        // Store results
-        state[i00] = new_amp[0];
-        state[i01] = new_amp[1];
-        state[i10] = new_amp[2];
-        state[i11] = new_amp[3];
+        base += outer_step;
     }
 }
 
@@ -73,8 +100,7 @@ pub unsafe fn apply_gate_avx2(
     qubit2: usize,
     num_qubits: usize,
 ) {
-    // For now, fallback to scalar implementation
-    // Full AVX2 implementation would use vectorized 4×4 multiplication
+    // AVX2 specialized path can be added later; for now reuse scalar
     apply_gate_scalar(state, matrix, qubit1, qubit2, num_qubits);
 }
 
