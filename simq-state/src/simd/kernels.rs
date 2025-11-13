@@ -1,5 +1,6 @@
 //! Low-level SIMD kernels for common operations
 
+#[cfg(target_arch = "x86_64")]
 use num_complex::Complex64;
 
 #[cfg(target_arch = "x86_64")]
