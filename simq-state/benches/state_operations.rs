@@ -6,7 +6,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use num_complex::Complex64;
 use simq_state::simd::{apply_single_qubit_gate, norm_simd, normalize_simd};
 use simq_state::simd::single_qubit::apply_gate_scalar;
-use simq_state::StateVector;
+use simq_state::{StateVector, DenseState};
 
 fn hadamard_matrix() -> [[Complex64; 2]; 2] {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
@@ -143,11 +143,91 @@ fn bench_state_vector_creation(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_dense_state_creation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("dense_state_creation");
+
+    for num_qubits in [10, 15, 20].iter() {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                b.iter(|| {
+                    let state = DenseState::new(black_box(num_qubits)).unwrap();
+                    black_box(state);
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn bench_dense_state_gate_application(c: &mut Criterion) {
+    let mut group = c.benchmark_group("dense_state_gate_application");
+
+    for num_qubits in [10, 15, 20].iter() {
+        let size = 1 << num_qubits;
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                let mut state = DenseState::new(num_qubits).unwrap();
+                let h = hadamard_matrix();
+
+                b.iter(|| {
+                    state.apply_single_qubit_gate(black_box(&h), black_box(0)).unwrap();
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn bench_dense_state_measurement(c: &mut Criterion) {
+    let mut group = c.benchmark_group("dense_state_measurement");
+
+    for num_qubits in [10, 15, 20].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("get_probability", num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                let state = DenseState::new(num_qubits).unwrap();
+
+                b.iter(|| {
+                    let prob = state.get_probability(black_box(0)).unwrap();
+                    black_box(prob);
+                })
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("get_all_probabilities", num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                let state = DenseState::new(num_qubits).unwrap();
+
+                b.iter(|| {
+                    let probs = state.get_all_probabilities();
+                    black_box(probs);
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_single_qubit_gate_scalar,
     bench_single_qubit_gate_simd,
     bench_norm,
     bench_state_vector_creation,
+    bench_dense_state_creation,
+    bench_dense_state_gate_application,
+    bench_dense_state_measurement,
 );
 criterion_main!(benches);

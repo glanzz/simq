@@ -6,7 +6,22 @@ High-performance quantum state representations with SIMD-optimized operations fo
 
 The `simq-state` crate provides efficient quantum state vector implementations with SIMD (Single Instruction, Multiple Data) optimized matrix-vector multiplication. This dramatically accelerates quantum circuit simulation by leveraging modern CPU vector instructions (SSE2, AVX, AVX-512).
 
+## State Representations
+
+The crate provides **three complementary state representations**:
+
+1. **SparseState**: AHashMap-based storage for states with few non-zero amplitudes
+2. **DenseState**: 64-byte aligned vectors for SIMD-optimized operations
+3. **AdaptiveState**: Automatically switches between Sparse and Dense based on density
+
 ## Features
+
+### Automatic Sparse↔Dense Conversion
+
+- **Intelligent Switching**: AdaptiveState automatically converts Sparse→Dense when density exceeds threshold (default 10%)
+- **Memory Efficient**: Starts sparse, converts to dense only when beneficial
+- **Zero Overhead**: Conversion happens seamlessly during gate operations
+- **Configurable**: Customize threshold for your specific use case
 
 ### State Vector Management
 
@@ -36,6 +51,49 @@ The `simq-state` crate provides efficient quantum state vector implementations w
 - **Cache-friendly**: Properly aligned memory reduces cache misses
 
 ## Usage
+
+### Adaptive State with Automatic Conversion (Recommended)
+
+```rust
+use simq_state::AdaptiveState;
+use num_complex::Complex64;
+
+// Start with sparse representation (optimal for initial states)
+let mut state = AdaptiveState::new(10)?;
+println!("Representation: {}", state.representation()); // "Sparse"
+
+// Apply gates - automatically converts when density > 10%
+let h = 1.0 / 2.0_f64.sqrt();
+let hadamard = [
+    [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
+    [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
+];
+
+for qubit in 0..10 {
+    state.apply_single_qubit_gate(&hadamard, qubit)?;
+}
+
+println!("Representation: {}", state.representation()); // "Dense"
+println!("Density: {:.2}%", state.density() * 100.0);   // "100.00%"
+```
+
+### Manual Sparse↔Dense Conversion
+
+```rust
+use simq_state::{SparseState, DenseState};
+
+// Create sparse state
+let sparse = SparseState::new(10)?;
+println!("Memory: {} amplitudes", sparse.num_amplitudes()); // 1
+
+// Convert to dense for SIMD operations
+let dense = DenseState::from_sparse(&sparse)?;
+println!("Memory: {} amplitudes", dense.dimension()); // 1024
+
+// Convert back to sparse
+let sparse_again = dense.to_sparse()?;
+println!("Memory: {} amplitudes", sparse_again.num_amplitudes()); // 1
+```
 
 ### Basic State Vector Operations
 

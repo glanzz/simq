@@ -120,7 +120,7 @@ impl StateVector {
             });
         }
 
-        let mut state = Self::new(num_qubits)?;
+        let state = Self::new(num_qubits)?;
 
         // Copy amplitudes
         unsafe {
