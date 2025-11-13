@@ -30,11 +30,13 @@
 
 pub mod state_vector;
 pub mod sparse_state;
+pub mod dense_state;
+pub mod adaptive_state;
 pub mod simd;
 pub mod error;
-pub mod dense_state;
 
 pub use state_vector::StateVector;
 pub use sparse_state::SparseState;
 pub use dense_state::DenseState;
+pub use adaptive_state::{AdaptiveState, StateStats};
 pub use error::{StateError, Result};

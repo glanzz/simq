@@ -6,6 +6,7 @@
 
 use crate::error::{Result, StateError};
 use crate::simd::{apply_single_qubit_gate, apply_two_qubit_gate};
+use crate::sparse_state::SparseState;
 use crate::state_vector::StateVector;
 use num_complex::Complex64;
 use std::fmt;
@@ -511,6 +512,76 @@ impl DenseState {
     pub fn is_simd_aligned(&self) -> bool {
         self.vector.is_simd_aligned()
     }
+
+    /// Convert from a sparse state to dense representation
+    ///
+    /// # Arguments
+    /// * `sparse` - The sparse state to convert
+    ///
+    /// # Returns
+    /// A new dense state with the same quantum state
+    ///
+    /// # Example
+    /// ```
+    /// use simq_state::{SparseState, DenseState};
+    ///
+    /// let sparse = SparseState::new(3).unwrap();
+    /// let dense = DenseState::from_sparse(&sparse).unwrap();
+    /// assert_eq!(dense.num_qubits(), 3);
+    /// ```
+    pub fn from_sparse(sparse: &SparseState) -> Result<Self> {
+        let amplitudes = sparse.to_dense();
+        Self::from_amplitudes(sparse.num_qubits(), &amplitudes)
+    }
+
+    /// Convert to a sparse state representation
+    ///
+    /// # Returns
+    /// A new sparse state with non-zero amplitudes extracted
+    ///
+    /// # Note
+    /// Amplitudes with magnitude < 1e-14 are considered zero and discarded
+    ///
+    /// # Example
+    /// ```
+    /// use simq_state::DenseState;
+    ///
+    /// let dense = DenseState::new(3).unwrap();
+    /// let sparse = dense.to_sparse().unwrap();
+    /// assert_eq!(sparse.num_amplitudes(), 1); // Only |000⟩ is non-zero
+    /// ```
+    pub fn to_sparse(&self) -> Result<SparseState> {
+        SparseState::from_dense_amplitudes(self.num_qubits(), self.amplitudes())
+    }
+
+    /// Calculate the sparsity of the current state
+    ///
+    /// # Returns
+    /// The fraction of non-zero amplitudes (0.0 to 1.0)
+    ///
+    /// # Note
+    /// Amplitudes with magnitude < 1e-14 are considered zero
+    pub fn sparsity(&self) -> f32 {
+        let tolerance = 1e-14;
+        let non_zero_count = self
+            .amplitudes()
+            .iter()
+            .filter(|amp| amp.norm_sqr() > tolerance)
+            .count();
+
+        non_zero_count as f32 / self.dimension() as f32
+    }
+
+    /// Check if the state would benefit from sparse representation
+    ///
+    /// # Arguments
+    /// * `threshold` - Sparsity threshold (default 0.1 = 10%)
+    ///
+    /// # Returns
+    /// True if sparsity < threshold (suggesting sparse representation would be more efficient)
+    pub fn should_convert_to_sparse(&self, threshold: f32) -> bool {
+        self.sparsity() < threshold
+    }
 }
 
 impl fmt::Debug for DenseState {
@@ -765,5 +836,70 @@ mod tests {
     fn test_alignment() {
         let state = DenseState::new(5).unwrap();
         assert!(state.is_simd_aligned());
+    }
+
+    #[test]
+    fn test_from_sparse() {
+        let sparse = SparseState::new(3).unwrap();
+        let dense = DenseState::from_sparse(&sparse).unwrap();
+
+        assert_eq!(dense.num_qubits(), 3);
+        assert_eq!(dense.amplitudes()[0], Complex64::new(1.0, 0.0));
+        for i in 1..dense.dimension() {
+            assert_eq!(dense.amplitudes()[i], Complex64::new(0.0, 0.0));
+        }
+    }
+
+    #[test]
+    fn test_to_sparse() {
+        let dense = DenseState::new(3).unwrap();
+        let sparse = dense.to_sparse().unwrap();
+
+        assert_eq!(sparse.num_qubits(), 3);
+        assert_eq!(sparse.num_amplitudes(), 1);
+        assert_eq!(sparse.get_amplitude(0), Complex64::new(1.0, 0.0));
+    }
+
+    #[test]
+    fn test_sparse_dense_roundtrip() {
+        let mut sparse1 = SparseState::new(2).unwrap();
+        sparse1.set_amplitude(0, Complex64::new(0.6, 0.0));
+        sparse1.set_amplitude(1, Complex64::new(0.8, 0.0));
+
+        let dense = DenseState::from_sparse(&sparse1).unwrap();
+        let sparse2 = dense.to_sparse().unwrap();
+
+        assert_relative_eq!(
+            sparse2.get_amplitude(0).re,
+            0.6,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            sparse2.get_amplitude(1).re,
+            0.8,
+            epsilon = 1e-10
+        );
+    }
+
+    #[test]
+    fn test_sparsity() {
+        let mut state = DenseState::new(3).unwrap();
+        // Only |000⟩ is non-zero: 1/8 = 0.125
+        assert!((state.sparsity() - 0.125).abs() < 0.01);
+
+        // Add more non-zero amplitudes
+        let amps = state.amplitudes_mut();
+        amps[1] = Complex64::new(0.5, 0.0);
+        amps[2] = Complex64::new(0.5, 0.0);
+        // Now 3/8 = 0.375
+        assert!((state.sparsity() - 0.375).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_should_convert_to_sparse() {
+        let state = DenseState::new(4).unwrap();
+        // Only 1/16 = 0.0625 sparsity
+        assert!(state.should_convert_to_sparse(0.1));
+        assert!(!state.should_convert_to_sparse(0.05));
     }
 }
