@@ -5,7 +5,7 @@
 //! measurement, gate application, and state manipulation.
 
 use crate::error::{Result, StateError};
-use crate::simd::{apply_single_qubit_gate, apply_two_qubit_gate, apply_cnot, apply_cz, apply_controlled_u};
+use crate::simd::{apply_single_qubit_gate, apply_two_qubit_gate, apply_cnot, apply_cz, apply_controlled_u, apply_crx, apply_cry, apply_crz};
 use crate::sparse_state::SparseState;
 use crate::state_vector::StateVector;
 use num_complex::Complex64;
@@ -438,7 +438,140 @@ impl DenseState {
         Ok(())
     }
 
-    /// Get the probability of measuring a specific computational basis state
+    /// Apply a controlled-RX(θ) gate
+    ///
+    /// CRX(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RX(θ)
+    /// Applies RX(θ) to the target qubit when the control qubit is 1.
+    ///
+    /// # Arguments
+    /// * `control` - Index of the control qubit (0-indexed)
+    /// * `target` - Index of the target qubit (0-indexed)
+    /// * `theta` - Rotation angle in radians
+    ///
+    /// # Errors
+    /// Returns error if qubit indices are invalid or equal
+    pub fn apply_crx(&mut self, control: usize, target: usize, theta: f64) -> Result<()> {
+        let num_qubits = self.num_qubits();
+
+        if control >= num_qubits {
+            return Err(StateError::InvalidQubitIndex {
+                index: control,
+                num_qubits,
+            });
+        }
+        if target >= num_qubits {
+            return Err(StateError::InvalidQubitIndex {
+                index: target,
+                num_qubits,
+            });
+        }
+        if control == target {
+            return Err(StateError::InvalidQubitIndex {
+                index: control,
+                num_qubits,
+            });
+        }
+
+        apply_crx(
+            self.vector.amplitudes_mut(),
+            control,
+            target,
+            theta,
+            num_qubits,
+        );
+        self.needs_normalization = false;
+        Ok(())
+    }
+
+    /// Apply a controlled-RY(θ) gate
+    ///
+    /// CRY(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RY(θ)
+    /// Applies RY(θ) to the target qubit when the control qubit is 1.
+    ///
+    /// # Arguments
+    /// * `control` - Index of the control qubit (0-indexed)
+    /// * `target` - Index of the target qubit (0-indexed)
+    /// * `theta` - Rotation angle in radians
+    ///
+    /// # Errors
+    /// Returns error if qubit indices are invalid or equal
+    pub fn apply_cry(&mut self, control: usize, target: usize, theta: f64) -> Result<()> {
+        let num_qubits = self.num_qubits();
+
+        if control >= num_qubits {
+            return Err(StateError::InvalidQubitIndex {
+                index: control,
+                num_qubits,
+            });
+        }
+        if target >= num_qubits {
+            return Err(StateError::InvalidQubitIndex {
+                index: target,
+                num_qubits,
+            });
+        }
+        if control == target {
+            return Err(StateError::InvalidQubitIndex {
+                index: control,
+                num_qubits,
+            });
+        }
+
+        apply_cry(
+            self.vector.amplitudes_mut(),
+            control,
+            target,
+            theta,
+            num_qubits,
+        );
+        self.needs_normalization = false;
+        Ok(())
+    }
+
+    /// Apply a controlled-RZ(θ) gate
+    ///
+    /// CRZ(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RZ(θ)
+    /// Applies RZ(θ) to the target qubit when the control qubit is 1.
+    ///
+    /// # Arguments
+    /// * `control` - Index of the control qubit (0-indexed)
+    /// * `target` - Index of the target qubit (0-indexed)
+    /// * `theta` - Rotation angle in radians
+    ///
+    /// # Errors
+    /// Returns error if qubit indices are invalid or equal
+    pub fn apply_crz(&mut self, control: usize, target: usize, theta: f64) -> Result<()> {
+        let num_qubits = self.num_qubits();
+
+        if control >= num_qubits {
+            return Err(StateError::InvalidQubitIndex {
+                index: control,
+                num_qubits,
+            });
+        }
+        if target >= num_qubits {
+            return Err(StateError::InvalidQubitIndex {
+                index: target,
+                num_qubits,
+            });
+        }
+        if control == target {
+            return Err(StateError::InvalidQubitIndex {
+                index: control,
+                num_qubits,
+            });
+        }
+
+        apply_crz(
+            self.vector.amplitudes_mut(),
+            control,
+            target,
+            theta,
+            num_qubits,
+        );
+        self.needs_normalization = false;
+        Ok(())
+    }    /// Get the probability of measuring a specific computational basis state
     ///
     /// # Arguments
     /// * `basis_state` - The basis state index (0 to 2^n - 1)

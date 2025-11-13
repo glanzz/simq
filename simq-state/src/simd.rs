@@ -216,6 +216,7 @@ pub fn apply_cz(
 /// Apply a controlled-U gate (U gate on target if control qubit is 1)
 ///
 /// More general than CNOT but still optimized compared to full 4×4 multiplication.
+/// Uses cache-friendly striped iteration for better memory locality.
 ///
 /// # Arguments
 /// * `state` - Mutable slice of state amplitudes
@@ -231,6 +232,71 @@ pub fn apply_controlled_u(
     u_matrix: &[[Complex64; 2]; 2],
     num_qubits: usize,
 ) {
-    controlled_gates::apply_controlled_u_scalar(state, control, target, u_matrix, num_qubits);
+    controlled_gates::apply_controlled_u_striped(state, control, target, u_matrix, num_qubits);
 }
 
+/// Apply a controlled-RX(θ) gate
+///
+/// CRX(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RX(θ)
+/// Applies RX(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_crx(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_crx(state, control, target, theta, num_qubits);
+}
+
+/// Apply a controlled-RY(θ) gate
+///
+/// CRY(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RY(θ)
+/// Applies RY(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_cry(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_cry(state, control, target, theta, num_qubits);
+}
+
+/// Apply a controlled-RZ(θ) gate
+///
+/// CRZ(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RZ(θ)
+/// Applies RZ(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_crz(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_crz(state, control, target, theta, num_qubits);
+}
