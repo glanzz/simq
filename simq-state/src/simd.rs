@@ -9,6 +9,8 @@
 pub mod single_qubit;
 pub mod two_qubit;
 pub mod kernels;
+pub mod controlled_gates;
+pub mod diagonal;
 
 use num_complex::Complex64;
 
@@ -152,4 +154,197 @@ pub fn normalize_simd(vec: &mut [Complex64]) {
             *z *= inv_norm;
         }
     }
+}
+
+/// Apply a CNOT (Controlled-NOT) gate optimized for the controlled structure
+///
+/// This uses direct amplitude manipulation instead of full 4×4 matrix
+/// multiplication, providing 3-4x speedup for large state vectors.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `num_qubits` - Total number of qubits
+///
+/// # Example
+/// ```ignore
+/// use num_complex::Complex64;
+/// use simq_state::simd::apply_cnot;
+///
+/// let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), ...];
+/// apply_cnot(&mut state, 0, 1, 3);
+/// ```
+#[inline]
+pub fn apply_cnot(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_cnot_striped(state, control, target, num_qubits);
+}
+
+/// Apply a CZ (Controlled-Z) gate optimized for the controlled structure
+///
+/// This applies a phase of -1 only to the |11⟩ state, which is much faster
+/// than full 4×4 matrix multiplication.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `qubit1` - Index of the first qubit
+/// * `qubit2` - Index of the second qubit
+/// * `num_qubits` - Total number of qubits
+///
+/// # Example
+/// ```ignore
+/// use num_complex::Complex64;
+/// use simq_state::simd::apply_cz;
+///
+/// let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), ...];
+/// apply_cz(&mut state, 0, 1, 3);
+/// ```
+#[inline]
+pub fn apply_cz(
+    state: &mut [Complex64],
+    qubit1: usize,
+    qubit2: usize,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_cz_striped(state, qubit1, qubit2, num_qubits);
+}
+
+/// Apply a controlled-U gate (U gate on target if control qubit is 1)
+///
+/// More general than CNOT but still optimized compared to full 4×4 multiplication.
+/// Uses cache-friendly striped iteration for better memory locality.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `u_matrix` - 2×2 unitary matrix to apply to target when control=1
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_controlled_u(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    u_matrix: &[[Complex64; 2]; 2],
+    num_qubits: usize,
+) {
+    controlled_gates::apply_controlled_u_striped(state, control, target, u_matrix, num_qubits);
+}
+
+/// Apply a controlled-RX(θ) gate
+///
+/// CRX(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RX(θ)
+/// Applies RX(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_crx(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_crx(state, control, target, theta, num_qubits);
+}
+
+/// Apply a controlled-RY(θ) gate
+///
+/// CRY(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RY(θ)
+/// Applies RY(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_cry(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_cry(state, control, target, theta, num_qubits);
+}
+
+/// Apply a controlled-RZ(θ) gate
+///
+/// CRZ(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RZ(θ)
+/// Applies RZ(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_crz(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_crz(state, control, target, theta, num_qubits);
+}
+
+/// Apply a diagonal single-qubit gate with SIMD optimization
+///
+/// Diagonal gates have the form [[a, 0], [0, b]] and can be applied 2-3x faster
+/// than general gates because they only require scalar multiplication rather than
+/// full complex matrix multiplication.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `diagonal` - [a, b] diagonal elements of the gate matrix
+/// * `qubit` - Index of the qubit to apply the gate to
+/// * `num_qubits` - Total number of qubits in the state
+///
+/// # Examples
+///
+/// ```ignore
+/// use num_complex::Complex64;
+/// use simq_state::simd::apply_diagonal_gate;
+///
+/// // Apply Z gate: [[1, 0], [0, -1]]
+/// let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+/// apply_diagonal_gate(&mut state, diagonal, 0, num_qubits);
+///
+/// // Apply Phase(π/4): [[1, 0], [0, e^(iπ/4)]]
+/// let theta = std::f64::consts::PI / 4.0;
+/// let diagonal = [
+///     Complex64::new(1.0, 0.0),
+///     Complex64::new(theta.cos(), theta.sin())
+/// ];
+/// apply_diagonal_gate(&mut state, diagonal, 0, num_qubits);
+/// ```
+///
+/// # Performance
+/// This function automatically selects the optimal implementation:
+/// - Parallel processing for state vectors with ≥16 qubits
+/// - AVX2 SIMD for large strides
+/// - SSE2 SIMD for small strides (better cache locality)
+/// - Scalar fallback when SIMD is unavailable
+#[inline]
+pub fn apply_diagonal_gate(
+    state: &mut [Complex64],
+    diagonal: [Complex64; 2],
+    qubit: usize,
+    num_qubits: usize,
+) {
+    diagonal::apply_diagonal_gate_optimized(state, diagonal, qubit, num_qubits);
 }

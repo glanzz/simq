@@ -67,6 +67,56 @@ pub trait Gate: Send + Sync + fmt::Debug {
     fn matrix(&self) -> Option<Vec<Complex64>> {
         None
     }
+
+    /// Whether this gate is diagonal in the computational basis
+    ///
+    /// Diagonal gates have the form diag(a₀, a₁, ..., a_{2^n-1})
+    /// where only diagonal elements are non-zero. These gates can
+    /// be applied more efficiently as they only require scalar
+    /// multiplication rather than full matrix multiplication.
+    ///
+    /// Examples of diagonal gates:
+    /// - Phase gates: P(θ), S, T, U1
+    /// - Z rotation: RZ(θ)
+    /// - Pauli-Z: Z
+    /// - Controlled-Z: CZ
+    ///
+    /// # Performance
+    /// Diagonal gates can be applied ~2-3x faster than general gates
+    /// because they avoid complex matrix multiplications.
+    fn is_diagonal(&self) -> bool {
+        false
+    }
+}
+
+/// Trait for single-qubit diagonal gates
+///
+/// Diagonal gates in the computational basis have the form:
+/// [[a, 0], [0, b]] where a and b are complex phases.
+///
+/// This trait provides optimized access to these diagonal elements,
+/// enabling faster gate application through direct scalar multiplication
+/// instead of full 2×2 matrix multiplication.
+///
+/// # Example
+/// ```ignore
+/// struct PhaseGate { theta: f64 }
+///
+/// impl DiagonalGate for PhaseGate {
+///     fn diagonal_elements(&self) -> [Complex64; 2] {
+///         [Complex64::new(1.0, 0.0),
+///          Complex64::new(theta.cos(), theta.sin())]
+///     }
+/// }
+/// ```
+pub trait DiagonalGate: Gate {
+    /// Get the diagonal elements [a, b] for the gate matrix [[a, 0], [0, b]]
+    ///
+    /// For a single-qubit diagonal gate, this returns the two complex
+    /// values on the diagonal. The gate application becomes:
+    /// - |0⟩ component: multiply by elements[0]
+    /// - |1⟩ component: multiply by elements[1]
+    fn diagonal_elements(&self) -> [Complex64; 2];
 }
 
 /// A gate operation applied to specific qubits
