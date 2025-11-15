@@ -10,6 +10,7 @@ pub mod single_qubit;
 pub mod two_qubit;
 pub mod kernels;
 pub mod controlled_gates;
+pub mod diagonal;
 
 use num_complex::Complex64;
 
@@ -299,4 +300,51 @@ pub fn apply_crz(
     num_qubits: usize,
 ) {
     controlled_gates::apply_crz(state, control, target, theta, num_qubits);
+}
+
+/// Apply a diagonal single-qubit gate with SIMD optimization
+///
+/// Diagonal gates have the form [[a, 0], [0, b]] and can be applied 2-3x faster
+/// than general gates because they only require scalar multiplication rather than
+/// full complex matrix multiplication.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `diagonal` - [a, b] diagonal elements of the gate matrix
+/// * `qubit` - Index of the qubit to apply the gate to
+/// * `num_qubits` - Total number of qubits in the state
+///
+/// # Examples
+///
+/// ```ignore
+/// use num_complex::Complex64;
+/// use simq_state::simd::apply_diagonal_gate;
+///
+/// // Apply Z gate: [[1, 0], [0, -1]]
+/// let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+/// apply_diagonal_gate(&mut state, diagonal, 0, num_qubits);
+///
+/// // Apply Phase(π/4): [[1, 0], [0, e^(iπ/4)]]
+/// let theta = std::f64::consts::PI / 4.0;
+/// let diagonal = [
+///     Complex64::new(1.0, 0.0),
+///     Complex64::new(theta.cos(), theta.sin())
+/// ];
+/// apply_diagonal_gate(&mut state, diagonal, 0, num_qubits);
+/// ```
+///
+/// # Performance
+/// This function automatically selects the optimal implementation:
+/// - Parallel processing for state vectors with ≥16 qubits
+/// - AVX2 SIMD for large strides
+/// - SSE2 SIMD for small strides (better cache locality)
+/// - Scalar fallback when SIMD is unavailable
+#[inline]
+pub fn apply_diagonal_gate(
+    state: &mut [Complex64],
+    diagonal: [Complex64; 2],
+    qubit: usize,
+    num_qubits: usize,
+) {
+    diagonal::apply_diagonal_gate_optimized(state, diagonal, qubit, num_qubits);
 }

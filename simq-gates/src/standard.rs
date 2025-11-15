@@ -1,7 +1,7 @@
 //! Standard quantum gate implementations with pre-computed matrices
 
 use num_complex::Complex64;
-use simq_core::gate::Gate;
+use simq_core::gate::{Gate, DiagonalGate};
 use crate::matrices;
 
 /// Helper macro to implement the matrix() method for gates
@@ -124,8 +124,20 @@ impl Gate for PauliZ {
         true
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(Self::matrix_vec())
+    }
+}
+
+impl DiagonalGate for PauliZ {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // Z = [[1, 0], [0, -1]]
+        [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)]
     }
 }
 
@@ -146,8 +158,20 @@ impl Gate for SGate {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(Self::matrix_vec())
+    }
+}
+
+impl DiagonalGate for SGate {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // S = [[1, 0], [0, i]]
+        [Complex64::new(1.0, 0.0), Complex64::new(0.0, 1.0)]
     }
 }
 
@@ -168,8 +192,20 @@ impl Gate for SGateDagger {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(Self::matrix_vec())
+    }
+}
+
+impl DiagonalGate for SGateDagger {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // S† = [[1, 0], [0, -i]]
+        [Complex64::new(1.0, 0.0), Complex64::new(0.0, -1.0)]
     }
 }
 
@@ -190,8 +226,21 @@ impl Gate for TGate {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(Self::matrix_vec())
+    }
+}
+
+impl DiagonalGate for TGate {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // T = [[1, 0], [0, e^(iπ/4)]]
+        const SQRT2_2: f64 = std::f64::consts::FRAC_1_SQRT_2;
+        [Complex64::new(1.0, 0.0), Complex64::new(SQRT2_2, SQRT2_2)]
     }
 }
 
@@ -212,8 +261,21 @@ impl Gate for TGateDagger {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(Self::matrix_vec())
+    }
+}
+
+impl DiagonalGate for TGateDagger {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // T† = [[1, 0], [0, e^(-iπ/4)]]
+        const SQRT2_2: f64 = std::f64::consts::FRAC_1_SQRT_2;
+        [Complex64::new(1.0, 0.0), Complex64::new(SQRT2_2, -SQRT2_2)]
     }
 }
 
@@ -667,12 +729,28 @@ impl Gate for RotationZ {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn description(&self) -> String {
         format!("RZ({:.4})", self.theta)
     }
 
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+impl DiagonalGate for RotationZ {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // RZ(θ) = [[e^(-iθ/2), 0], [0, e^(iθ/2)]]
+        let half_theta = self.theta / 2.0;
+        [
+            Complex64::new(half_theta.cos(), -half_theta.sin()),
+            Complex64::new(half_theta.cos(), half_theta.sin()),
+        ]
     }
 }
 
@@ -711,12 +789,27 @@ impl Gate for Phase {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn description(&self) -> String {
         format!("P({:.4})", self.theta)
     }
 
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+impl DiagonalGate for Phase {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // P(θ) = [[1, 0], [0, e^(iθ)]]
+        [
+            Complex64::new(1.0, 0.0),
+            Complex64::new(self.theta.cos(), self.theta.sin()),
+        ]
     }
 }
 
@@ -755,12 +848,27 @@ impl Gate for U1 {
         1
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn description(&self) -> String {
         format!("U1({:.4})", self.lambda)
     }
 
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+impl DiagonalGate for U1 {
+    #[inline]
+    fn diagonal_elements(&self) -> [Complex64; 2] {
+        // U1(λ) = [[1, 0], [0, e^(iλ)]]
+        [
+            Complex64::new(1.0, 0.0),
+            Complex64::new(self.lambda.cos(), self.lambda.sin()),
+        ]
     }
 }
 
