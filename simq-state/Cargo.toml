@@ -25,3 +25,7 @@ proptest.workspace = true
 [[bench]]
 name = "state_operations"
 harness = false
+
+[[bench]]
+name = "measurement_performance"
+harness = false
