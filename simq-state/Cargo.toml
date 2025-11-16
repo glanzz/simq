@@ -29,3 +29,7 @@ harness = false
 [[bench]]
 name = "measurement_performance"
 harness = false
+
+[[bench]]
+name = "observable_performance"
+harness = false
