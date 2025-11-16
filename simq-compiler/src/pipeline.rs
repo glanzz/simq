@@ -4,7 +4,10 @@
 //! with sensible defaults for different use cases.
 
 use crate::compiler::{Compiler, CompilerBuilder};
-use crate::passes::{DeadCodeElimination, GateCommutation, GateFusion, TemplateSubstitution};
+use crate::passes::{
+    AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion,
+    TemplateSubstitution,
+};
 use std::sync::Arc;
 
 /// Optimization level presets
@@ -78,7 +81,7 @@ fn create_o1_compiler() -> Compiler {
 fn create_o2_compiler() -> Compiler {
     CompilerBuilder::new()
         .add_pass(Arc::new(DeadCodeElimination::new()))
-        .add_pass(Arc::new(TemplateSubstitution::new()))
+        .add_pass(Arc::new(AdvancedTemplateMatching::new()))
         .add_pass(Arc::new(GateFusion::new()))
         .max_iterations(5)
         .enable_timing(true)
@@ -93,7 +96,7 @@ fn create_o3_compiler() -> Compiler {
     CompilerBuilder::new()
         .add_pass(Arc::new(DeadCodeElimination::new()))
         .add_pass(Arc::new(GateCommutation::new()))
-        .add_pass(Arc::new(TemplateSubstitution::new()))
+        .add_pass(Arc::new(AdvancedTemplateMatching::new()))
         .add_pass(Arc::new(GateFusion::new()))
         .max_iterations(10)
         .enable_timing(true)
@@ -147,6 +150,12 @@ impl PipelineBuilder {
     /// Add template substitution pass
     pub fn with_template_substitution(mut self) -> Self {
         self.builder = self.builder.add_pass(Arc::new(TemplateSubstitution::new()));
+        self
+    }
+
+    /// Add advanced template matching pass (recommended over basic template substitution)
+    pub fn with_advanced_template_matching(mut self) -> Self {
+        self.builder = self.builder.add_pass(Arc::new(AdvancedTemplateMatching::new()));
         self
     }
 
