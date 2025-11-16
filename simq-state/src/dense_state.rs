@@ -657,11 +657,16 @@ impl DenseState {
     ///
     /// # Returns
     /// Vector of probabilities, where probabilities[i] = |amplitude[i]|^2
+    ///
+    /// This method uses SIMD acceleration when available for improved performance.
     pub fn get_all_probabilities(&self) -> Vec<f64> {
-        self.amplitudes()
-            .iter()
-            .map(|amp| amp.norm_sqr())
-            .collect()
+        let amplitudes = self.amplitudes();
+        let mut probabilities = vec![0.0; amplitudes.len()];
+
+        // Use SIMD-optimized computation
+        crate::simd::kernels::compute_probabilities(amplitudes, &mut probabilities);
+
+        probabilities
     }
 
     /// Measure a single qubit and collapse the state

@@ -36,6 +36,8 @@ pub mod cow_state;
 pub mod validation;
 pub mod simd;
 pub mod error;
+pub mod measurement;
+pub mod observable;
 
 pub use state_vector::StateVector;
 pub use sparse_state::SparseState;
@@ -43,3 +45,5 @@ pub use dense_state::DenseState;
 pub use adaptive_state::{AdaptiveState, StateStats};
 pub use cow_state::{CowState, CowStats, MemoryStats};
 pub use error::{StateError, Result};
+pub use measurement::{Measurement, MeasurementResult, SamplingResult, ComputationalBasis, MidCircuitMeasurement};
+pub use observable::{Pauli, PauliString, PauliObservable};
