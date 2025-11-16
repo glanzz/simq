@@ -130,8 +130,10 @@ mod dead_code_elimination;
 mod gate_fusion;
 mod gate_commutation;
 mod template_substitution;
+mod template_matching;
 
 pub use dead_code_elimination::DeadCodeElimination;
 pub use gate_fusion::GateFusion;
 pub use gate_commutation::GateCommutation;
 pub use template_substitution::TemplateSubstitution;
+pub use template_matching::AdvancedTemplateMatching;

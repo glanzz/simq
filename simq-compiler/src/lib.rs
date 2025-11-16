@@ -87,6 +87,7 @@ pub mod decomposition;
 pub mod analysis;
 pub mod passes;
 pub mod compiler;
+pub mod pipeline;
 
 pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
@@ -125,4 +126,9 @@ pub use compiler::{
     Compiler,
     CompilerConfig,
     CompilerBuilder,
+};
+pub use pipeline::{
+    create_compiler,
+    OptimizationLevel,
+    PipelineBuilder,
 };
