@@ -103,6 +103,14 @@ impl Circuit {
         self.operations.iter()
     }
 
+    /// Get a mutable reference to the operations vector
+    ///
+    /// This is useful for optimization passes that need to modify the circuit.
+    /// Use with caution as direct modifications bypass validation.
+    pub fn operations_mut(&mut self) -> &mut Vec<GateOp> {
+        &mut self.operations
+    }
+
     /// Get a specific operation by index
     pub fn get_operation(&self, index: usize) -> Option<&GateOp> {
         self.operations.get(index)
