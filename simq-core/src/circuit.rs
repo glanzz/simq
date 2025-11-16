@@ -648,12 +648,19 @@ mod tests {
             num_qubits: 1,
         });
 
+        // Empty circuit has depth 0
         assert_eq!(circuit.depth(), 0);
 
+        // Single gate has depth 1
         circuit.add_gate(gate.clone(), &[QubitId::new(0)]).unwrap();
         assert_eq!(circuit.depth(), 1);
 
-        circuit.add_gate(gate, &[QubitId::new(1)]).unwrap();
+        // Two gates on different qubits can run in parallel, so depth is still 1
+        circuit.add_gate(gate.clone(), &[QubitId::new(1)]).unwrap();
+        assert_eq!(circuit.depth(), 1);
+
+        // Gate on same qubit as first creates a dependency, depth becomes 2
+        circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
         assert_eq!(circuit.depth(), 2);
     }
 }

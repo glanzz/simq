@@ -319,6 +319,11 @@ impl DependencyGraph {
 
     /// Compute circuit depth (longest path in DAG)
     pub fn depth(&self) -> Result<usize> {
+        // Empty circuit has depth 0
+        if self.num_nodes() == 0 {
+            return Ok(0);
+        }
+
         // Use topological sort and dynamic programming
         let topo_order = self.topological_sort()?;
         let mut distances = vec![0; self.num_nodes()];
