@@ -1,6 +1,5 @@
 # SimQ - High-Performance Quantum Computing SDK
 
-[![CI](https://github.com/yourusername/simq/workflows/CI/badge.svg)](https://github.com/yourusername/simq/actions)
 [![codecov](https://codecov.io/gh/yourusername/simq/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/simq)
 [![Crates.io](https://img.shields.io/crates/v/simq.svg)](https://crates.io/crates/simq)
 [![Documentation](https://docs.rs/simq/badge.svg)](https://docs.rs/simq)
