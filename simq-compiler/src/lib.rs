@@ -6,6 +6,7 @@
 //! - **Circuit simplification**: Reducing gate count and depth
 //! - **Gate decomposition**: Translating gates to different basis sets
 //! - **Matrix computation**: Advanced matrix operations for quantum gates
+//! - **Circuit analysis**: Statistics, resource estimation, and parallelism analysis
 //!
 //! # Gate Decomposition
 //!
@@ -27,12 +28,34 @@
 //! let decomposer = UniversalDecomposer::new(config);
 //! let result = decomposer.decompose_gate(&gate)?;
 //! ```
+//!
+//! # Circuit Analysis
+//!
+//! The analysis module provides comprehensive circuit analysis including gate statistics,
+//! resource estimation, and parallelism analysis:
+//!
+//! ```ignore
+//! use simq_compiler::CircuitAnalysis;
+//! use simq_core::Circuit;
+//!
+//! // Analyze a circuit
+//! let circuit = Circuit::new(3);
+//! // ... add gates ...
+//! let analysis = CircuitAnalysis::analyze(&circuit)?;
+//!
+//! println!("{}", analysis);
+//! // Prints:
+//! // - Gate statistics (counts by type, depth)
+//! // - Resource estimates (memory, time)
+//! // - Parallelism analysis (layers, parallelism factor)
+//! ```
 
 pub mod fusion;
 pub mod lazy;
 pub mod matrix_utils;
 pub mod matrix_computation;
 pub mod decomposition;
+pub mod analysis;
 
 pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
@@ -56,4 +79,9 @@ pub use matrix_computation::{
     doubly_controlled_gate_2x2,
     decompose_zyz,
     gate_fidelity_2x2,
+};
+pub use analysis::{
+    GateStatistics,
+    ResourceEstimate,
+    CircuitAnalysis,
 };
