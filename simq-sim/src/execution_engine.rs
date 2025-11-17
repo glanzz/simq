@@ -1,4 +1,12 @@
-//! Execution engine for SimQ simulator
+use std::time::{Duration, Instant};
+/// Telemetry data for execution profiling
+#[derive(Debug, Default)]
+pub struct ExecutionTelemetry {
+    pub total_gate_time: Duration,
+    pub per_gate_times: Vec<Duration>,
+    pub state_density: Vec<f32>,
+}
+/// Execution engine for SimQ simulator
 
 use simq_core::{Circuit, QubitId, Gate, GateOp};
 use std::sync::Arc;
@@ -14,18 +22,31 @@ pub struct ExecutionConfig {
 /// Execution engine for quantum circuits
 pub struct ExecutionEngine {
     config: ExecutionConfig,
+    pub telemetry: ExecutionTelemetry,
 }
 
 impl ExecutionEngine {
     pub fn new(config: ExecutionConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            telemetry: ExecutionTelemetry::default(),
+        }
     }
 
     /// Execute a compiled circuit on a quantum state
-    pub fn execute(&self, circuit: &Circuit, state: &mut AdaptiveState) {
+    pub fn execute(&mut self, circuit: &Circuit, state: &mut AdaptiveState) {
+        let mut total_gate_time = Duration::ZERO;
+        self.telemetry.per_gate_times.clear();
+        self.telemetry.state_density.clear();
         for gate_op in circuit.operations() {
+            let start = Instant::now();
             self.apply_gate_op(gate_op, state);
+            let elapsed = start.elapsed();
+            total_gate_time += elapsed;
+            self.telemetry.per_gate_times.push(elapsed);
+            self.telemetry.state_density.push(state.density());
         }
+        self.telemetry.total_gate_time = total_gate_time;
     }
 
     /// Apply a single gate operation to the quantum state
@@ -45,16 +66,16 @@ impl ExecutionEngine {
         // Example: single-qubit gate
         if qubits.len() == 1 {
             let qubit = qubits[0].index();
-            let matrix = gate.matrix();
+            let _matrix = gate.matrix();
             let stride = 1 << qubit;
             let amplitudes = state.amplitudes_mut();
             if self.config.use_parallel {
-                amplitudes.par_chunks_mut(stride * 2).for_each(|chunk| {
+                amplitudes.par_chunks_mut(stride * 2).for_each(|_chunk| {
                     // Apply 2x2 matrix to pairs of amplitudes
                     // TODO: SIMD optimization
                 });
             } else {
-                amplitudes.chunks_mut(stride * 2).for_each(|chunk| {
+                amplitudes.chunks_mut(stride * 2).for_each(|_chunk| {
                     // TODO: SIMD optimization
                 });
             }
