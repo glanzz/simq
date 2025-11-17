@@ -1,3 +1,13 @@
+/// Policy for error recovery during execution
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryPolicy {
+    /// Stop execution on first error
+    Halt,
+    /// Skip failed gate and continue
+    Skip,
+    /// Attempt to retry failed gate once
+    RetryOnce,
+}
 use std::time::{Duration, Instant};
 use std::collections::HashMap;
 use thread_id;
@@ -49,6 +59,7 @@ pub struct ExecutionConfig {
 pub struct ExecutionEngine {
     config: ExecutionConfig,
     pub telemetry: ExecutionTelemetry,
+    pub recovery_policy: RecoveryPolicy,
 }
 
 impl ExecutionEngine {
@@ -56,6 +67,7 @@ impl ExecutionEngine {
         Self {
             config,
             telemetry: ExecutionTelemetry::default(),
+            recovery_policy: RecoveryPolicy::Halt,
         }
     }
 
@@ -88,11 +100,37 @@ impl ExecutionEngine {
             };
             self.telemetry.record_memory(mem_bytes);
 
-            self.apply_gate_op(gate_op, state);
+            let mut gate_attempts = 0;
+            let mut gate_success = false;
+            loop {
+                gate_attempts += 1;
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    self.apply_gate_op(gate_op, state)
+                }));
+                match result {
+                    Ok(_) => {
+                        gate_success = true;
+                        break;
+                    }
+                    Err(_) => {
+                        self.telemetry.log_error(format!("Gate '{}' panicked (attempt {})", gate_name, gate_attempts));
+                        match self.recovery_policy {
+                            RecoveryPolicy::Halt => break,
+                            RecoveryPolicy::Skip => break,
+                            RecoveryPolicy::RetryOnce if gate_attempts < 2 => continue,
+                            _ => break,
+                        }
+                    }
+                }
+            }
             let elapsed = start.elapsed();
             total_gate_time += elapsed;
             self.telemetry.per_gate_times.push(elapsed);
             self.telemetry.state_density.push(state.density());
+            if !gate_success && self.recovery_policy == RecoveryPolicy::Halt {
+                self.telemetry.log_event("execution_halted_on_error");
+                break;
+            }
         }
         self.telemetry.total_gate_time = total_gate_time;
         self.telemetry.log_event("execution_complete");
