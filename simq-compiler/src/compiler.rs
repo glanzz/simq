@@ -50,6 +50,7 @@ impl Default for CompilerConfig {
 /// let mut circuit = Circuit::new(3);
 /// let result = compiler.compile(&mut circuit)?;
 /// ```
+#[derive(Clone)]
 pub struct Compiler {
     config: CompilerConfig,
     passes: Vec<Arc<dyn OptimizationPass>>,

@@ -78,6 +78,91 @@
 //! // - Resource estimates (memory, time)
 //! // - Parallelism analysis (layers, parallelism factor)
 //! ```
+//!
+//! # Adaptive Compilation
+//!
+//! The adaptive pipeline automatically selects optimization passes based on circuit
+//! characteristics:
+//!
+//! ```ignore
+//! use simq_compiler::adaptive_pipeline::AdaptiveCompiler;
+//! use simq_core::Circuit;
+//!
+//! let mut circuit = Circuit::new(5);
+//! // ... add gates ...
+//!
+//! // Adaptive compiler analyzes the circuit and selects optimal passes
+//! let adaptive = AdaptiveCompiler::new().with_verbose(true);
+//! let compiler = adaptive.create_for_circuit(&circuit);
+//! compiler.compile(&mut circuit)?;
+//! ```
+//!
+//! # Hardware-Aware Compilation
+//!
+//! Optimize circuits for specific quantum hardware platforms:
+//!
+//! ```ignore
+//! use simq_compiler::hardware_aware::{HardwareType, CostModel};
+//! use simq_core::Circuit;
+//!
+//! let circuit = Circuit::new(3);
+//! let cost_model = CostModel::new(HardwareType::IBM);
+//! let cost = cost_model.circuit_cost(&circuit);
+//! println!("Circuit cost on IBM hardware: {}", cost);
+//! ```
+//!
+//! # Compilation Caching
+//!
+//! Cache compilation results to avoid redundant optimization:
+//!
+//! ```ignore
+//! use simq_compiler::{CachedCompiler, pipeline::{create_compiler, OptimizationLevel}};
+//! use simq_core::Circuit;
+//!
+//! let compiler = create_compiler(OptimizationLevel::O2);
+//! let mut cached_compiler = CachedCompiler::new(compiler, 100);
+//!
+//! let mut circuit = Circuit::new(5);
+//! // ... add gates ...
+//!
+//! // First compilation - cache miss
+//! let result1 = cached_compiler.compile(&mut circuit)?;
+//! assert!(!result1.is_cached());
+//!
+//! // Second compilation of same circuit - cache hit!
+//! let result2 = cached_compiler.compile(&mut circuit)?;
+//! assert!(result2.is_cached());
+//!
+//! // View cache statistics
+//! let stats = cached_compiler.cache().statistics();
+//! println!("Hit rate: {:.1}%", stats.hit_rate());
+//! ```
+//!
+//! # Execution Planning
+//!
+//! Generate optimized execution plans with gate scheduling and parallelization:
+//!
+//! ```ignore
+//! use simq_compiler::execution_plan::ExecutionPlanner;
+//! use simq_core::Circuit;
+//!
+//! let circuit = Circuit::new(5);
+//! // ... add gates ...
+//!
+//! // Generate execution plan
+//! let planner = ExecutionPlanner::new();
+//! let plan = planner.generate_plan(&circuit);
+//!
+//! println!("Circuit depth: {} layers", plan.depth);
+//! println!("Parallelism factor: {:.2}x", plan.parallelism_factor);
+//! println!("Estimated time: {:.2} µs", plan.total_time);
+//!
+//! // Visualize execution layers
+//! for (i, layer) in plan.layers.iter().enumerate() {
+//!     println!("Layer {}: {} gates on {} qubits",
+//!         i, layer.gates.len(), layer.qubits.len());
+//! }
+//! ```
 
 pub mod fusion;
 pub mod lazy;
@@ -88,6 +173,12 @@ pub mod analysis;
 pub mod passes;
 pub mod compiler;
 pub mod pipeline;
+pub mod circuit_analysis_pass;
+pub mod adaptive_pipeline;
+pub mod hardware_aware;
+pub mod cache;
+pub mod cached_compiler;
+pub mod execution_plan;
 
 pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
@@ -131,4 +222,37 @@ pub use pipeline::{
     create_compiler,
     OptimizationLevel,
     PipelineBuilder,
+};
+pub use circuit_analysis_pass::{
+    CircuitCharacteristics,
+    CircuitSize,
+};
+pub use adaptive_pipeline::{
+    AdaptiveCompiler,
+    MultiLevelOptimizer,
+};
+pub use hardware_aware::{
+    HardwareModel,
+    IBMHardware,
+    GoogleHardware,
+    IonQHardware,
+    CostModel,
+    HardwareType,
+};
+pub use cache::{
+    CircuitFingerprint,
+    CompilationCache,
+    SharedCompilationCache,
+    CacheStatistics,
+};
+pub use cached_compiler::{
+    CachedCompiler,
+    SharedCachedCompiler,
+    CachedOptimizationResult,
+};
+pub use execution_plan::{
+    ExecutionPlan,
+    ExecutionPlanner,
+    ExecutionLayer,
+    ResourceRequirements,
 };
