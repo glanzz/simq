@@ -78,6 +78,38 @@
 //! // - Resource estimates (memory, time)
 //! // - Parallelism analysis (layers, parallelism factor)
 //! ```
+//!
+//! # Adaptive Compilation
+//!
+//! The adaptive pipeline automatically selects optimization passes based on circuit
+//! characteristics:
+//!
+//! ```ignore
+//! use simq_compiler::adaptive_pipeline::AdaptiveCompiler;
+//! use simq_core::Circuit;
+//!
+//! let mut circuit = Circuit::new(5);
+//! // ... add gates ...
+//!
+//! // Adaptive compiler analyzes the circuit and selects optimal passes
+//! let adaptive = AdaptiveCompiler::new().with_verbose(true);
+//! let compiler = adaptive.create_for_circuit(&circuit);
+//! compiler.compile(&mut circuit)?;
+//! ```
+//!
+//! # Hardware-Aware Compilation
+//!
+//! Optimize circuits for specific quantum hardware platforms:
+//!
+//! ```ignore
+//! use simq_compiler::hardware_aware::{HardwareType, CostModel};
+//! use simq_core::Circuit;
+//!
+//! let circuit = Circuit::new(3);
+//! let cost_model = CostModel::new(HardwareType::IBM);
+//! let cost = cost_model.circuit_cost(&circuit);
+//! println!("Circuit cost on IBM hardware: {}", cost);
+//! ```
 
 pub mod fusion;
 pub mod lazy;
@@ -88,6 +120,9 @@ pub mod analysis;
 pub mod passes;
 pub mod compiler;
 pub mod pipeline;
+pub mod circuit_analysis_pass;
+pub mod adaptive_pipeline;
+pub mod hardware_aware;
 
 pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
@@ -131,4 +166,20 @@ pub use pipeline::{
     create_compiler,
     OptimizationLevel,
     PipelineBuilder,
+};
+pub use circuit_analysis_pass::{
+    CircuitCharacteristics,
+    CircuitSize,
+};
+pub use adaptive_pipeline::{
+    AdaptiveCompiler,
+    MultiLevelOptimizer,
+};
+pub use hardware_aware::{
+    HardwareModel,
+    IBMHardware,
+    GoogleHardware,
+    IonQHardware,
+    CostModel,
+    HardwareType,
 };
