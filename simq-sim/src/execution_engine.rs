@@ -200,6 +200,7 @@ impl ExecutionEngine {
 use num_complex::Complex64;
 
 /// SIMD-optimized single-qubit gate application for dense state
+use rayon::prelude::*;
 pub fn apply_single_qubit_dense_simd(gate: &[[Complex64; 2]; 2], qubit: usize, state: &mut [Complex64]) {
     let stride = 1 << qubit;
     let n = state.len();
@@ -219,4 +220,17 @@ pub fn apply_single_qubit_dense_simd(gate: &[[Complex64; 2]; 2], qubit: usize, s
         }
         i += stride * 2;
     }
+    use rayon::prelude::*;
+    state.par_chunks_mut(stride * 2).for_each(|chunk| {
+        for j in 0..stride {
+            let idx0 = j;
+            let idx1 = j + stride;
+            let a = chunk[idx0];
+            let b = chunk[idx1];
+            let out0 = gate[0][0] * a + gate[0][1] * b;
+            let out1 = gate[1][0] * a + gate[1][1] * b;
+            chunk[idx0] = out0;
+            chunk[idx1] = out1;
+        }
+    });
 }
