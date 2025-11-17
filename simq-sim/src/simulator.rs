@@ -132,10 +132,19 @@ impl Simulator {
             s.initialization_time = init_time;
         }
 
-        // 3. Execute circuit (placeholder - actual execution would use simq-state)
-        // For now, we just return the initial state as the simulator core is a stub
+
+        // 3. Execute circuit using execution engine
         let gate_start = Instant::now();
-        // TODO: Implement actual gate application using simq-state APIs
+        {
+            use crate::execution_engine::{ExecutionEngine, ExecutionConfig};
+            let exec_config = ExecutionConfig {
+                use_parallel: self.config.parallel_threshold > 0,
+                use_simd: true,
+            };
+            let engine = ExecutionEngine::new(exec_config);
+            // AdaptiveState exposes as_mut() for mutation
+            engine.execute(&compiled_circuit, state.as_mut());
+        }
         let gate_time = gate_start.elapsed();
 
         if let Some(ref mut s) = stats {

@@ -40,7 +40,7 @@ pub mod config;
 pub mod simulator;
 pub mod result;
 pub mod error;
-pub mod execution;
+pub mod execution_engine;
 pub mod statistics;
 
 pub use config::SimulatorConfig;
