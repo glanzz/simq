@@ -140,6 +140,8 @@ impl Simulator {
             let exec_config = ExecutionConfig {
                 use_parallel: self.config.parallel_threshold > 0,
                 use_simd: true,
+                parallel_threshold: self.config.parallel_threshold,
+                use_gpu: self.config.use_gpu,
             };
             let mut engine = ExecutionEngine::new(exec_config);
             engine.execute(&compiled_circuit, &mut state);

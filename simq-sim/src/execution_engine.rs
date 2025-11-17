@@ -47,12 +47,15 @@ impl ExecutionTelemetry {
 use simq_core::{Circuit, QubitId, Gate, GateOp};
 use std::sync::Arc;
 use simq_state::{AdaptiveState, SparseState, DenseState};
-use rayon::prelude::*;
+use crate::gpu::GpuContext;
+// use rayon::prelude::*; // Only needed in kernel
 
 /// Configuration for execution engine
 pub struct ExecutionConfig {
     pub use_parallel: bool,
     pub use_simd: bool,
+    pub parallel_threshold: usize,
+    pub use_gpu: bool,
 }
 
 /// Execution engine for quantum circuits
@@ -60,6 +63,7 @@ pub struct ExecutionEngine {
     config: ExecutionConfig,
     pub telemetry: ExecutionTelemetry,
     pub recovery_policy: RecoveryPolicy,
+    pub gpu_context: Option<std::sync::Arc<crate::gpu::GpuContext>>,
 }
 
 impl ExecutionEngine {
@@ -68,7 +72,12 @@ impl ExecutionEngine {
             config,
             telemetry: ExecutionTelemetry::default(),
             recovery_policy: RecoveryPolicy::Halt,
+            gpu_context: None,
         }
+    }
+
+    pub fn set_gpu_context(&mut self, ctx: Option<&crate::gpu::GpuContext>) {
+        self.gpu_context = ctx.map(|c| std::sync::Arc::new((*c).clone()));
     }
 
     /// Execute a compiled circuit on a quantum state
@@ -140,7 +149,27 @@ impl ExecutionEngine {
     fn apply_gate_op(&self, gate_op: &GateOp, state: &mut AdaptiveState) {
         match state {
             AdaptiveState::Dense(ref mut dense) => {
-                self.apply_gate_dense(gate_op.gate(), gate_op.qubits(), dense);
+                // Use SIMD if enabled and single-qubit gate
+                if self.config.use_simd && gate_op.gate().num_qubits() == 1 {
+                    if let Some(matrix) = gate_op.gate().matrix() {
+                        // matrix: Vec<Complex<f64>> expected to be 4 elements for 2x2
+                        if matrix.len() == 4 {
+                            let mat: [[Complex64; 2]; 2] = [
+                                [matrix[0], matrix[1]],
+                                [matrix[2], matrix[3]],
+                            ];
+                            let qubit_idx = gate_op.qubits()[0].index();
+                            let threshold = self.config.parallel_threshold;
+                            apply_single_qubit_dense_simd(&mat, qubit_idx, dense.amplitudes_mut(), threshold);
+                        } else {
+                            self.apply_gate_dense(gate_op.gate(), gate_op.qubits(), dense);
+                        }
+                    } else {
+                        self.apply_gate_dense(gate_op.gate(), gate_op.qubits(), dense);
+                    }
+                } else {
+                    self.apply_gate_dense(gate_op.gate(), gate_op.qubits(), dense);
+                }
             }
             AdaptiveState::Sparse { state: ref mut sparse, .. } => {
                 self.apply_gate_sparse(gate_op.gate(), gate_op.qubits(), sparse);
@@ -174,5 +203,49 @@ impl ExecutionEngine {
     fn apply_gate_sparse(&self, _gate: &Arc<dyn Gate>, _qubits: &[QubitId], _state: &mut SparseState) {
         // For each non-zero amplitude, compute new amplitudes
         // TODO: Efficient sparse update
+    }
+}
+
+/// SIMD support
+use num_complex::Complex64;
+use rayon::prelude::*;
+/// SIMD-optimized single-qubit gate application for dense state with automatic parallelism selection
+pub fn apply_single_qubit_dense_simd(
+    gate: &[[Complex64; 2]; 2],
+    qubit: usize,
+    state: &mut [Complex64],
+    parallel_threshold: usize,
+) {
+    let stride = 1 << qubit;
+    let n = state.len();
+    // If state size exceeds threshold, use parallel execution
+    if n >= parallel_threshold {
+        state.par_chunks_mut(stride * 2).for_each(|chunk| {
+            for j in 0..stride {
+                let idx0 = j;
+                let idx1 = j + stride;
+                let a = chunk[idx0];
+                let b = chunk[idx1];
+                let out0 = gate[0][0] * a + gate[0][1] * b;
+                let out1 = gate[1][0] * a + gate[1][1] * b;
+                chunk[idx0] = out0;
+                chunk[idx1] = out1;
+            }
+        });
+    } else {
+        let mut i = 0;
+        while i < n {
+            for j in 0..stride {
+                let idx0 = i + j;
+                let idx1 = idx0 + stride;
+                let a = state[idx0];
+                let b = state[idx1];
+                let out0 = gate[0][0] * a + gate[0][1] * b;
+                let out1 = gate[1][0] * a + gate[1][1] * b;
+                state[idx0] = out0;
+                state[idx1] = out1;
+            }
+            i += stride * 2;
+        }
     }
 }

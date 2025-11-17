@@ -3,6 +3,10 @@
 /// Configuration for the quantum simulator
 #[derive(Debug, Clone)]
 pub struct SimulatorConfig {
+    /// Enable GPU backend (wgpu)
+    /// When true, uses GPU for gate application if available.
+    /// Default: false
+    pub use_gpu: bool,
     /// Density threshold for switching from sparse to dense representation
     ///
     /// When the state density (fraction of non-zero amplitudes) exceeds this
@@ -78,6 +82,7 @@ impl Default for SimulatorConfig {
             collect_statistics: false,
             seed: None,
             memory_limit: 0,
+            use_gpu: false,
         }
     }
 }
