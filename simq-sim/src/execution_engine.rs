@@ -47,6 +47,7 @@ impl ExecutionTelemetry {
 use simq_core::{Circuit, QubitId, Gate, GateOp};
 use std::sync::Arc;
 use simq_state::{AdaptiveState, SparseState, DenseState};
+use crate::gpu::GpuContext;
 // use rayon::prelude::*; // Only needed in kernel
 
 /// Configuration for execution engine
@@ -54,6 +55,7 @@ pub struct ExecutionConfig {
     pub use_parallel: bool,
     pub use_simd: bool,
     pub parallel_threshold: usize,
+    pub use_gpu: bool,
 }
 
 /// Execution engine for quantum circuits
@@ -61,6 +63,7 @@ pub struct ExecutionEngine {
     config: ExecutionConfig,
     pub telemetry: ExecutionTelemetry,
     pub recovery_policy: RecoveryPolicy,
+    pub gpu_context: Option<std::sync::Arc<crate::gpu::GpuContext>>,
 }
 
 impl ExecutionEngine {
@@ -69,7 +72,12 @@ impl ExecutionEngine {
             config,
             telemetry: ExecutionTelemetry::default(),
             recovery_policy: RecoveryPolicy::Halt,
+            gpu_context: None,
         }
+    }
+
+    pub fn set_gpu_context(&mut self, ctx: Option<&crate::gpu::GpuContext>) {
+        self.gpu_context = ctx.map(|c| std::sync::Arc::new((*c).clone()));
     }
 
     /// Execute a compiled circuit on a quantum state

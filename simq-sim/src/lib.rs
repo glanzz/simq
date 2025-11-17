@@ -38,6 +38,7 @@
 
 pub mod config;
 pub mod simulator;
+pub mod gpu;
 pub mod result;
 pub mod error;
 pub mod execution_engine;
