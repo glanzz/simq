@@ -137,6 +137,32 @@
 //! let stats = cached_compiler.cache().statistics();
 //! println!("Hit rate: {:.1}%", stats.hit_rate());
 //! ```
+//!
+//! # Execution Planning
+//!
+//! Generate optimized execution plans with gate scheduling and parallelization:
+//!
+//! ```ignore
+//! use simq_compiler::execution_plan::ExecutionPlanner;
+//! use simq_core::Circuit;
+//!
+//! let circuit = Circuit::new(5);
+//! // ... add gates ...
+//!
+//! // Generate execution plan
+//! let planner = ExecutionPlanner::new();
+//! let plan = planner.generate_plan(&circuit);
+//!
+//! println!("Circuit depth: {} layers", plan.depth);
+//! println!("Parallelism factor: {:.2}x", plan.parallelism_factor);
+//! println!("Estimated time: {:.2} µs", plan.total_time);
+//!
+//! // Visualize execution layers
+//! for (i, layer) in plan.layers.iter().enumerate() {
+//!     println!("Layer {}: {} gates on {} qubits",
+//!         i, layer.gates.len(), layer.qubits.len());
+//! }
+//! ```
 
 pub mod fusion;
 pub mod lazy;
@@ -152,6 +178,7 @@ pub mod adaptive_pipeline;
 pub mod hardware_aware;
 pub mod cache;
 pub mod cached_compiler;
+pub mod execution_plan;
 
 pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
@@ -222,4 +249,10 @@ pub use cached_compiler::{
     CachedCompiler,
     SharedCachedCompiler,
     CachedOptimizationResult,
+};
+pub use execution_plan::{
+    ExecutionPlan,
+    ExecutionPlanner,
+    ExecutionLayer,
+    ResourceRequirements,
 };
