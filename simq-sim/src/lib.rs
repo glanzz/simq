@@ -44,6 +44,16 @@ pub mod error;
 pub mod execution_engine;
 pub mod statistics;
 
+pub mod vqe_qaoa_helpers;
+
+pub use vqe_qaoa_helpers::{
+	vqe_gradient_parameter_shift,
+	vqe_gradient_finite_difference,
+	vqe_batch_expectation,
+	qaoa_circuit,
+	vqe_hardware_efficient_ansatz,
+};
+
 pub use config::SimulatorConfig;
 pub use simulator::Simulator;
 pub use result::{SimulationResult, MeasurementCounts};
