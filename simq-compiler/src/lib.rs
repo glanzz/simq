@@ -110,6 +110,33 @@
 //! let cost = cost_model.circuit_cost(&circuit);
 //! println!("Circuit cost on IBM hardware: {}", cost);
 //! ```
+//!
+//! # Compilation Caching
+//!
+//! Cache compilation results to avoid redundant optimization:
+//!
+//! ```ignore
+//! use simq_compiler::{CachedCompiler, pipeline::{create_compiler, OptimizationLevel}};
+//! use simq_core::Circuit;
+//!
+//! let compiler = create_compiler(OptimizationLevel::O2);
+//! let mut cached_compiler = CachedCompiler::new(compiler, 100);
+//!
+//! let mut circuit = Circuit::new(5);
+//! // ... add gates ...
+//!
+//! // First compilation - cache miss
+//! let result1 = cached_compiler.compile(&mut circuit)?;
+//! assert!(!result1.is_cached());
+//!
+//! // Second compilation of same circuit - cache hit!
+//! let result2 = cached_compiler.compile(&mut circuit)?;
+//! assert!(result2.is_cached());
+//!
+//! // View cache statistics
+//! let stats = cached_compiler.cache().statistics();
+//! println!("Hit rate: {:.1}%", stats.hit_rate());
+//! ```
 
 pub mod fusion;
 pub mod lazy;
@@ -123,6 +150,8 @@ pub mod pipeline;
 pub mod circuit_analysis_pass;
 pub mod adaptive_pipeline;
 pub mod hardware_aware;
+pub mod cache;
+pub mod cached_compiler;
 
 pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
@@ -182,4 +211,15 @@ pub use hardware_aware::{
     IonQHardware,
     CostModel,
     HardwareType,
+};
+pub use cache::{
+    CircuitFingerprint,
+    CompilationCache,
+    SharedCompilationCache,
+    CacheStatistics,
+};
+pub use cached_compiler::{
+    CachedCompiler,
+    SharedCachedCompiler,
+    CachedOptimizationResult,
 };
