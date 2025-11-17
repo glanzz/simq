@@ -47,12 +47,13 @@ impl ExecutionTelemetry {
 use simq_core::{Circuit, QubitId, Gate, GateOp};
 use std::sync::Arc;
 use simq_state::{AdaptiveState, SparseState, DenseState};
-use rayon::prelude::*;
+// use rayon::prelude::*; // Only needed in kernel
 
 /// Configuration for execution engine
 pub struct ExecutionConfig {
     pub use_parallel: bool,
     pub use_simd: bool,
+    pub parallel_threshold: usize,
 }
 
 /// Execution engine for quantum circuits
@@ -150,7 +151,8 @@ impl ExecutionEngine {
                                 [matrix[2], matrix[3]],
                             ];
                             let qubit_idx = gate_op.qubits()[0].index();
-                            apply_single_qubit_dense_simd(&mat, qubit_idx, dense.amplitudes_mut());
+                            let threshold = self.config.parallel_threshold;
+                            apply_single_qubit_dense_simd(&mat, qubit_idx, dense.amplitudes_mut(), threshold);
                         } else {
                             self.apply_gate_dense(gate_op.gate(), gate_op.qubits(), dense);
                         }
@@ -198,39 +200,44 @@ impl ExecutionEngine {
 
 /// SIMD support
 use num_complex::Complex64;
-
-/// SIMD-optimized single-qubit gate application for dense state
 use rayon::prelude::*;
-pub fn apply_single_qubit_dense_simd(gate: &[[Complex64; 2]; 2], qubit: usize, state: &mut [Complex64]) {
+/// SIMD-optimized single-qubit gate application for dense state with automatic parallelism selection
+pub fn apply_single_qubit_dense_simd(
+    gate: &[[Complex64; 2]; 2],
+    qubit: usize,
+    state: &mut [Complex64],
+    parallel_threshold: usize,
+) {
     let stride = 1 << qubit;
     let n = state.len();
-    let mut i = 0;
-    while i < n {
-        for j in 0..stride {
-            let idx0 = i + j;
-            let idx1 = idx0 + stride;
-            let a = state[idx0];
-            let b = state[idx1];
-            // SIMD: operate on real and imag parts together
-            // Scalar complex math (compatible with stable Rust)
-            let out0 = gate[0][0] * a + gate[0][1] * b;
-            let out1 = gate[1][0] * a + gate[1][1] * b;
-            state[idx0] = out0;
-            state[idx1] = out1;
+    // If state size exceeds threshold, use parallel execution
+    if n >= parallel_threshold {
+        state.par_chunks_mut(stride * 2).for_each(|chunk| {
+            for j in 0..stride {
+                let idx0 = j;
+                let idx1 = j + stride;
+                let a = chunk[idx0];
+                let b = chunk[idx1];
+                let out0 = gate[0][0] * a + gate[0][1] * b;
+                let out1 = gate[1][0] * a + gate[1][1] * b;
+                chunk[idx0] = out0;
+                chunk[idx1] = out1;
+            }
+        });
+    } else {
+        let mut i = 0;
+        while i < n {
+            for j in 0..stride {
+                let idx0 = i + j;
+                let idx1 = idx0 + stride;
+                let a = state[idx0];
+                let b = state[idx1];
+                let out0 = gate[0][0] * a + gate[0][1] * b;
+                let out1 = gate[1][0] * a + gate[1][1] * b;
+                state[idx0] = out0;
+                state[idx1] = out1;
+            }
+            i += stride * 2;
         }
-        i += stride * 2;
     }
-    use rayon::prelude::*;
-    state.par_chunks_mut(stride * 2).for_each(|chunk| {
-        for j in 0..stride {
-            let idx0 = j;
-            let idx1 = j + stride;
-            let a = chunk[idx0];
-            let b = chunk[idx1];
-            let out0 = gate[0][0] * a + gate[0][1] * b;
-            let out1 = gate[1][0] * a + gate[1][1] * b;
-            chunk[idx0] = out0;
-            chunk[idx1] = out1;
-        }
-    });
 }
