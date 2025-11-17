@@ -125,7 +125,7 @@ impl Simulator {
 
         // 2. Initialize state
         let init_start = Instant::now();
-        let state = AdaptiveState::new(num_qubits)?;
+        let mut state = AdaptiveState::new(num_qubits)?;
         let init_time = init_start.elapsed();
 
         if let Some(ref mut s) = stats {
@@ -141,9 +141,8 @@ impl Simulator {
                 use_parallel: self.config.parallel_threshold > 0,
                 use_simd: true,
             };
-            let engine = ExecutionEngine::new(exec_config);
-            // AdaptiveState exposes as_mut() for mutation
-            engine.execute(&compiled_circuit, state.as_mut());
+            let mut engine = ExecutionEngine::new(exec_config);
+            engine.execute(&compiled_circuit, &mut state);
         }
         let gate_time = gate_start.elapsed();
 

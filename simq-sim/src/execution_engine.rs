@@ -1,10 +1,36 @@
 use std::time::{Duration, Instant};
+use std::collections::HashMap;
+use thread_id;
 /// Telemetry data for execution profiling
 #[derive(Debug, Default)]
 pub struct ExecutionTelemetry {
     pub total_gate_time: Duration,
     pub per_gate_times: Vec<Duration>,
     pub state_density: Vec<f32>,
+    pub memory_usage: Vec<usize>,
+    pub gate_type_counts: HashMap<String, usize>,
+    pub thread_ids: Vec<u64>,
+    pub parallelism: usize,
+    pub error_events: Vec<String>,
+    pub custom_events: Vec<(String, Instant)>,
+}
+
+impl ExecutionTelemetry {
+    pub fn log_error(&mut self, msg: impl Into<String>) {
+        self.error_events.push(msg.into());
+    }
+    pub fn log_event(&mut self, label: impl Into<String>) {
+        self.custom_events.push((label.into(), Instant::now()));
+    }
+    pub fn inc_gate_type(&mut self, gate_name: &str) {
+        *self.gate_type_counts.entry(gate_name.to_string()).or_insert(0) += 1;
+    }
+    pub fn record_memory(&mut self, bytes: usize) {
+        self.memory_usage.push(bytes);
+    }
+    pub fn record_thread(&mut self) {
+        self.thread_ids.push(thread_id::get() as u64);
+    }
 }
 /// Execution engine for SimQ simulator
 
@@ -38,8 +64,30 @@ impl ExecutionEngine {
         let mut total_gate_time = Duration::ZERO;
         self.telemetry.per_gate_times.clear();
         self.telemetry.state_density.clear();
+        self.telemetry.memory_usage.clear();
+        self.telemetry.gate_type_counts.clear();
+        self.telemetry.thread_ids.clear();
+        self.telemetry.error_events.clear();
+        self.telemetry.custom_events.clear();
+        self.telemetry.parallelism = rayon::current_num_threads();
+
         for gate_op in circuit.operations() {
             let start = Instant::now();
+            let gate_name = gate_op.gate().name();
+            self.telemetry.inc_gate_type(gate_name);
+            self.telemetry.log_event(format!("apply_gate:{}", gate_name));
+            self.telemetry.record_thread();
+            // Estimate memory usage (dense: 2^n * 16, sparse: hashmap size)
+            let mem_bytes = match state {
+                AdaptiveState::Dense(ref dense) => {
+                    dense.dimension() * std::mem::size_of::<num_complex::Complex64>()
+                }
+                AdaptiveState::Sparse { state: ref sparse, .. } => {
+                    sparse.amplitudes().len() * std::mem::size_of::<num_complex::Complex64>()
+                }
+            };
+            self.telemetry.record_memory(mem_bytes);
+
             self.apply_gate_op(gate_op, state);
             let elapsed = start.elapsed();
             total_gate_time += elapsed;
@@ -47,6 +95,7 @@ impl ExecutionEngine {
             self.telemetry.state_density.push(state.density());
         }
         self.telemetry.total_gate_time = total_gate_time;
+        self.telemetry.log_event("execution_complete");
     }
 
     /// Apply a single gate operation to the quantum state
