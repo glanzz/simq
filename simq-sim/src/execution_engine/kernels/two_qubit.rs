@@ -121,43 +121,13 @@ fn apply_two_qubit_parallel(
     qubit1: usize,
     qubit2: usize,
 ) {
-    let chunk_size = stride_max * 2;
-    let num_chunks = state.len() / chunk_size;
-
-    (0..num_chunks)
-        .into_par_iter()
-        .for_each(|chunk_idx| {
-            let base_offset = chunk_idx * chunk_size;
-
-            for j in 0..stride_min {
-                for k in 0..stride_min {
-                    let base = base_offset + j;
-
-                    if (base & stride_min == 0) && ((base + k * stride_max) & stride_max == 0) {
-                        let idx = get_two_qubit_indices(base, qubit1, qubit2);
-
-                        // Safety: indices are computed to be within bounds
-                        unsafe {
-                            let a = [
-                                *state.get_unchecked(idx[0]),
-                                *state.get_unchecked(idx[1]),
-                                *state.get_unchecked(idx[2]),
-                                *state.get_unchecked(idx[3]),
-                            ];
-
-                            let state_ptr = state.as_mut_ptr();
-                            for (out_idx, &out) in idx.iter().enumerate() {
-                                let mut sum = Complex64::new(0.0, 0.0);
-                                for (in_idx, &amp) in a.iter().enumerate() {
-                                    sum += gate[out_idx][in_idx] * amp;
-                                }
-                                *state_ptr.add(out) = sum;
-                            }
-                        }
-                    }
-                }
-            }
-        });
+    // TODO: Implement proper parallel execution with correct synchronization
+    // For now, use sequential execution to avoid borrow checker issues
+    // The parallel version requires either:
+    // 1. Unsafe code with careful non-overlapping access guarantees
+    // 2. A different parallelization strategy (e.g., using locks or atomics)
+    // 3. Restructuring to collect updates and apply them separately
+    apply_two_qubit_sequential(gate, stride_min, stride_max, state, qubit1, qubit2);
 }
 
 /// Get the 4 indices for a 2-qubit gate application
@@ -211,24 +181,12 @@ pub fn apply_cnot(
     let control_mask = 1 << control;
     let target_mask = 1 << target;
 
-    if use_parallel && n >= parallel_threshold {
-        (0..n)
-            .into_par_iter()
-            .step_by(1)
-            .filter(|&i| i & control_mask != 0 && i & target_mask == 0)
-            .for_each(|i| unsafe {
-                let state_ptr = state.as_mut_ptr();
-                let j = i | target_mask;
-                let temp = *state_ptr.add(i);
-                *state_ptr.add(i) = *state_ptr.add(j);
-                *state_ptr.add(j) = temp;
-            });
-    } else {
-        for i in 0..n {
-            if i & control_mask != 0 && i & target_mask == 0 {
-                let j = i | target_mask;
-                state.swap(i, j);
-            }
+    // TODO: Parallel version has borrow checker issues - use sequential for now
+    // The parallel swap operation requires careful handling of mutable access
+    for i in 0..n {
+        if i & control_mask != 0 && i & target_mask == 0 {
+            let j = i | target_mask;
+            state.swap(i, j);
         }
     }
 
@@ -325,30 +283,14 @@ pub fn apply_swap(
     let mask1 = 1 << qubit1;
     let mask2 = 1 << qubit2;
 
-    if use_parallel && n >= parallel_threshold {
-        (0..n)
-            .into_par_iter()
-            .filter(|&i| {
-                let bit1 = (i & mask1) != 0;
-                let bit2 = (i & mask2) != 0;
-                bit1 && !bit2
-            })
-            .for_each(|i| unsafe {
-                let j = (i & !mask1) | mask2;
-                let state_ptr = state.as_mut_ptr();
-                let temp = *state_ptr.add(i);
-                *state_ptr.add(i) = *state_ptr.add(j);
-                *state_ptr.add(j) = temp;
-            });
-    } else {
-        for i in 0..n {
-            let bit1 = (i & mask1) != 0;
-            let bit2 = (i & mask2) != 0;
+    // TODO: Parallel version has borrow checker issues - use sequential for now
+    for i in 0..n {
+        let bit1 = (i & mask1) != 0;
+        let bit2 = (i & mask2) != 0;
 
-            if bit1 && !bit2 {
-                let j = (i & !mask1) | mask2;
-                state.swap(i, j);
-            }
+        if bit1 && !bit2 {
+            let j = (i & !mask1) | mask2;
+            state.swap(i, j);
         }
     }
 
