@@ -193,8 +193,25 @@ fn apply_multi_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
-    // TODO: Parallel version has borrow checker issues - use sequential for now
-    apply_multi_controlled_sequential(control_mask, num_controls, target_stride, gate, state);
+    (0..state.len())
+        .into_par_iter()
+        .step_by(target_stride * 2)
+        .for_each(|i| {
+            for j in 0..target_stride {
+                let idx = i + j;
+                if idx + target_stride < state.len() &&
+                   (idx & control_mask).count_ones() as usize == num_controls {
+                    unsafe {
+                        let state_ptr = state.as_mut_ptr();
+                        let a = *state_ptr.add(idx);
+                        let b = *state_ptr.add(idx + target_stride);
+
+                        *state_ptr.add(idx) = gate[0][0] * a + gate[0][1] * b;
+                        *state_ptr.add(idx + target_stride) = gate[1][0] * a + gate[1][1] * b;
+                    }
+                }
+            }
+        });
 }
 
 #[cfg(test)]
