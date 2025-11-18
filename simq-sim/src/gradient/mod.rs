@@ -9,10 +9,12 @@
 pub mod parameter_shift;
 pub mod finite_difference;
 pub mod batch;
+pub mod autodiff;
 
 pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
 pub use finite_difference::compute_gradient_finite_difference;
 pub use batch::evaluate_batch_expectation;
+pub use autodiff::{Dual, gradient_forward, HybridAD};
 
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
