@@ -20,6 +20,8 @@ parking_lot.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 thread-id = "5.0.0"
+approx.workspace = true
+ahash.workspace = true
 
 # Optional GPU backend
 wgpu = { version = "0.19", optional = true }
