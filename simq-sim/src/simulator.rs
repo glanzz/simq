@@ -137,14 +137,14 @@ impl Simulator {
         let gate_start = Instant::now();
         {
             use crate::execution_engine::{ExecutionEngine, ExecutionConfig};
-            let exec_config = ExecutionConfig {
-                use_parallel: self.config.parallel_threshold > 0,
-                use_simd: true,
-                parallel_threshold: self.config.parallel_threshold,
-                use_gpu: self.config.use_gpu,
-            };
+            let mut exec_config = ExecutionConfig::default();
+            exec_config.parallel_threshold = self.config.parallel_threshold;
+            exec_config.use_gpu = self.config.use_gpu;
             let mut engine = ExecutionEngine::new(exec_config);
-            engine.execute(&compiled_circuit, &mut state);
+            engine.execute(&compiled_circuit, &mut state)
+                .map_err(|e| SimulatorError::ExecutionFailed {
+                    message: format!("Execution engine failed: {:?}", e),
+                })?;
         }
         let gate_time = gate_start.elapsed();
 

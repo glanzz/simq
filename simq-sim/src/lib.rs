@@ -50,9 +50,6 @@ pub mod gradient;
 mod autodiff;
 
 pub use vqe_qaoa_helpers::{
-	vqe_gradient_parameter_shift,
-	vqe_gradient_finite_difference,
-	vqe_batch_expectation,
 	qaoa_circuit,
 	vqe_hardware_efficient_ansatz,
 };

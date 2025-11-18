@@ -9,11 +9,13 @@
 pub mod parameter_shift;
 pub mod finite_difference;
 pub mod batch;
+pub mod batch_advanced;
 pub mod autodiff;
 
 pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
 pub use finite_difference::compute_gradient_finite_difference;
 pub use batch::evaluate_batch_expectation;
+pub use batch_advanced::{AdaptiveBatchEvaluator, BatchConfig, latin_hypercube_sampling, ImportanceSampler, line_search, verify_gradients};
 pub use autodiff::{Dual, gradient_forward, HybridAD};
 
 use simq_core::Circuit;

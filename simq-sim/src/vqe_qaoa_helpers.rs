@@ -1,3 +1,8 @@
+//! VQE/QAOA helper functions for SimQ
+//!
+//! This module provides high-level routines for variational quantum algorithms,
+//! including circuit builders for QAOA and VQE.
+
 use std::sync::Arc;
 use simq_core::circuit::Circuit;
 use simq_core::QubitId;
@@ -56,48 +61,3 @@ pub fn vqe_hardware_efficient_ansatz(num_qubits: usize, params: &[f64]) -> Circu
     }
     circuit
 }
-
-//! VQE/QAOA helper functions for SimQ
-//!
-//! This module provides high-level routines for variational quantum algorithms,
-//! including batch gradient computation and expectation evaluation.
-
-use crate::simulator::Simulator;
-use crate::gradient::compute_gradient_parameter_shift;
-use crate::finite_diff::compute_gradient_finite_difference;
-use crate::batch_eval::evaluate_batch_expectation;
-use crate::circuit::ParametricCircuit;
-use crate::observable::Observable;
-
-/// Compute gradients for a parametric circuit using the parameter shift rule.
-pub fn vqe_gradient_parameter_shift(
-    simulator: &Simulator,
-    circuit: &ParametricCircuit,
-    observable: &Observable,
-    params: &[f64],
-) -> Vec<f64> {
-    compute_gradient_parameter_shift(simulator, circuit, observable, params)
-}
-
-/// Compute gradients for a parametric circuit using finite differences.
-pub fn vqe_gradient_finite_difference(
-    simulator: &Simulator,
-    circuit: &ParametricCircuit,
-    observable: &Observable,
-    params: &[f64],
-    epsilon: f64,
-) -> Vec<f64> {
-    compute_gradient_finite_difference(simulator, circuit, observable, params, epsilon)
-}
-
-/// Evaluate expectation values for a batch of parameter sets.
-pub fn vqe_batch_expectation(
-    simulator: &Simulator,
-    circuit: &ParametricCircuit,
-    observable: &Observable,
-    batch_params: &[Vec<f64>],
-) -> Vec<f64> {
-    evaluate_batch_expectation(simulator, circuit, observable, batch_params)
-}
-
-// TODO: Add QAOA circuit generator and VQE ansatz templates here.

@@ -88,15 +88,16 @@ fn evaluate_single_expectation(
 ) -> Result<f64> {
     let result = simulator.run(circuit)?;
 
+    // Convert to dense state for expectation value computation
     let expectation = match &result.state {
         AdaptiveState::Dense(dense) => {
-            observable.expectation_value_dense(dense.amplitudes())
+            observable.expectation_value(dense)?
         }
         AdaptiveState::Sparse { state: sparse, .. } => {
-            observable.expectation_value_sparse(
-                sparse.amplitudes(),
-                circuit.num_qubits(),
-            )
+            // Convert sparse to dense for expectation value
+            use simq_state::DenseState;
+            let dense = DenseState::from_sparse(sparse);
+            observable.expectation_value(&dense)?
         }
     };
 
@@ -123,16 +124,16 @@ where
         .iter()
         .map(|observable| match &result.state {
             AdaptiveState::Dense(dense) => {
-                observable.expectation_value_dense(dense.amplitudes())
+                observable.expectation_value(dense)
             }
             AdaptiveState::Sparse { state: sparse, .. } => {
-                observable.expectation_value_sparse(
-                    sparse.amplitudes(),
-                    circuit.num_qubits(),
-                )
+                use simq_state::DenseState;
+                let dense = DenseState::from_sparse(sparse);
+                observable.expectation_value(&dense)
             }
         })
-        .collect();
+        .collect::<Result<Vec<f64>, _>>()
+        .map_err(|e| crate::error::SimulatorError::StateError { message: format!("{:?}", e) })?;
 
     Ok(expectation_values)
 }

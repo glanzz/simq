@@ -203,13 +203,12 @@ fn evaluate_expectation(
 
     let expectation = match &result.state {
         AdaptiveState::Dense(dense) => {
-            observable.expectation_value_dense(dense.amplitudes())
+            observable.expectation_value(dense)?
         }
         AdaptiveState::Sparse { state: sparse, .. } => {
-            observable.expectation_value_sparse(
-                sparse.amplitudes(),
-                circuit.num_qubits(),
-            )
+            use simq_state::DenseState;
+            let dense = DenseState::from_sparse(sparse);
+            observable.expectation_value(&dense)?
         }
     };
 

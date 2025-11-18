@@ -22,6 +22,7 @@ tracing.workspace = true
 thread-id = "5.0.0"
 approx.workspace = true
 ahash.workspace = true
+rand.workspace = true
 
 # Optional GPU backend
 wgpu = { version = "0.19", optional = true }

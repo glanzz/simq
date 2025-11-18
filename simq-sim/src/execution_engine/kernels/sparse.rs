@@ -9,11 +9,11 @@ use crate::execution_engine::error::Result;
 pub fn apply_single_qubit_sparse(
     gate: &Matrix2x2,
     qubit: usize,
-    amplitudes: &mut AHashMap<usize, Complex64>,
+    amplitudes: &mut AHashMap<u64, Complex64>,
     num_qubits: usize,
 ) -> Result<()> {
-    let mask = 1 << qubit;
-    let mut new_amplitudes: AHashMap<usize, Complex64> = AHashMap::new();
+    let mask = 1u64 << qubit;
+    let mut new_amplitudes: AHashMap<u64, Complex64> = AHashMap::new();
 
     // Process all existing amplitudes
     for (&idx, &amp) in amplitudes.iter() {
@@ -43,12 +43,12 @@ pub fn apply_two_qubit_sparse(
     gate: &[[Complex64; 4]; 4],
     qubit1: usize,
     qubit2: usize,
-    amplitudes: &mut AHashMap<usize, Complex64>,
+    amplitudes: &mut AHashMap<u64, Complex64>,
     num_qubits: usize,
 ) -> Result<()> {
-    let mask1 = 1 << qubit1;
-    let mask2 = 1 << qubit2;
-    let mut new_amplitudes: AHashMap<usize, Complex64> = AHashMap::new();
+    let mask1 = 1u64 << qubit1;
+    let mask2 = 1u64 << qubit2;
+    let mut new_amplitudes: AHashMap<u64, Complex64> = AHashMap::new();
 
     // Collect all basis states that need to be updated
     let mut basis_states = std::collections::HashSet::new();
