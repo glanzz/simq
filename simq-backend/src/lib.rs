@@ -20,6 +20,7 @@ pub mod error;
 pub mod transpiler;
 pub mod routing;
 pub mod gate_decomposition;
+pub mod backend_selector;
 
 #[cfg(feature = "local-simulator")]
 pub mod local_simulator;
@@ -39,6 +40,7 @@ pub use routing::{Router, RoutingStrategy, SwapGate, SabreRouter, RoutingStats};
 pub use gate_decomposition::{
     GateDecomposer, optimize_inverse_gates, optimize_merge_rotations, analyze_gate_distribution,
 };
+pub use backend_selector::{BackendSelector, SelectionCriteria, BackendFeature};
 
 #[cfg(feature = "local-simulator")]
 pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
