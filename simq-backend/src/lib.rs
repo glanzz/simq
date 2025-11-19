@@ -22,6 +22,9 @@ pub mod transpiler;
 #[cfg(feature = "local-simulator")]
 pub mod local_simulator;
 
+#[cfg(feature = "ibm-quantum")]
+pub mod ibm_quantum;
+
 pub use backend::{QuantumBackend, BackendType};
 pub use capabilities::{BackendCapabilities, ConnectivityGraph, GateSet};
 pub use result::{BackendResult, JobStatus, ExecutionMetadata};
@@ -30,3 +33,6 @@ pub use transpiler::Transpiler;
 
 #[cfg(feature = "local-simulator")]
 pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
+
+#[cfg(feature = "ibm-quantum")]
+pub use ibm_quantum::{IBMQuantumBackend, IBMConfig};

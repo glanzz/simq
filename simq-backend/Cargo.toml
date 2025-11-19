@@ -22,10 +22,12 @@ rand.workspace = true
 uuid = { version = "1.6", features = ["v4"] }
 async-trait = "0.1"
 tokio = { version = "1.35", features = ["time"], optional = true }
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
 
 [features]
 default = ["local-simulator"]
 local-simulator = ["simq-sim"]
+ibm-quantum = ["reqwest"]
 async = ["tokio"]
 
 [dev-dependencies]
