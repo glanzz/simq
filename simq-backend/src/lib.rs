@@ -19,8 +19,14 @@ pub mod result;
 pub mod error;
 pub mod transpiler;
 
+#[cfg(feature = "local-simulator")]
+pub mod local_simulator;
+
 pub use backend::{QuantumBackend, BackendType};
 pub use capabilities::{BackendCapabilities, ConnectivityGraph, GateSet};
 pub use result::{BackendResult, JobStatus, ExecutionMetadata};
 pub use error::{BackendError, Result};
 pub use transpiler::Transpiler;
+
+#[cfg(feature = "local-simulator")]
+pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
