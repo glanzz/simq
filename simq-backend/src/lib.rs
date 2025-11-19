@@ -18,6 +18,7 @@ pub mod capabilities;
 pub mod result;
 pub mod error;
 pub mod transpiler;
+pub mod routing;
 
 #[cfg(feature = "local-simulator")]
 pub mod local_simulator;
@@ -33,6 +34,7 @@ pub use transpiler::{
     Transpiler, OptimizationLevel, TranspilationCost, DecompositionRule,
     DecompositionRules, QubitMapping, SwapStrategy,
 };
+pub use routing::{Router, RoutingStrategy, SwapGate, SabreRouter, RoutingStats};
 
 #[cfg(feature = "local-simulator")]
 pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
