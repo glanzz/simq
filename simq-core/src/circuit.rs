@@ -116,6 +116,105 @@ impl Circuit {
         self.operations.get(index)
     }
 
+    /// Get a mutable reference to a specific operation
+    pub fn get_operation_mut(&mut self, index: usize) -> Option<&mut GateOp> {
+        self.operations.get_mut(index)
+    }
+
+    /// Remove an operation at the specified index
+    ///
+    /// Returns the removed operation, or None if index is out of bounds.
+    pub fn remove_operation(&mut self, index: usize) -> Option<GateOp> {
+        if index < self.operations.len() {
+            Some(self.operations.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Insert an operation at the specified index
+    ///
+    /// # Errors
+    /// Returns error if qubits are out of bounds or index is invalid
+    pub fn insert_operation(&mut self, index: usize, operation: GateOp) -> Result<()> {
+        // Validate qubits
+        for &qubit in operation.qubits() {
+            if qubit.index() >= self.num_qubits {
+                return Err(QuantumError::invalid_qubit(qubit.index(), self.num_qubits));
+            }
+        }
+
+        if index > self.operations.len() {
+            return Err(QuantumError::ValidationError(format!(
+                "Insert index {} out of bounds (len={})",
+                index,
+                self.operations.len()
+            )));
+        }
+
+        self.operations.insert(index, operation);
+        Ok(())
+    }
+
+    /// Append operations from another circuit
+    ///
+    /// # Errors
+    /// Returns error if circuits have different number of qubits
+    pub fn append(&mut self, other: &Circuit) -> Result<()> {
+        if self.num_qubits != other.num_qubits {
+            return Err(QuantumError::ValidationError(format!(
+                "Cannot append circuits with different qubit counts ({} vs {})",
+                self.num_qubits, other.num_qubits
+            )));
+        }
+
+        for op in other.operations() {
+            self.operations.push(op.clone());
+        }
+        Ok(())
+    }
+
+    /// Count gates by name
+    ///
+    /// Returns a map of gate name to count
+    pub fn gate_counts(&self) -> std::collections::HashMap<String, usize> {
+        let mut counts = std::collections::HashMap::new();
+        for op in &self.operations {
+            *counts.entry(op.gate().name().to_string()).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    /// Count two-qubit gates
+    pub fn two_qubit_gate_count(&self) -> usize {
+        self.operations
+            .iter()
+            .filter(|op| op.gate().num_qubits() == 2)
+            .count()
+    }
+
+    /// Get all two-qubit gate operations
+    pub fn two_qubit_operations(&self) -> impl Iterator<Item = &GateOp> {
+        self.operations
+            .iter()
+            .filter(|op| op.gate().num_qubits() == 2)
+    }
+
+    /// Count single-qubit gates
+    pub fn single_qubit_gate_count(&self) -> usize {
+        self.operations
+            .iter()
+            .filter(|op| op.gate().num_qubits() == 1)
+            .count()
+    }
+
+    /// Get all single-qubit gate operations
+    pub fn single_qubit_operations(&self) -> impl Iterator<Item = &GateOp> {
+        self.operations
+            .iter()
+            .filter(|op| op.gate().num_qubits() == 1)
+    }
+
     /// Clear all operations from the circuit
     pub fn clear(&mut self) {
         self.operations.clear();
