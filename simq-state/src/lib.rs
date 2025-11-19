@@ -33,6 +33,8 @@ pub mod sparse_state;
 pub mod dense_state;
 pub mod adaptive_state;
 pub mod cow_state;
+pub mod density_matrix;
+pub mod density_matrix_simulator;
 pub mod validation;
 pub mod simd;
 pub mod error;
@@ -44,6 +46,10 @@ pub use sparse_state::SparseState;
 pub use dense_state::DenseState;
 pub use adaptive_state::{AdaptiveState, StateStats};
 pub use cow_state::{CowState, CowStats, MemoryStats};
+pub use density_matrix::DensityMatrix;
+pub use density_matrix_simulator::{DensityMatrixConfig, DensityMatrixSimulator, SimulationStats};
 pub use error::{StateError, Result};
-pub use measurement::{Measurement, MeasurementResult, SamplingResult, ComputationalBasis, MidCircuitMeasurement};
-pub use observable::{Pauli, PauliString, PauliObservable};
+pub use measurement::{
+    ComputationalBasis, Measurement, MeasurementResult, MidCircuitMeasurement, SamplingResult,
+};
+pub use observable::{Pauli, PauliObservable, PauliString};
