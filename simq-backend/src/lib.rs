@@ -1,14 +1,49 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Hardware Backend Abstraction for SimQ
+//!
+//! This crate provides a unified interface for executing quantum circuits on
+//! different backends, including:
+//! - Local simulators (built-in)
+//! - IBM Quantum (via Qiskit Runtime API)
+//! - AWS Braket
+//! - Azure Quantum
+//! - Other cloud providers
+//!
+//! # Architecture
+//!
+//! The backend system uses a trait-based abstraction that allows seamless
+//! switching between different execution targets while maintaining the same API.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod backend;
+pub mod capabilities;
+pub mod result;
+pub mod error;
+pub mod transpiler;
+pub mod routing;
+pub mod gate_decomposition;
+pub mod backend_selector;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+#[cfg(feature = "local-simulator")]
+pub mod local_simulator;
+
+#[cfg(feature = "ibm-quantum")]
+pub mod ibm_quantum;
+
+pub use backend::{QuantumBackend, BackendType};
+pub use capabilities::{BackendCapabilities, ConnectivityGraph, GateSet};
+pub use result::{BackendResult, JobStatus, ExecutionMetadata};
+pub use error::{BackendError, Result};
+pub use transpiler::{
+    Transpiler, OptimizationLevel, TranspilationCost, DecompositionRule,
+    DecompositionRules, QubitMapping, SwapStrategy,
+};
+pub use routing::{Router, RoutingStrategy, SwapGate, SabreRouter, RoutingStats};
+pub use gate_decomposition::{
+    GateDecomposer, optimize_inverse_gates, optimize_merge_rotations, analyze_gate_distribution,
+};
+pub use backend_selector::{BackendSelector, SelectionCriteria, BackendFeature};
+
+#[cfg(feature = "local-simulator")]
+pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
+
+#[cfg(feature = "ibm-quantum")]
+pub use ibm_quantum::{IBMQuantumBackend, IBMConfig};

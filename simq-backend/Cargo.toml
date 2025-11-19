@@ -12,9 +12,23 @@ description = "Hardware backend abstraction for SimQ"
 [dependencies]
 simq-core.workspace = true
 simq-compiler.workspace = true
+simq-gates.workspace = true
+simq-sim = { workspace = true, optional = true }
+simq-state.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ahash.workspace = true
+rand.workspace = true
+uuid = { version = "1.6", features = ["v4"] }
+async-trait = "0.1"
+tokio = { version = "1.35", features = ["time"], optional = true }
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+
+[features]
+default = ["local-simulator"]
+local-simulator = ["simq-sim"]
+ibm-quantum = ["reqwest"]
+async = ["tokio"]
 
 [dev-dependencies]
