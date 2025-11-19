@@ -11,12 +11,19 @@ pub mod finite_difference;
 pub mod batch;
 pub mod batch_advanced;
 pub mod autodiff;
+pub mod vqe_qaoa;
 
 pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
 pub use finite_difference::{compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod};
 pub use batch::evaluate_batch_expectation;
 pub use batch_advanced::{AdaptiveBatchEvaluator, BatchConfig, latin_hypercube_sampling, ImportanceSampler, line_search, verify_gradients};
 pub use autodiff::{Dual, gradient_forward, HybridAD};
+pub use vqe_qaoa::{
+    VQEConfig, VQEOptimizer, QAOAConfig, QAOAOptimizer,
+    AdamConfig, AdamOptimizer, MomentumConfig, MomentumOptimizer,
+    OptimizationResult, OptimizationStep, ConvergenceStatus,
+    gradient_descent,
+};
 
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
