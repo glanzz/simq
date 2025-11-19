@@ -19,6 +19,7 @@ pub mod result;
 pub mod error;
 pub mod transpiler;
 pub mod routing;
+pub mod gate_decomposition;
 
 #[cfg(feature = "local-simulator")]
 pub mod local_simulator;
@@ -35,6 +36,9 @@ pub use transpiler::{
     DecompositionRules, QubitMapping, SwapStrategy,
 };
 pub use routing::{Router, RoutingStrategy, SwapGate, SabreRouter, RoutingStats};
+pub use gate_decomposition::{
+    GateDecomposer, optimize_inverse_gates, optimize_merge_rotations, analyze_gate_distribution,
+};
 
 #[cfg(feature = "local-simulator")]
 pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};

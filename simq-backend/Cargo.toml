@@ -12,6 +12,7 @@ description = "Hardware backend abstraction for SimQ"
 [dependencies]
 simq-core.workspace = true
 simq-compiler.workspace = true
+simq-gates.workspace = true
 simq-sim = { workspace = true, optional = true }
 simq-state.workspace = true
 thiserror.workspace = true
