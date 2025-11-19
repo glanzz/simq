@@ -63,6 +63,7 @@ pub mod circuit_builder;
 pub mod dynamic_builder;
 pub mod error;
 pub mod gate;
+pub mod noise;
 pub mod parameter;
 pub mod parameter_id;
 pub mod parameter_registry;
@@ -79,6 +80,10 @@ pub use circuit_builder::CircuitBuilder;
 pub use dynamic_builder::DynamicCircuitBuilder;
 pub use error::QuantumError;
 pub use gate::{Gate, GateOp};
+pub use noise::{
+    AmplitudeDamping, DepolarizingChannel, KrausOperator, NoiseChannel, NoiseModel, PhaseDamping,
+    ReadoutError,
+};
 pub use num_complex::Complex64;
 pub use parameter::Parameter;
 pub use parameter_id::ParameterId;
@@ -86,8 +91,7 @@ pub use parameter_registry::ParameterRegistry;
 pub use qubit::QubitId;
 pub use qubit_ref::Qubit;
 pub use validation::{
-    DependencyGraph, ValidationReport, ValidationRule, ValidationResult,
-    ParallelismAnalysis,
+    DependencyGraph, ParallelismAnalysis, ValidationReport, ValidationResult, ValidationRule,
 };
 
 /// Type alias for results in SimQ
