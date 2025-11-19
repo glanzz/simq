@@ -29,7 +29,10 @@ pub use backend::{QuantumBackend, BackendType};
 pub use capabilities::{BackendCapabilities, ConnectivityGraph, GateSet};
 pub use result::{BackendResult, JobStatus, ExecutionMetadata};
 pub use error::{BackendError, Result};
-pub use transpiler::Transpiler;
+pub use transpiler::{
+    Transpiler, OptimizationLevel, TranspilationCost, DecompositionRule,
+    DecompositionRules, QubitMapping, SwapStrategy,
+};
 
 #[cfg(feature = "local-simulator")]
 pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
