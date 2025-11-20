@@ -35,6 +35,7 @@ pub mod adaptive_state;
 pub mod cow_state;
 pub mod density_matrix;
 pub mod density_matrix_simulator;
+pub mod monte_carlo_simulator;
 pub mod validation;
 pub mod simd;
 pub mod error;
@@ -48,6 +49,7 @@ pub use adaptive_state::{AdaptiveState, StateStats};
 pub use cow_state::{CowState, CowStats, MemoryStats};
 pub use density_matrix::DensityMatrix;
 pub use density_matrix_simulator::{DensityMatrixConfig, DensityMatrixSimulator, SimulationStats};
+pub use monte_carlo_simulator::{MonteCarloConfig, MonteCarloSimulator, MonteCarloStats};
 pub use error::{StateError, Result};
 pub use measurement::{
     ComputationalBasis, Measurement, MeasurementResult, MidCircuitMeasurement, SamplingResult,

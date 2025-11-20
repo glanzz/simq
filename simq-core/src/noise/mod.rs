@@ -29,9 +29,14 @@
 //! ```
 
 pub mod channels;
+pub mod monte_carlo;
 pub mod types;
 
 pub use channels::{
     AmplitudeDamping, DepolarizingChannel, PhaseDamping, ReadoutError,
+};
+pub use monte_carlo::{
+    AmplitudeDampingMC, DepolarizingMC, MonteCarloSampler, PauliOperation, PhaseDampingMC,
+    ReadoutErrorMC,
 };
 pub use types::{KrausOperator, NoiseChannel, NoiseModel};
