@@ -46,6 +46,7 @@ pub mod statistics;
 
 pub mod vqe_qaoa_helpers;
 pub mod gradient;
+pub mod qaoa;
 
 mod autodiff;
 
