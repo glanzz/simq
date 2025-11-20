@@ -81,9 +81,10 @@ pub use dynamic_builder::DynamicCircuitBuilder;
 pub use error::QuantumError;
 pub use gate::{Gate, GateOp};
 pub use noise::{
-    AmplitudeDamping, AmplitudeDampingMC, DepolarizingChannel, DepolarizingMC, KrausOperator,
-    MonteCarloSampler, NoiseChannel, NoiseModel, PauliOperation, PhaseDamping, PhaseDampingMC,
-    ReadoutError, ReadoutErrorMC,
+    AmplitudeDamping, AmplitudeDampingMC, CrosstalkProperties, DepolarizingChannel, DepolarizingMC,
+    GateNoise, GateTiming, HardwareNoiseModel, KrausOperator, MonteCarloSampler, NoiseChannel,
+    NoiseModel, PauliOperation, PhaseDamping, PhaseDampingMC, QubitProperties, QubitTimeTracker,
+    ReadoutError, ReadoutErrorMC, TwoQubitGateProperties,
 };
 pub use num_complex::Complex64;
 pub use parameter::Parameter;

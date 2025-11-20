@@ -29,14 +29,21 @@
 //! ```
 
 pub mod channels;
+pub mod hardware;
 pub mod monte_carlo;
+pub mod time_tracker;
 pub mod types;
 
 pub use channels::{
     AmplitudeDamping, DepolarizingChannel, PhaseDamping, ReadoutError,
 };
+pub use hardware::{
+    CrosstalkProperties, GateNoise, GateTiming, HardwareNoiseModel, QubitProperties,
+    TwoQubitGateProperties,
+};
 pub use monte_carlo::{
     AmplitudeDampingMC, DepolarizingMC, MonteCarloSampler, PauliOperation, PhaseDampingMC,
     ReadoutErrorMC,
 };
+pub use time_tracker::QubitTimeTracker;
 pub use types::{KrausOperator, NoiseChannel, NoiseModel};
