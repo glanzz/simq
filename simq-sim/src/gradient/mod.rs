@@ -12,6 +12,7 @@ pub mod batch;
 pub mod batch_advanced;
 pub mod autodiff;
 pub mod vqe_qaoa;
+pub mod classical_optimizers;
 
 pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
 pub use finite_difference::{compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod};
@@ -23,6 +24,10 @@ pub use vqe_qaoa::{
     AdamConfig, AdamOptimizer, MomentumConfig, MomentumOptimizer,
     OptimizationResult, OptimizationStep, ConvergenceStatus,
     gradient_descent,
+};
+pub use classical_optimizers::{
+    LBFGSOptimizer, LBFGSConfig,
+    NelderMeadOptimizer, NelderMeadConfig,
 };
 
 use simq_core::Circuit;
