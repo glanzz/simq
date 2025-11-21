@@ -12,6 +12,8 @@ pub mod batch;
 pub mod batch_advanced;
 pub mod autodiff;
 pub mod vqe_qaoa;
+pub mod classical_optimizers;
+pub mod convergence;
 
 pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
 pub use finite_difference::{compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod};
@@ -23,6 +25,16 @@ pub use vqe_qaoa::{
     AdamConfig, AdamOptimizer, MomentumConfig, MomentumOptimizer,
     OptimizationResult, OptimizationStep, ConvergenceStatus,
     gradient_descent,
+};
+pub use classical_optimizers::{
+    LBFGSOptimizer, LBFGSConfig,
+    NelderMeadOptimizer, NelderMeadConfig,
+};
+pub use convergence::{
+    ConvergenceMonitor, MonitorConfig, StepMetrics,
+    StoppingCriterion, ConvergenceReport,
+    progress_callback, energy_logger, target_energy_callback,
+    BestTracker, TrackedOptimizationResult,
 };
 
 use simq_core::Circuit;
