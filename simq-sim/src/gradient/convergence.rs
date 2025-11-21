@@ -756,9 +756,232 @@ pub fn target_energy_callback(target: f64) -> MonitorCallback {
     })
 }
 
+// ============================================================================
+// Simple Best Tracker
+// ============================================================================
+
+/// Lightweight tracker for best energy and parameters
+///
+/// Use this when you just need to track the best solution without
+/// full convergence monitoring overhead.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut tracker = BestTracker::new();
+///
+/// for iteration in 0..100 {
+///     let energy = compute_energy(&params);
+///     tracker.update(energy, &params);
+///     // ... update params ...
+/// }
+///
+/// println!("Best energy: {}", tracker.best_energy());
+/// let best_params = tracker.best_parameters();
+/// ```
+#[derive(Debug, Clone)]
+pub struct BestTracker {
+    best_energy: f64,
+    best_parameters: Vec<f64>,
+    best_iteration: usize,
+    current_iteration: usize,
+    history: Vec<f64>,
+    track_history: bool,
+}
+
+impl BestTracker {
+    /// Create a new best tracker
+    pub fn new() -> Self {
+        Self {
+            best_energy: f64::INFINITY,
+            best_parameters: Vec::new(),
+            best_iteration: 0,
+            current_iteration: 0,
+            history: Vec::new(),
+            track_history: false,
+        }
+    }
+
+    /// Create with history tracking enabled
+    pub fn with_history() -> Self {
+        Self {
+            track_history: true,
+            ..Self::new()
+        }
+    }
+
+    /// Update with new energy and parameters
+    ///
+    /// Returns `true` if this is a new best, `false` otherwise
+    pub fn update(&mut self, energy: f64, parameters: &[f64]) -> bool {
+        if self.track_history {
+            self.history.push(energy);
+        }
+
+        let is_new_best = energy < self.best_energy;
+        if is_new_best {
+            self.best_energy = energy;
+            self.best_parameters = parameters.to_vec();
+            self.best_iteration = self.current_iteration;
+        }
+
+        self.current_iteration += 1;
+        is_new_best
+    }
+
+    /// Get the best energy found
+    pub fn best_energy(&self) -> f64 {
+        self.best_energy
+    }
+
+    /// Get the parameters at best energy
+    pub fn best_parameters(&self) -> &[f64] {
+        &self.best_parameters
+    }
+
+    /// Get the iteration where best was found
+    pub fn best_iteration(&self) -> usize {
+        self.best_iteration
+    }
+
+    /// Get total iterations recorded
+    pub fn num_iterations(&self) -> usize {
+        self.current_iteration
+    }
+
+    /// Check if any improvement has been found
+    pub fn has_improved(&self) -> bool {
+        self.best_energy < f64::INFINITY
+    }
+
+    /// Get energy history (if tracking enabled)
+    pub fn history(&self) -> &[f64] {
+        &self.history
+    }
+
+    /// Get improvement from first to best
+    pub fn total_improvement(&self) -> Option<f64> {
+        self.history.first().map(|first| first - self.best_energy)
+    }
+
+    /// Reset the tracker
+    pub fn reset(&mut self) {
+        self.best_energy = f64::INFINITY;
+        self.best_parameters.clear();
+        self.best_iteration = 0;
+        self.current_iteration = 0;
+        self.history.clear();
+    }
+}
+
+impl Default for BestTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// Optimization Result with Best Tracking
+// ============================================================================
+
+/// Extended optimization result that guarantees best parameters are returned
+#[derive(Debug, Clone)]
+pub struct TrackedOptimizationResult {
+    /// Final parameters (may not be best)
+    pub final_parameters: Vec<f64>,
+    /// Final energy
+    pub final_energy: f64,
+    /// Best parameters found during optimization
+    pub best_parameters: Vec<f64>,
+    /// Best energy found
+    pub best_energy: f64,
+    /// Iteration where best was found
+    pub best_iteration: usize,
+    /// Total iterations
+    pub num_iterations: usize,
+    /// Final gradient (if available)
+    pub final_gradient: Option<Vec<f64>>,
+    /// Convergence status
+    pub stopping_criterion: StoppingCriterion,
+    /// Total time
+    pub total_time: Duration,
+    /// Energy history
+    pub energy_history: Vec<f64>,
+}
+
+impl TrackedOptimizationResult {
+    /// Check if converged
+    pub fn converged(&self) -> bool {
+        self.stopping_criterion.is_converged()
+    }
+
+    /// Get the improvement from initial to best
+    pub fn improvement(&self) -> f64 {
+        if let Some(&initial) = self.energy_history.first() {
+            initial - self.best_energy
+        } else {
+            0.0
+        }
+    }
+
+    /// Get relative improvement
+    pub fn relative_improvement(&self) -> f64 {
+        if let Some(&initial) = self.energy_history.first() {
+            if initial.abs() > 1e-10 {
+                (initial - self.best_energy) / initial.abs()
+            } else {
+                self.improvement()
+            }
+        } else {
+            0.0
+        }
+    }
+
+    /// Print a summary
+    pub fn print_summary(&self) {
+        println!("Optimization Result:");
+        println!("  Status:          {:?}", self.stopping_criterion);
+        println!("  Iterations:      {}", self.num_iterations);
+        println!("  Time:            {:?}", self.total_time);
+        println!("  Best energy:     {:.8} (iter {})", self.best_energy, self.best_iteration);
+        println!("  Final energy:    {:.8}", self.final_energy);
+        println!("  Improvement:     {:.8} ({:.2}%)",
+            self.improvement(),
+            self.relative_improvement() * 100.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_best_tracker() {
+        let mut tracker = BestTracker::new();
+
+        tracker.update(1.0, &[0.5]);
+        assert!((tracker.best_energy() - 1.0).abs() < 1e-10);
+
+        tracker.update(0.5, &[0.3]);
+        assert!((tracker.best_energy() - 0.5).abs() < 1e-10);
+
+        // Worse energy shouldn't update best
+        tracker.update(0.8, &[0.4]);
+        assert!((tracker.best_energy() - 0.5).abs() < 1e-10);
+        assert_eq!(tracker.best_iteration(), 1);
+    }
+
+    #[test]
+    fn test_best_tracker_with_history() {
+        let mut tracker = BestTracker::with_history();
+
+        tracker.update(1.0, &[0.5]);
+        tracker.update(0.5, &[0.3]);
+        tracker.update(0.8, &[0.4]);
+
+        assert_eq!(tracker.history().len(), 3);
+        assert!((tracker.total_improvement().unwrap() - 0.5).abs() < 1e-10);
+    }
 
     #[test]
     fn test_monitor_basic() {

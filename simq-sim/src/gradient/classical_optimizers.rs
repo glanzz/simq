@@ -642,7 +642,8 @@ where
                     energies[worst_idx] = contracted_energy;
                 } else {
                     // Shrink simplex toward best point
-                    self.shrink(&mut simplex, &simplex[best_idx]);
+                    let best_point = simplex[best_idx].clone();
+                    self.shrink(&mut simplex, &best_point);
                     for i in 0..simplex.len() {
                         if i != best_idx {
                             let circuit = (self.circuit_builder)(&simplex[i]);

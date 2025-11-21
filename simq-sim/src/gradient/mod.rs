@@ -34,6 +34,7 @@ pub use convergence::{
     ConvergenceMonitor, MonitorConfig, StepMetrics,
     StoppingCriterion, ConvergenceReport,
     progress_callback, energy_logger, target_energy_callback,
+    BestTracker, TrackedOptimizationResult,
 };
 
 use simq_core::Circuit;
