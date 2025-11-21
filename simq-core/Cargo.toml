@@ -28,6 +28,7 @@ cache = ["serialization", "dep:dashmap"]
 [dev-dependencies]
 approx.workspace = true
 criterion = { version = "0.5", features = ["html_reports"] }
+simq-gates = { path = "../simq-gates" }
 
 [[bench]]
 name = "noise_overhead"
