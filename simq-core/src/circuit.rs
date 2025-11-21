@@ -617,6 +617,33 @@ impl Circuit {
     pub fn to_ascii_with_config(&self, config: &crate::ascii_renderer::AsciiConfig) -> String {
         crate::ascii_renderer::render_with_config(self, config)
     }
+
+    /// Render circuit as LaTeX using quantikz package
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// println!("{}", circuit.to_latex());
+    /// ```
+    pub fn to_latex(&self) -> String {
+        crate::latex_renderer::render(self)
+    }
+
+    /// Render circuit as LaTeX with custom configuration
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::{Circuit, LatexConfig};
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let config = LatexConfig::default().standalone(true);
+    /// println!("{}", circuit.to_latex_with_config(&config));
+    /// ```
+    pub fn to_latex_with_config(&self, config: &crate::latex_renderer::LatexConfig) -> String {
+        crate::latex_renderer::render_with_config(self, config)
+    }
 }
 
 impl std::fmt::Display for Circuit {
