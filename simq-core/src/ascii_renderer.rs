@@ -235,15 +235,33 @@ impl<'a> AsciiRenderer<'a> {
         let name = op.gate().name();
         let desc = op.gate().description();
 
-        // Use description if it has params, otherwise use name
-        if desc != name && desc.contains('(') {
-            // Truncate long parameter descriptions
-            if desc.len() > 10 && self.config.compact {
-                format!("{}(..)", name)
+        // Check if description has useful info (parameters or custom details)
+        let default_desc = format!("{}-qubit gate '{}'", op.gate().num_qubits(), name);
+        let has_params = desc.contains('(') && desc.contains(')');
+        let is_custom_desc = desc != default_desc && desc != name;
+
+        if has_params {
+            // Parametric gate - use description with params
+            if desc.len() > 12 && self.config.compact {
+                // Truncate long params in compact mode
+                if let Some(paren_idx) = desc.find('(') {
+                    let base = &desc[..paren_idx];
+                    format!("{}(..)", base)
+                } else {
+                    format!("{}(..)", name)
+                }
+            } else {
+                desc.to_string()
+            }
+        } else if is_custom_desc {
+            // Custom gate with custom description - show description
+            if desc.len() > 12 && self.config.compact {
+                format!("{}...", &desc[..9])
             } else {
                 desc.to_string()
             }
         } else {
+            // Simple gate - just use name
             name.to_string()
         }
     }
@@ -305,19 +323,29 @@ impl<'a> AsciiRenderer<'a> {
                 let min_q = *indices.iter().min().unwrap();
                 let max_q = *indices.iter().max().unwrap();
 
-                // First qubit gets the control symbol (for CNOT-like)
-                // Last qubit gets target
                 let name = op.gate().name().to_uppercase();
-                let is_controlled = name.starts_with('C') || name == "CNOT" || name == "CCNOT";
+                let is_controlled = name.starts_with('C') || name == "CNOT" || name == "CCNOT" || name == "TOFFOLI";
+                let is_swap = name == "SWAP" || name == "ISWAP";
+                let is_cswap = name == "CSWAP" || name == "FREDKIN";
 
                 for (i, &q) in indices.iter().enumerate() {
                     qubit_gate.insert(q, *op);
-                    if is_controlled && i < indices.len() - 1 {
+                    if is_swap {
+                        // SWAP: both qubits are targets (×)
+                        qubit_role.insert(q, QubitRole::Target);
+                    } else if is_cswap {
+                        // CSWAP/Fredkin: first is control, rest are targets
+                        if i == 0 {
+                            qubit_role.insert(q, QubitRole::Control);
+                        } else {
+                            qubit_role.insert(q, QubitRole::Target);
+                        }
+                    } else if is_controlled && i < indices.len() - 1 {
                         qubit_role.insert(q, QubitRole::Control);
                     } else if is_controlled {
                         qubit_role.insert(q, QubitRole::Target);
                     } else {
-                        qubit_role.insert(q, QubitRole::Multi(i));
+                        qubit_role.insert(q, QubitRole::Multi);
                     }
                 }
 
@@ -351,10 +379,16 @@ impl<'a> AsciiRenderer<'a> {
                     let name = op.gate().name().to_uppercase();
                     let sym = if name == "CNOT" || name == "CX" {
                         "⊕".to_string()
-                    } else if name == "CCNOT" || name == "CCX" {
+                    } else if name == "CCNOT" || name == "CCX" || name == "TOFFOLI" {
                         "⊕".to_string()
                     } else if name == "CZ" {
                         "●".to_string()
+                    } else if name == "CY" {
+                        "[Y]".to_string()
+                    } else if name == "SWAP" || name == "ISWAP" {
+                        "×".to_string()
+                    } else if name == "CSWAP" || name == "FREDKIN" {
+                        "×".to_string()
                     } else {
                         // For other controlled gates, show the base gate
                         let base = name.trim_start_matches('C');
@@ -362,11 +396,11 @@ impl<'a> AsciiRenderer<'a> {
                     };
                     line.push_str(&center_str(&sym, width));
                 }
-                Some(QubitRole::Multi(i)) => {
+                Some(QubitRole::Multi) => {
                     let op = qubit_gate[&q];
-                    let sym = format!("[{}]", op.gate().name());
-                    line.push_str(&center_str(&sym, width));
-                    let _ = i; // Suppress unused warning
+                    let sym = self.gate_symbol(op);
+                    let boxed = format!("[{}]", sym);
+                    line.push_str(&center_str(&boxed, width));
                 }
                 Some(QubitRole::Wire) => {
                     // Vertical wire for multi-qubit gates
@@ -386,7 +420,7 @@ enum QubitRole {
     Single,
     Control,
     Target,
-    Multi(usize),
+    Multi,
     Wire,
 }
 
@@ -478,5 +512,55 @@ mod tests {
         for line in ascii.lines() {
             assert!(line.chars().count() <= 50);
         }
+    }
+
+    #[test]
+    fn test_custom_gate_with_description() {
+        // Custom gate with custom description
+        #[derive(Debug)]
+        struct MyOracle;
+        impl Gate for MyOracle {
+            fn name(&self) -> &str { "Oracle" }
+            fn num_qubits(&self) -> usize { 1 }
+            fn description(&self) -> String { "Grover Oracle".to_string() }
+        }
+
+        let mut circuit = Circuit::new(2);
+        circuit.add_gate(Arc::new(MyOracle), &[QubitId::new(0)]).unwrap();
+        let ascii = render(&circuit);
+        assert!(ascii.contains("Grover Oracle"));
+    }
+
+    #[test]
+    fn test_parametric_gate() {
+        #[derive(Debug)]
+        struct ParamGate(f64, f64);
+        impl Gate for ParamGate {
+            fn name(&self) -> &str { "U" }
+            fn num_qubits(&self) -> usize { 1 }
+            fn description(&self) -> String { format!("U({:.2}, {:.2})", self.0, self.1) }
+        }
+
+        let mut circuit = Circuit::new(1);
+        circuit.add_gate(Arc::new(ParamGate(1.57, 3.14)), &[QubitId::new(0)]).unwrap();
+        let ascii = render(&circuit);
+        assert!(ascii.contains("U(1.57, 3.14)"));
+    }
+
+    #[test]
+    fn test_multi_qubit_custom_gate() {
+        #[derive(Debug)]
+        struct CustomTwoQubit;
+        impl Gate for CustomTwoQubit {
+            fn name(&self) -> &str { "XX" }
+            fn num_qubits(&self) -> usize { 2 }
+            fn description(&self) -> String { "XX(π/2)".to_string() }
+        }
+
+        let mut circuit = Circuit::new(2);
+        circuit.add_gate(Arc::new(CustomTwoQubit), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        let ascii = render(&circuit);
+        // Multi-qubit non-controlled gates show [description] on each qubit
+        assert!(ascii.contains("[XX(π/2)]"));
     }
 }

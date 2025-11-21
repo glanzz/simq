@@ -1,116 +1,159 @@
 //! ASCII Circuit Rendering Demo
 //!
-//! Demonstrates how to render quantum circuits as ASCII art.
+//! Demonstrates how to render quantum circuits as ASCII art with all gate types.
 //!
 //! Run with: cargo run --example ascii_circuit -p simq-core
 
-use simq_core::{AsciiConfig, Circuit, DynamicCircuitBuilder, Gate};
+use simq_core::{AsciiConfig, Circuit, DynamicCircuitBuilder, Gate, QubitId};
+use simq_gates::standard::*;
 use std::sync::Arc;
 
-// Simple mock gates for demonstration
+// Custom gate examples
 #[derive(Debug)]
-struct H;
-impl Gate for H {
-    fn name(&self) -> &str { "H" }
+struct GroverOracle;
+impl Gate for GroverOracle {
+    fn name(&self) -> &str { "Oracle" }
     fn num_qubits(&self) -> usize { 1 }
+    fn description(&self) -> String { "Grover".to_string() }
 }
 
 #[derive(Debug)]
-struct X;
-impl Gate for X {
-    fn name(&self) -> &str { "X" }
+struct GroverDiffusion;
+impl Gate for GroverDiffusion {
+    fn name(&self) -> &str { "Diffusion" }
     fn num_qubits(&self) -> usize { 1 }
+    fn description(&self) -> String { "Diffusion".to_string() }
 }
 
 #[derive(Debug)]
-struct T;
-impl Gate for T {
-    fn name(&self) -> &str { "T" }
-    fn num_qubits(&self) -> usize { 1 }
-}
-
-#[derive(Debug)]
-struct CNOT;
-impl Gate for CNOT {
-    fn name(&self) -> &str { "CNOT" }
+struct XXGate(f64);
+impl Gate for XXGate {
+    fn name(&self) -> &str { "XX" }
     fn num_qubits(&self) -> usize { 2 }
+    fn description(&self) -> String { format!("XX({:.4})", self.0) }
 }
 
 #[derive(Debug)]
-struct CZ;
-impl Gate for CZ {
-    fn name(&self) -> &str { "CZ" }
-    fn num_qubits(&self) -> usize { 2 }
-}
-
-#[derive(Debug)]
-struct RZ(f64);
-impl Gate for RZ {
-    fn name(&self) -> &str { "RZ" }
+struct QFTGate;
+impl Gate for QFTGate {
+    fn name(&self) -> &str { "QFT" }
     fn num_qubits(&self) -> usize { 1 }
-    fn description(&self) -> String {
-        format!("RZ({:.3})", self.0)
-    }
+    fn description(&self) -> String { "QFT".to_string() }
 }
 
 fn main() {
     println!("=== ASCII Circuit Renderer Demo ===\n");
 
-    // Build a sample circuit
+    // Demo 1: Basic single-qubit gates
+    println!("1. Single-Qubit Gates:");
     let mut builder = DynamicCircuitBuilder::new(4);
+    builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
+    builder.apply_gate(Arc::new(PauliX), &[1]).unwrap();
+    builder.apply_gate(Arc::new(PauliY), &[2]).unwrap();
+    builder.apply_gate(Arc::new(PauliZ), &[3]).unwrap();
+    builder.apply_gate(Arc::new(SGate), &[0]).unwrap();
+    builder.apply_gate(Arc::new(TGate), &[1]).unwrap();
+    builder.apply_gate(Arc::new(SXGate), &[2]).unwrap();
+    builder.apply_gate(Arc::new(Identity), &[3]).unwrap();
+    println!("{}\n", builder.build().to_ascii());
 
-    builder.apply_gate(Arc::new(H), &[0]).unwrap();
-    builder.apply_gate(Arc::new(H), &[1]).unwrap();
-    builder.apply_gate(Arc::new(CNOT), &[0, 2]).unwrap();
-    builder.apply_gate(Arc::new(X), &[3]).unwrap();
-    builder.apply_gate(Arc::new(CZ), &[1, 3]).unwrap();
-    builder.apply_gate(Arc::new(T), &[0]).unwrap();
-    builder
-        .apply_gate(Arc::new(RZ(std::f64::consts::PI / 4.0)), &[2])
-        .unwrap();
+    // Demo 2: Rotation gates
+    println!("2. Rotation Gates:");
+    let mut builder = DynamicCircuitBuilder::new(3);
+    builder.apply_gate(Arc::new(RotationX::new(std::f64::consts::PI / 4.0)), &[0]).unwrap();
+    builder.apply_gate(Arc::new(RotationY::new(std::f64::consts::PI / 2.0)), &[1]).unwrap();
+    builder.apply_gate(Arc::new(RotationZ::new(std::f64::consts::PI)), &[2]).unwrap();
+    builder.apply_gate(Arc::new(Phase::new(0.5)), &[0]).unwrap();
+    builder.apply_gate(Arc::new(U3::new(1.0, 2.0, 3.0)), &[1]).unwrap();
+    println!("{}\n", builder.build().to_ascii());
 
-    let circuit = builder.build();
+    // Demo 3: Two-qubit gates
+    println!("3. Two-Qubit Gates:");
+    let mut builder = DynamicCircuitBuilder::new(4);
+    builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
+    builder.apply_gate(Arc::new(CZ), &[2, 3]).unwrap();
+    builder.apply_gate(Arc::new(Swap), &[0, 2]).unwrap();
+    builder.apply_gate(Arc::new(ISwap), &[1, 3]).unwrap();
+    builder.apply_gate(Arc::new(CY), &[0, 3]).unwrap();
+    println!("{}\n", builder.build().to_ascii());
 
-    // Default rendering (auto-detects terminal width)
-    println!("Default (auto terminal width):");
-    println!("{}\n", circuit.to_ascii());
+    // Demo 4: Three-qubit gates
+    println!("4. Three-Qubit Gates:");
+    let mut builder = DynamicCircuitBuilder::new(4);
+    builder.apply_gate(Arc::new(Toffoli), &[0, 1, 2]).unwrap();
+    builder.apply_gate(Arc::new(Fredkin), &[1, 2, 3]).unwrap();
+    println!("{}\n", builder.build().to_ascii());
 
-    // Custom width
-    println!("Custom width (80 chars):");
-    let config = AsciiConfig {
-        max_width: 80,
-        ..Default::default()
-    };
-    println!("{}\n", circuit.to_ascii_with_config(&config));
+    // Demo 5: Complex circuit
+    println!("5. Bell State + Teleportation-like Circuit:");
+    let mut builder = DynamicCircuitBuilder::new(3);
+    builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
+    builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
+    builder.apply_gate(Arc::new(CNot), &[1, 2]).unwrap();
+    builder.apply_gate(Arc::new(Hadamard), &[1]).unwrap();
+    builder.apply_gate(Arc::new(CNot), &[0, 2]).unwrap();
+    builder.apply_gate(Arc::new(CZ), &[1, 2]).unwrap();
+    println!("{}\n", builder.build().to_ascii());
 
-    // Narrow terminal
-    println!("Narrow terminal (50 chars):");
-    let config = AsciiConfig {
-        max_width: 50,
-        ..Default::default()
-    };
-    println!("{}\n", circuit.to_ascii_with_config(&config));
-
-    // Compact mode for very narrow
-    println!("Compact mode (40 chars):");
+    // Demo 6: Width adaptation
+    println!("6. Narrow Terminal (40 chars):");
     let config = AsciiConfig {
         max_width: 40,
         compact: true,
         ..Default::default()
     };
-    println!("{}\n", circuit.to_ascii_with_config(&config));
+    let mut builder = DynamicCircuitBuilder::new(2);
+    builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
+    builder.apply_gate(Arc::new(RotationX::new(1.234)), &[1]).unwrap();
+    builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
+    println!("{}\n", builder.build().to_ascii_with_config(&config));
 
-    // No labels
-    println!("Without qubit labels:");
+    // Demo 7: Without labels
+    println!("7. Without Qubit Labels:");
     let config = AsciiConfig {
         max_width: 60,
         show_labels: false,
         ..Default::default()
     };
-    println!("{}\n", circuit.to_ascii_with_config(&config));
+    let mut builder = DynamicCircuitBuilder::new(3);
+    builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
+    builder.apply_gate(Arc::new(Hadamard), &[1]).unwrap();
+    builder.apply_gate(Arc::new(Hadamard), &[2]).unwrap();
+    builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
+    builder.apply_gate(Arc::new(CNot), &[1, 2]).unwrap();
+    println!("{}\n", builder.build().to_ascii_with_config(&config));
 
-    // Empty circuit
-    println!("Empty circuit:");
-    let empty = Circuit::new(3);
+    // Demo 8: Custom gates
+    println!("8. Custom Gates:");
+    let mut circuit = Circuit::new(3);
+    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(1)]).unwrap();
+    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(2)]).unwrap();
+    circuit.add_gate(Arc::new(GroverOracle), &[QubitId::new(0)]).unwrap();
+    circuit.add_gate(Arc::new(GroverOracle), &[QubitId::new(1)]).unwrap();
+    circuit.add_gate(Arc::new(GroverOracle), &[QubitId::new(2)]).unwrap();
+    circuit.add_gate(Arc::new(GroverDiffusion), &[QubitId::new(0)]).unwrap();
+    circuit.add_gate(Arc::new(GroverDiffusion), &[QubitId::new(1)]).unwrap();
+    circuit.add_gate(Arc::new(GroverDiffusion), &[QubitId::new(2)]).unwrap();
+    println!("{}\n", circuit.to_ascii());
+
+    // Demo 9: Parametric custom gate (XX interaction)
+    println!("9. Parametric Custom Gate (XX):");
+    let mut builder = DynamicCircuitBuilder::new(3);
+    builder.apply_gate(Arc::new(XXGate(std::f64::consts::PI / 4.0)), &[0, 1]).unwrap();
+    builder.apply_gate(Arc::new(XXGate(std::f64::consts::PI / 2.0)), &[1, 2]).unwrap();
+    println!("{}\n", builder.build().to_ascii());
+
+    // Demo 10: QFT-like circuit
+    println!("10. QFT-like Custom Circuit:");
+    let mut circuit = Circuit::new(4);
+    for i in 0..4 {
+        circuit.add_gate(Arc::new(QFTGate), &[QubitId::new(i)]).unwrap();
+    }
+    println!("{}\n", circuit.to_ascii());
+
+    // Demo 11: Empty circuit
+    println!("11. Empty Circuit:");
+    let empty = Circuit::new(2);
     println!("{}", empty.to_ascii());
 }
