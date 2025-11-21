@@ -26,7 +26,7 @@ rand.workspace = true
 
 # Classical optimizers for VQE/QAOA
 argmin = "0.10"
-argmin-math = { version = "0.4", features = ["ndarray_latest-serde"] }
+argmin-math = { version = "0.4", features = ["vec"] }
 
 # Optional GPU backend
 wgpu = { version = "0.19", optional = true }
