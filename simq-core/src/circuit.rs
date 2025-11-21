@@ -587,6 +587,38 @@ impl Circuit {
     }
 }
 
+impl Circuit {
+    /// Render circuit as ASCII art
+    ///
+    /// Returns a string representation of the circuit suitable for terminal display.
+    /// The output adapts to terminal width automatically.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// println!("{}", circuit.to_ascii());
+    /// ```
+    pub fn to_ascii(&self) -> String {
+        crate::ascii_renderer::render(self)
+    }
+
+    /// Render circuit as ASCII art with custom configuration
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::{Circuit, AsciiConfig};
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let config = AsciiConfig { max_width: 60, ..Default::default() };
+    /// println!("{}", circuit.to_ascii_with_config(&config));
+    /// ```
+    pub fn to_ascii_with_config(&self, config: &crate::ascii_renderer::AsciiConfig) -> String {
+        crate::ascii_renderer::render_with_config(self, config)
+    }
+}
+
 impl std::fmt::Display for Circuit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Circuit({} qubits, {} operations)", self.num_qubits, self.len())?;

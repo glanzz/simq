@@ -58,6 +58,7 @@
 //! assert_eq!(circuit.num_qubits(), 5);
 //! ```
 
+pub mod ascii_renderer;
 pub mod circuit;
 pub mod circuit_builder;
 pub mod dynamic_builder;
@@ -75,6 +76,7 @@ pub mod validation;
 pub mod serialization;
 
 // Re-exports for convenience
+pub use ascii_renderer::{render as render_ascii, render_with_config as render_ascii_with_config, AsciiConfig};
 pub use circuit::Circuit;
 pub use circuit_builder::CircuitBuilder;
 pub use dynamic_builder::DynamicCircuitBuilder;
