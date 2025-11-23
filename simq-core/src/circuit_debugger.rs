@@ -416,7 +416,6 @@ impl fmt::Display for StepInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::QubitId;
     use std::sync::Arc;
 
     // Mock gate for testing
@@ -434,13 +433,13 @@ mod tests {
     fn create_test_circuit() -> Circuit {
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(Arc::new(MockGate("H")), &[QubitId::new(0)])
+            .add_gate(Arc::new(MockGate("H")), &[crate::QubitId::new(0)])
             .unwrap();
         circuit
-            .add_gate(Arc::new(MockGate("X")), &[QubitId::new(1)])
+            .add_gate(Arc::new(MockGate("X")), &[crate::QubitId::new(1)])
             .unwrap();
         circuit
-            .add_gate(Arc::new(MockGate("CNOT")), &[QubitId::new(0)])
+            .add_gate(Arc::new(MockGate("CNOT")), &[crate::QubitId::new(0)])
             .unwrap();
         circuit
     }
@@ -532,7 +531,7 @@ mod tests {
         assert_eq!(debugger.breakpoints(), &[2]);
 
         debugger.clear_breakpoints();
-        assert_eq!(debugger.breakpoints(), &[]);
+        assert_eq!(debugger.breakpoints().len(), 0);
     }
 
     #[test]
