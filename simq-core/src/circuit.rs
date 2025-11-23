@@ -103,6 +103,11 @@ impl Circuit {
         self.operations.iter()
     }
 
+    /// Get all operations as a slice
+    pub fn operations_slice(&self) -> &[GateOp] {
+        &self.operations
+    }
+
     /// Get a mutable reference to the operations vector
     ///
     /// This is useful for optimization passes that need to modify the circuit.
@@ -584,6 +589,65 @@ impl Circuit {
         }
 
         hasher.finish()
+    }
+}
+
+impl Circuit {
+    /// Render circuit as ASCII art
+    ///
+    /// Returns a string representation of the circuit suitable for terminal display.
+    /// The output adapts to terminal width automatically.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// println!("{}", circuit.to_ascii());
+    /// ```
+    pub fn to_ascii(&self) -> String {
+        crate::ascii_renderer::render(self)
+    }
+
+    /// Render circuit as ASCII art with custom configuration
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::{Circuit, AsciiConfig};
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let config = AsciiConfig { max_width: 60, ..Default::default() };
+    /// println!("{}", circuit.to_ascii_with_config(&config));
+    /// ```
+    pub fn to_ascii_with_config(&self, config: &crate::ascii_renderer::AsciiConfig) -> String {
+        crate::ascii_renderer::render_with_config(self, config)
+    }
+
+    /// Render circuit as LaTeX using quantikz package
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::Circuit;
+    ///
+    /// let circuit = Circuit::new(2);
+    /// println!("{}", circuit.to_latex());
+    /// ```
+    pub fn to_latex(&self) -> String {
+        crate::latex_renderer::render(self)
+    }
+
+    /// Render circuit as LaTeX with custom configuration
+    ///
+    /// # Example
+    /// ```ignore
+    /// use simq_core::{Circuit, LatexConfig};
+    ///
+    /// let circuit = Circuit::new(2);
+    /// let config = LatexConfig::default().standalone(true);
+    /// println!("{}", circuit.to_latex_with_config(&config));
+    /// ```
+    pub fn to_latex_with_config(&self, config: &crate::latex_renderer::LatexConfig) -> String {
+        crate::latex_renderer::render_with_config(self, config)
     }
 }
 

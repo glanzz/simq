@@ -58,7 +58,12 @@
 //! assert_eq!(circuit.num_qubits(), 5);
 //! ```
 
+pub mod ascii_renderer;
+pub mod bloch_sphere;
 pub mod circuit;
+pub mod circuit_debugger;
+pub mod stateful_debugger;
+pub mod latex_renderer;
 pub mod circuit_builder;
 pub mod dynamic_builder;
 pub mod error;
@@ -75,6 +80,20 @@ pub mod validation;
 pub mod serialization;
 
 // Re-exports for convenience
+pub use ascii_renderer::{
+    render as render_ascii, render_with_config as render_ascii_with_config,
+    render_detailed as render_ascii_detailed, AsciiConfig, AsciiConfigBuilder,
+    RenderStyle, WireStyle, RenderedCircuit,
+};
+pub use latex_renderer::{
+    render as render_latex, render_with_config as render_latex_with_config,
+    LatexConfig,
+};
+pub use circuit_debugger::{CircuitDebugger, DebuggerStatus, StepInfo};
+pub use stateful_debugger::{
+    StatefulDebugger, StateSnapshot, AmplitudeEntry, VisualizationConfig,
+};
+pub use bloch_sphere::{BlochVector, BlochAngles, BlochRenderConfig};
 pub use circuit::Circuit;
 pub use circuit_builder::CircuitBuilder;
 pub use dynamic_builder::DynamicCircuitBuilder;
