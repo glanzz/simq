@@ -205,26 +205,34 @@ fn apply_multi_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
-    let state_ptr = SendPtr(state.as_mut_ptr());
+    let gate_copy = *gate; // Copy the gate matrix
     
-    (0..state.len())
+    // Collect indices that need to be modified
+    let modifications: Vec<(usize, Complex64, Complex64)> = (0..state.len())
         .into_par_iter()
         .step_by(target_stride * 2)
-        .for_each(|i| {
+        .flat_map(|i| {
+            let mut mods = Vec::new();
             for j in 0..target_stride {
                 let idx = i + j;
                 if idx + target_stride < state.len() &&
                    (idx & control_mask).count_ones() as usize == num_controls {
-                    unsafe {
-                        let a = *state_ptr.0.add(idx);
-                        let b = *state_ptr.0.add(idx + target_stride);
-
-                        *state_ptr.0.add(idx) = gate[0][0] * a + gate[0][1] * b;
-                        *state_ptr.0.add(idx + target_stride) = gate[1][0] * a + gate[1][1] * b;
-                    }
+                    let a = state[idx];
+                    let b = state[idx + target_stride];
+                    let new_a = gate_copy[0][0] * a + gate_copy[0][1] * b;
+                    let new_b = gate_copy[1][0] * a + gate_copy[1][1] * b;
+                    mods.push((idx, new_a, new_b));
                 }
             }
-        });
+            mods
+        })
+        .collect();
+    
+    // Apply modifications sequentially
+    for (idx, new_a, new_b) in modifications {
+        state[idx] = new_a;
+        state[idx + target_stride] = new_b;
+    }
 }
 
 #[cfg(test)]

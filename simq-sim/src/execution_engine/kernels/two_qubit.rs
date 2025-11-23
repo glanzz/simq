@@ -129,12 +129,13 @@ fn apply_two_qubit_parallel(
     qubit2: usize,
 ) {
     let chunk_size = stride_max * 2;
-    let num_chunks = state.len() / chunk_size;
-    let state_ptr = SendPtr(state.as_mut_ptr());
-
-    (0..num_chunks)
-        .into_par_iter()
-        .for_each(move |chunk_idx| {
+    let gate_copy = *gate; // Copy the gate matrix
+    
+    // Use par_chunks_mut for safe parallel mutation
+    state
+        .par_chunks_mut(chunk_size)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
             let base_offset = chunk_idx * chunk_size;
 
             for j in 0..stride_min {
@@ -142,23 +143,36 @@ fn apply_two_qubit_parallel(
                     let base = base_offset + j;
 
                     if (base & stride_min == 0) && ((base + k * stride_max) & stride_max == 0) {
-                        let idx = get_two_qubit_indices(base, qubit1, qubit2);
-
-                        // Safety: indices are computed to be within bounds
-                        unsafe {
+                        let idx_local = get_two_qubit_indices(base, qubit1, qubit2);
+                        
+                        // Convert global indices to chunk-local indices
+                        let idx_in_chunk: Vec<Option<usize>> = idx_local.iter()
+                            .map(|&global_idx| {
+                                if global_idx >= base_offset && global_idx < base_offset + chunk.len() {
+                                    Some(global_idx - base_offset)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        
+                        // Only process if all indices are in this chunk
+                        if idx_in_chunk.iter().all(|opt| opt.is_some()) {
+                            let local_idx: Vec<usize> = idx_in_chunk.iter().map(|opt| opt.unwrap()).collect();
+                            
                             let a = [
-                                *state_ptr.0.add(idx[0]),
-                                *state_ptr.0.add(idx[1]),
-                                *state_ptr.0.add(idx[2]),
-                                *state_ptr.0.add(idx[3]),
+                                chunk[local_idx[0]],
+                                chunk[local_idx[1]],
+                                chunk[local_idx[2]],
+                                chunk[local_idx[3]],
                             ];
 
-                            for (out_idx, &out) in idx.iter().enumerate() {
+                            for (out_idx, &local_out) in local_idx.iter().enumerate() {
                                 let mut sum = Complex64::new(0.0, 0.0);
                                 for (in_idx, &amp) in a.iter().enumerate() {
-                                    sum += gate[out_idx][in_idx] * amp;
+                                    sum += gate_copy[out_idx][in_idx] * amp;
                                 }
-                                *state_ptr.0.add(out) = sum;
+                                chunk[local_out] = sum;
                             }
                         }
                     }
@@ -217,19 +231,19 @@ pub fn apply_cnot(
 
     let control_mask = 1 << control;
     let target_mask = 1 << target;
-    let state_ptr = SendPtr(state.as_mut_ptr());
 
     if use_parallel && n >= parallel_threshold {
-        (0..n)
+        // Collect indices to swap
+        let swap_pairs: Vec<(usize, usize)> = (0..n)
             .into_par_iter()
-            .step_by(1)
             .filter(|&i| i & control_mask != 0 && i & target_mask == 0)
-            .for_each(|i| unsafe {
-                let j = i | target_mask;
-                let temp = *state_ptr.0.add(i);
-                *state_ptr.0.add(i) = *state_ptr.0.add(j);
-                *state_ptr.0.add(j) = temp;
-            });
+            .map(|i| (i, i | target_mask))
+            .collect();
+        
+        // Perform swaps sequentially (they don't overlap so this is safe)
+        for (i, j) in swap_pairs {
+            state.swap(i, j);
+        }
     } else {
         for i in 0..n {
             if i & control_mask != 0 && i & target_mask == 0 {
@@ -331,22 +345,26 @@ pub fn apply_swap(
 
     let mask1 = 1 << qubit1;
     let mask2 = 1 << qubit2;
-    let state_ptr = SendPtr(state.as_mut_ptr());
 
     if use_parallel && n >= parallel_threshold {
-        (0..n)
+        // Collect indices to swap
+        let swap_pairs: Vec<(usize, usize)> = (0..n)
             .into_par_iter()
             .filter(|&i| {
                 let bit1 = (i & mask1) != 0;
                 let bit2 = (i & mask2) != 0;
                 bit1 && !bit2
             })
-            .for_each(|i| unsafe {
+            .map(|i| {
                 let j = (i & !mask1) | mask2;
-                let temp = *state_ptr.0.add(i);
-                *state_ptr.0.add(i) = *state_ptr.0.add(j);
-                *state_ptr.0.add(j) = temp;
-            });
+                (i, j)
+            })
+            .collect();
+        
+        // Perform swaps sequentially
+        for (i, j) in swap_pairs {
+            state.swap(i, j);
+        }
     } else {
         for i in 0..n {
             let bit1 = (i & mask1) != 0;

@@ -157,12 +157,10 @@ impl ExecutionEngine {
         state: &mut AdaptiveState,
         timeout_check: Option<(Instant, std::time::Duration)>,
     ) -> Result<()> {
-        // Use parallel executor with layer-based execution
-        self.parallel_executor.execute(circuit, state, |gate_op, state| {
-            self.apply_gate_op(gate_op, state)
-        })?;
-
-        Ok(())
+        // For now, fallback to sequential execution to avoid closure borrowing issues
+        // TODO: Implement proper parallel execution with layer-based approach
+        self.telemetry.log_event("parallel_fallback_to_sequential");
+        self.execute_sequential(circuit, state, timeout_check)
     }
 
     /// Execute circuit on GPU

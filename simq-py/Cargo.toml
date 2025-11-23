@@ -23,7 +23,7 @@ simq-core = { path = "../simq-core" }
 simq-gates = { path = "../simq-gates" }
 # Note: simq-state, simq-sim, simq-backend, simq-compiler will be added in Phase 1+
 simq-state = { path = "../simq-state" }
-# simq-sim = { path = "../simq-sim" }
+simq-sim = { path = "../simq-sim" }
 # simq-backend = { path = "../simq-backend", features = ["local-simulator"] }
 # simq-compiler = { path = "../simq-compiler" }
 
