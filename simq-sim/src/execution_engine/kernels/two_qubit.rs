@@ -5,6 +5,13 @@ use rayon::prelude::*;
 use super::Matrix4x4;
 use crate::execution_engine::error::{ExecutionError, Result};
 
+// Safety wrapper for raw pointers to allow Send+Sync
+// This is safe because we partition the work to ensure no data races
+#[derive(Copy, Clone)]
+struct SendPtr<T>(*mut T);
+unsafe impl<T> Send for SendPtr<T> {}
+unsafe impl<T> Sync for SendPtr<T> {}
+
 /// Apply a general two-qubit gate to a dense state vector
 ///
 /// # Arguments
@@ -123,10 +130,11 @@ fn apply_two_qubit_parallel(
 ) {
     let chunk_size = stride_max * 2;
     let num_chunks = state.len() / chunk_size;
+    let state_ptr = SendPtr(state.as_mut_ptr());
 
     (0..num_chunks)
         .into_par_iter()
-        .for_each(|chunk_idx| {
+        .for_each(move |chunk_idx| {
             let base_offset = chunk_idx * chunk_size;
 
             for j in 0..stride_min {
@@ -139,19 +147,18 @@ fn apply_two_qubit_parallel(
                         // Safety: indices are computed to be within bounds
                         unsafe {
                             let a = [
-                                *state.get_unchecked(idx[0]),
-                                *state.get_unchecked(idx[1]),
-                                *state.get_unchecked(idx[2]),
-                                *state.get_unchecked(idx[3]),
+                                *state_ptr.0.add(idx[0]),
+                                *state_ptr.0.add(idx[1]),
+                                *state_ptr.0.add(idx[2]),
+                                *state_ptr.0.add(idx[3]),
                             ];
 
-                            let state_ptr = state.as_mut_ptr();
                             for (out_idx, &out) in idx.iter().enumerate() {
                                 let mut sum = Complex64::new(0.0, 0.0);
                                 for (in_idx, &amp) in a.iter().enumerate() {
                                     sum += gate[out_idx][in_idx] * amp;
                                 }
-                                *state_ptr.add(out) = sum;
+                                *state_ptr.0.add(out) = sum;
                             }
                         }
                     }
@@ -210,6 +217,7 @@ pub fn apply_cnot(
 
     let control_mask = 1 << control;
     let target_mask = 1 << target;
+    let state_ptr = SendPtr(state.as_mut_ptr());
 
     if use_parallel && n >= parallel_threshold {
         (0..n)
@@ -217,11 +225,10 @@ pub fn apply_cnot(
             .step_by(1)
             .filter(|&i| i & control_mask != 0 && i & target_mask == 0)
             .for_each(|i| unsafe {
-                let state_ptr = state.as_mut_ptr();
                 let j = i | target_mask;
-                let temp = *state_ptr.add(i);
-                *state_ptr.add(i) = *state_ptr.add(j);
-                *state_ptr.add(j) = temp;
+                let temp = *state_ptr.0.add(i);
+                *state_ptr.0.add(i) = *state_ptr.0.add(j);
+                *state_ptr.0.add(j) = temp;
             });
     } else {
         for i in 0..n {
@@ -324,6 +331,7 @@ pub fn apply_swap(
 
     let mask1 = 1 << qubit1;
     let mask2 = 1 << qubit2;
+    let state_ptr = SendPtr(state.as_mut_ptr());
 
     if use_parallel && n >= parallel_threshold {
         (0..n)
@@ -335,10 +343,9 @@ pub fn apply_swap(
             })
             .for_each(|i| unsafe {
                 let j = (i & !mask1) | mask2;
-                let state_ptr = state.as_mut_ptr();
-                let temp = *state_ptr.add(i);
-                *state_ptr.add(i) = *state_ptr.add(j);
-                *state_ptr.add(j) = temp;
+                let temp = *state_ptr.0.add(i);
+                *state_ptr.0.add(i) = *state_ptr.0.add(j);
+                *state_ptr.0.add(j) = temp;
             });
     } else {
         for i in 0..n {

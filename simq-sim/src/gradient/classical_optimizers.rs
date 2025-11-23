@@ -52,7 +52,7 @@ fn compute_expectation(
         AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };
@@ -761,7 +761,7 @@ where
     /// Compute simplex size (max distance from centroid)
     fn compute_simplex_size(&self, simplex: &[Vec<f64>], indices: &[usize]) -> f64 {
         let centroid = self.compute_centroid(simplex, indices);
-        let mut max_dist = 0.0;
+        let mut max_dist: f64 = 0.0;
 
         for &idx in indices {
             let dist: f64 = simplex[idx]
