@@ -1,0 +1,36 @@
+[package]
+name = "simq-py"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Python bindings for SimQ quantum computing SDK"
+
+[lib]
+name = "simq"
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 for Python bindings
+pyo3 = { version = "0.21", features = ["extension-module", "abi3-py38"] }
+numpy = "0.21"
+
+# SimQ crates (minimal set for Phase 0)
+simq-core = { path = "../simq-core" }
+simq-gates = { path = "../simq-gates" }
+# Note: simq-state, simq-sim, simq-backend, simq-compiler will be added in Phase 1+
+# simq-state = { path = "../simq-state" }
+# simq-sim = { path = "../simq-sim" }
+# simq-backend = { path = "../simq-backend", features = ["local-simulator"] }
+# simq-compiler = { path = "../simq-compiler" }
+
+# Utility crates
+num-complex.workspace = true
+# ndarray.workspace = true
+parking_lot.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
