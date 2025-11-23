@@ -60,6 +60,7 @@
 
 pub mod ascii_renderer;
 pub mod circuit;
+pub mod circuit_debugger;
 pub mod latex_renderer;
 pub mod circuit_builder;
 pub mod dynamic_builder;
@@ -86,6 +87,7 @@ pub use latex_renderer::{
     render as render_latex, render_with_config as render_latex_with_config,
     LatexConfig,
 };
+pub use circuit_debugger::{CircuitDebugger, DebuggerStatus, StepInfo};
 pub use circuit::Circuit;
 pub use circuit_builder::CircuitBuilder;
 pub use dynamic_builder::DynamicCircuitBuilder;

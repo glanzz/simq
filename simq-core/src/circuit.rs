@@ -103,6 +103,11 @@ impl Circuit {
         self.operations.iter()
     }
 
+    /// Get all operations as a slice
+    pub fn operations_slice(&self) -> &[GateOp] {
+        &self.operations
+    }
+
     /// Get a mutable reference to the operations vector
     ///
     /// This is useful for optimization passes that need to modify the circuit.
