@@ -56,6 +56,17 @@ try:
     from simq._simq import (
         __version__,
         __author__,
+        # Core types
+        Circuit,
+        CircuitBuilder,
+        QubitId,
+        Parameter,
+        # Exceptions
+        QuantumException,
+        InvalidQubitError,
+        InvalidGateError,
+        InvalidParameterError,
+        CircuitError,
     )
 except ImportError as e:
     raise ImportError(
@@ -64,20 +75,20 @@ except ImportError as e:
         f"Error: {e}"
     ) from e
 
-# Version information
+# Public API
 __all__ = [
+    # Version info
     "__version__",
     "__author__",
+    # Core types
+    "Circuit",
+    "CircuitBuilder",
+    "QubitId",
+    "Parameter",
+    # Exceptions
+    "QuantumException",
+    "InvalidQubitError",
+    "InvalidGateError",
+    "InvalidParameterError",
+    "CircuitError",
 ]
-
-# Type checking imports (will be populated in Phase 1+)
-if TYPE_CHECKING:
-    pass
-    # from simq._simq import (
-    #     Circuit,
-    #     CircuitBuilder,
-    #     Simulator,
-    #     SimulatorConfig,
-    #     SimulationResult,
-    #     # ... more types as we implement them
-    # )

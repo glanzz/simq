@@ -51,8 +51,8 @@ fn _simq(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "High-performance quantum computing SDK with Python bindings",
     )?;
 
-    // Register core types (will be implemented in Phase 1)
-    // core::register(m)?;
+    // Register core types
+    core::register(_py, m)?;
 
     Ok(())
 }
