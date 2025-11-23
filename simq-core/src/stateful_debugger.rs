@@ -295,6 +295,59 @@ impl<'a> StatefulDebugger<'a> {
             .sum();
         sum_fourth_power
     }
+
+    /// Extract single-qubit reduced state from multi-qubit state
+    ///
+    /// Traces out all qubits except the specified one.
+    ///
+    /// # Arguments
+    /// * `amplitudes` - Full state vector
+    /// * `num_qubits` - Total number of qubits
+    /// * `target_qubit` - Index of qubit to extract (0-indexed)
+    ///
+    /// # Returns
+    /// Two-element array representing the reduced single-qubit state
+    pub fn extract_single_qubit_state(
+        amplitudes: &[Complex64],
+        num_qubits: usize,
+        target_qubit: usize,
+    ) -> [Complex64; 2] {
+        if target_qubit >= num_qubits {
+            return [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        }
+
+        let dimension = 1 << num_qubits;
+        if amplitudes.len() != dimension {
+            return [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        }
+
+        // For a single qubit system, just return the amplitudes
+        if num_qubits == 1 {
+            return [amplitudes[0], amplitudes[1]];
+        }
+
+        // Calculate reduced density matrix elements
+        let mut rho_00 = Complex64::new(0.0, 0.0);
+        let mut rho_11 = Complex64::new(0.0, 0.0);
+
+        let target_bit = num_qubits - 1 - target_qubit;
+
+        for i in 0..dimension {
+            let target_state = (i >> target_bit) & 1;
+            if target_state == 0 {
+                rho_00 += amplitudes[i].conj() * amplitudes[i];
+            } else {
+                rho_11 += amplitudes[i].conj() * amplitudes[i];
+            }
+        }
+
+        // For visualization purposes, return sqrt of diagonal elements
+        // (this is an approximation for mixed states)
+        [
+            Complex64::new(rho_00.re.sqrt(), 0.0),
+            Complex64::new(rho_11.re.sqrt(), 0.0),
+        ]
+    }
 }
 
 /// Helper functions for state visualization

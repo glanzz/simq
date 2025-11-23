@@ -59,6 +59,7 @@
 //! ```
 
 pub mod ascii_renderer;
+pub mod bloch_sphere;
 pub mod circuit;
 pub mod circuit_debugger;
 pub mod stateful_debugger;
@@ -92,6 +93,7 @@ pub use circuit_debugger::{CircuitDebugger, DebuggerStatus, StepInfo};
 pub use stateful_debugger::{
     StatefulDebugger, StateSnapshot, AmplitudeEntry, VisualizationConfig,
 };
+pub use bloch_sphere::{BlochVector, BlochAngles, BlochRenderConfig};
 pub use circuit::Circuit;
 pub use circuit_builder::CircuitBuilder;
 pub use dynamic_builder::DynamicCircuitBuilder;
