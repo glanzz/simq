@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 // Module declarations
 pub mod core;
 pub mod gates;
+pub mod simulation;
 
 /// SimQ: High-Performance Quantum Computing SDK
 ///
@@ -57,6 +58,7 @@ fn _simq(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register gate types
     gates::register(_py, m)?;
+    simulation::register(_py, m)?;
 
     Ok(())
 }

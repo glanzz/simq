@@ -45,6 +45,12 @@ from .gates import (
     toffoli, fredkin, custom,
 )
 
+from .simulation import (
+    Simulator,
+    SimulatorConfig,
+    SimulationResult,
+)
+
 __all__ = [
     "__version__",
     "__author__",
@@ -76,4 +82,9 @@ __all__ = [
     "swap", "iswap", "ecr",
     "rxx", "ryy", "rzz", "cphase",
     "toffoli", "fredkin", "custom",
+    
+    # Simulation
+    "Simulator",
+    "SimulatorConfig",
+    "SimulationResult",
 ]
