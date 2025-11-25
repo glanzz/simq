@@ -45,6 +45,14 @@ from .gates import (
     toffoli, fredkin, custom,
 )
 
+from .noise import (
+    DepolarizingChannel,
+    AmplitudeDamping,
+    PhaseDamping,
+    ReadoutError,
+    HardwareNoiseModel,
+)
+
 from .simulation import (
     Simulator,
     SimulatorConfig,
@@ -82,6 +90,13 @@ __all__ = [
     "swap", "iswap", "ecr",
     "rxx", "ryy", "rzz", "cphase",
     "toffoli", "fredkin", "custom",
+
+    # Noise
+    "DepolarizingChannel",
+    "AmplitudeDamping",
+    "PhaseDamping",
+    "ReadoutError",
+    "HardwareNoiseModel",
     
     # Simulation
     "Simulator",
