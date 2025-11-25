@@ -76,6 +76,18 @@ impl PyCircuit {
     }
 }
 
+impl PyCircuit {
+    /// Access the inner Rust circuit (internal use)
+    pub(crate) fn inner(&self) -> &RustCircuit {
+        &self.inner
+    }
+
+    /// Create PyCircuit from Rust circuit (internal use)
+    pub(crate) fn from_rust(circuit: Arc<RustCircuit>) -> Self {
+        Self { inner: circuit }
+    }
+}
+
 /// Python wrapper for CircuitBuilder
 ///
 /// Builder for constructing quantum circuits with a dynamic number of qubits.

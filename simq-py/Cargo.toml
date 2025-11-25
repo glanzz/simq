@@ -21,11 +21,11 @@ numpy = "0.21"
 # SimQ crates (minimal set for Phase 0)
 simq-core = { path = "../simq-core" }
 simq-gates = { path = "../simq-gates" }
-# Note: simq-state, simq-sim, simq-backend, simq-compiler will be added in Phase 1+
+# Phase 5: Advanced features - backends and compiler
 simq-state = { path = "../simq-state" }
 simq-sim = { path = "../simq-sim" }
-# simq-backend = { path = "../simq-backend", features = ["local-simulator"] }
-# simq-compiler = { path = "../simq-compiler" }
+simq-backend = { path = "../simq-backend", features = ["local-simulator", "ibm-quantum"] }
+# simq-compiler = { path = "../simq-compiler" }  # Phase 5 focuses on backends
 
 # Utility crates
 num-complex.workspace = true

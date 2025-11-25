@@ -6,6 +6,8 @@
 use pyo3::prelude::*;
 
 // Module declarations
+pub mod backend;
+pub mod compiler;
 pub mod core;
 pub mod gates;
 pub mod noise;
@@ -61,6 +63,10 @@ fn _simq(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     gates::register(_py, m)?;
     noise::register(_py, m)?;
     simulation::register(_py, m)?;
+
+    // Phase 5: Register advanced features
+    backend::register(_py, m)?;
+    compiler::register(_py, m)?;
 
     Ok(())
 }
