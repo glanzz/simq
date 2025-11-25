@@ -669,6 +669,37 @@ impl DenseState {
         probabilities
     }
 
+    /// Get the probability of measuring 0 and 1 for a specific qubit
+    ///
+    /// # Arguments
+    /// * `qubit` - Index of the qubit to measure (0-indexed)
+    ///
+    /// # Returns
+    /// Tuple (prob_0, prob_1)
+    ///
+    /// # Errors
+    /// Returns error if qubit index is invalid
+    pub fn measure_probability(&self, qubit: usize) -> Result<(f64, f64)> {
+        if qubit >= self.num_qubits() {
+            return Err(StateError::InvalidQubitIndex {
+                index: qubit,
+                num_qubits: self.num_qubits(),
+            });
+        }
+
+        // Calculate probability of measuring |0⟩
+        let mask = 1 << qubit;
+        let prob_zero: f64 = self
+            .amplitudes()
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| idx & mask == 0)
+            .map(|(_, amp)| amp.norm_sqr())
+            .sum();
+
+        Ok((prob_zero, 1.0 - prob_zero))
+    }
+
     /// Measure a single qubit and collapse the state
     ///
     /// # Arguments
