@@ -1,3 +1,53 @@
+"""
+SimQ: High-Performance Quantum Computing SDK
+=============================================
+
+SimQ is a quantum computing SDK with Python bindings built on a high-performance
+Rust core. It provides a comprehensive set of tools for quantum circuit construction,
+simulation, noise modeling, and hardware backend integration.
+
+Quick Start
+-----------
+
+Create and simulate a simple Bell state::
+
+    import simq
+    
+    # Build circuit
+    builder = simq.CircuitBuilder(2)
+    builder.h(0)
+    builder.cx(0, 1)
+    circuit = builder.build()
+    
+    # Simulate
+    config = simq.SimulatorConfig(shots=1000)
+    simulator = simq.Simulator(config)
+    result = simulator.run(circuit)
+    print(result.state_vector)
+
+Modules
+-------
+
+- :mod:`simq.gates`: Quantum gate library (Pauli, Hadamard, CNOT, etc.)
+- :mod:`simq.noise`: Noise models for realistic quantum simulations
+- :mod:`simq.simulation`: High-performance quantum circuit simulator
+- :mod:`simq.visualization`: Plotting and visualization utilities
+
+Core Classes
+------------
+
+Circuit
+    Immutable quantum circuit representation
+CircuitBuilder
+    Builder for constructing quantum circuits
+Simulator
+    High-performance quantum circuit simulator
+HardwareNoiseModel
+    Hardware noise model for realistic simulations
+
+For more information, see https://github.com/your-org/simq
+"""
+
 from ._simq import (
     __version__,
     __author__,

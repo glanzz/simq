@@ -1,170 +1,207 @@
-from typing import List, Optional, Union
-import numpy as np
-from ._simq import gates as _rust_gates
+"""
+SimQ Gates Module
+=================
 
-# Single-qubit gates
-HGate = _rust_gates.HGate
-XGate = _rust_gates.XGate
-YGate = _rust_gates.YGate
-ZGate = _rust_gates.ZGate
-SGate = _rust_gates.SGate
-SdgGate = _rust_gates.SdgGate
-TGate = _rust_gates.TGate
-TdgGate = _rust_gates.TdgGate
-SXGate = _rust_gates.SXGate
-SXdgGate = _rust_gates.SXdgGate
+This module provides a comprehensive library of quantum gates for the SimQ framework.
+All gates are available both as class-based constructors and convenience factory functions.
 
-# Parameterized single-qubit gates
-RXGate = _rust_gates.RXGate
-RYGate = _rust_gates.RYGate
-RZGate = _rust_gates.RZGate
-PhaseGate = _rust_gates.PhaseGate
-U3Gate = _rust_gates.U3Gate
+Gate Categories
+---------------
 
-# Two-qubit gates
-CXGate = _rust_gates.CXGate
-CZGate = _rust_gates.CZGate
-# CYGate = _rust_gates.CYGate
-# CHGate = _rust_gates.CHGate
-SwapGate = _rust_gates.SwapGate
-iSwapGate = _rust_gates.iSwapGate
-ECRGate = _rust_gates.ECRGate
+Single-Qubit Gates
+    Basic gates: H, X, Y, Z
+    Phase gates: S, T, and their adjoints
+    SX gate and its adjoint
+    
+Parameterized Single-Qubit Gates
+    Rotation gates: RX, RY, RZ
+    Phase gate: Phase
+    Universal gate: U3
+    
+Two-Qubit Gates
+    CNOT (CX), CZ
+    SWAP, iSWAP, ECR (echoed cross-resonance)
+    
+Parameterized Two-Qubit Gates
+    RXX, RYY, RZZ (two-qubit rotations)
+    Controlled phase: CPhase
+    
+Three-Qubit Gates
+    Toffoli (CCNOT)
+    Fredkin (CSWAP)
+    
+Custom Gates
+    User-defined gates with custom unitary matrices
 
-# Parameterized two-qubit gates
-RXXGate = _rust_gates.RXXGate
-RYYGate = _rust_gates.RYYGate
-RZZGate = _rust_gates.RZZGate
-CPhaseGate = _rust_gates.CPhaseGate
+Examples
+--------
 
-# Three-qubit gates
-ToffoliGate = _rust_gates.ToffoliGate
-FredkinGate = _rust_gates.FredkinGate
+Using factory functions::
 
-# Custom gates
-CustomGate = _rust_gates.CustomGate
+    import simq
+    
+    builder = simq.CircuitBuilder(2)
+    builder.h(0)              # Hadamard on qubit 0
+    builder.rx(0, np.pi/4)    # RX rotation
+    builder.cx(0, 1)          # CNOT
+    
+Using gate classes::
 
-def h() -> HGate:
-    """Create a Hadamard gate."""
+    from simq.gates import HGate, CNOTGate
+    
+    h = HGate()
+    cnot = CXGate(control=0, target=1)
+"""
+
+from .._simq import (
+    # Single-qubit gates
+    HGate, XGate, YGate, ZGate,
+    SGate, SdgGate, TGate, TdgGate,
+    SXGate, SXdgGate,
+    
+    # Parameterized single-qubit gates
+    RXGate, RYGate, RZGate, PhaseGate, U3Gate,
+    
+    # Two-qubit gates
+    CXGate, CZGate,
+    SwapGate, iSwapGate, ECRGate,
+    
+    # Parameterized two-qubit gates
+    RXXGate, RYYGate, RZZGate, CPhaseGate,
+    
+    # Three-qubit gates
+    ToffoliGate, FredkinGate,
+    
+    # Custom gates
+    CustomGate,
+)
+
+# Factory functions for convenience
+def h(qubit):
+    """Apply Hadamard gate to qubit."""
     return HGate()
 
-def x() -> XGate:
-    """Create a Pauli-X gate."""
+def x(qubit):
+    """Apply Pauli-X gate to qubit."""
     return XGate()
 
-def y() -> YGate:
-    """Create a Pauli-Y gate."""
+def y(qubit):
+    """Apply Pauli-Y gate to qubit."""
     return YGate()
 
-def z() -> ZGate:
-    """Create a Pauli-Z gate."""
+def z(qubit):
+    """Apply Pauli-Z gate to qubit."""
     return ZGate()
 
-def s() -> SGate:
-    """Create an S gate."""
+def s(qubit):
+    """Apply S gate (phase π/2) to qubit."""
     return SGate()
 
-def sdg() -> SdgGate:
-    """Create an S-dagger gate."""
+def sdg(qubit):
+    """Apply S-dagger gate to qubit."""
     return SdgGate()
 
-def t() -> TGate:
-    """Create a T gate."""
+def t(qubit):
+    """Apply T gate (phase π/4) to qubit."""
     return TGate()
 
-def tdg() -> TdgGate:
-    """Create a T-dagger gate."""
+def tdg(qubit):
+    """Apply T-dagger gate to qubit."""
     return TdgGate()
 
-def sx() -> SXGate:
-    """Create a square-root X gate."""
+def sx(qubit):
+    """Apply √X gate to qubit."""
     return SXGate()
 
-def sxdg() -> SXdgGate:
-    """Create an inverse square-root X gate."""
+def sxdg(qubit):
+    """Apply √X-dagger gate to qubit."""
     return SXdgGate()
 
-def rx(theta: float) -> RXGate:
-    """Create a rotation-X gate."""
-    return RXGate(theta)
+def rx(qubit, theta):
+    """Apply RX rotation gate to qubit."""
+    return RXGate(theta=theta)
 
-def ry(theta: float) -> RYGate:
-    """Create a rotation-Y gate."""
-    return RYGate(theta)
+def ry(qubit, theta):
+    """Apply RY rotation gate to qubit."""
+    return RYGate(theta=theta)
 
-def rz(theta: float) -> RZGate:
-    """Create a rotation-Z gate."""
-    return RZGate(theta)
+def rz(qubit, theta):
+    """Apply RZ rotation gate to qubit."""
+    return RZGate(theta=theta)
 
-def phase(theta: float) -> PhaseGate:
-    """Create a phase gate."""
-    return PhaseGate(theta)
+def phase(qubit, theta):
+    """Apply phase gate to qubit."""
+    return PhaseGate(theta=theta)
 
-def u3(theta: float, phi: float, lambda_: float) -> U3Gate:
-    """Create a U3 gate."""
-    return U3Gate(theta, phi, lambda_)
+def u3(qubit, theta, phi, lambda_):
+    """Apply universal single-qubit gate."""
+    return U3Gate(theta=theta, phi=phi, lambda_=lambda_)
 
-def cx() -> CXGate:
-    """Create a controlled-X (CNOT) gate."""
+def cx(control, target):
+    """Apply CNOT (controlled-X) gate."""
     return CXGate()
 
-def cz() -> CZGate:
-    """Create a controlled-Z gate."""
+def cz(control, target):
+    """Apply CZ (controlled-Z) gate."""
     return CZGate()
 
-# def cy() -> CYGate:
-#     """Create a controlled-Y gate."""
-#     return CYGate()
-
-# def ch() -> CHGate:
-#     """Create a controlled-Hadamard gate."""
-#     return CHGate()
-
-def swap() -> SwapGate:
-    """Create a SWAP gate."""
+def swap(qubit1, qubit2):
+    """Apply SWAP gate."""
     return SwapGate()
 
-def iswap() -> iSwapGate:
-    """Create an iSWAP gate."""
+def iswap(qubit1, qubit2):
+    """Apply iSWAP gate."""
     return iSwapGate()
 
-def ecr() -> ECRGate:
-    """Create an ECR gate."""
+def ecr(qubit1, qubit2):
+    """Apply ECR (echoed cross-resonance) gate."""
     return ECRGate()
 
-def rxx(theta: float) -> RXXGate:
-    """Create a rotation-XX gate."""
-    return RXXGate(theta)
+def rxx(qubit1, qubit2, theta):
+    """Apply RXX rotation gate."""
+    return RXXGate(theta=theta)
 
-def ryy(theta: float) -> RYYGate:
-    """Create a rotation-YY gate."""
-    return RYYGate(theta)
+def ryy(qubit1, qubit2, theta):
+    """Apply RYY rotation gate."""
+    return RYYGate(theta=theta)
 
-def rzz(theta: float) -> RZZGate:
-    """Create a rotation-ZZ gate."""
-    return RZZGate(theta)
+def rzz(qubit1, qubit2, theta):
+    """Apply RZZ rotation gate."""
+    return RZZGate(theta=theta)
 
-def cphase(theta: float) -> CPhaseGate:
-    """Create a controlled-phase gate."""
-    return CPhaseGate(theta)
+def cphase(control, target, theta):
+    """Apply controlled phase gate."""
+    return CPhaseGate(theta=theta)
 
-def toffoli() -> ToffoliGate:
-    """Create a Toffoli (CCNOT) gate."""
+def toffoli(control1, control2, target):
+    """Apply Toffoli (CCNOT) gate."""
     return ToffoliGate()
 
-def fredkin() -> FredkinGate:
-    """Create a Fredkin (CSWAP) gate."""
+def fredkin(control, target1, target2):
+    """Apply Fredkin (CSWAP) gate."""
     return FredkinGate()
 
-def custom(name: str, matrix: Union[List[List[complex]], np.ndarray]) -> CustomGate:
-    """Create a custom gate from a unitary matrix.
+def custom(qubits, matrix, name=None):
+    """Create custom gate with given unitary matrix."""
+    return CustomGate(matrix=matrix, name=name)
+
+__all__ = [
+    # Gate classes
+    "HGate", "XGate", "YGate", "ZGate",
+    "SGate", "SdgGate", "TGate", "TdgGate",
+    "SXGate", "SXdgGate",
+    "RXGate", "RYGate", "RZGate", "PhaseGate", "U3Gate",
+    "CXGate", "CZGate",
+    "SwapGate", "iSwapGate", "ECRGate",
+    "RXXGate", "RYYGate", "RZZGate", "CPhaseGate",
+    "ToffoliGate", "FredkinGate",
+    "CustomGate",
     
-    Args:
-        name: Name of the gate
-        matrix: Unitary matrix as a list of lists or numpy array
-        
-    Returns:
-        CustomGate: The custom gate object
-    """
-    if isinstance(matrix, np.ndarray):
-        matrix = matrix.tolist()
-    return CustomGate(name, matrix)
+    # Factory functions
+    "h", "x", "y", "z", "s", "sdg", "t", "tdg", "sx", "sxdg",
+    "rx", "ry", "rz", "phase", "u3",
+    "cx", "cz",
+    "swap", "iswap", "ecr",
+    "rxx", "ryy", "rzz", "cphase",
+    "toffoli", "fredkin", "custom",
+]
