@@ -74,6 +74,14 @@ impl PyCircuit {
     fn to_ascii(&self) -> String {
         simq_core::render_ascii(&self.inner)
     }
+
+    /// Get LaTeX representation of the circuit
+    ///
+    /// Returns:
+    ///     String containing LaTeX code using quantikz package
+    fn to_latex(&self) -> String {
+        self.inner.to_latex()
+    }
 }
 
 impl PyCircuit {
