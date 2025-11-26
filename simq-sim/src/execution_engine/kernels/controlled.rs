@@ -5,6 +5,13 @@ use rayon::prelude::*;
 use crate::execution_engine::error::{ExecutionError, Result};
 use super::Matrix2x2;
 
+// Safety wrapper for raw pointers to allow Send+Sync
+// This is safe because we partition the work to ensure no data races
+#[derive(Copy, Clone)]
+struct SendPtr<T>(*mut T);
+unsafe impl<T> Send for SendPtr<T> {}
+unsafe impl<T> Sync for SendPtr<T> {}
+
 /// Apply a controlled single-qubit gate
 ///
 /// Applies a single-qubit gate to the target qubit, conditioned on the control qubit being |1⟩.
@@ -82,12 +89,17 @@ fn apply_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
+    let state_len = state.len();
+    let state_ptr = state.as_ptr() as usize;
+    
     state
         .par_chunks_mut(target_stride * 2)
-        .for_each(|chunk| {
-            for j in 0..target_stride.min(chunk.len() - target_stride) {
-                let base_idx = chunk.as_ptr() as usize - state.as_ptr() as usize;
-                let idx = base_idx / std::mem::size_of::<Complex64>() + j;
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base_idx = chunk_idx * target_stride * 2;
+            
+            for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
+                let idx = base_idx + j;
 
                 if idx & control_mask != 0 {
                     let a = chunk[j];
@@ -193,22 +205,21 @@ fn apply_multi_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
-    (0..state.len())
-        .into_par_iter()
-        .step_by(target_stride * 2)
-        .for_each(|i| {
-            for j in 0..target_stride {
-                let idx = i + j;
-                if idx + target_stride < state.len() &&
-                   (idx & control_mask).count_ones() as usize == num_controls {
-                    unsafe {
-                        let state_ptr = state.as_mut_ptr();
-                        let a = *state_ptr.add(idx);
-                        let b = *state_ptr.add(idx + target_stride);
+    state
+        .par_chunks_mut(target_stride * 2)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base_idx = chunk_idx * target_stride * 2;
+            
+            for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
+                let idx = base_idx + j; // Global index for control mask check
 
-                        *state_ptr.add(idx) = gate[0][0] * a + gate[0][1] * b;
-                        *state_ptr.add(idx + target_stride) = gate[1][0] * a + gate[1][1] * b;
-                    }
+                if (idx & control_mask).count_ones() as usize == num_controls {
+                    let a = chunk[j];
+                    let b = chunk[j + target_stride];
+
+                    chunk[j] = gate[0][0] * a + gate[0][1] * b;
+                    chunk[j + target_stride] = gate[1][0] * a + gate[1][1] * b;
                 }
             }
         });

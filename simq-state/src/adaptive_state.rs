@@ -334,6 +334,20 @@ impl AdaptiveState {
         }
     }
 
+    /// Get the probability of measuring 0 and 1 for a specific qubit
+    ///
+    /// # Arguments
+    /// * `qubit` - Index of the qubit
+    ///
+    /// # Returns
+    /// Tuple (prob_0, prob_1)
+    pub fn measure_probability(&self, qubit: usize) -> Result<(f64, f64)> {
+        match self {
+            Self::Sparse { state, .. } => state.measure_probability(qubit),
+            Self::Dense(state) => state.measure_probability(qubit),
+        }
+    }
+
     /// Get all amplitudes as a dense vector
     ///
     /// # Returns
