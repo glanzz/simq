@@ -9,6 +9,10 @@ homepage.workspace = true
 rust-version.workspace = true
 description = "Python bindings for SimQ quantum computing SDK"
 
+[features]
+default = ["ibm-quantum"]
+ibm-quantum = []
+
 [lib]
 name = "simq"
 crate-type = ["cdylib"]
@@ -25,7 +29,7 @@ simq-gates = { path = "../simq-gates" }
 simq-state = { path = "../simq-state" }
 simq-sim = { path = "../simq-sim" }
 simq-backend = { path = "../simq-backend", features = ["local-simulator", "ibm-quantum"] }
-# simq-compiler = { path = "../simq-compiler" }  # Phase 5 focuses on backends
+simq-compiler = { path = "../simq-compiler" }
 
 # Utility crates
 num-complex.workspace = true
