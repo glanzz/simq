@@ -89,6 +89,12 @@ impl IBMConfig {
         self.polling_interval_seconds = interval_seconds;
         self
     }
+
+    /// Set request timeout
+    pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
+        self.request_timeout_seconds = timeout_seconds;
+        self
+    }
 }
 
 /// IBM Quantum backend
