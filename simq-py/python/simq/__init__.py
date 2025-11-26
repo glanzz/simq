@@ -12,6 +12,19 @@ from ._simq import (
     InvalidQubitError,
     InvalidGateError,
     InvalidParameterError,
+    # Compiler
+    Compiler,
+    OptimizationLevel,
+    CircuitAnalysis,
+    # Backend
+    BackendResult,
+    JobStatus,
+    BackendType,
+    LocalSimulatorConfig,
+    LocalSimulatorBackend,
+    # IBM Quantum (optional)
+    IBMConfig,
+    IBMQuantumBackend,
 )
 
 from .gates import (
@@ -59,6 +72,11 @@ from .simulation import (
     SimulationResult,
 )
 
+from .visualization import (
+    plot_histogram,
+    plot_bloch_vector,
+)
+
 __all__ = [
     "__version__",
     "__author__",
@@ -102,4 +120,24 @@ __all__ = [
     "Simulator",
     "SimulatorConfig",
     "SimulationResult",
+    
+    # Compiler
+    "Compiler",
+    "OptimizationLevel",
+    "CircuitAnalysis",
+    
+    # Backend
+    "BackendResult",
+    "JobStatus",
+    "BackendType",
+    "LocalSimulatorConfig",
+    "LocalSimulatorBackend",
+    "IBMConfig",
+    "IBMQuantumBackend",
+    
+    # Visualization
+    "plot_histogram",
+    "plot_bloch_vector",
 ]
+
+
