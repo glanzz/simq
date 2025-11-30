@@ -79,7 +79,7 @@ fn main() {
 
     let compiler = create_compiler(OptimizationLevel::O2);
     let mut cached = CachedCompiler::new(compiler.clone(), 50);
-    let mut uncached = compiler;
+    let uncached = compiler;
 
     let num_circuits = 100;
     let num_unique = 10; // Only 10 unique circuit patterns
