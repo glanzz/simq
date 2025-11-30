@@ -1,6 +1,5 @@
 //! Gate matrix caching
 
-use num_complex::Complex64;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -8,7 +8,7 @@
 
 use crate::passes::OptimizationPass;
 use simq_core::{gate::Gate, Circuit, GateOp, QubitId, Result};
-use simq_gates::standard::{Hadamard, PauliX, PauliY, PauliZ};
+use simq_gates::standard::{PauliX, PauliY, PauliZ};
 use std::sync::Arc;
 
 /// A pattern matcher function that checks if a sequence matches
@@ -20,6 +20,7 @@ type ReplacementGenerator = fn(QubitId) -> Vec<(Arc<dyn Gate>, QubitId)>;
 /// An advanced template with pattern matching and replacement generation
 struct AdvancedTemplate {
     /// Name of this template
+    #[allow(dead_code)]
     name: &'static str,
     /// Minimum pattern length
     min_length: usize,
@@ -30,6 +31,7 @@ struct AdvancedTemplate {
     /// Replacement generator
     generator: ReplacementGenerator,
     /// Description
+    #[allow(dead_code)]
     description: &'static str,
 }
 

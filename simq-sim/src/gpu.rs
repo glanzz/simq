@@ -4,7 +4,6 @@
 
 #[cfg(feature = "gpu")]
 use wgpu;
-use num_complex::Complex;
 
 #[cfg(feature = "gpu")]
 #[derive(Clone)]

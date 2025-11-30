@@ -3,7 +3,7 @@
 //! Automatically selects the best backend for a given circuit based on
 //! requirements, capabilities, and available backends.
 
-use crate::{BackendCapabilities, BackendError, QuantumBackend, Result};
+use crate::{BackendError, QuantumBackend, Result};
 use simq_core::Circuit;
 use std::sync::Arc;
 

@@ -331,7 +331,6 @@ pub fn apply_gate_parallel(
     num_qubits: usize,
 ) {
     let dimension = 1 << num_qubits;
-    let qubit_mask = 1 << qubit;
     let stride = 1 << qubit;
 
     // Extract matrix elements for better cache locality
@@ -348,7 +347,7 @@ pub fn apply_gate_parallel(
 
     // Create ranges for parallel processing
     // Each range processes a contiguous block of "low" indices
-    let ranges: Vec<_> = (0..num_threads)
+    let _ranges: Vec<_> = (0..num_threads)
         .map(|thread_id| {
             let start = thread_id * pairs_per_thread;
             let end = std::cmp::min(start + pairs_per_thread, num_pairs);

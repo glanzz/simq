@@ -36,7 +36,7 @@
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
 use simq_state::AdaptiveState;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use super::{ConvergenceStatus, OptimizationResult, OptimizationStep};
 

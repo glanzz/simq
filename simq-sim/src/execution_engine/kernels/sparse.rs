@@ -10,13 +10,13 @@ pub fn apply_single_qubit_sparse(
     gate: &Matrix2x2,
     qubit: usize,
     amplitudes: &mut AHashMap<u64, Complex64>,
-    num_qubits: usize,
+    _num_qubits: usize,
 ) -> Result<()> {
     let mask = 1u64 << qubit;
     let mut new_amplitudes: AHashMap<u64, Complex64> = AHashMap::new();
 
     // Process all existing amplitudes
-    for (&idx, &amp) in amplitudes.iter() {
+    for (&idx, &_amp) in amplitudes.iter() {
         let idx0 = idx & !mask; // Clear qubit bit
         let idx1 = idx | mask;   // Set qubit bit
 
@@ -44,7 +44,7 @@ pub fn apply_two_qubit_sparse(
     qubit1: usize,
     qubit2: usize,
     amplitudes: &mut AHashMap<u64, Complex64>,
-    num_qubits: usize,
+    _num_qubits: usize,
 ) -> Result<()> {
     let mask1 = 1u64 << qubit1;
     let mask2 = 1u64 << qubit2;

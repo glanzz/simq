@@ -213,7 +213,7 @@ pub fn latin_hypercube_sampling(
     let mut samples = Vec::with_capacity(num_samples);
 
     // Create permutations for each dimension
-    let mut permutations: Vec<Vec<usize>> = (0..num_params)
+    let permutations: Vec<Vec<usize>> = (0..num_params)
         .map(|_| {
             let mut perm: Vec<usize> = (0..num_samples).collect();
             perm.shuffle(&mut rng);

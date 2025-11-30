@@ -16,9 +16,9 @@
 //! let transpiled = transpiler.transpile(&circuit, &backend.capabilities())?;
 //! ```
 
-use crate::{BackendCapabilities, BackendError, ConnectivityGraph, GateSet, Result};
+use crate::{BackendCapabilities, BackendError, Result};
 use simq_core::Circuit;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Transpiler for converting circuits to backend-specific formats
 ///
@@ -120,7 +120,7 @@ impl Transpiler {
     fn decompose_to_native(
         &self,
         circuit: &Circuit,
-        capabilities: &BackendCapabilities,
+        _capabilities: &BackendCapabilities,
     ) -> Result<Circuit> {
         // TODO: This requires iterating over circuit gates
         // For now, we check if all gates are supported
@@ -190,7 +190,7 @@ impl Transpiler {
     /// - Template matching for common patterns
     /// - Basic peephole optimization
     fn optimize_medium(&self, circuit: &Circuit) -> Result<Circuit> {
-        let mut optimized = self.optimize_light(circuit)?;
+        let optimized = self.optimize_light(circuit)?;
 
         // TODO: Implement medium optimization
         // - Commute gates to enable more cancellations
@@ -207,7 +207,7 @@ impl Transpiler {
     /// - Advanced template matching
     /// - Synthesis-based optimization
     fn optimize_heavy(&self, circuit: &Circuit) -> Result<Circuit> {
-        let mut optimized = self.optimize_medium(circuit)?;
+        let optimized = self.optimize_medium(circuit)?;
 
         // TODO: Implement heavy optimization
         // - Partition circuit into blocks
@@ -220,27 +220,21 @@ impl Transpiler {
     /// Estimate the cost of the transpiled circuit
     pub fn estimate_cost(
         &self,
-        circuit: &Circuit,
-        capabilities: &BackendCapabilities,
+        _circuit: &Circuit,
+        _capabilities: &BackendCapabilities,
     ) -> TranspilationCost {
         // Estimate based on circuit structure
         let num_gates = 0; // TODO: Get from circuit when API available
         let depth = 0; // TODO: Get from circuit when API available
+        let num_swaps = 0; // TODO: Estimate from connectivity
 
-        // Estimate SWAP overhead if connectivity is limited
-        let swap_overhead = if capabilities.connectivity.is_some() {
-            // Rough estimate: 10-30% overhead for SWAPs
-            (num_gates as f64 * 0.2) as usize
-        } else {
-            0
-        };
-
+        // Naive cost model - refine based on actual backend
         TranspilationCost {
             original_gates: num_gates,
-            transpiled_gates: num_gates + swap_overhead,
+            transpiled_gates: num_gates,
             original_depth: depth,
-            transpiled_depth: depth + swap_overhead / 2, // SWAPs add depth
-            swap_gates: swap_overhead / 3, // Each SWAP is 3 CNOTs
+            transpiled_depth: depth,
+            swap_gates: num_swaps,
         }
     }
 }

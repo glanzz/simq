@@ -153,6 +153,7 @@ fn validate_gate_matrix(gate: &Matrix2x2) -> Result<()> {
 
 #[cfg(not(debug_assertions))]
 #[inline]
+#[allow(dead_code)]
 fn validate_gate_matrix(_gate: &Matrix2x2) -> Result<()> {
     Ok(())
 }

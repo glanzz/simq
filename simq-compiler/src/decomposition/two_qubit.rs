@@ -45,9 +45,7 @@ use simq_core::{Gate, Result, QuantumError};
 use std::sync::Arc;
 use std::f64::consts::PI;
 
-const EPSILON: f64 = 1e-10;
 const ZERO: Complex64 = Complex64::new(0.0, 0.0);
-const ONE: Complex64 = Complex64::new(1.0, 0.0);
 
 /// Entangling gate basis for two-qubit decomposition
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -206,7 +204,7 @@ impl TwoQubitDecomposer {
     }
 
     /// Optimize the decomposition by reducing gate count
-    pub fn optimize_decomposition(&self, decomp: &mut CanonicalDecomposition, level: u8) {
+    pub fn optimize_decomposition(&self, _decomp: &mut CanonicalDecomposition, level: u8) {
         if level == 0 {
             return;
         }

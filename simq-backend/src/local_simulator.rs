@@ -134,7 +134,6 @@ impl LocalSimulatorBackend {
         let probabilities = self.compute_probabilities(state)?;
 
         // Sample from the distribution
-        use rand::Rng;
         let mut rng = if let Some(seed) = self.config.seed {
             rand::rngs::StdRng::seed_from_u64(seed)
         } else {

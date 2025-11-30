@@ -13,7 +13,7 @@ use crate::execution_engine::{
     recovery::RecoveryPolicy,
     checkpoint::CheckpointManager,
     validation,
-    cache::{GateMatrixCache, GateCacheKey, CachedMatrix, OrderedFloat},
+    cache::{GateMatrixCache, GateCacheKey, CachedMatrix},
     parallel::ParallelExecutor,
     adaptive::AdaptiveStrategy,
     kernels::*,
@@ -155,7 +155,7 @@ impl ExecutionEngine {
         &mut self,
         circuit: &Circuit,
         state: &mut AdaptiveState,
-        timeout_check: Option<(Instant, std::time::Duration)>,
+        _timeout_check: Option<(Instant, std::time::Duration)>,
     ) -> Result<()> {
         // Use parallel executor with layer-based execution
         // We need to temporarily take the parallel executor out of self to avoid
@@ -182,12 +182,12 @@ impl ExecutionEngine {
         &mut self,
         circuit: &Circuit,
         state: &mut AdaptiveState,
-        timeout_check: Option<(Instant, std::time::Duration)>,
+        _timeout_check: Option<(Instant, std::time::Duration)>,
     ) -> Result<()> {
         // TODO: Implement GPU execution
         // For now, fallback to sequential
         self.telemetry.log_event("gpu_fallback_to_sequential");
-        self.execute_sequential(circuit, state, timeout_check)
+        self.execute_sequential(circuit, state, None)
     }
 
     /// Execute a single gate with retry logic
@@ -200,7 +200,6 @@ impl ExecutionEngine {
         self.telemetry.record_thread();
 
         let mut attempts = 0;
-        let max_attempts = self.recovery_policy.max_attempts();
 
         loop {
             attempts += 1;
@@ -250,7 +249,7 @@ impl ExecutionEngine {
     fn apply_gate_op(&mut self, gate_op: &GateOp, state: &mut AdaptiveState) -> Result<()> {
         let gate = gate_op.gate();
         let qubits = gate_op.qubits();
-        let num_qubits = gate.num_qubits();
+        let _num_qubits = gate.num_qubits();
 
         // Determine if we should use parallel execution for this gate
         let use_parallel = self.adaptive_strategy.should_parallelize_gate(state);

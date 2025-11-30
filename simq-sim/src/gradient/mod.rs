@@ -162,8 +162,6 @@ pub fn compute_gradient<F>(
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
 {
-    use crate::error::SimulatorError;
-
     match config.method {
         GradientMethod::ParameterShift => {
             // Use parameter shift rule

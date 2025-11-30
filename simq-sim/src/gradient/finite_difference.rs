@@ -88,7 +88,7 @@ where
         FiniteDifferenceMethod::Central => None,
     };
 
-    let num_evals_per_param = match config.method {
+    let _num_evals_per_param = match config.method {
         FiniteDifferenceMethod::Forward | FiniteDifferenceMethod::Backward => 1,
         FiniteDifferenceMethod::Central => 2,
     };

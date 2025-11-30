@@ -2,7 +2,7 @@
 
 use simq_state::AdaptiveState;
 use crate::execution_engine::error::Result;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// A checkpoint of execution state
 #[derive(Debug, Clone)]
@@ -34,7 +34,7 @@ impl CheckpointManager {
         self
     }
 
-    pub fn create_checkpoint(&mut self, gate_index: usize, state: &AdaptiveState) -> Result<()> {
+    pub fn create_checkpoint(&mut self, gate_index: usize, _state: &AdaptiveState) -> Result<()> {
         // TODO: Implement state serialization
         let checkpoint = Checkpoint {
             gate_index,
@@ -51,7 +51,7 @@ impl CheckpointManager {
         Ok(())
     }
 
-    pub fn restore_checkpoint(&self, index: usize) -> Result<(usize, AdaptiveState)> {
+    pub fn restore_checkpoint(&self, _index: usize) -> Result<(usize, AdaptiveState)> {
         // TODO: Implement state deserialization
         Err(crate::execution_engine::error::ExecutionError::CheckpointFailed {
             reason: "Not implemented".to_string(),

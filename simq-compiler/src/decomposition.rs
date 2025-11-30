@@ -206,7 +206,7 @@ pub trait Decomposer: Send + Sync {
     fn name(&self) -> &str;
 
     /// Estimate the cost of decomposition (gate count)
-    fn estimate_cost(&self, gate: &dyn Gate) -> Option<usize> {
+    fn estimate_cost(&self, _gate: &dyn Gate) -> Option<usize> {
         None
     }
 }
