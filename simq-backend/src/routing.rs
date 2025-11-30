@@ -4,7 +4,7 @@
 //! and inserting SWAP gates to handle limited connectivity constraints.
 
 use crate::{BackendError, ConnectivityGraph, QubitMapping, Result};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 /// Router for handling qubit connectivity constraints
 ///
@@ -247,9 +247,11 @@ impl SwapGate {
 /// Reference: https://arxiv.org/abs/1809.02573
 pub struct SabreRouter {
     /// Lookahead window size
+    #[allow(dead_code)]
     lookahead: usize,
 
     /// Decay factor for heuristic
+    #[allow(dead_code)]
     decay: f64,
 }
 
@@ -279,6 +281,7 @@ impl SabreRouter {
     }
 
     /// Calculate SABRE heuristic score for a SWAP
+    #[allow(dead_code)]
     fn heuristic_score(
         &self,
         _swap: &SwapGate,

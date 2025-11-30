@@ -12,6 +12,7 @@ use simq_state::observable::PauliObservable;
 use crate::Simulator;
 use crate::error::Result;
 use super::batch::BatchResult;
+use rand::distributions::Distribution;
 
 /// Configuration for advanced batch evaluation
 #[derive(Debug, Clone)]
@@ -110,12 +111,10 @@ impl AdaptiveBatchEvaluator {
             // Check timeout
             if let Some(timeout) = self.config.timeout {
                 if start_time.elapsed() > timeout {
-                    return Err(crate::error::SimulatorError::Timeout {
-                        message: format!(
-                            "Batch evaluation timeout after {} evaluations",
-                            processed
-                        ),
-                    });
+                    return Err(crate::error::SimulatorError::Other(format!(
+                        "Batch evaluation timeout after {} evaluations",
+                        processed
+                    )));
                 }
             }
 
@@ -191,7 +190,7 @@ fn evaluate_single(
         }
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };
@@ -214,7 +213,7 @@ pub fn latin_hypercube_sampling(
     let mut samples = Vec::with_capacity(num_samples);
 
     // Create permutations for each dimension
-    let mut permutations: Vec<Vec<usize>> = (0..num_params)
+    let permutations: Vec<Vec<usize>> = (0..num_params)
         .map(|_| {
             let mut perm: Vec<usize> = (0..num_samples).collect();
             perm.shuffle(&mut rng);

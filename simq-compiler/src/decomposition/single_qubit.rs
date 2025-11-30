@@ -50,8 +50,6 @@ use std::f64::consts::PI;
 
 // Constants
 const EPSILON: f64 = 1e-10;
-const ZERO: Complex64 = Complex64::new(0.0, 0.0);
-const ONE: Complex64 = Complex64::new(1.0, 0.0);
 const I: Complex64 = Complex64::new(0.0, 1.0);
 
 /// Euler angle basis for single-qubit decomposition

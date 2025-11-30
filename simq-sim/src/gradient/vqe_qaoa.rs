@@ -17,7 +17,7 @@ use simq_state::observable::PauliObservable;
 use simq_state::AdaptiveState;
 use std::time::{Duration, Instant};
 
-use super::{compute_gradient_auto, GradientConfig, GradientMethod, GradientResult};
+use super::{compute_gradient_auto, GradientConfig, GradientMethod};
 
 /// Helper function to compute expectation value
 fn compute_expectation(
@@ -33,7 +33,7 @@ fn compute_expectation(
         }
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };
@@ -572,12 +572,12 @@ where
         // Optimize each layer sequentially
         for layer in 0..self.config.num_layers {
             let layer_start_idx = layer * 2;
-            let layer_end_idx = layer_start_idx + 2;
+            let _layer_end_idx = layer_start_idx + 2;
 
             // Optimize just this layer's parameters
             for _iteration in 0..self.config.max_iterations {
                 let circuit = (self.circuit_builder)(&params);
-                let energy = compute_expectation(simulator, &circuit, observable)?;
+                let _energy = compute_expectation(simulator, &circuit, observable)?;
                 let grad_result = compute_gradient_auto(
                     simulator,
                     &self.circuit_builder,

@@ -9,7 +9,7 @@
 //! and removing gates on dead qubits.
 
 use crate::passes::OptimizationPass;
-use simq_core::{Circuit, QubitId, Result};
+use simq_core::{Circuit, Result};
 use std::collections::HashSet;
 
 /// Dead code elimination optimization pass

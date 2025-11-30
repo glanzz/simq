@@ -16,7 +16,7 @@ use simq_core::Circuit;
 use simq_state::AdaptiveState;
 use simq_state::observable::PauliObservable;
 use crate::Simulator;
-use crate::error::{SimulatorError, Result};
+use crate::error::Result;
 use super::{GradientResult, GradientMethod};
 
 /// Configuration for parameter shift rule
@@ -189,7 +189,7 @@ fn evaluate_expectation(
         }
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };

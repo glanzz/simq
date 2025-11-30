@@ -88,7 +88,7 @@ where
         FiniteDifferenceMethod::Central => None,
     };
 
-    let num_evals_per_param = match config.method {
+    let _num_evals_per_param = match config.method {
         FiniteDifferenceMethod::Forward | FiniteDifferenceMethod::Backward => 1,
         FiniteDifferenceMethod::Central => 2,
     };
@@ -205,11 +205,11 @@ fn evaluate_expectation(
         AdaptiveState::Dense(dense) => {
             observable.expectation_value(dense)?
         }
-        AdaptiveState::Sparse { state: sparse, .. } => {
-            use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
-            observable.expectation_value(&dense)?
-        }
+            AdaptiveState::Sparse { state: sparse, .. } => {
+                use simq_state::DenseState;
+                let dense = DenseState::from_sparse(sparse)?;
+                observable.expectation_value(&dense)?
+            }
     };
 
     Ok(expectation)

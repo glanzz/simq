@@ -5,7 +5,7 @@
 //! This optimizes both memory usage and computational performance.
 
 use crate::dense_state::DenseState;
-use crate::error::{Result, StateError};
+use crate::error::Result;
 use crate::sparse_state::SparseState;
 use num_complex::Complex64;
 use std::fmt;
@@ -163,7 +163,7 @@ impl AdaptiveState {
     ///
     /// Returns true if conversion occurred
     fn check_and_convert(&mut self) -> bool {
-        if let Self::Sparse { state, threshold } = self {
+        if let Self::Sparse { state, threshold: _ } = self {
             if state.should_convert_to_dense() {
                 let dense = DenseState::from_sparse(state)
                     .expect("Sparse→Dense conversion failed");

@@ -188,7 +188,6 @@ impl PauliString {
     /// Compute expectation value for diagonal Pauli string (fast path)
     fn expectation_value_diagonal(&self, state: &DenseState) -> Result<f64> {
         let amplitudes = state.amplitudes();
-        let num_qubits = state.num_qubits();
 
         let mut expectation = 0.0;
 

@@ -3,10 +3,10 @@
 //! This module provides concrete implementations of gate decompositions
 //! to various target gate sets (IBM, Rigetti, etc.)
 
-use crate::{BackendError, DecompositionRule, GateSet, Result};
+use crate::{BackendError, GateSet, Result};
 use simq_core::{Circuit, GateOp, QubitId};
 use simq_gates::{
-    CNot, CZ, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationZ, SGate, SXGate, TGate,
+    CNot, CZ, PauliX, RotationX, RotationZ, SXGate,
 };
 use std::collections::HashMap;
 use std::f64::consts::PI;

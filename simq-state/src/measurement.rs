@@ -119,6 +119,7 @@ impl SamplingResult {
 /// Supports both single-shot measurement and efficient multi-shot sampling.
 pub struct ComputationalBasis {
     /// Qubits to measure (if None, measures all qubits)
+    #[allow(dead_code)]
     qubits: Option<Vec<usize>>,
 
     /// Whether to collapse the state after measurement

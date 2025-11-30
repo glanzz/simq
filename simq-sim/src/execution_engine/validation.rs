@@ -2,7 +2,6 @@
 
 use simq_state::AdaptiveState;
 use crate::execution_engine::error::{ExecutionError, Result};
-use num_complex::Complex64;
 
 /// Validate that a quantum state is normalized
 pub fn validate_normalization(state: &AdaptiveState, tolerance: f64) -> Result<()> {

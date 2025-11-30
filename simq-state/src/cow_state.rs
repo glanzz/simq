@@ -10,7 +10,6 @@
 
 use crate::dense_state::DenseState;
 use crate::error::Result;
-use crate::state_vector::StateVector;
 use num_complex::Complex64;
 use std::fmt;
 use std::sync::Arc;

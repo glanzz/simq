@@ -284,11 +284,14 @@ pub struct ReverseTape {
 
 #[derive(Debug, Clone)]
 enum Operation {
+    #[allow(dead_code)]
     Input { index: usize },
     Add { lhs: usize, rhs: usize },
     Mul { lhs: usize, rhs: usize },
     Sin { arg: usize },
+    #[allow(dead_code)]
     Cos { arg: usize },
+    #[allow(dead_code)]
     Exp { arg: usize },
 }
 

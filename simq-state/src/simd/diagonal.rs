@@ -240,11 +240,10 @@ pub fn apply_diagonal_gate_parallel(
     state: &mut [Complex64],
     diagonal: [Complex64; 2],
     qubit: usize,
-    num_qubits: usize,
+    _num_qubits: usize,
 ) {
     use rayon::prelude::*;
 
-    let dimension = 1usize << num_qubits;
     let stride = 1usize << qubit;
 
     // Split state into mutable chunks and process in parallel

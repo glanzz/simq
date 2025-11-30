@@ -9,19 +9,20 @@
 //! Template matching can significantly reduce circuit size and improve execution.
 
 use crate::passes::OptimizationPass;
-use simq_core::{Circuit, GateOp, QubitId, Result};
-use std::sync::Arc;
+use simq_core::{Circuit, GateOp, Result};
 
 /// A template pattern that can be matched and replaced
 #[derive(Debug, Clone)]
 struct Template {
     /// Name of this template
+    #[allow(dead_code)]
     name: String,
     /// Pattern to match (sequence of gate names)
     pattern: Vec<String>,
     /// Replacement gate sequence (if None, pattern is deleted)
     replacement: Option<Vec<String>>,
     /// Description of what this template optimizes
+    #[allow(dead_code)]
     description: String,
 }
 

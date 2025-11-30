@@ -26,6 +26,7 @@ use crate::{
     BackendCapabilities, BackendError, BackendResult, BackendType, ExecutionMetadata, JobStatus,
     QuantumBackend, Result,
 };
+use rand::SeedableRng;
 use simq_core::Circuit;
 use simq_sim::Simulator;
 use simq_state::AdaptiveState;
@@ -117,8 +118,8 @@ impl LocalSimulatorBackend {
     }
 
     /// Create a simulator instance for this backend
-    fn create_simulator(&self, num_qubits: usize) -> Simulator {
-        Simulator::new(num_qubits)
+    fn create_simulator(&self, _num_qubits: usize) -> Simulator {
+        Simulator::new(simq_sim::SimulatorConfig::default())
     }
 
     /// Convert simulator state to measurement counts
@@ -133,7 +134,6 @@ impl LocalSimulatorBackend {
         let probabilities = self.compute_probabilities(state)?;
 
         // Sample from the distribution
-        use rand::Rng;
         let mut rng = if let Some(seed) = self.config.seed {
             rand::rngs::StdRng::seed_from_u64(seed)
         } else {
@@ -171,7 +171,7 @@ impl LocalSimulatorBackend {
                 let num_qubits = state.num_qubits();
                 let mut probs = Vec::new();
 
-                for (basis_state, amp) in state.iter() {
+                for (basis_state, amp) in state.amplitudes().iter() {
                     let prob = amp.norm_sqr();
                     if prob > 1e-10 {
                         let bitstring = format!("{:0width$b}", basis_state, width = num_qubits);
@@ -251,6 +251,7 @@ impl QuantumBackend for LocalSimulatorBackend {
             cnot_count: None,
             cost: None,
             error_message: None,
+            queue_time: None,
             extra: HashMap::new(),
         };
 

@@ -1,9 +1,8 @@
 //! Parallel execution strategies
 
 use simq_core::{Circuit, GateOp};
-use simq_compiler::execution_plan::{ExecutionPlanner, ExecutionPlan};
+use simq_compiler::execution_plan::ExecutionPlanner;
 use simq_state::AdaptiveState;
-use rayon::prelude::*;
 use crate::execution_engine::error::{ExecutionError, Result};
 use crate::execution_engine::config::ParallelStrategy;
 
@@ -26,7 +25,7 @@ impl ParallelExecutor {
         &self,
         circuit: &Circuit,
         state: &mut AdaptiveState,
-        mut apply_gate: F,
+        apply_gate: F,
     ) -> Result<()>
     where
         F: FnMut(&GateOp, &mut AdaptiveState) -> Result<()> + Send + Sync,
@@ -100,7 +99,7 @@ impl ParallelExecutor {
         &self,
         circuit: &Circuit,
         state: &mut AdaptiveState,
-        mut apply_gate: F,
+        apply_gate: F,
     ) -> Result<()>
     where
         F: FnMut(&GateOp, &mut AdaptiveState) -> Result<()>,
@@ -115,7 +114,7 @@ impl ParallelExecutor {
         &self,
         circuit: &Circuit,
         state: &mut AdaptiveState,
-        mut apply_gate: F,
+        apply_gate: F,
     ) -> Result<()>
     where
         F: FnMut(&GateOp, &mut AdaptiveState) -> Result<()>,
