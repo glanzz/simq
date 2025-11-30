@@ -450,6 +450,9 @@ mod tests {
     use super::*;
     use crate::matrix_computation::{hadamard_matrix, pauli_x_matrix, pauli_z_matrix};
 
+    const ZERO: Complex64 = Complex64::new(0.0, 0.0);
+    const ONE: Complex64 = Complex64::new(1.0, 0.0);
+
     #[test]
     fn test_zyz_identity() {
         let id: Matrix2 = [[ONE, ZERO], [ZERO, ONE]];

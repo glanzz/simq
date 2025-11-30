@@ -32,6 +32,8 @@ use std::collections::HashSet;
 /// // ... add gates ...
 /// pass.apply(&mut circuit)?;
 /// ```
+/// 
+use simq_core::QubitId;
 #[derive(Debug, Clone)]
 pub struct DeadCodeElimination {
     /// Remove self-inverse gate pairs (e.g., X-X → identity)
