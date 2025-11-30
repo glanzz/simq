@@ -168,16 +168,19 @@ impl CompilationCache {
         }
 
         // Insert or update
-        if self.cache.contains_key(&fingerprint) {
-            // Update existing entry
-            self.cache.insert(fingerprint, circuit);
-            // Move to back of queue
-            self.lru_queue.retain(|fp| *fp != fingerprint);
-            self.lru_queue.push_back(fingerprint);
-        } else {
-            // Insert new entry
-            self.cache.insert(fingerprint, circuit);
-            self.lru_queue.push_back(fingerprint);
+        match self.cache.entry(fingerprint) {
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                // Update existing entry
+                e.insert(circuit);
+                // Move to back of queue
+                self.lru_queue.retain(|fp| *fp != fingerprint);
+                self.lru_queue.push_back(fingerprint);
+            }
+            std::collections::hash_map::Entry::Vacant(e) => {
+                // Insert new entry
+                e.insert(circuit);
+                self.lru_queue.push_back(fingerprint);
+            }
         }
 
         self.stats.current_size = self.cache.len();

@@ -362,7 +362,7 @@ fn get_terminal_size_stty() -> Option<usize> {
         .and_then(|output| {
             if output.status.success() {
                 String::from_utf8(output.stdout).ok().and_then(|s| {
-                    let parts: Vec<&str> = s.trim().split_whitespace().collect();
+                    let parts: Vec<&str> = s.split_whitespace().collect();
                     if parts.len() >= 2 {
                         parts[1].parse().ok()
                     } else {
@@ -745,7 +745,7 @@ impl<'a> AsciiRenderer<'a> {
                 qubit_gate.insert(q, *op);
                 qubit_role.insert(q, QubitRole::Single);
             } else {
-                self.analyze_multi_qubit_gate(*op, &mut qubit_gate, &mut qubit_role);
+                self.analyze_multi_qubit_gate(op, &mut qubit_gate, &mut qubit_role);
             }
         }
 

@@ -12,22 +12,19 @@ use std::sync::Arc;
 
 /// Optimization level presets
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum OptimizationLevel {
     /// No optimization
     O0,
     /// Basic optimization (dead code elimination only)
     O1,
     /// Standard optimization (dead code + fusion + templates)
+    #[default]
     O2,
     /// Aggressive optimization (all passes with commutation)
     O3,
 }
 
-impl Default for OptimizationLevel {
-    fn default() -> Self {
-        Self::O2
-    }
-}
 
 /// Create a compiler with the specified optimization level
 ///

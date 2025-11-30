@@ -112,9 +112,9 @@ pub fn tensor_product_4x4(a: &Matrix4, b: &Matrix2) -> Matrix8 {
 /// General implementation for dynamic matrices.
 pub fn tensor_product_dynamic(a: &DynamicMatrix, b: &DynamicMatrix) -> Result<DynamicMatrix> {
     let a_rows = a.len();
-    let a_cols = a.get(0).map(|row| row.len()).unwrap_or(0);
+    let a_cols = a.first().map(|row| row.len()).unwrap_or(0);
     let b_rows = b.len();
-    let b_cols = b.get(0).map(|row| row.len()).unwrap_or(0);
+    let b_cols = b.first().map(|row| row.len()).unwrap_or(0);
 
     if a_rows == 0 || a_cols == 0 || b_rows == 0 || b_cols == 0 {
         return Err(QuantumError::ValidationError("Empty matrix".to_string()));

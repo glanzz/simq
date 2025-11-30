@@ -245,7 +245,6 @@ impl TwoQubitDecomposer {
     /// Optimize the decomposition by reducing gate count
     pub fn optimize_decomposition(&self, _decomp: &mut CanonicalDecomposition, level: u8) {
         if level == 0 {
-            return;
         }
 
         // TODO: Implement optimization:

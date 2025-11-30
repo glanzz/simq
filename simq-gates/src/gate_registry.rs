@@ -142,7 +142,7 @@ impl GateRegistry {
         }
 
         println!("Registered Custom Gates:");
-        println!("{:<20} {:<10} {:<12} {}", "Name", "Qubits", "Hermitian", "Description");
+        println!("{:<20} {:<10} {:<12} Description", "Name", "Qubits", "Hermitian");
         println!("{}", "-".repeat(70));
 
         for info in self.list_gates() {

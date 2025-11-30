@@ -9,7 +9,6 @@
 //! Template matching can significantly reduce circuit size and improve execution.
 
 use crate::passes::OptimizationPass;
-use simq_core::QubitId;
 use simq_core::{Circuit, GateOp, Result};
 
 /// A template pattern that can be matched and replaced

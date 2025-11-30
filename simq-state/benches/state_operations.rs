@@ -6,7 +6,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use num_complex::Complex64;
 use simq_state::simd::diagonal::apply_diagonal_gate_scalar;
 use simq_state::simd::single_qubit::apply_gate_scalar;
-use simq_state::simd::{apply_diagonal_gate, apply_single_qubit_gate, norm_simd, normalize_simd};
+use simq_state::simd::{apply_diagonal_gate, apply_single_qubit_gate, norm_simd};
 use simq_state::{DenseState, StateVector};
 
 fn hadamard_matrix() -> [[Complex64; 2]; 2] {

@@ -166,8 +166,8 @@ pub fn embed_gate_matrix_vec(
                     let mask = 1 << qubit;
                     let i_bit = (i & mask) >> qubit;
                     let j_bit = (j & mask) >> qubit;
-                    gate_input |= (i_bit as usize) << idx;
-                    gate_output |= (j_bit as usize) << idx;
+                    gate_input |= i_bit << idx;
+                    gate_output |= j_bit << idx;
 
                     // Check if non-gate qubits match
                     if (i ^ (i_bit << qubit)) != (j ^ (j_bit << qubit)) {
@@ -461,10 +461,10 @@ mod tests {
 
         // X on qubit 0: |q1 q0⟩ → |q1 (X q0)⟩
         // |00⟩ → |01⟩ (flip qubit 0: 0→1)
-        assert_relative_eq!(x_embedded[1 * 4 + 0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(x_embedded[4].re, 1.0, epsilon = 1e-10);
 
         // |01⟩ → |00⟩ (flip qubit 0: 1→0)
-        assert_relative_eq!(x_embedded[0 * 4 + 1].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(x_embedded[1].re, 1.0, epsilon = 1e-10);
 
         // |10⟩ → |11⟩ (flip qubit 0: 0→1)
         assert_relative_eq!(x_embedded[3 * 4 + 2].re, 1.0, epsilon = 1e-10);

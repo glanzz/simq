@@ -278,18 +278,10 @@ impl ReadoutErrorMC {
     pub fn apply_to_measurement(&self, measured_bit: bool, random_value: f64) -> bool {
         if measured_bit {
             // Measured 1, flip to 0 with probability p10
-            if random_value < self.p10 {
-                false
-            } else {
-                true
-            }
+            random_value >= self.p10
         } else {
             // Measured 0, flip to 1 with probability p01
-            if random_value < self.p01 {
-                true
-            } else {
-                false
-            }
+            random_value < self.p01
         }
     }
 

@@ -13,7 +13,7 @@ use simq_compiler::passes::{
 };
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{
-    CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationY, RotationZ, SGate, Swap, TGate, CZ,
+    CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationZ, SGate, TGate, CZ,
 };
 use std::sync::Arc;
 

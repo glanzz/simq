@@ -12,28 +12,6 @@ use crate::passes::OptimizationPass;
 use simq_core::{Circuit, Result};
 use std::collections::HashSet;
 
-/// Dead code elimination optimization pass
-///
-/// Removes gates that don't contribute to the final circuit output.
-///
-/// # Algorithm
-/// 1. Mark all qubits as "live" by default (conservative approach)
-/// 2. Scan circuit backwards to find which qubits are actually used
-/// 3. Remove gates that only operate on dead qubits
-/// 4. Remove self-inverse gate pairs (e.g., X-X, H-H, CNOT-CNOT)
-///
-/// # Example
-/// ```ignore
-/// use simq_compiler::passes::DeadCodeElimination;
-/// use simq_core::Circuit;
-///
-/// let pass = DeadCodeElimination::new();
-/// let mut circuit = Circuit::new(3);
-/// // ... add gates ...
-/// pass.apply(&mut circuit)?;
-/// ```
-///
-use simq_core::QubitId;
 #[derive(Debug, Clone)]
 pub struct DeadCodeElimination {
     /// Remove self-inverse gate pairs (e.g., X-X → identity)

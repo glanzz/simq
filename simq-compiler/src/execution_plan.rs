@@ -364,11 +364,10 @@ impl ExecutionPlanner {
 
             // Add newly ready gates
             for (idx, gate_deps) in deps.iter() {
-                if !scheduled.contains(idx) && !ready_queue.contains(idx) {
-                    if gate_deps.iter().all(|&dep| scheduled.contains(&dep)) {
+                if !scheduled.contains(idx) && !ready_queue.contains(idx)
+                    && gate_deps.iter().all(|&dep| scheduled.contains(&dep)) {
                         ready_queue.push(*idx);
                     }
-                }
             }
 
             if !layer.is_empty() {

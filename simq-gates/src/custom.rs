@@ -443,14 +443,14 @@ impl CustomGateBuilder {
     pub fn build(self) -> Result<CustomGate, CustomGateError> {
         let num_qubits = self
             .num_qubits
-            .ok_or_else(|| CustomGateError::InvalidDimensions {
+            .ok_or(CustomGateError::InvalidDimensions {
                 expected: 0,
                 actual: 0,
             })?;
 
         let matrix = self
             .matrix
-            .ok_or_else(|| CustomGateError::InvalidDimensions {
+            .ok_or(CustomGateError::InvalidDimensions {
                 expected: 0,
                 actual: 0,
             })?;
