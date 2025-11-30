@@ -37,7 +37,7 @@ fn main() {
     println!("=== Advanced Compilation Pipeline Demo ===\n");
 
     // Create a sample circuit
-    let mut circuit = create_sample_circuit();
+    let circuit = create_sample_circuit();
 
     println!("Initial circuit:");
     println!("  Gates: {}", circuit.len());

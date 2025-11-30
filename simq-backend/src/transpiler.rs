@@ -9,11 +9,11 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```ignore
 //! use simq_backend::{Transpiler, OptimizationLevel};
 //!
 //! let transpiler = Transpiler::new(OptimizationLevel::Medium);
-//! let transpiled = transpiler.transpile(&circuit, &backend.capabilities())?;
+//! let transpiled = transpiler.transpile(&circuit, &backend.capabilities());
 //! ```
 
 use crate::{BackendCapabilities, BackendError, Result};

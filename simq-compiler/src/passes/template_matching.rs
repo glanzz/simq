@@ -9,6 +9,7 @@
 use crate::passes::OptimizationPass;
 use simq_core::{gate::Gate, Circuit, GateOp, QubitId, Result};
 use simq_gates::standard::{PauliX, PauliY, PauliZ};
+use simq_gates::Hadamard;
 use std::sync::Arc;
 
 /// A pattern matcher function that checks if a sequence matches

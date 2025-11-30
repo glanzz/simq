@@ -54,43 +54,52 @@ fn main() -> Result<()> {
     println!("   Circuit: {} qubits, {} operations", circuit.num_qubits(), circuit.len());
     println!();
 
-    // Serialize to JSON
-    println!("2. Serializing circuit to JSON...");
-    let json = circuit.to_json()?;
-    println!("   JSON length: {} bytes", json.len());
-    println!("   JSON preview: {}", &json[..json.len().min(100)]);
-    if json.len() > 100 {
-        println!("   ...");
+    #[cfg(feature = "serialization")]
+    {
+        // Serialize to JSON
+        println!("2. Serializing circuit to JSON...");
+        let json = circuit.to_json()?;
+        println!("   JSON length: {} bytes", json.len());
+        println!("   JSON preview: {}", &json[..json.len().min(100)]);
+        if json.len() > 100 {
+            println!("   ...");
+        }
+        println!();
+
+        // Serialize to binary
+        println!("3. Serializing circuit to binary...");
+        let bytes = circuit.to_bytes()?;
+        println!("   Binary length: {} bytes", bytes.len());
+        println!("   Compression ratio: {:.2}x smaller than JSON", json.len() as f64 / bytes.len() as f64);
+        println!();
+
+        // Generate cache key
+        println!("4. Generating cache key...");
+        let cache_key = circuit.cache_key();
+        println!("   Cache key: {}", cache_key);
+        println!("   (Same circuit structure will have the same cache key)");
+        println!();
+
+        // Demonstrate cache key consistency
+        println!("5. Verifying cache key consistency...");
+        let mut circuit2 = Circuit::new(2);
+        let h_gate2 = Arc::new(HadamardGate);
+        let cnot_gate2 = Arc::new(CnotGate);
+        circuit2.add_gate(h_gate2, &[QubitId::new(0)])?;
+        circuit2.add_gate(cnot_gate2, &[QubitId::new(0), QubitId::new(1)])?;
+
+        let cache_key2 = circuit2.cache_key();
+        println!("   Cache key 1: {}", cache_key);
+        println!("   Cache key 2: {}", cache_key2);
+        println!("   Keys match: {}", cache_key == cache_key2);
+        println!();
     }
-    println!();
 
-    // Serialize to binary
-    println!("3. Serializing circuit to binary...");
-    let bytes = circuit.to_bytes()?;
-    println!("   Binary length: {} bytes", bytes.len());
-    println!("   Compression ratio: {:.2}x smaller than JSON", json.len() as f64 / bytes.len() as f64);
-    println!();
-
-    // Generate cache key
-    println!("4. Generating cache key...");
-    let cache_key = circuit.cache_key();
-    println!("   Cache key: {}", cache_key);
-    println!("   (Same circuit structure will have the same cache key)");
-    println!();
-
-    // Demonstrate cache key consistency
-    println!("5. Verifying cache key consistency...");
-    let mut circuit2 = Circuit::new(2);
-    let h_gate2 = Arc::new(HadamardGate);
-    let cnot_gate2 = Arc::new(CnotGate);
-    circuit2.add_gate(h_gate2, &[QubitId::new(0)])?;
-    circuit2.add_gate(cnot_gate2, &[QubitId::new(0), QubitId::new(1)])?;
-
-    let cache_key2 = circuit2.cache_key();
-    println!("   Cache key 1: {}", cache_key);
-    println!("   Cache key 2: {}", cache_key2);
-    println!("   Keys match: {}", cache_key == cache_key2);
-    println!();
+    #[cfg(not(feature = "serialization"))]
+    {
+        println!("2-5. Serialization functionality not available (enable 'serialization' feature)");
+        println!();
+    }
 
     #[cfg(feature = "cache")]
     {

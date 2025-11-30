@@ -10,7 +10,6 @@ use simq_sim::gradient::{
 use simq_sim::Simulator;
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
-use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Gradient Computation with Automatic Fallback ===\n");
@@ -20,19 +19,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 1: Automatic method selection (simplest interface)
     println!("Example 1: Automatic gradient computation");
-    println!("-" .repeat(50));
+    println!("{}", "-".repeat(50));
 
     let params = vec![0.5, 1.0, 1.5];
 
     // Build a simple parameterized circuit
     let circuit_builder = |p: &[f64]| {
-        let mut circuit = Circuit::new(2);
+        let circuit = Circuit::new(2);
         // Add parameterized gates here
         circuit
     };
 
     // Create observable (Z⊗Z)
-    let observable = PauliObservable::new(2);
+    let observable = PauliObservable::new();
 
     // Compute gradient with automatic fallback
     let result = compute_gradient_auto(
@@ -49,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 2: Explicit configuration
     println!("Example 2: Explicit configuration");
-    println!("-".repeat(50));
+    println!("{}", "-".repeat(50));
 
     let config = GradientConfig {
         method: GradientMethod::Auto,
@@ -74,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 3: Force specific method
     println!("Example 3: Force parameter shift rule");
-    println!("-".repeat(50));
+    println!("{}", "-".repeat(50));
 
     let ps_config = GradientConfig {
         method: GradientMethod::ParameterShift,
@@ -95,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 4: Force finite differences
     println!("Example 4: Force finite differences");
-    println!("-".repeat(50));
+    println!("{}", "-".repeat(50));
 
     let fd_config = GradientConfig {
         method: GradientMethod::FiniteDifference,
@@ -117,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 5: VQE-style optimization loop
     println!("Example 5: VQE optimization loop with gradient descent");
-    println!("-".repeat(50));
+    println!("{}", "-".repeat(50));
 
     let mut params = vec![0.1, 0.2, 0.3];
     let learning_rate = 0.01;

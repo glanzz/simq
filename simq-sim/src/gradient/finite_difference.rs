@@ -235,6 +235,7 @@ mod tests {
     use super::*;
     use simq_core::QubitId;
     use simq_gates::standard::{Hadamard, RotationY};
+    use simq_state::observable::PauliString;
     use std::sync::Arc;
     use crate::SimulatorConfig;
 
@@ -249,7 +250,7 @@ mod tests {
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
 
         let config = FiniteDifferenceConfig {
@@ -280,7 +281,7 @@ mod tests {
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
 
         let config = FiniteDifferenceConfig {

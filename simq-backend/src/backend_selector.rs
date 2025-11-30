@@ -4,6 +4,7 @@
 //! requirements, capabilities, and available backends.
 
 use crate::{BackendError, QuantumBackend, Result};
+use crate::BackendCapabilities;
 use simq_core::Circuit;
 use std::sync::Arc;
 

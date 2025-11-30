@@ -37,7 +37,9 @@ pub fn apply_single_qubit_dense(
         });
     }
 
-    let stride = 1 << qubit;
+    // Convert qubit index to bit position (big-endian: qubit 0 is MSB)
+    let bit_position = num_qubits - 1 - qubit;
+    let stride = 1 << bit_position;
 
     // Validate gate matrix (optional in release builds)
     #[cfg(debug_assertions)]

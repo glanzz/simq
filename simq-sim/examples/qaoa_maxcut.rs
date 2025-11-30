@@ -7,8 +7,10 @@
 
 use simq_sim::Simulator;
 use simq_sim::gradient::{QAOAOptimizer, QAOAConfig, AdamOptimizer, AdamConfig};
-use simq_core::{Circuit, Gate};
-use simq_state::observable::PauliObservable;
+use simq_core::{Circuit, QubitId};
+use simq_state::observable::{PauliObservable, PauliString};
+use simq_gates::standard::{Hadamard, CNot, RotationZ, RotationX};
+use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("QAOA: MaxCut Problem\n");
@@ -18,15 +20,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Edges: (0,1), (1,2), (0,2)
     // Goal: Maximize the number of edges between different partitions
     let num_qubits = 3;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // MaxCut Hamiltonian: H_C = -0.5 * sum_{(i,j) in E} (I - Z_i Z_j)
     // For triangle: H_C = -0.5 * ((I - Z0Z1) + (I - Z1Z2) + (I - Z0Z2))
     // We'll use the cost observable: Z0Z1 + Z1Z2 + Z0Z2 (minimize to solve MaxCut)
     let observable = {
-        let mut obs = PauliObservable::from_pauli_string("ZZI", 0.5)?; // Z0Z1
-        obs = obs.add(&PauliObservable::from_pauli_string("IZZ", 0.5)?)?; // Z1Z2
-        obs.add(&PauliObservable::from_pauli_string("ZIZ", 0.5)?)?  // Z0Z2
+        let mut obs = PauliObservable::from_pauli_string(PauliString::from_str("ZZI")?, 0.5); // Z0Z1
+        obs.add_term(PauliString::from_str("IZZ")?, 0.5); // Z1Z2
+        obs.add_term(PauliString::from_str("ZIZ")?, 0.5); // Z0Z2
+        obs
     };
 
     // QAOA circuit builder
@@ -39,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Initial state: uniform superposition
         for i in 0..num_qubits {
-            circuit.add_gate(Gate::H(i));
+            circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(i)]).unwrap();
         }
 
         // QAOA layers
@@ -52,23 +55,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // RZZ(theta) = exp(-i * theta/2 * Z_i Z_j)
 
             // Edge (0,1)
-            circuit.add_gate(Gate::CNOT(0, 1));
-            circuit.add_gate(Gate::RZ(1, 2.0 * gamma));
-            circuit.add_gate(Gate::CNOT(0, 1));
+            circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+            circuit.add_gate(Arc::new(RotationZ::new(2.0 * gamma)), &[QubitId::new(1)]).unwrap();
+            circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
 
             // Edge (1,2)
-            circuit.add_gate(Gate::CNOT(1, 2));
-            circuit.add_gate(Gate::RZ(2, 2.0 * gamma));
-            circuit.add_gate(Gate::CNOT(1, 2));
+            circuit.add_gate(Arc::new(CNot), &[QubitId::new(1), QubitId::new(2)]).unwrap();
+            circuit.add_gate(Arc::new(RotationZ::new(2.0 * gamma)), &[QubitId::new(2)]).unwrap();
+            circuit.add_gate(Arc::new(CNot), &[QubitId::new(1), QubitId::new(2)]).unwrap();
 
             // Edge (0,2)
-            circuit.add_gate(Gate::CNOT(0, 2));
-            circuit.add_gate(Gate::RZ(2, 2.0 * gamma));
-            circuit.add_gate(Gate::CNOT(0, 2));
+            circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(2)]).unwrap();
+            circuit.add_gate(Arc::new(RotationZ::new(2.0 * gamma)), &[QubitId::new(2)]).unwrap();
+            circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(2)]).unwrap();
 
             // Mixer Hamiltonian: exp(-i * beta * sum_i X_i)
             for i in 0..num_qubits {
-                circuit.add_gate(Gate::RX(i, 2.0 * beta));
+                circuit.add_gate(Arc::new(RotationX::new(2.0 * beta)), &[QubitId::new(i)]).unwrap();
             }
         }
 
@@ -117,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let final_circuit = circuit_builder(&result.parameters);
     let final_result = simulator.run(&final_circuit)?;
     println!("\nTop measurement outcomes (probability > 5%):");
-    let amplitudes = final_result.state_vector();
+    let amplitudes = final_result.state.to_dense_vec();
     let mut probs: Vec<(usize, f64)> = amplitudes
         .iter()
         .enumerate()

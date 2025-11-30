@@ -252,6 +252,7 @@ mod tests {
     use super::*;
     use simq_core::QubitId;
     use simq_gates::standard::{Hadamard, RotationY};
+    use simq_state::observable::PauliString;
     use std::sync::Arc;
     use crate::SimulatorConfig;
 
@@ -268,7 +269,7 @@ mod tests {
         };
 
         // Observable: Z
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let params = vec![0.5];
         let config = ParameterShiftConfig::default();
@@ -297,7 +298,7 @@ mod tests {
             circuit
         };
 
-        let observable = PauliObservable::from_string("ZZ", &[0, 1]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("ZZ").unwrap(), 1.0);
 
         let params = vec![0.3, 0.7];
         let config = ParameterShiftConfig::default();
@@ -330,7 +331,7 @@ mod tests {
     fn test_zero_params() {
         let simulator = Simulator::new(SimulatorConfig::default());
         let circuit_builder = |_: &[f64]| Circuit::new(1);
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let result = compute_gradient_parameter_shift(
             &simulator,

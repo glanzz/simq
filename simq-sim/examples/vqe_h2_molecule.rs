@@ -7,8 +7,10 @@
 
 use simq_sim::Simulator;
 use simq_sim::gradient::{VQEOptimizer, VQEConfig, AdamOptimizer, AdamConfig};
-use simq_core::{Circuit, Gate};
-use simq_state::observable::PauliObservable;
+use simq_core::{Circuit, QubitId};
+use simq_state::observable::{PauliObservable, PauliString};
+use simq_gates::standard::{RotationY, CNot};
+use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("VQE: H2 Molecule Ground State Energy\n");
@@ -16,12 +18,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create simulator
     let num_qubits = 2;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // H2 molecule Hamiltonian (simplified, at equilibrium bond length)
     // H = -1.0523 * I - 0.3979 * Z0 - 0.3979 * Z1 - 0.0112 * Z0Z1 + 0.1809 * X0X1
     // We'll optimize the X0X1 term component
-    let observable = PauliObservable::from_pauli_string("XX", -0.1809)?;
+    let observable = PauliObservable::from_pauli_string(PauliString::from_str("XX")?, -0.1809);
 
     // VQE ansatz: Hardware-efficient ansatz
     // Circuit structure: RY(θ0) ⊗ RY(θ1) - CNOT(0,1) - RY(θ2) ⊗ RY(θ3)
@@ -29,15 +31,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut circuit = Circuit::new(num_qubits);
 
         // Layer 1: Single-qubit rotations
-        circuit.add_gate(Gate::RY(0, params[0]));
-        circuit.add_gate(Gate::RY(1, params[1]));
+        circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)]).unwrap();
 
         // Entangling layer
-        circuit.add_gate(Gate::CNOT(0, 1));
+        circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
 
         // Layer 2: Single-qubit rotations
-        circuit.add_gate(Gate::RY(0, params[2]));
-        circuit.add_gate(Gate::RY(1, params[3]));
+        circuit.add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(Arc::new(RotationY::new(params[3])), &[QubitId::new(1)]).unwrap();
 
         circuit
     };

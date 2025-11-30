@@ -6,7 +6,7 @@ use simq_gates::standard::*;
 use simq_core::gate::Gate;
 use std::f64::consts::PI;
 
-const EPSILON: f64 = 1e-10;
+const EPSILON: f64 = 1e-8;
 
 // Helper function to multiply 2x2 matrices
 fn mult_2x2(

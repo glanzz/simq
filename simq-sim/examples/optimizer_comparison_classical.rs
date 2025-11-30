@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We'll focus on the Z0Z1 term for this comparison
 
     let num_qubits = 2;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // Create observable: Z0 ⊗ Z1
     let mut paulis = vec![Pauli::I; num_qubits];
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         simq_state::AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };

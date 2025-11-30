@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         3, // depth
     );
 
-    let simulator = Simulator::new(builder.num_qubits());
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
 
     println!("Problem size: {} numbers → {} qubits", numbers.len(), builder.num_qubits());
@@ -122,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let final_result = simulator.run(&final_circuit)?;
 
     println!("\nTop solutions (probability > 5%):");
-    let amplitudes = final_result.state_vector();
+    let amplitudes = final_result.state.to_dense_vec();
     let mut probs: Vec<(usize, f64)> = amplitudes
         .iter()
         .enumerate()
@@ -172,7 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             depth,
         );
 
-        let simulator = Simulator::new(builder.num_qubits());
+        let simulator = Simulator::new(Default::default());
         let observable = builder.cost_observable()?;
         let initial_params = random_initial_parameters(depth, Some(42 + depth as u64));
 
@@ -218,7 +218,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         2,
     );
 
-    let simulator = Simulator::new(3);
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
     let initial_params = vec![0.5, 0.3, 0.7, 0.4];
 
@@ -264,7 +264,7 @@ fn run_maxcut_example(graph: &Graph, name: &str, depth: usize) -> Result<(), Box
         depth,
     );
 
-    let simulator = Simulator::new(builder.num_qubits());
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
 
     println!("Graph: {}", name);
@@ -288,7 +288,7 @@ fn run_maxcut_example(graph: &Graph, name: &str, depth: usize) -> Result<(), Box
     // Find best cut
     let final_circuit = builder.build(&result.parameters);
     let final_result = simulator.run(&final_circuit)?;
-    let amplitudes = final_result.state_vector();
+    let amplitudes = final_result.state.to_dense_vec();
 
     let (best_state, best_prob) = amplitudes
         .iter()
@@ -319,7 +319,7 @@ fn run_maxcut_with_mixer(
         depth,
     );
 
-    let simulator = Simulator::new(builder.num_qubits());
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
 
     let initial_params = random_initial_parameters(depth, Some(42));

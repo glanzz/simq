@@ -202,8 +202,8 @@ pub fn compute_probabilities(amplitudes: &[Complex64], output: &mut [f64]) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use approx::assert_relative_eq;
+    
+    
 
     #[test]
     #[cfg(target_arch = "x86_64")]

@@ -10,6 +10,7 @@
 
 use crate::passes::OptimizationPass;
 use simq_core::{Circuit, GateOp, Result};
+use simq_core::QubitId;
 
 /// A template pattern that can be matched and replaced
 #[derive(Debug, Clone)]
