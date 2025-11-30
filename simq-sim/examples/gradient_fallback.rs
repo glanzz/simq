@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build a simple parameterized circuit
     let circuit_builder = |p: &[f64]| {
-        let mut circuit = Circuit::new(2);
+        let circuit = Circuit::new(2);
         // Add parameterized gates here
         circuit
     };
