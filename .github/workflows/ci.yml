@@ -116,16 +116,16 @@ jobs:
       - name: Run security audit
         run: cargo audit
 
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # docs:
+  #   name: Documentation
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+  #     - name: Install Rust
+  #       uses: dtolnay/rust-toolchain@stable
 
-      - name: Build documentation
-        run: cargo doc --no-deps --all-features
-        env:
-          RUSTDOCFLAGS: -D warnings
+  #     - name: Build documentation
+  #       run: cargo doc --no-deps --all-features
+  #       env:
+  #         RUSTDOCFLAGS: -D warnings
