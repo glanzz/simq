@@ -6,11 +6,11 @@
 //! The operations are specialized for 2×2 and 4×4 complex matrices,
 //! which correspond to single-qubit and two-qubit quantum gates.
 
-pub mod single_qubit;
-pub mod two_qubit;
-pub mod kernels;
 pub mod controlled_gates;
 pub mod diagonal;
+pub mod kernels;
+pub mod single_qubit;
+pub mod two_qubit;
 
 use num_complex::Complex64;
 
@@ -176,12 +176,7 @@ pub fn normalize_simd(vec: &mut [Complex64]) {
 /// apply_cnot(&mut state, 0, 1, 3);
 /// ```
 #[inline]
-pub fn apply_cnot(
-    state: &mut [Complex64],
-    control: usize,
-    target: usize,
-    num_qubits: usize,
-) {
+pub fn apply_cnot(state: &mut [Complex64], control: usize, target: usize, num_qubits: usize) {
     controlled_gates::apply_cnot_striped(state, control, target, num_qubits);
 }
 
@@ -205,12 +200,7 @@ pub fn apply_cnot(
 /// apply_cz(&mut state, 0, 1, 3);
 /// ```
 #[inline]
-pub fn apply_cz(
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-    num_qubits: usize,
-) {
+pub fn apply_cz(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
     controlled_gates::apply_cz_striped(state, qubit1, qubit2, num_qubits);
 }
 

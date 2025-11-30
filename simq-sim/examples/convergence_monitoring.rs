@@ -9,16 +9,15 @@
 //!
 //! Run with: cargo run --example convergence_monitoring
 
-use simq_sim::Simulator;
-use simq_sim::gradient::{
-    ConvergenceMonitor, MonitorConfig, StoppingCriterion,
-    progress_callback, target_energy_callback,
-    compute_gradient_auto, GradientConfig, GradientMethod,
-};
 use simq_core::{Circuit, QubitId};
-use simq_state::observable::{PauliObservable, PauliString, Pauli};
+use simq_gates::{CNot, Hadamard, RotationY};
+use simq_sim::gradient::{
+    compute_gradient_auto, progress_callback, target_energy_callback, ConvergenceMonitor,
+    GradientConfig, GradientMethod, MonitorConfig, StoppingCriterion,
+};
+use simq_sim::Simulator;
+use simq_state::observable::{Pauli, PauliObservable, PauliString};
 use simq_state::AdaptiveState;
-use simq_gates::{Hadamard, RotationY, CNot};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -74,7 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let energy = compute_expectation(&result, &observable)?;
 
         // Compute gradient
-        let grad_result = compute_gradient_auto(&simulator, &circuit_builder, &observable, &params)?;
+        let grad_result =
+            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params)?;
 
         // Record metrics
         monitor.record(iteration, energy, &grad_result.gradients, &params);
@@ -118,7 +118,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let circuit = circuit_builder(&params2);
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
-        let grad_result = compute_gradient_auto(&simulator, &circuit_builder, &observable, &params2)?;
+        let grad_result =
+            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params2)?;
 
         monitor2.record(iteration, energy, &grad_result.gradients, &params2);
 
@@ -156,18 +157,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let circuit = circuit_builder(&params3);
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
-        let grad_result = compute_gradient_auto(&simulator, &circuit_builder, &observable, &params3)?;
+        let grad_result =
+            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params3)?;
 
         monitor3.record(iteration, energy, &grad_result.gradients, &params3);
 
         if iteration % 10 == 0 {
-            println!("Iteration {:3}: energy = {:.6}, best = {:.6}",
-                iteration, energy, monitor3.best_energy());
+            println!(
+                "Iteration {:3}: energy = {:.6}, best = {:.6}",
+                iteration,
+                energy,
+                monitor3.best_energy()
+            );
         }
 
         if monitor3.should_stop() {
-            println!("\nStopped at iteration {}: {}",
-                iteration, monitor3.stopping_criterion().description());
+            println!(
+                "\nStopped at iteration {}: {}",
+                iteration,
+                monitor3.stopping_criterion().description()
+            );
             break;
         }
 
@@ -177,8 +186,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\nBest energy found: {:.8} at iteration {}",
-        monitor3.best_energy(), monitor3.best_iteration());
+    println!(
+        "\nBest energy found: {:.8} at iteration {}",
+        monitor3.best_energy(),
+        monitor3.best_iteration()
+    );
 
     // ========================================================================
     // Example 4: Target Energy Callback
@@ -203,14 +215,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let circuit = circuit_builder(&params4);
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
-        let grad_result = compute_gradient_auto(&simulator, &circuit_builder, &observable, &params4)?;
+        let grad_result =
+            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params4)?;
 
         monitor4.record(iteration, energy, &grad_result.gradients, &params4);
 
         if monitor4.should_stop() {
             if monitor4.stopping_criterion() == StoppingCriterion::UserStop {
-                println!("Target energy {} reached at iteration {}!",
-                    target_energy, iteration);
+                println!("Target energy {} reached at iteration {}!", target_energy, iteration);
             }
             break;
         }
@@ -245,7 +257,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let circuit = circuit_builder(&params5);
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
-        let grad_result = compute_gradient_auto(&simulator, &circuit_builder, &observable, &params5)?;
+        let grad_result =
+            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params5)?;
 
         monitor5.record(iteration, energy, &grad_result.gradients, &params5);
 
@@ -297,7 +310,7 @@ fn compute_expectation(
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
     Ok(expectation)
 }

@@ -92,7 +92,7 @@ impl BackendCapabilities {
             supports_conditional: true,
             supports_reset: true,
             supports_parametric: false,
-            cost_per_shot: Some(0.00003), // Example cost
+            cost_per_shot: Some(0.00003),  // Example cost
             average_queue_time: Some(120), // 2 minutes
             metadata: HashMap::new(),
         }

@@ -70,7 +70,10 @@ fn main() -> Result<()> {
         println!("3. Serializing circuit to binary...");
         let bytes = circuit.to_bytes()?;
         println!("   Binary length: {} bytes", bytes.len());
-        println!("   Compression ratio: {:.2}x smaller than JSON", json.len() as f64 / bytes.len() as f64);
+        println!(
+            "   Compression ratio: {:.2}x smaller than JSON",
+            json.len() as f64 / bytes.len() as f64
+        );
         println!();
 
         // Generate cache key
@@ -124,14 +127,19 @@ fn main() -> Result<()> {
         println!("   Cache hit: {}", cached.is_some());
 
         if let Some(cached_circuit) = cached {
-            println!("   Retrieved circuit: {} qubits, {} operations",
-                     cached_circuit.num_qubits(), cached_circuit.len());
+            println!(
+                "   Retrieved circuit: {} qubits, {} operations",
+                cached_circuit.num_qubits(),
+                cached_circuit.len()
+            );
         }
 
         // Get cache statistics
         let stats = cache.stats();
-        println!("   Cache stats: {} hits, {} misses, {} entries",
-                 stats.hits, stats.misses, stats.size);
+        println!(
+            "   Cache stats: {} hits, {} misses, {} entries",
+            stats.hits, stats.misses, stats.size
+        );
         println!("   Hit rate: {:.2}%", stats.hit_rate());
         println!();
     }
@@ -146,4 +154,3 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-

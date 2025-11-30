@@ -45,9 +45,7 @@ fn example_bell_state() {
     let mut state = StateVector::new(2).unwrap();
     let mut executor = LazyExecutor::new(LazyConfig::default());
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     // Show results
     println!("State amplitudes:");
@@ -215,8 +213,9 @@ fn example_cache_performance() {
     println!("  Cache hits: {}", stats_no_cache.cache_hits);
     println!("  Cache misses: {}", stats_no_cache.cache_misses);
 
-    println!("\nCaching reduced computations from {} to {}!",
-        stats_no_cache.matrices_computed,
-        stats.matrices_computed);
+    println!(
+        "\nCaching reduced computations from {} to {}!",
+        stats_no_cache.matrices_computed, stats.matrices_computed
+    );
     println!();
 }

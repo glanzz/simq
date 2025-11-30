@@ -1,9 +1,9 @@
 //! Single-qubit gate application kernels
 
-use num_complex::Complex64;
-use rayon::prelude::*;
 use super::Matrix2x2;
 use crate::execution_engine::error::{ExecutionError, Result};
+use num_complex::Complex64;
+use rayon::prelude::*;
 
 /// Apply a single-qubit gate to a dense state vector
 ///
@@ -56,11 +56,7 @@ pub fn apply_single_qubit_dense(
 
 /// Apply single-qubit gate sequentially
 #[inline]
-fn apply_single_qubit_sequential(
-    gate: &Matrix2x2,
-    stride: usize,
-    state: &mut [Complex64],
-) {
+fn apply_single_qubit_sequential(gate: &Matrix2x2, stride: usize, state: &mut [Complex64]) {
     let n = state.len();
     let mut i = 0;
 
@@ -81,25 +77,19 @@ fn apply_single_qubit_sequential(
 
 /// Apply single-qubit gate in parallel
 #[inline]
-fn apply_single_qubit_parallel(
-    gate: &Matrix2x2,
-    stride: usize,
-    state: &mut [Complex64],
-) {
-    state
-        .par_chunks_mut(stride * 2)
-        .for_each(|chunk| {
-            for j in 0..stride.min(chunk.len() - stride) {
-                let idx0 = j;
-                let idx1 = j + stride;
+fn apply_single_qubit_parallel(gate: &Matrix2x2, stride: usize, state: &mut [Complex64]) {
+    state.par_chunks_mut(stride * 2).for_each(|chunk| {
+        for j in 0..stride.min(chunk.len() - stride) {
+            let idx0 = j;
+            let idx1 = j + stride;
 
-                let a = chunk[idx0];
-                let b = chunk[idx1];
+            let a = chunk[idx0];
+            let b = chunk[idx1];
 
-                chunk[idx0] = gate[0][0] * a + gate[0][1] * b;
-                chunk[idx1] = gate[1][0] * a + gate[1][1] * b;
-            }
-        });
+            chunk[idx0] = gate[0][0] * a + gate[0][1] * b;
+            chunk[idx1] = gate[1][0] * a + gate[1][1] * b;
+        }
+    });
 }
 
 /// Apply single-qubit gate with SIMD optimizations
@@ -180,13 +170,11 @@ pub fn apply_pauli_x(
     let stride = 1 << qubit;
 
     if use_parallel && n >= parallel_threshold {
-        state
-            .par_chunks_mut(stride * 2)
-            .for_each(|chunk| {
-                for j in 0..stride.min(chunk.len() - stride) {
-                    chunk.swap(j, j + stride);
-                }
-            });
+        state.par_chunks_mut(stride * 2).for_each(|chunk| {
+            for j in 0..stride.min(chunk.len() - stride) {
+                chunk.swap(j, j + stride);
+            }
+        });
     } else {
         let mut i = 0;
         while i < n {
@@ -220,15 +208,13 @@ pub fn apply_pauli_z(
     let stride = 1 << qubit;
 
     if use_parallel && n >= parallel_threshold {
-        state
-            .par_chunks_mut(stride * 2)
-            .for_each(|chunk| {
-                for j in stride..stride * 2 {
-                    if j < chunk.len() {
-                        chunk[j] = -chunk[j];
-                    }
+        state.par_chunks_mut(stride * 2).for_each(|chunk| {
+            for j in stride..stride * 2 {
+                if j < chunk.len() {
+                    chunk[j] = -chunk[j];
                 }
-            });
+            }
+        });
     } else {
         let mut i = 0;
         while i < n {
@@ -265,16 +251,14 @@ pub fn apply_hadamard(
     let stride = 1 << qubit;
 
     if use_parallel && n >= parallel_threshold {
-        state
-            .par_chunks_mut(stride * 2)
-            .for_each(|chunk| {
-                for j in 0..stride.min(chunk.len() - stride) {
-                    let a = chunk[j];
-                    let b = chunk[j + stride];
-                    chunk[j] = (a + b) * factor;
-                    chunk[j + stride] = (a - b) * factor;
-                }
-            });
+        state.par_chunks_mut(stride * 2).for_each(|chunk| {
+            for j in 0..stride.min(chunk.len() - stride) {
+                let a = chunk[j];
+                let b = chunk[j + stride];
+                chunk[j] = (a + b) * factor;
+                chunk[j + stride] = (a - b) * factor;
+            }
+        });
     } else {
         let mut i = 0;
         while i < n {
@@ -298,10 +282,7 @@ mod tests {
 
     #[test]
     fn test_pauli_x() {
-        let mut state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
 
         apply_pauli_x(0, &mut state, false, usize::MAX).unwrap();
 
@@ -311,10 +292,7 @@ mod tests {
 
     #[test]
     fn test_pauli_z() {
-        let mut state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(1.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
 
         apply_pauli_z(0, &mut state, false, usize::MAX).unwrap();
 
@@ -324,10 +302,7 @@ mod tests {
 
     #[test]
     fn test_hadamard() {
-        let mut state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
 
         apply_hadamard(0, &mut state, false, usize::MAX).unwrap();
 
@@ -340,16 +315,17 @@ mod tests {
     fn test_general_single_qubit() {
         // Test with Hadamard matrix
         let h_gate: Matrix2x2 = [
-            [Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
-             Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0)],
-            [Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
-             Complex64::new(-std::f64::consts::FRAC_1_SQRT_2, 0.0)],
+            [
+                Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+                Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            ],
+            [
+                Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+                Complex64::new(-std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            ],
         ];
 
-        let mut state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
 
         apply_single_qubit_dense(&h_gate, 0, &mut state, false, usize::MAX).unwrap();
 
@@ -365,10 +341,7 @@ mod tests {
             [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
         ];
 
-        let mut state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
 
         let result = apply_single_qubit_dense(&gate, 10, &mut state, false, usize::MAX);
         assert!(result.is_err());

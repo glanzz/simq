@@ -9,9 +9,9 @@
 //! - Enhanced universal cache (multi-level)
 //! - Runtime caching (lazy evaluation)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use simq_gates::{
-    compile_time_cache::{CommonAngles, VQEAngles, UniversalCache},
+    compile_time_cache::{CommonAngles, UniversalCache, VQEAngles},
     generated::{EnhancedUniversalCache, GeneratedAngleCache},
     matrices,
 };
@@ -39,26 +39,18 @@ fn bench_common_angles_cache(c: &mut Criterion) {
     let mut group = c.benchmark_group("common_angles_cache");
 
     // Test exact matches (should be zero-cost)
-    let common_angles = vec![
-        ("PI_OVER_4", PI / 4.0),
-        ("PI_OVER_2", PI / 2.0),
-        ("PI", PI),
-    ];
+    let common_angles = vec![("PI_OVER_4", PI / 4.0), ("PI_OVER_2", PI / 2.0), ("PI", PI)];
 
     for (name, angle) in common_angles {
-        group.bench_with_input(
-            BenchmarkId::new("RX", name),
-            &angle,
-            |b, &angle| {
-                b.iter(|| {
-                    if let Some(matrix) = CommonAngles::rx_lookup(black_box(angle)) {
-                        black_box(matrix)
-                    } else {
-                        black_box(matrices::rotation_x(angle))
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("RX", name), &angle, |b, &angle| {
+            b.iter(|| {
+                if let Some(matrix) = CommonAngles::rx_lookup(black_box(angle)) {
+                    black_box(matrix)
+                } else {
+                    black_box(matrices::rotation_x(angle))
+                }
+            });
+        });
     }
 
     group.finish();
@@ -94,19 +86,15 @@ fn bench_generated_cache(c: &mut Criterion) {
     ];
 
     for (name, angle) in clifford_angles {
-        group.bench_with_input(
-            BenchmarkId::new("RX_Clifford", name),
-            &angle,
-            |b, &angle| {
-                b.iter(|| {
-                    if let Some(matrix) = GeneratedAngleCache::rx_clifford_t(black_box(angle)) {
-                        black_box(matrix)
-                    } else {
-                        black_box(matrices::rotation_x(angle))
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("RX_Clifford", name), &angle, |b, &angle| {
+            b.iter(|| {
+                if let Some(matrix) = GeneratedAngleCache::rx_clifford_t(black_box(angle)) {
+                    black_box(matrix)
+                } else {
+                    black_box(matrices::rotation_x(angle))
+                }
+            });
+        });
     }
 
     // Test QAOA cache
@@ -129,20 +117,16 @@ fn bench_universal_cache(c: &mut Criterion) {
     let mut group = c.benchmark_group("universal_cache");
 
     let test_angles = vec![
-        ("Common_PI_4", PI / 4.0),      // Should hit Level 1
-        ("VQE_0.1", 0.1),               // Should hit Level 2
-        ("QAOA_1.0", 1.0),              // Should hit Level 3
-        ("Large_5.0", 5.0),             // Should fallback
+        ("Common_PI_4", PI / 4.0), // Should hit Level 1
+        ("VQE_0.1", 0.1),          // Should hit Level 2
+        ("QAOA_1.0", 1.0),         // Should hit Level 3
+        ("Large_5.0", 5.0),        // Should fallback
     ];
 
     for (name, angle) in test_angles {
-        group.bench_with_input(
-            BenchmarkId::new("RX", name),
-            &angle,
-            |b, &angle| {
-                b.iter(|| black_box(UniversalCache::rx(black_box(angle))));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("RX", name), &angle, |b, &angle| {
+            b.iter(|| black_box(UniversalCache::rx(black_box(angle))));
+        });
     }
 
     group.finish();
@@ -152,22 +136,18 @@ fn bench_enhanced_universal_cache(c: &mut Criterion) {
     let mut group = c.benchmark_group("enhanced_universal_cache");
 
     let test_angles = vec![
-        ("Common_PI_4", PI / 4.0),      // Level 1: Common angles
-        ("Clifford_PI_8", PI / 8.0),    // Level 2: Clifford+T
-        ("PiFrac_PI_3", PI / 3.0),      // Level 3: π fractions
-        ("VQE_0.05", 0.05),             // Level 4: VQE range
-        ("QAOA_2.0", 2.0),              // Level 5: QAOA range
-        ("Fallback_10.0", 10.0),        // Level 6: Runtime compute
+        ("Common_PI_4", PI / 4.0),   // Level 1: Common angles
+        ("Clifford_PI_8", PI / 8.0), // Level 2: Clifford+T
+        ("PiFrac_PI_3", PI / 3.0),   // Level 3: π fractions
+        ("VQE_0.05", 0.05),          // Level 4: VQE range
+        ("QAOA_2.0", 2.0),           // Level 5: QAOA range
+        ("Fallback_10.0", 10.0),     // Level 6: Runtime compute
     ];
 
     for (name, angle) in test_angles {
-        group.bench_with_input(
-            BenchmarkId::new("RX", name),
-            &angle,
-            |b, &angle| {
-                b.iter(|| black_box(EnhancedUniversalCache::rx(black_box(angle))));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("RX", name), &angle, |b, &angle| {
+            b.iter(|| black_box(EnhancedUniversalCache::rx(black_box(angle))));
+        });
     }
 
     group.finish();
@@ -202,9 +182,7 @@ fn bench_memory_access_patterns(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_access");
 
     // Simulate realistic workload: random angle access
-    let angles: Vec<f64> = (0..1000)
-        .map(|i| (i as f64 * 0.001) % (PI / 4.0))
-        .collect();
+    let angles: Vec<f64> = (0..1000).map(|i| (i as f64 * 0.001) % (PI / 4.0)).collect();
 
     group.bench_function("Sequential_Direct", |b| {
         let mut idx = 0;

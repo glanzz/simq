@@ -344,14 +344,14 @@ mod tests {
         match mc.get_operation(0) {
             PauliOperation::NoJump { sqrt_1_minus_gamma } => {
                 assert!((sqrt_1_minus_gamma - (0.9_f64).sqrt()).abs() < 1e-10);
-            }
+            },
             _ => panic!("Expected NoJump"),
         }
 
         match mc.get_operation(1) {
             PauliOperation::JumpToZero { sqrt_gamma } => {
                 assert!((sqrt_gamma - (0.1_f64).sqrt()).abs() < 1e-10);
-            }
+            },
             _ => panic!("Expected JumpToZero"),
         }
     }

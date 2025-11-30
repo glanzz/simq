@@ -34,9 +34,7 @@ pub mod monte_carlo;
 pub mod time_tracker;
 pub mod types;
 
-pub use channels::{
-    AmplitudeDamping, DepolarizingChannel, PhaseDamping, ReadoutError,
-};
+pub use channels::{AmplitudeDamping, DepolarizingChannel, PhaseDamping, ReadoutError};
 pub use hardware::{
     CrosstalkProperties, GateNoise, GateTiming, HardwareNoiseModel, QubitProperties,
     TwoQubitGateProperties,

@@ -15,10 +15,7 @@ pub enum SimulatorError {
     InvalidCircuit(String),
 
     /// Memory limit exceeded
-    OutOfMemory {
-        requested: usize,
-        limit: usize,
-    },
+    OutOfMemory { requested: usize, limit: usize },
 
     /// Too many qubits for available memory
     TooManyQubits {
@@ -33,19 +30,13 @@ pub enum SimulatorError {
     StateInitializationFailed(String),
 
     /// Gate application failed
-    GateApplicationFailed {
-        gate_index: usize,
-        reason: String,
-    },
+    GateApplicationFailed { gate_index: usize, reason: String },
 
     /// Measurement failed
     MeasurementFailed(String),
 
     /// Invalid qubit index
-    InvalidQubit {
-        qubit: usize,
-        num_qubits: usize,
-    },
+    InvalidQubit { qubit: usize, num_qubits: usize },
 
     /// Other error
     Other(String),
@@ -56,17 +47,13 @@ impl fmt::Display for SimulatorError {
         match self {
             SimulatorError::InvalidConfig(msg) => {
                 write!(f, "Invalid configuration: {}", msg)
-            }
+            },
             SimulatorError::InvalidCircuit(msg) => {
                 write!(f, "Invalid circuit: {}", msg)
-            }
+            },
             SimulatorError::OutOfMemory { requested, limit } => {
-                write!(
-                    f,
-                    "Out of memory: requested {} bytes, limit {} bytes",
-                    requested, limit
-                )
-            }
+                write!(f, "Out of memory: requested {} bytes, limit {} bytes", requested, limit)
+            },
             SimulatorError::TooManyQubits {
                 num_qubits,
                 max_qubits,
@@ -76,29 +63,22 @@ impl fmt::Display for SimulatorError {
                     "Too many qubits: circuit has {}, max supported is {}",
                     num_qubits, max_qubits
                 )
-            }
+            },
             SimulatorError::CompilationFailed(msg) => {
                 write!(f, "Compilation failed: {}", msg)
-            }
+            },
             SimulatorError::StateInitializationFailed(msg) => {
                 write!(f, "State initialization failed: {}", msg)
-            }
+            },
             SimulatorError::GateApplicationFailed { gate_index, reason } => {
                 write!(f, "Gate {} application failed: {}", gate_index, reason)
-            }
+            },
             SimulatorError::MeasurementFailed(msg) => {
                 write!(f, "Measurement failed: {}", msg)
-            }
-            SimulatorError::InvalidQubit {
-                qubit,
-                num_qubits,
-            } => {
-                write!(
-                    f,
-                    "Invalid qubit index {}: circuit has {} qubits",
-                    qubit, num_qubits
-                )
-            }
+            },
+            SimulatorError::InvalidQubit { qubit, num_qubits } => {
+                write!(f, "Invalid qubit index {}: circuit has {} qubits", qubit, num_qubits)
+            },
             SimulatorError::Other(msg) => write!(f, "{}", msg),
         }
     }

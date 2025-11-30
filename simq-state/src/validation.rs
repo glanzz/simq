@@ -104,10 +104,7 @@ pub fn validate_normalization(amplitudes: &[Complex64], tolerance: f64) -> Valid
     let message = if valid {
         format!("State is normalized (norm = {:.10})", norm)
     } else {
-        format!(
-            "State normalization error: norm = {:.10}, error = {:.2e}",
-            norm, norm_error
-        )
+        format!("State normalization error: norm = {:.10}, error = {:.2e}", norm, norm_error)
     };
 
     ValidationResult {
@@ -136,10 +133,7 @@ pub fn validate_probabilities(probabilities: &[f64], tolerance: f64) -> Validati
     let message = if valid {
         format!("Probabilities sum to 1.0 (sum = {:.10})", total)
     } else {
-        format!(
-            "Probability sum error: sum = {:.10}, error = {:.2e}",
-            total, error
-        )
+        format!("Probability sum error: sum = {:.10}, error = {:.2e}", total, error)
     };
 
     ValidationResult {
@@ -221,7 +215,10 @@ pub fn check_finite(amplitudes: &[Complex64]) -> bool {
 ///
 /// # Returns
 /// Validation result or error if state is invalid
-pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Result<ValidationResult> {
+pub fn validate_state(
+    amplitudes: &[Complex64],
+    policy: ValidationPolicy,
+) -> Result<ValidationResult> {
     match policy {
         ValidationPolicy::None => Ok(ValidationResult {
             valid: true,
@@ -235,9 +232,7 @@ pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Res
         ValidationPolicy::Critical | ValidationPolicy::Strict => {
             // Check for NaN/infinity
             if !check_finite(amplitudes) {
-                return Err(StateError::NotNormalized {
-                    norm: f64::NAN,
-                });
+                return Err(StateError::NotNormalized { norm: f64::NAN });
             }
 
             // Check normalization
@@ -248,7 +243,7 @@ pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Res
             }
 
             Ok(result)
-        }
+        },
     }
 }
 

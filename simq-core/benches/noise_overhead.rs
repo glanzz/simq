@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use simq_core::noise::{
-    HardwareNoiseModel, QubitTimeTracker, DepolarizingChannel, AmplitudeDamping,
-    PhaseDamping, NoiseChannel, GateTiming,
+    AmplitudeDamping, DepolarizingChannel, GateTiming, HardwareNoiseModel, NoiseChannel,
+    PhaseDamping, QubitTimeTracker,
 };
 
 /// Benchmark single-qubit gate noise generation
@@ -36,16 +36,14 @@ fn bench_two_qubit_noise_generation(c: &mut Criterion) {
         model.set_two_qubit_gate(0, 1, 0.99, 0.3);
 
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(
-            BenchmarkId::new("with_config", num_qubits),
-            num_qubits,
-            |b, _| {
-                b.iter(|| {
-                    let noise = model.two_qubit_gate_noise(black_box(0), black_box(1)).unwrap();
-                    black_box(noise);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("with_config", num_qubits), num_qubits, |b, _| {
+            b.iter(|| {
+                let noise = model
+                    .two_qubit_gate_noise(black_box(0), black_box(1))
+                    .unwrap();
+                black_box(noise);
+            });
+        });
     }
 
     group.finish();
@@ -83,15 +81,11 @@ fn bench_time_tracking(c: &mut Criterion) {
         let mut tracker = QubitTimeTracker::new(*num_qubits, timing);
 
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(
-            BenchmarkId::new("single_gate", num_qubits),
-            num_qubits,
-            |b, _| {
-                b.iter(|| {
-                    tracker.apply_single_qubit_gate(black_box(0));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("single_gate", num_qubits), num_qubits, |b, _| {
+            b.iter(|| {
+                tracker.apply_single_qubit_gate(black_box(0));
+            });
+        });
     }
 
     group.finish();
@@ -110,16 +104,12 @@ fn bench_idle_time_calculation(c: &mut Criterion) {
         tracker.apply_two_qubit_gate(1, 2);
 
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(
-            BenchmarkId::new("single_qubit", num_qubits),
-            num_qubits,
-            |b, _| {
-                b.iter(|| {
-                    let idle = tracker.idle_time_since_last_operation(black_box(3));
-                    black_box(idle);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("single_qubit", num_qubits), num_qubits, |b, _| {
+            b.iter(|| {
+                let idle = tracker.idle_time_since_last_operation(black_box(3));
+                black_box(idle);
+            });
+        });
     }
 
     group.finish();
@@ -136,16 +126,12 @@ fn bench_all_idle_times(c: &mut Criterion) {
         tracker.apply_single_qubit_gate(0);
 
         group.throughput(Throughput::Elements(*num_qubits as u64));
-        group.bench_with_input(
-            BenchmarkId::new("all_qubits", num_qubits),
-            num_qubits,
-            |b, _| {
-                b.iter(|| {
-                    let idle_times = tracker.all_idle_times();
-                    black_box(idle_times);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("all_qubits", num_qubits), num_qubits, |b, _| {
+            b.iter(|| {
+                let idle_times = tracker.all_idle_times();
+                black_box(idle_times);
+            });
+        });
     }
 
     group.finish();
@@ -225,24 +211,21 @@ fn bench_circuit_fidelity_estimation(c: &mut Criterion) {
 
     for circuit_depth in [10, 50, 100, 500].iter() {
         let single_gates = vec![*circuit_depth; 5];
-        let two_gates: Vec<(usize, usize)> = (0..*circuit_depth).map(|i| (i % 4, (i % 4) + 1)).collect();
+        let two_gates: Vec<(usize, usize)> =
+            (0..*circuit_depth).map(|i| (i % 4, (i % 4) + 1)).collect();
         let total_time = (*circuit_depth as f64) * 0.1;
 
         group.throughput(Throughput::Elements(*circuit_depth as u64));
-        group.bench_with_input(
-            BenchmarkId::new("depth", circuit_depth),
-            circuit_depth,
-            |b, _| {
-                b.iter(|| {
-                    let fidelity = model.estimate_circuit_fidelity(
-                        black_box(&single_gates),
-                        black_box(&two_gates),
-                        black_box(total_time),
-                    );
-                    black_box(fidelity);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("depth", circuit_depth), circuit_depth, |b, _| {
+            b.iter(|| {
+                let fidelity = model.estimate_circuit_fidelity(
+                    black_box(&single_gates),
+                    black_box(&two_gates),
+                    black_box(total_time),
+                );
+                black_box(fidelity);
+            });
+        });
     }
 
     group.finish();
@@ -262,15 +245,11 @@ fn bench_synchronization(c: &mut Criterion) {
         }
 
         group.throughput(Throughput::Elements(*num_qubits as u64));
-        group.bench_with_input(
-            BenchmarkId::new("sync_all", num_qubits),
-            num_qubits,
-            |b, _| {
-                b.iter(|| {
-                    tracker.synchronize_all_qubits();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("sync_all", num_qubits), num_qubits, |b, _| {
+            b.iter(|| {
+                tracker.synchronize_all_qubits();
+            });
+        });
     }
 
     group.finish();

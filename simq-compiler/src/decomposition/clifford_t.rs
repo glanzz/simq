@@ -46,12 +46,14 @@
 //! - Amy, Maslov, Mosca, "Polynomial-time T-depth optimization of Clifford+T circuits" (2014)
 //! - Solovay-Kitaev theorem for universal approximation
 
-use crate::decomposition::{Decomposer, DecompositionConfig, DecompositionResult, DecompositionMetadata};
-use crate::matrix_computation::{Matrix2, is_unitary_2x2};
+use crate::decomposition::{
+    Decomposer, DecompositionConfig, DecompositionMetadata, DecompositionResult,
+};
+use crate::matrix_computation::{is_unitary_2x2, Matrix2};
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
-use std::sync::Arc;
+use simq_core::{Gate, QuantumError, Result};
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 const EPSILON: f64 = 1e-10;
 
@@ -130,7 +132,7 @@ impl CliffordTDecomposer {
         let k = k.rem_euclid(8);
 
         match k {
-            0 => vec![],  // Identity
+            0 => vec![], // Identity
             1 => vec![CliffordTGate::T],
             2 => vec![CliffordTGate::S],
             3 => vec![CliffordTGate::T, CliffordTGate::S],
@@ -164,9 +166,7 @@ impl CliffordTDecomposer {
     /// Then approximates each Ry and Rz using Clifford+T gates.
     pub fn decompose_single_qubit(&self, matrix: &Matrix2) -> Result<Vec<CliffordTGate>> {
         if !is_unitary_2x2(matrix) {
-            return Err(QuantumError::ValidationError(
-                "Matrix is not unitary".to_string()
-            ));
+            return Err(QuantumError::ValidationError("Matrix is not unitary".to_string()));
         }
 
         // Extract Euler angles (ZYZ decomposition)
@@ -229,7 +229,8 @@ impl CliffordTDecomposer {
 
     /// Count T gates in a gate sequence
     pub fn count_t_gates(gates: &[CliffordTGate]) -> usize {
-        gates.iter()
+        gates
+            .iter()
             .filter(|g| matches!(g, CliffordTGate::T | CliffordTGate::TDagger))
             .count()
     }
@@ -246,10 +247,10 @@ impl CliffordTDecomposer {
                         depth += 1;
                         in_t_layer = true;
                     }
-                }
+                },
                 _ => {
                     in_t_layer = false;
-                }
+                },
             }
         }
 
@@ -268,32 +269,32 @@ impl CliffordTDecomposer {
         for gate in gates {
             match (optimized.last(), gate) {
                 // T† T = I (cancel)
-                (Some(&CliffordTGate::TDagger), CliffordTGate::T) |
-                (Some(&CliffordTGate::T), CliffordTGate::TDagger) => {
+                (Some(&CliffordTGate::TDagger), CliffordTGate::T)
+                | (Some(&CliffordTGate::T), CliffordTGate::TDagger) => {
                     optimized.pop();
-                }
+                },
 
                 // S† S = I (cancel)
-                (Some(&CliffordTGate::SDagger), CliffordTGate::S) |
-                (Some(&CliffordTGate::S), CliffordTGate::SDagger) => {
+                (Some(&CliffordTGate::SDagger), CliffordTGate::S)
+                | (Some(&CliffordTGate::S), CliffordTGate::SDagger) => {
                     optimized.pop();
-                }
+                },
 
                 // HH = I (cancel)
                 (Some(&CliffordTGate::H), CliffordTGate::H) => {
                     optimized.pop();
-                }
+                },
 
                 // SS = Z
                 (Some(&CliffordTGate::S), CliffordTGate::S) => {
                     optimized.pop();
                     optimized.push(CliffordTGate::Z);
-                }
+                },
 
                 // Otherwise, add gate
                 _ => {
                     optimized.push(*gate);
-                }
+                },
             }
         }
 
@@ -308,10 +309,14 @@ impl Default for CliffordTDecomposer {
 }
 
 impl Decomposer for CliffordTDecomposer {
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult> {
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult> {
         if gate.num_qubits() != 1 {
             return Err(QuantumError::ValidationError(
-                "Clifford+T decomposition currently supports single-qubit gates only".to_string()
+                "Clifford+T decomposition currently supports single-qubit gates only".to_string(),
             ));
         }
 
@@ -483,9 +488,9 @@ mod tests {
     fn test_t_depth() {
         let gates = vec![
             CliffordTGate::T,
-            CliffordTGate::T,  // Same layer
-            CliffordTGate::H,  // Clifford
-            CliffordTGate::T,  // New layer
+            CliffordTGate::T, // Same layer
+            CliffordTGate::H, // Clifford
+            CliffordTGate::T, // New layer
         ];
 
         assert_eq!(CliffordTDecomposer::count_t_depth(&gates), 2);
@@ -497,9 +502,9 @@ mod tests {
 
         let gates = vec![
             CliffordTGate::T,
-            CliffordTGate::TDagger,  // Should cancel
+            CliffordTGate::TDagger, // Should cancel
             CliffordTGate::H,
-            CliffordTGate::H,  // Should cancel
+            CliffordTGate::H, // Should cancel
         ];
 
         let optimized = decomposer.optimize_t_count(&gates);

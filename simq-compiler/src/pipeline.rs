@@ -155,7 +155,9 @@ impl PipelineBuilder {
 
     /// Add advanced template matching pass (recommended over basic template substitution)
     pub fn with_advanced_template_matching(mut self) -> Self {
-        self.builder = self.builder.add_pass(Arc::new(AdvancedTemplateMatching::new()));
+        self.builder = self
+            .builder
+            .add_pass(Arc::new(AdvancedTemplateMatching::new()));
         self
     }
 

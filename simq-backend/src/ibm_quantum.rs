@@ -80,11 +80,7 @@ impl IBMConfig {
     }
 
     /// Set polling configuration
-    pub fn with_polling(
-        mut self,
-        max_attempts: usize,
-        interval_seconds: u64,
-    ) -> Self {
+    pub fn with_polling(mut self, max_attempts: usize, interval_seconds: u64) -> Self {
         self.max_polling_attempts = max_attempts;
         self.polling_interval_seconds = interval_seconds;
         self
@@ -155,10 +151,7 @@ impl IBMQuantumBackend {
 
     /// Fetch backend properties from IBM API
     fn fetch_backend_properties(&self) -> Result<IBMBackendProperties> {
-        let url = format!(
-            "{}/v1/backends/{}",
-            self.config.api_url, self.backend_name
-        );
+        let url = format!("{}/v1/backends/{}", self.config.api_url, self.backend_name);
 
         let response = self
             .client
@@ -343,9 +336,7 @@ impl IBMQuantumBackend {
             .map_err(|e| BackendError::NetworkError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(BackendError::Other(
-                "Failed to retrieve results".to_string(),
-            ));
+            return Err(BackendError::Other("Failed to retrieve results".to_string()));
         }
 
         let results: IBMResults = response
@@ -361,10 +352,7 @@ impl IBMQuantumBackend {
             queue_time: None,
             total_time: None,
             backend_name: Some(self.backend_name.clone()),
-            backend_version: self
-                .properties
-                .as_ref()
-                .map(|p| p.backend_version.clone()),
+            backend_version: self.properties.as_ref().map(|p| p.backend_version.clone()),
             status: JobStatus::Completed,
             num_qubits: None,
             circuit_depth: None,
@@ -405,9 +393,7 @@ impl IBMQuantumBackend {
         }
 
         if counts.is_empty() {
-            return Err(BackendError::Other(
-                "No measurement counts found in results".to_string(),
-            ));
+            return Err(BackendError::Other("No measurement counts found in results".to_string()));
         }
 
         Ok(counts)
@@ -425,10 +411,7 @@ impl IBMQuantumBackend {
             .map_err(|e| BackendError::NetworkError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(BackendError::Other(format!(
-                "Failed to cancel job: {}",
-                job_id
-            )));
+            return Err(BackendError::Other(format!("Failed to cancel job: {}", job_id)));
         }
 
         Ok(())
@@ -468,26 +451,23 @@ impl QuantumBackend for IBMQuantumBackend {
                     let mut result = self.get_job_results_impl(&job_id)?;
                     result.metadata.total_time = Some(start_time.elapsed());
                     return Ok(result);
-                }
+                },
                 JobStatus::Failed => {
-                    return Err(BackendError::JobExecutionFailed(format!(
-                        "Job {} failed",
-                        job_id
-                    )));
-                }
+                    return Err(BackendError::JobExecutionFailed(format!("Job {} failed", job_id)));
+                },
                 JobStatus::Cancelled => {
                     return Err(BackendError::JobExecutionFailed(format!(
                         "Job {} was cancelled",
                         job_id
                     )));
-                }
+                },
                 _ => {
                     // Still running, continue polling
                     if attempt % 10 == 0 {
                         // Log progress every 20 seconds
                         eprintln!("Job {} status: {:?}", job_id, status);
                     }
-                }
+                },
             }
         }
 
@@ -627,24 +607,21 @@ mod tests {
 
     #[test]
     fn test_config_with_instance() {
-        let config = IBMConfig::new("test-token")
-            .with_instance("ibm-q/open/main");
+        let config = IBMConfig::new("test-token").with_instance("ibm-q/open/main");
 
         assert_eq!(config.instance, Some("ibm-q/open/main".to_string()));
     }
 
     #[test]
     fn test_config_custom_url() {
-        let config = IBMConfig::new("test-token")
-            .with_api_url("https://custom.api.com");
+        let config = IBMConfig::new("test-token").with_api_url("https://custom.api.com");
 
         assert_eq!(config.api_url, "https://custom.api.com");
     }
 
     #[test]
     fn test_config_polling() {
-        let config = IBMConfig::new("test-token")
-            .with_polling(100, 5);
+        let config = IBMConfig::new("test-token").with_polling(100, 5);
 
         assert_eq!(config.max_polling_attempts, 100);
         assert_eq!(config.polling_interval_seconds, 5);

@@ -32,7 +32,7 @@ use std::collections::HashSet;
 /// // ... add gates ...
 /// pass.apply(&mut circuit)?;
 /// ```
-/// 
+///
 use simq_core::QubitId;
 #[derive(Debug, Clone)]
 pub struct DeadCodeElimination {
@@ -222,7 +222,9 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(id_gate, &[QubitId::new(1)]).unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
@@ -246,8 +248,12 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
         assert_eq!(circuit.len(), 3);
@@ -268,7 +274,9 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -314,8 +322,12 @@ mod tests {
             num_qubits: 2,
         });
 
-        circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-        circuit.add_gate(cnot, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(cnot, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
 
         assert_eq!(circuit.len(), 2);
 
@@ -335,7 +347,9 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
         assert_eq!(circuit.len(), 2);

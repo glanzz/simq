@@ -1,22 +1,22 @@
 //! Production-grade execution engine
 
-use simq_core::{Circuit, GateOp, QubitId, Gate};
+use num_complex::Complex64;
+use simq_core::{Circuit, Gate, GateOp, QubitId};
 use simq_state::AdaptiveState;
 use std::sync::Arc;
 use std::time::Instant;
-use num_complex::Complex64;
 
 use crate::execution_engine::{
+    adaptive::AdaptiveStrategy,
+    cache::{CachedMatrix, GateCacheKey, GateMatrixCache},
+    checkpoint::CheckpointManager,
     config::{ExecutionConfig, ExecutionMode},
     error::{ExecutionError, Result},
-    telemetry::ExecutionTelemetry,
-    recovery::RecoveryPolicy,
-    checkpoint::CheckpointManager,
-    validation,
-    cache::{GateMatrixCache, GateCacheKey, CachedMatrix},
-    parallel::ParallelExecutor,
-    adaptive::AdaptiveStrategy,
     kernels::*,
+    parallel::ParallelExecutor,
+    recovery::RecoveryPolicy,
+    telemetry::ExecutionTelemetry,
+    validation,
 };
 
 /// Production-grade execution engine
@@ -46,7 +46,7 @@ impl ExecutionEngine {
             parallel_executor: ParallelExecutor::new(config.parallel_strategy),
             adaptive_strategy: AdaptiveStrategy::new(
                 config.dense_threshold,
-                1 << 20,  // GPU threshold
+                1 << 20, // GPU threshold
                 config.parallel_threshold,
             ),
             telemetry: ExecutionTelemetry::new(),
@@ -83,13 +83,14 @@ impl ExecutionEngine {
 
         // Determine execution mode
         let execution_mode = match self.config.mode {
-            ExecutionMode::Adaptive => {
-                self.adaptive_strategy.select_execution_mode(state, circuit.len())
-            }
+            ExecutionMode::Adaptive => self
+                .adaptive_strategy
+                .select_execution_mode(state, circuit.len()),
             mode => mode,
         };
 
-        self.telemetry.log_event(format!("mode:{:?}", execution_mode));
+        self.telemetry
+            .log_event(format!("mode:{:?}", execution_mode));
 
         // Execute based on mode
         match execution_mode {
@@ -162,12 +163,11 @@ impl ExecutionEngine {
         // borrowing self mutably (in the closure) while also borrowing parallel_executor
         let parallel_executor = std::mem::replace(
             &mut self.parallel_executor,
-            ParallelExecutor::new(self.config.parallel_strategy)
+            ParallelExecutor::new(self.config.parallel_strategy),
         );
 
-        let result = parallel_executor.execute(circuit, state, |gate_op, state| {
-            self.apply_gate_op(gate_op, state)
-        });
+        let result = parallel_executor
+            .execute(circuit, state, |gate_op, state| self.apply_gate_op(gate_op, state));
 
         // Put it back
         self.parallel_executor = parallel_executor;
@@ -191,12 +191,17 @@ impl ExecutionEngine {
     }
 
     /// Execute a single gate with retry logic
-    fn execute_gate_with_retry(&mut self, gate_op: &GateOp, state: &mut AdaptiveState) -> Result<()> {
+    fn execute_gate_with_retry(
+        &mut self,
+        gate_op: &GateOp,
+        state: &mut AdaptiveState,
+    ) -> Result<()> {
         let gate_name = gate_op.gate().name();
         let start = Instant::now();
 
         self.telemetry.inc_gate_type(gate_name);
-        self.telemetry.log_event(format!("apply_gate:{}", gate_name));
+        self.telemetry
+            .log_event(format!("apply_gate:{}", gate_name));
         self.telemetry.record_thread();
 
         let mut attempts = 0;
@@ -215,15 +220,15 @@ impl ExecutionEngine {
                     let mem_bytes = match state {
                         AdaptiveState::Dense(ref dense) => {
                             dense.dimension() * std::mem::size_of::<Complex64>()
-                        }
-                        AdaptiveState::Sparse { state: ref sparse, .. } => {
-                            sparse.amplitudes().len() * std::mem::size_of::<Complex64>()
-                        }
+                        },
+                        AdaptiveState::Sparse {
+                            state: ref sparse, ..
+                        } => sparse.amplitudes().len() * std::mem::size_of::<Complex64>(),
                     };
                     self.telemetry.record_memory(mem_bytes);
 
                     return Ok(());
-                }
+                },
                 Err(e) => {
                     self.telemetry.log_error(format!(
                         "Gate '{}' failed (attempt {}): {}",
@@ -238,9 +243,9 @@ impl ExecutionEngine {
                                 return Err(ExecutionError::ExecutionHalted { attempts });
                             }
                             // Continue to retry
-                        }
+                        },
                     }
-                }
+                },
             }
         }
     }
@@ -258,10 +263,13 @@ impl ExecutionEngine {
         match state {
             AdaptiveState::Dense(ref mut dense) => {
                 self.apply_gate_dense(gate, qubits, dense, use_parallel, threshold)?;
-            }
-            AdaptiveState::Sparse { state: ref mut sparse, .. } => {
+            },
+            AdaptiveState::Sparse {
+                state: ref mut sparse,
+                ..
+            } => {
                 self.apply_gate_sparse(gate, qubits, sparse, use_parallel, threshold)?;
-            }
+            },
         }
 
         Ok(())
@@ -292,10 +300,12 @@ impl ExecutionEngine {
             self.telemetry.cache_miss();
 
             // Get matrix from gate
-            let matrix_vec = gate.matrix().ok_or_else(|| ExecutionError::InvalidGateMatrix {
-                gate: gate_name.to_string(),
-                reason: "Gate has no matrix representation".to_string(),
-            })?;
+            let matrix_vec = gate
+                .matrix()
+                .ok_or_else(|| ExecutionError::InvalidGateMatrix {
+                    gate: gate_name.to_string(),
+                    reason: "Gate has no matrix representation".to_string(),
+                })?;
 
             // Convert to appropriate format and cache
             let cached_matrix = match num_qubits {
@@ -311,7 +321,7 @@ impl ExecutionEngine {
                         [matrix_vec[2], matrix_vec[3]],
                     ];
                     CachedMatrix::Single(mat)
-                }
+                },
                 2 => {
                     if matrix_vec.len() != 16 {
                         return Err(ExecutionError::InvalidGateMatrix {
@@ -326,18 +336,19 @@ impl ExecutionEngine {
                         }
                     }
                     CachedMatrix::Two(mat)
-                }
+                },
                 _ => {
                     return Err(ExecutionError::GateApplicationFailed {
                         gate: gate_name.to_string(),
                         qubits: qubits.to_vec(),
                         reason: format!("Unsupported gate with {} qubits", num_qubits),
                     });
-                }
+                },
             };
 
             let cached_matrix = Arc::new(cached_matrix);
-            self.matrix_cache.insert(cache_key, (*cached_matrix).clone());
+            self.matrix_cache
+                .insert(cache_key, (*cached_matrix).clone());
             cached_matrix
         };
 
@@ -352,29 +363,52 @@ impl ExecutionEngine {
                     // Check for special gates and use optimized implementations
                     match gate_name {
                         "X" | "PauliX" => {
-                            single_qubit::apply_pauli_x(qubit_idx, amplitudes, use_parallel, threshold)?;
-                        }
+                            single_qubit::apply_pauli_x(
+                                qubit_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
+                        },
                         "Z" | "PauliZ" => {
-                            single_qubit::apply_pauli_z(qubit_idx, amplitudes, use_parallel, threshold)?;
-                        }
+                            single_qubit::apply_pauli_z(
+                                qubit_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
+                        },
                         "H" | "Hadamard" => {
-                            single_qubit::apply_hadamard(qubit_idx, amplitudes, use_parallel, threshold)?;
-                        }
+                            single_qubit::apply_hadamard(
+                                qubit_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
+                        },
                         _ => {
                             // General single-qubit gate
                             if self.config.use_simd {
                                 single_qubit::apply_single_qubit_dense_simd(
-                                    mat, qubit_idx, amplitudes, use_parallel, threshold
+                                    mat,
+                                    qubit_idx,
+                                    amplitudes,
+                                    use_parallel,
+                                    threshold,
                                 )?;
                             } else {
                                 single_qubit::apply_single_qubit_dense(
-                                    mat, qubit_idx, amplitudes, use_parallel, threshold
+                                    mat,
+                                    qubit_idx,
+                                    amplitudes,
+                                    use_parallel,
+                                    threshold,
                                 )?;
                             }
-                        }
+                        },
                     }
                 }
-            }
+            },
             2 => {
                 let qubit1_idx = qubits[0].index();
                 let qubit2_idx = qubits[1].index();
@@ -383,30 +417,53 @@ impl ExecutionEngine {
                     // Check for special two-qubit gates
                     match gate_name {
                         "CNOT" | "CX" => {
-                            two_qubit::apply_cnot(qubit1_idx, qubit2_idx, amplitudes, use_parallel, threshold)?;
-                        }
+                            two_qubit::apply_cnot(
+                                qubit1_idx,
+                                qubit2_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
+                        },
                         "CZ" => {
-                            two_qubit::apply_cz(qubit1_idx, qubit2_idx, amplitudes, use_parallel, threshold)?;
-                        }
+                            two_qubit::apply_cz(
+                                qubit1_idx,
+                                qubit2_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
+                        },
                         "SWAP" => {
-                            two_qubit::apply_swap(qubit1_idx, qubit2_idx, amplitudes, use_parallel, threshold)?;
-                        }
+                            two_qubit::apply_swap(
+                                qubit1_idx,
+                                qubit2_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
+                        },
                         _ => {
                             // General two-qubit gate
                             two_qubit::apply_two_qubit_dense(
-                                mat, qubit1_idx, qubit2_idx, amplitudes, use_parallel, threshold
+                                mat,
+                                qubit1_idx,
+                                qubit2_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
                             )?;
-                        }
+                        },
                     }
                 }
-            }
+            },
             _ => {
                 return Err(ExecutionError::GateApplicationFailed {
                     gate: gate_name.to_string(),
                     qubits: qubits.to_vec(),
                     reason: format!("Gates with {} qubits not yet supported", num_qubits),
                 });
-            }
+            },
         }
 
         Ok(())
@@ -424,10 +481,12 @@ impl ExecutionEngine {
         let gate_name = gate.name();
         let num_qubits = qubits.len();
 
-        let matrix_vec = gate.matrix().ok_or_else(|| ExecutionError::InvalidGateMatrix {
-            gate: gate_name.to_string(),
-            reason: "Gate has no matrix representation".to_string(),
-        })?;
+        let matrix_vec = gate
+            .matrix()
+            .ok_or_else(|| ExecutionError::InvalidGateMatrix {
+                gate: gate_name.to_string(),
+                reason: "Gate has no matrix representation".to_string(),
+            })?;
 
         let num_qubits_total = (state.dimension() as f64).log2() as usize;
 
@@ -450,7 +509,7 @@ impl ExecutionEngine {
                     state.amplitudes_mut(),
                     num_qubits_total,
                 )?;
-            }
+            },
             2 => {
                 if matrix_vec.len() != 16 {
                     return Err(ExecutionError::InvalidGateMatrix {
@@ -472,14 +531,14 @@ impl ExecutionEngine {
                     state.amplitudes_mut(),
                     num_qubits_total,
                 )?;
-            }
+            },
             _ => {
                 return Err(ExecutionError::GateApplicationFailed {
                     gate: gate_name.to_string(),
                     qubits: qubits.to_vec(),
                     reason: format!("Sparse gates with {} qubits not yet supported", num_qubits),
                 });
-            }
+            },
         }
 
         Ok(())
@@ -517,7 +576,7 @@ impl ExecutionEngine {
 mod tests {
     use super::*;
     use simq_core::QubitId;
-    use simq_gates::standard::{Hadamard, CNot, PauliX};
+    use simq_gates::standard::{CNot, Hadamard, PauliX};
 
     #[test]
     fn test_engine_creation() {
@@ -532,8 +591,12 @@ mod tests {
         let mut engine = ExecutionEngine::new(config);
 
         let mut circuit = Circuit::new(2);
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+            .unwrap();
 
         let mut state = AdaptiveState::new(2).unwrap();
 
@@ -547,8 +610,12 @@ mod tests {
         let mut engine = ExecutionEngine::new(config);
 
         let mut circuit = Circuit::new(2);
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
 
         let mut state = AdaptiveState::new(2).unwrap();
 

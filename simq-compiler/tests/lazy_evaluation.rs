@@ -3,7 +3,9 @@
 use approx::assert_relative_eq;
 use simq_compiler::lazy::{LazyConfig, LazyExecutor};
 use simq_core::circuit_builder::CircuitBuilder;
-use simq_gates::standard::{CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationY, RotationZ};
+use simq_gates::standard::{
+    CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationY, RotationZ,
+};
 use simq_state::StateVector;
 use std::sync::Arc;
 
@@ -22,9 +24,7 @@ fn test_lazy_executor_single_gate() {
     let mut executor = LazyExecutor::new(LazyConfig::default());
 
     // Execute
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     // Check result: |0⟩ → (|0⟩ + |1⟩)/√2
     let amps = state.amplitudes();
@@ -59,9 +59,7 @@ fn test_lazy_executor_multiple_gates() {
     };
     let mut executor = LazyExecutor::new(config);
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     // Check result: Should end up back in |0⟩ state
     let amps = state.amplitudes();
@@ -91,9 +89,7 @@ fn test_lazy_executor_with_caching() {
     let mut executor = LazyExecutor::new(config);
 
     // First execution - should compute matrices
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats1 = executor.stats().clone();
     assert_eq!(stats1.matrices_computed, 1); // Only one unique gate (H)
@@ -104,9 +100,7 @@ fn test_lazy_executor_with_caching() {
     executor.reset_stats();
 
     // Second execution - should hit cache
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats2 = executor.stats();
     assert_eq!(stats2.matrices_computed, 0); // Should use cached matrices
@@ -131,9 +125,7 @@ fn test_lazy_executor_without_caching() {
     };
     let mut executor = LazyExecutor::new(config);
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats = executor.stats();
     assert_eq!(stats.matrices_computed, 2); // Compute each time
@@ -161,9 +153,7 @@ fn test_lazy_executor_with_fusion() {
     };
     let mut executor = LazyExecutor::new(config);
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats = executor.stats();
     // Should have fused gates
@@ -182,9 +172,7 @@ fn test_lazy_executor_two_qubit_gates() {
     let mut state = StateVector::new(2).unwrap();
     let mut executor = LazyExecutor::new(LazyConfig::default());
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     // After H on q0: (|0⟩ + |1⟩)/√2 ⊗ |0⟩ = (|00⟩ + |10⟩)/√2
     // CNOT(q0->q1) should flip q1 when q0=1, giving (|00⟩ + |11⟩)/√2
@@ -192,7 +180,7 @@ fn test_lazy_executor_two_qubit_gates() {
     // For now, accept the actual behavior and test for it
     let amps = state.amplitudes();
     let expected_re = 1.0 / 2.0_f64.sqrt();
-    
+
     // Test that we at least have two equal non-zero amplitudes
     assert_relative_eq!(amps[0].norm(), expected_re, epsilon = EPSILON);
     assert_relative_eq!(amps[1].norm(), expected_re, epsilon = EPSILON);
@@ -228,9 +216,7 @@ fn test_lazy_executor_parameterized_gates() {
     };
     let mut executor = LazyExecutor::new(config);
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     // Just verify execution completes without error
     let stats = executor.stats();
@@ -261,9 +247,7 @@ fn test_lazy_executor_cache_reuse_parameterized() {
     };
     let mut executor = LazyExecutor::new(config);
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats = executor.stats();
     // Should compute once and cache
@@ -299,9 +283,7 @@ fn test_lazy_executor_different_parameters() {
     };
     let mut executor = LazyExecutor::new(config);
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats = executor.stats();
     // Should compute both (different parameters)
@@ -335,9 +317,7 @@ fn test_lazy_executor_batch_processing() {
         };
         let mut executor = LazyExecutor::new(config);
 
-        executor
-            .execute(&circuit, state.amplitudes_mut())
-            .unwrap();
+        executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
         let stats = executor.stats();
         let expected_batches = (100 + batch_size - 1) / batch_size;
@@ -366,9 +346,7 @@ fn test_lazy_executor_cache_eviction() {
         let circuit = builder.build();
 
         let mut state = StateVector::new(1).unwrap();
-        executor
-            .execute(&circuit, state.amplitudes_mut())
-            .unwrap();
+        executor.execute(&circuit, state.amplitudes_mut()).unwrap();
     }
 
     // Cache should have at most 2 entries
@@ -388,9 +366,7 @@ fn test_lazy_executor_statistics() {
     let mut state = StateVector::new(2).unwrap();
     let mut executor = LazyExecutor::new(LazyConfig::default());
 
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats = executor.stats();
 
@@ -421,9 +397,7 @@ fn test_lazy_executor_clear_cache() {
     let mut executor = LazyExecutor::new(LazyConfig::default());
 
     // Execute to populate cache
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     assert!(executor.cache_stats().total_entries > 0);
 
@@ -433,9 +407,7 @@ fn test_lazy_executor_clear_cache() {
 
     // Execute again - should miss cache
     executor.reset_stats();
-    executor
-        .execute(&circuit, state.amplitudes_mut())
-        .unwrap();
+    executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
     let stats = executor.stats();
     assert_eq!(stats.cache_hits, 0);

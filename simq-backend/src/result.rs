@@ -1,7 +1,7 @@
 //! Backend execution results
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Duration;
 
 /// Result of executing a circuit on a backend
@@ -40,9 +40,7 @@ impl BackendResult {
     pub fn probabilities(&self) -> HashMap<String, f64> {
         self.counts
             .iter()
-            .map(|(bitstring, &count)| {
-                (bitstring.clone(), count as f64 / self.shots as f64)
-            })
+            .map(|(bitstring, &count)| (bitstring.clone(), count as f64 / self.shots as f64))
             .collect()
     }
 

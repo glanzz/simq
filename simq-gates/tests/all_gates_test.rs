@@ -2,17 +2,14 @@
 
 use approx::assert_relative_eq;
 use num_complex::Complex64;
-use simq_gates::standard::*;
 use simq_core::gate::Gate;
+use simq_gates::standard::*;
 use std::f64::consts::PI;
 
 const EPSILON: f64 = 1e-8;
 
 // Helper function to multiply 2x2 matrices
-fn mult_2x2(
-    a: &[[Complex64; 2]; 2],
-    b: &[[Complex64; 2]; 2],
-) -> [[Complex64; 2]; 2] {
+fn mult_2x2(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2]) -> [[Complex64; 2]; 2] {
     let mut result = [[Complex64::new(0.0, 0.0); 2]; 2];
     for i in 0..2 {
         for j in 0..2 {
@@ -445,7 +442,8 @@ fn test_ecr_gate() {
     let matrix = ECR::matrix();
 
     // Just verify matrix is properly formed (non-zero elements)
-    let non_zero_count = matrix.iter()
+    let non_zero_count = matrix
+        .iter()
         .flatten()
         .filter(|&c| c.norm() > EPSILON)
         .count();
@@ -614,10 +612,7 @@ fn test_all_single_qubit_gates_are_unitary() {
     ];
 
     for matrix in gates {
-        assert!(
-            is_unitary_2x2(&matrix),
-            "Matrix is not unitary"
-        );
+        assert!(is_unitary_2x2(&matrix), "Matrix is not unitary");
     }
 }
 

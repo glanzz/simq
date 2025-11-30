@@ -80,21 +80,21 @@
 //! - Ross & Selinger, "Optimal ancilla-free Clifford+T approximation" (2016)
 
 pub mod basis;
+pub mod clifford_t;
+pub mod multi_qubit;
 pub mod single_qubit;
 pub mod two_qubit;
-pub mod multi_qubit;
-pub mod clifford_t;
 
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
+use simq_core::{Gate, QuantumError, Result};
 use std::sync::Arc;
 
 // Re-export main types
-pub use basis::{BasisGateSet, BasisGate};
-pub use single_qubit::{SingleQubitDecomposer, EulerBasis};
-pub use two_qubit::{TwoQubitDecomposer, EntanglementGate};
-pub use multi_qubit::MultiQubitDecomposer;
+pub use basis::{BasisGate, BasisGateSet};
 pub use clifford_t::{CliffordTDecomposer, GridSynthConfig};
+pub use multi_qubit::MultiQubitDecomposer;
+pub use single_qubit::{EulerBasis, SingleQubitDecomposer};
+pub use two_qubit::{EntanglementGate, TwoQubitDecomposer};
 
 // ============================================================================
 // Configuration
@@ -197,7 +197,11 @@ pub struct DecompositionMetadata {
 /// Trait for gate decomposition strategies
 pub trait Decomposer: Send + Sync {
     /// Decompose a gate into a sequence of basis gates
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult>;
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult>;
 
     /// Check if this decomposer can handle the given gate
     fn can_decompose(&self, gate: &dyn Gate) -> bool;
@@ -234,21 +238,22 @@ impl UniversalDecomposer {
             1 => {
                 let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
                 decomposer.decompose(gate, &self.config)
-            }
+            },
             2 => {
                 let decomposer = TwoQubitDecomposer::new(EntanglementGate::CNOT);
                 decomposer.decompose(gate, &self.config)
-            }
+            },
             _ => {
                 let decomposer = MultiQubitDecomposer::new();
                 decomposer.decompose(gate, &self.config)
-            }
+            },
         }
     }
 
     /// Decompose a sequence of gates
     pub fn decompose_gates(&self, gates: &[Arc<dyn Gate>]) -> Result<Vec<DecompositionResult>> {
-        gates.iter()
+        gates
+            .iter()
             .map(|g| self.decompose_gate(g.as_ref()))
             .collect()
     }
@@ -290,9 +295,10 @@ pub fn validate_decomposition(
     let fidelity = compute_fidelity(original, decomposed)?;
 
     if fidelity < threshold {
-        return Err(QuantumError::ValidationError(
-            format!("Decomposition fidelity {} below threshold {}", fidelity, threshold)
-        ));
+        return Err(QuantumError::ValidationError(format!(
+            "Decomposition fidelity {} below threshold {}",
+            fidelity, threshold
+        )));
     }
 
     Ok(fidelity)

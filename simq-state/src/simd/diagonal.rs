@@ -315,7 +315,6 @@ pub fn apply_diagonal_gate_optimized(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     /// Helper to create a simple test state
     fn create_test_state(num_qubits: usize) -> Vec<Complex64> {
@@ -369,10 +368,7 @@ mod tests {
         let mut state_scalar = create_test_state(4);
         let mut state_avx2 = state_scalar.clone();
 
-        let diagonal = [
-            Complex64::new(0.707, 0.707),
-            Complex64::new(-0.707, 0.707),
-        ];
+        let diagonal = [Complex64::new(0.707, 0.707), Complex64::new(-0.707, 0.707)];
 
         apply_diagonal_gate_scalar(&mut state_scalar, diagonal, 2, 4);
         unsafe {

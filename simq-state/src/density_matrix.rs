@@ -64,9 +64,7 @@ impl DensityMatrix {
 
         let matrix_size = dimension
             .checked_mul(dimension)
-            .ok_or(StateError::AllocationError {
-                size: usize::MAX,
-            })?;
+            .ok_or(StateError::AllocationError { size: usize::MAX })?;
 
         let mut matrix = vec![Complex64::new(0.0, 0.0); matrix_size];
         // Initialize to |0...0⟩⟨0...0| - only (0,0) element is 1
@@ -292,8 +290,9 @@ impl DensityMatrix {
                 let mut sum = Complex64::new(0.0, 0.0);
 
                 for k in 0..dim {
-                    let u_dag_elem =
-                        self.get_two_qubit_element(unitary, k, j, stride0, stride1).conj();
+                    let u_dag_elem = self
+                        .get_two_qubit_element(unitary, k, j, stride0, stride1)
+                        .conj();
                     sum += new_matrix[i * dim + k] * u_dag_elem;
                 }
 

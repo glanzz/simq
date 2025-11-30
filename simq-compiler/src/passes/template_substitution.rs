@@ -9,8 +9,8 @@
 //! Template matching can significantly reduce circuit size and improve execution.
 
 use crate::passes::OptimizationPass;
-use simq_core::{Circuit, GateOp, Result};
 use simq_core::QubitId;
+use simq_core::{Circuit, GateOp, Result};
 
 /// A template pattern that can be matched and replaced
 #[derive(Debug, Clone)]
@@ -91,34 +91,14 @@ impl TemplateSubstitution {
             Template::new(
                 "h-y-h",
                 vec!["H", "Y", "H"],
-                Some(vec!["Y"]),  // Y is unchanged by H conjugation  (with phase)
+                Some(vec!["Y"]), // Y is unchanged by H conjugation  (with phase)
                 "Hadamard conjugation of Y gives -Y (ignoring global phase)",
             ),
             // Self-inverse pairs (already handled by dead code elimination, but keeping for completeness)
-            Template::new(
-                "x-x",
-                vec!["X", "X"],
-                None::<Vec<&str>>,
-                "X is self-inverse",
-            ),
-            Template::new(
-                "y-y",
-                vec!["Y", "Y"],
-                None::<Vec<&str>>,
-                "Y is self-inverse",
-            ),
-            Template::new(
-                "z-z",
-                vec!["Z", "Z"],
-                None::<Vec<&str>>,
-                "Z is self-inverse",
-            ),
-            Template::new(
-                "h-h",
-                vec!["H", "H"],
-                None::<Vec<&str>>,
-                "Hadamard is self-inverse",
-            ),
+            Template::new("x-x", vec!["X", "X"], None::<Vec<&str>>, "X is self-inverse"),
+            Template::new("y-y", vec!["Y", "Y"], None::<Vec<&str>>, "Y is self-inverse"),
+            Template::new("z-z", vec!["Z", "Z"], None::<Vec<&str>>, "Z is self-inverse"),
+            Template::new("h-h", vec!["H", "H"], None::<Vec<&str>>, "Hadamard is self-inverse"),
             // S and S† patterns
             Template::new(
                 "s-s-s-s",
@@ -126,12 +106,7 @@ impl TemplateSubstitution {
                 None::<Vec<&str>>,
                 "Four S gates equal identity",
             ),
-            Template::new(
-                "s-s",
-                vec!["S", "S"],
-                Some(vec!["Z"]),
-                "Two S gates equal Z",
-            ),
+            Template::new("s-s", vec!["S", "S"], Some(vec!["Z"]), "Two S gates equal Z"),
             Template::new(
                 "t-t-t-t-t-t-t-t",
                 vec!["T", "T", "T", "T", "T", "T", "T", "T"],
@@ -289,7 +264,9 @@ mod tests {
             name: "X".to_string(),
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -308,7 +285,9 @@ mod tests {
             name: "H".to_string(),
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -327,7 +306,9 @@ mod tests {
             name: "S".to_string(),
         });
 
-        circuit.add_gate(s_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(s_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(s_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -348,7 +329,9 @@ mod tests {
             name: "X".to_string(),
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
         assert_eq!(circuit.len(), 2);

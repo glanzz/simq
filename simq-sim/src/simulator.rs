@@ -89,9 +89,7 @@ impl Simulator {
 
         // Validate circuit
         if circuit.len() == 0 {
-            return Err(SimulatorError::InvalidCircuit(
-                "Empty circuit".to_string(),
-            ));
+            return Err(SimulatorError::InvalidCircuit("Empty circuit".to_string()));
         }
 
         // Check qubit count
@@ -132,20 +130,20 @@ impl Simulator {
             s.initialization_time = init_time;
         }
 
-
         // 3. Execute circuit using execution engine
         let gate_start = Instant::now();
         {
-            use crate::execution_engine::{ExecutionEngine, ExecutionConfig};
+            use crate::execution_engine::{ExecutionConfig, ExecutionEngine};
             let mut exec_config = ExecutionConfig::default();
             exec_config.parallel_threshold = self.config.parallel_threshold;
             exec_config.use_gpu = self.config.use_gpu;
             let mut engine = ExecutionEngine::new(exec_config);
-            engine.execute(&compiled_circuit, &mut state)
-                .map_err(|e| SimulatorError::GateApplicationFailed {
+            engine.execute(&compiled_circuit, &mut state).map_err(|e| {
+                SimulatorError::GateApplicationFailed {
                     gate_index: 0, // Unknown index
                     reason: format!("Execution engine failed: {:?}", e),
-                })?;
+                }
+            })?;
         }
         let gate_time = gate_start.elapsed();
 
@@ -296,7 +294,7 @@ mod tests {
     #[test]
     fn test_max_qubits_estimation() {
         let sim = Simulator::new(
-            SimulatorConfig::default().with_memory_limit(1024 * 1024) // 1 MB
+            SimulatorConfig::default().with_memory_limit(1024 * 1024), // 1 MB
         );
 
         let max_qubits = sim.estimate_max_qubits();

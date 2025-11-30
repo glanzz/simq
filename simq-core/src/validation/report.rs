@@ -1,7 +1,7 @@
 //! Validation report aggregation
 
+use crate::validation::rules::{ValidationError, ValidationResult, ValidationWarning};
 use crate::Circuit;
-use crate::validation::rules::{ValidationResult, ValidationError, ValidationWarning};
 use std::collections::HashMap;
 
 /// Comprehensive validation report
@@ -25,7 +25,9 @@ impl ValidationReport {
 
     /// Check if report has any errors
     pub fn has_errors(&self) -> bool {
-        self.results.values().any(|r| !r.is_valid || !r.errors.is_empty())
+        self.results
+            .values()
+            .any(|r| !r.is_valid || !r.errors.is_empty())
     }
 
     /// Check if report has any warnings
@@ -127,4 +129,3 @@ mod tests {
         assert_eq!(report.errors().len(), 1);
     }
 }
-

@@ -1,8 +1,8 @@
 //! Standard quantum gate implementations with pre-computed matrices
 
-use num_complex::Complex64;
-use simq_core::gate::{Gate, DiagonalGate};
 use crate::matrices;
+use num_complex::Complex64;
+use simq_core::gate::{DiagonalGate, Gate};
 
 /// Helper macro to implement the matrix() method for gates
 macro_rules! impl_matrix_method {

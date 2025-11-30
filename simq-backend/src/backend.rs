@@ -57,9 +57,7 @@ pub trait QuantumBackend: Send + Sync {
 
     /// Retrieve job results (optional, for cloud backends)
     fn get_result(&self, _job_id: &str) -> Result<BackendResult> {
-        Err(crate::BackendError::Other(
-            "Async job retrieval not supported".to_string(),
-        ))
+        Err(crate::BackendError::Other("Async job retrieval not supported".to_string()))
     }
 
     /// Cancel a running job (optional, for cloud backends)
@@ -162,13 +160,13 @@ pub trait AsyncQuantumBackend: QuantumBackend {
             match status {
                 crate::JobStatus::Completed => {
                     return self.get_result(&job_id);
-                }
+                },
                 crate::JobStatus::Failed | crate::JobStatus::Cancelled => {
                     return Err(crate::BackendError::JobExecutionFailed(format!(
                         "Job {} ended with status: {}",
                         job_id, status
                     )));
-                }
+                },
                 _ => {
                     // Still running, check timeout
                     if let Some(timeout) = timeout_seconds {
@@ -182,7 +180,7 @@ pub trait AsyncQuantumBackend: QuantumBackend {
 
                     // Wait before polling again
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                }
+                },
             }
         }
     }

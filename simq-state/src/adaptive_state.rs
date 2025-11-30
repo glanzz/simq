@@ -33,10 +33,7 @@ const DEFAULT_SPARSE_TO_DENSE_THRESHOLD: f32 = 0.1;
 /// ```
 pub enum AdaptiveState {
     /// Sparse representation (AHashMap-based)
-    Sparse {
-        state: SparseState,
-        threshold: f32,
-    },
+    Sparse { state: SparseState, threshold: f32 },
     /// Dense representation (64-byte aligned vectors)
     Dense(DenseState),
 }
@@ -163,10 +160,13 @@ impl AdaptiveState {
     ///
     /// Returns true if conversion occurred
     fn check_and_convert(&mut self) -> bool {
-        if let Self::Sparse { state, threshold: _ } = self {
+        if let Self::Sparse {
+            state,
+            threshold: _,
+        } = self
+        {
             if state.should_convert_to_dense() {
-                let dense = DenseState::from_sparse(state)
-                    .expect("Sparse→Dense conversion failed");
+                let dense = DenseState::from_sparse(state).expect("Sparse→Dense conversion failed");
                 *self = Self::Dense(dense);
                 return true;
             }
@@ -189,7 +189,7 @@ impl AdaptiveState {
             Self::Dense(state) => {
                 state.normalize();
                 Ok(())
-            }
+            },
         }
     }
 
@@ -211,7 +211,7 @@ impl AdaptiveState {
                 let thresh = *threshold;
                 *state = SparseState::new(num_qubits).expect("Failed to reset sparse state");
                 *threshold = thresh;
-            }
+            },
             Self::Dense(state) => state.reset(),
         }
     }
@@ -250,17 +250,14 @@ impl AdaptiveState {
         match self {
             Self::Sparse { state, .. } => {
                 // Flatten matrix for sparse representation
-                let flat_matrix = [
-                    matrix[0][0], matrix[0][1],
-                    matrix[1][0], matrix[1][1],
-                ];
+                let flat_matrix = [matrix[0][0], matrix[0][1], matrix[1][0], matrix[1][1]];
                 state.apply_single_qubit_gate(&flat_matrix, qubit)?;
                 Ok(self.check_and_convert())
-            }
+            },
             Self::Dense(state) => {
                 state.apply_single_qubit_gate(matrix, qubit)?;
                 Ok(false)
-            }
+            },
         }
     }
 
@@ -290,11 +287,11 @@ impl AdaptiveState {
                 }
                 state.apply_two_qubit_gate(&flat_matrix, qubit1, qubit2)?;
                 Ok(self.check_and_convert())
-            }
+            },
             Self::Dense(state) => {
                 state.apply_two_qubit_gate(matrix, qubit1, qubit2)?;
                 Ok(false)
-            }
+            },
         }
     }
 
@@ -307,9 +304,7 @@ impl AdaptiveState {
     /// The probability |amplitude|^2 of measuring this basis state
     pub fn get_probability(&self, basis_state: usize) -> Result<f64> {
         match self {
-            Self::Sparse { state, .. } => {
-                state.expectation_basis(basis_state as u64)
-            }
+            Self::Sparse { state, .. } => state.expectation_basis(basis_state as u64),
             Self::Dense(state) => state.get_probability(basis_state),
         }
     }
@@ -329,7 +324,7 @@ impl AdaptiveState {
                 let outcome = if random_value < prob_0 { 0 } else { 1 };
                 state.measure_and_collapse(qubit, outcome as u32)?;
                 Ok(outcome)
-            }
+            },
             Self::Dense(state) => state.measure_qubit(qubit, random_value),
         }
     }

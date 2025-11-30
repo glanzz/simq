@@ -1,8 +1,8 @@
 //! Diagonal gate application kernels (phase gates, etc.)
 
+use crate::execution_engine::error::Result;
 use num_complex::Complex64;
 use rayon::prelude::*;
-use crate::execution_engine::error::Result;
 
 /// Apply a diagonal gate (phase gate) to specific qubits
 ///
@@ -91,10 +91,7 @@ mod tests {
 
     #[test]
     fn test_phase_gate() {
-        let mut state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(1.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
 
         let phase = Complex64::new(0.0, 1.0); // i
         apply_phase_gate(0, phase, &mut state, false, usize::MAX).unwrap();

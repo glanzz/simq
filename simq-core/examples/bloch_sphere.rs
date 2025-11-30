@@ -4,8 +4,8 @@
 //!
 //! Run with: cargo run --example bloch_sphere -p simq-core
 
-use simq_core::BlochVector;
 use num_complex::Complex64;
+use simq_core::BlochVector;
 
 fn main() {
     println!("=== Bloch Sphere Visualization Demo ===\n");
@@ -63,14 +63,11 @@ fn main() {
 
     // Demo 4: Arbitrary state
     println!("\n4. Arbitrary Pure State:");
-    let theta = std::f64::consts::PI / 3.0;  // 60 degrees from z-axis
-    let phi = std::f64::consts::PI / 4.0;    // 45 degrees in xy-plane
+    let theta = std::f64::consts::PI / 3.0; // 60 degrees from z-axis
+    let phi = std::f64::consts::PI / 4.0; // 45 degrees in xy-plane
     let arbitrary_state = [
         Complex64::new((theta / 2.0).cos(), 0.0),
-        Complex64::new(
-            (theta / 2.0).sin() * phi.cos(),
-            (theta / 2.0).sin() * phi.sin(),
-        ),
+        Complex64::new((theta / 2.0).sin() * phi.cos(), (theta / 2.0).sin() * phi.sin()),
     ];
     let bloch = BlochVector::from_state(&arbitrary_state);
     println!("{}", bloch.describe());

@@ -104,9 +104,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "X"
-                        && ops[1].gate().name() == "X"
+                    ops.len() == 2 && ops[0].gate().name() == "X" && ops[1].gate().name() == "X"
                 },
                 generator: |_| vec![], // Identity - remove both gates
                 description: "X is self-inverse",
@@ -117,9 +115,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "Y"
-                        && ops[1].gate().name() == "Y"
+                    ops.len() == 2 && ops[0].gate().name() == "Y" && ops[1].gate().name() == "Y"
                 },
                 generator: |_| vec![],
                 description: "Y is self-inverse",
@@ -130,9 +126,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "Z"
-                        && ops[1].gate().name() == "Z"
+                    ops.len() == 2 && ops[0].gate().name() == "Z" && ops[1].gate().name() == "Z"
                 },
                 generator: |_| vec![],
                 description: "Z is self-inverse",
@@ -143,9 +137,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "H"
-                        && ops[1].gate().name() == "H"
+                    ops.len() == 2 && ops[0].gate().name() == "H" && ops[1].gate().name() == "H"
                 },
                 generator: |_| vec![],
                 description: "Hadamard is self-inverse",

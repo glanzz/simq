@@ -35,10 +35,10 @@
 //! ```
 
 use simq_core::{Circuit, QubitId};
-use simq_state::observable::{PauliObservable, PauliString, Pauli};
+use simq_gates::{CNot, Hadamard, RotationX, RotationY, RotationZ};
+use simq_state::observable::{Pauli, PauliObservable, PauliString};
 use std::collections::HashMap;
 use std::sync::Arc;
-use simq_gates::{Hadamard, RotationX, RotationY, RotationZ, CNot};
 
 // ============================================================================
 // Graph Data Structure
@@ -240,42 +240,39 @@ impl ProblemType {
     /// Get a description of the problem
     pub fn description(&self) -> String {
         match self {
-            ProblemType::MaxCut(g) => format!(
-                "MaxCut: {} vertices, {} edges",
-                g.num_vertices,
-                g.num_edges()
-            ),
-            ProblemType::MinVertexCover(g) => format!(
-                "Min Vertex Cover: {} vertices, {} edges",
-                g.num_vertices,
-                g.num_edges()
-            ),
-            ProblemType::MaxIndependentSet(g) => format!(
-                "Max Independent Set: {} vertices, {} edges",
-                g.num_vertices,
-                g.num_edges()
-            ),
+            ProblemType::MaxCut(g) => {
+                format!("MaxCut: {} vertices, {} edges", g.num_vertices, g.num_edges())
+            },
+            ProblemType::MinVertexCover(g) => {
+                format!("Min Vertex Cover: {} vertices, {} edges", g.num_vertices, g.num_edges())
+            },
+            ProblemType::MaxIndependentSet(g) => {
+                format!("Max Independent Set: {} vertices, {} edges", g.num_vertices, g.num_edges())
+            },
             ProblemType::NumberPartitioning(numbers) => {
                 format!("Number Partitioning: {} numbers", numbers.len())
-            }
+            },
             ProblemType::GraphColoring(g, k) => format!(
                 "Graph {}-Coloring: {} vertices, {} edges",
                 k,
                 g.num_vertices,
                 g.num_edges()
             ),
-            ProblemType::MaxKSat { num_variables, clauses } => {
+            ProblemType::MaxKSat {
+                num_variables,
+                clauses,
+            } => {
                 format!("Max k-SAT: {} variables, {} clauses", num_variables, clauses.len())
-            }
+            },
             ProblemType::TSP { num_cities, .. } => {
                 format!("TSP: {} cities", num_cities)
-            }
+            },
             ProblemType::Portfolio { assets, .. } => {
                 format!("Portfolio Optimization: {} assets", assets)
-            }
+            },
             ProblemType::Custom { num_qubits, terms } => {
                 format!("Custom Problem: {} qubits, {} terms", num_qubits, terms.len())
-            }
+            },
         }
     }
 }
@@ -474,17 +471,17 @@ impl QAOACircuitBuilder {
                 for q in 0..self.num_qubits {
                     let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(q)]);
                 }
-            }
+            },
             InitialState::Zero => {
                 // Do nothing, qubits start in |0⟩
-            }
+            },
             InitialState::WarmStart | InitialState::Custom => {
                 // User must provide custom initialization
                 // For now, default to uniform superposition
                 for q in 0..self.num_qubits {
                     let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(q)]);
                 }
-            }
+            },
         }
     }
 
@@ -493,28 +490,31 @@ impl QAOACircuitBuilder {
         match &self.problem {
             ProblemType::MaxCut(graph) => {
                 self.apply_maxcut_hamiltonian(circuit, graph, gamma);
-            }
+            },
             ProblemType::MinVertexCover(graph) => {
                 self.apply_vertex_cover_hamiltonian(circuit, graph, gamma);
-            }
+            },
             ProblemType::MaxIndependentSet(graph) => {
                 self.apply_independent_set_hamiltonian(circuit, graph, gamma);
-            }
+            },
             ProblemType::NumberPartitioning(numbers) => {
                 self.apply_number_partition_hamiltonian(circuit, numbers, gamma);
-            }
+            },
             ProblemType::GraphColoring(graph, num_colors) => {
                 self.apply_graph_coloring_hamiltonian(circuit, graph, *num_colors, gamma);
-            }
-            ProblemType::MaxKSat { num_variables, clauses } => {
+            },
+            ProblemType::MaxKSat {
+                num_variables,
+                clauses,
+            } => {
                 self.apply_maxsat_hamiltonian(circuit, *num_variables, clauses, gamma);
-            }
+            },
             ProblemType::Custom { terms, .. } => {
                 self.apply_custom_hamiltonian(circuit, terms, gamma);
-            }
+            },
             _ => {
                 // For unimplemented problems, apply identity (no-op)
-            }
+            },
         }
     }
 
@@ -524,10 +524,8 @@ impl QAOACircuitBuilder {
             // Apply exp(-i * gamma * weight * Z_i Z_j)
             // This is equivalent to: CNOT(i,j), RZ(2*gamma*weight), CNOT(i,j)
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * gamma * weight)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma * weight)), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
         }
     }
@@ -541,30 +539,22 @@ impl QAOACircuitBuilder {
         for &(i, j, weight) in &graph.edges {
             // (1 - Z_i)(1 - Z_j) = 1 - Z_i - Z_j + Z_i Z_j
             // Single qubit terms
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(-2.0 * gamma * weight)),
-                &[QubitId::new(i)],
-            );
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(-2.0 * gamma * weight)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(-2.0 * gamma * weight)), &[QubitId::new(i)]);
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(-2.0 * gamma * weight)), &[QubitId::new(j)]);
 
             // Two qubit term: Z_i Z_j
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * gamma * weight)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma * weight)), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
         }
 
         // Penalty terms: minimize number of vertices
         for i in 0..graph.num_vertices {
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * gamma * penalty)),
-                &[QubitId::new(i)],
-            );
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma * penalty)), &[QubitId::new(i)]);
         }
     }
 
@@ -575,28 +565,19 @@ impl QAOACircuitBuilder {
 
         // Maximize set size: -sum_i Z_i
         for i in 0..graph.num_vertices {
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(-2.0 * gamma)),
-                &[QubitId::new(i)],
-            );
+            let _ = circuit.add_gate(Arc::new(RotationZ::new(-2.0 * gamma)), &[QubitId::new(i)]);
         }
 
         // Penalty for edges within the set
         for &(i, j, _) in &graph.edges {
             // (1 - Z_i)(1 - Z_j) penalizes both vertices being 1
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(-2.0 * gamma * penalty)),
-                &[QubitId::new(i)],
-            );
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(-2.0 * gamma * penalty)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(-2.0 * gamma * penalty)), &[QubitId::new(i)]);
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(-2.0 * gamma * penalty)), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * gamma * penalty)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma * penalty)), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
         }
     }
@@ -618,10 +599,8 @@ impl QAOACircuitBuilder {
             for j in (i + 1)..numbers.len() {
                 let coeff = 2.0 * numbers[i] * numbers[j];
                 let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
-                let _ = circuit.add_gate(
-                    Arc::new(RotationZ::new(2.0 * gamma * coeff)),
-                    &[QubitId::new(j)],
-                );
+                let _ = circuit
+                    .add_gate(Arc::new(RotationZ::new(2.0 * gamma * coeff)), &[QubitId::new(j)]);
                 let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
             }
         }
@@ -664,7 +643,12 @@ impl QAOACircuitBuilder {
     }
 
     /// Apply custom Hamiltonian
-    fn apply_custom_hamiltonian(&self, circuit: &mut Circuit, terms: &[(Vec<usize>, f64)], gamma: f64) {
+    fn apply_custom_hamiltonian(
+        &self,
+        circuit: &mut Circuit,
+        terms: &[(Vec<usize>, f64)],
+        gamma: f64,
+    ) {
         for (qubits, coeff) in terms {
             if qubits.len() == 1 {
                 // Single qubit term: Z_i
@@ -674,18 +658,14 @@ impl QAOACircuitBuilder {
                 );
             } else if qubits.len() == 2 {
                 // Two qubit term: Z_i Z_j
-                let _ = circuit.add_gate(
-                    Arc::new(CNot),
-                    &[QubitId::new(qubits[0]), QubitId::new(qubits[1])],
-                );
+                let _ = circuit
+                    .add_gate(Arc::new(CNot), &[QubitId::new(qubits[0]), QubitId::new(qubits[1])]);
                 let _ = circuit.add_gate(
                     Arc::new(RotationZ::new(2.0 * gamma * coeff)),
                     &[QubitId::new(qubits[1])],
                 );
-                let _ = circuit.add_gate(
-                    Arc::new(CNot),
-                    &[QubitId::new(qubits[0]), QubitId::new(qubits[1])],
-                );
+                let _ = circuit
+                    .add_gate(Arc::new(CNot), &[QubitId::new(qubits[0]), QubitId::new(qubits[1])]);
             }
             // For more qubits, would need multi-controlled operations
         }
@@ -697,34 +677,30 @@ impl QAOACircuitBuilder {
             MixerType::StandardX => {
                 // H_M = sum_i X_i => apply RX(2*beta) to all qubits
                 for q in 0..self.num_qubits {
-                    let _ = circuit.add_gate(
-                        Arc::new(RotationX::new(2.0 * beta)),
-                        &[QubitId::new(q)],
-                    );
+                    let _ =
+                        circuit.add_gate(Arc::new(RotationX::new(2.0 * beta)), &[QubitId::new(q)]);
                 }
-            }
+            },
             MixerType::StandardY => {
                 // H_M = sum_i Y_i => apply RY(2*beta) to all qubits
                 for q in 0..self.num_qubits {
-                    let _ = circuit.add_gate(
-                        Arc::new(RotationY::new(2.0 * beta)),
-                        &[QubitId::new(q)],
-                    );
+                    let _ =
+                        circuit.add_gate(Arc::new(RotationY::new(2.0 * beta)), &[QubitId::new(q)]);
                 }
-            }
+            },
             MixerType::XY => {
                 // H_M = sum_{<i,j>} (X_i X_j + Y_i Y_j)
                 // This preserves Hamming weight
                 self.apply_xy_mixer(circuit, beta);
-            }
+            },
             MixerType::Grover => {
                 // Grover mixer: 2|s⟩⟨s| - I where |s⟩ is uniform superposition
                 self.apply_grover_mixer(circuit, beta);
-            }
+            },
             MixerType::Ring => {
                 // Ring mixer: nearest-neighbor XY coupling
                 self.apply_ring_mixer(circuit, beta);
-            }
+            },
         }
     }
 
@@ -737,10 +713,7 @@ impl QAOACircuitBuilder {
             let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(i)]);
             let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * beta)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit.add_gate(Arc::new(RotationZ::new(2.0 * beta)), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(i)]);
             let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(j)]);
@@ -756,10 +729,7 @@ impl QAOACircuitBuilder {
             let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(q)]);
         }
         for q in 0..self.num_qubits {
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * beta)),
-                &[QubitId::new(q)],
-            );
+            let _ = circuit.add_gate(Arc::new(RotationZ::new(2.0 * beta)), &[QubitId::new(q)]);
         }
         for q in 0..self.num_qubits {
             let _ = circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(q)]);
@@ -772,10 +742,7 @@ impl QAOACircuitBuilder {
         for i in 0..self.num_qubits {
             let j = (i + 1) % self.num_qubits;
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
-            let _ = circuit.add_gate(
-                Arc::new(RotationZ::new(2.0 * beta)),
-                &[QubitId::new(j)],
-            );
+            let _ = circuit.add_gate(Arc::new(RotationZ::new(2.0 * beta)), &[QubitId::new(j)]);
             let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(j)]);
         }
     }
@@ -786,9 +753,7 @@ impl QAOACircuitBuilder {
     pub fn cost_observable(&self) -> Result<PauliObservable, String> {
         match &self.problem {
             ProblemType::MaxCut(graph) => self.maxcut_observable(graph),
-            ProblemType::NumberPartitioning(numbers) => {
-                self.number_partition_observable(numbers)
-            }
+            ProblemType::NumberPartitioning(numbers) => self.number_partition_observable(numbers),
             ProblemType::Custom { terms, .. } => self.custom_observable(terms),
             _ => Err("Observable generation not yet implemented for this problem type".to_string()),
         }
@@ -806,7 +771,8 @@ impl QAOACircuitBuilder {
         paulis[i] = Pauli::Z;
         paulis[j] = Pauli::Z;
 
-        let mut observable = PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), weight);
+        let mut observable =
+            PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), weight);
 
         // Add remaining edges
         for &(i, j, weight) in &graph.edges[1..] {
@@ -827,7 +793,8 @@ impl QAOACircuitBuilder {
         let mut paulis = vec![Pauli::I; self.num_qubits];
         paulis[0] = Pauli::Z;
 
-        let mut observable = PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), numbers[0]);
+        let mut observable =
+            PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), numbers[0]);
 
         for i in 1..numbers.len() {
             let mut paulis = vec![Pauli::I; self.num_qubits];
@@ -852,7 +819,8 @@ impl QAOACircuitBuilder {
             paulis[q] = Pauli::Z;
         }
 
-        let mut observable = PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), *coeff);
+        let mut observable =
+            PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), *coeff);
 
         // Add remaining terms
         for (qubits, coeff) in &terms[1..] {
@@ -909,8 +877,8 @@ pub fn evaluate_partition_solution(numbers: &[f64], bitstring: &[bool]) -> f64 {
 
 /// Generate random initial parameters for QAOA
 pub fn random_initial_parameters(depth: usize, seed: Option<u64>) -> Vec<f64> {
-    use rand::{Rng, SeedableRng};
     use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
 
     let mut rng = if let Some(s) = seed {
         StdRng::seed_from_u64(s)
@@ -961,11 +929,7 @@ mod tests {
     #[test]
     fn test_qaoa_builder() {
         let graph = Graph::cycle(3);
-        let builder = QAOACircuitBuilder::new(
-            ProblemType::MaxCut(graph),
-            MixerType::StandardX,
-            2,
-        );
+        let builder = QAOACircuitBuilder::new(ProblemType::MaxCut(graph), MixerType::StandardX, 2);
 
         assert_eq!(builder.num_qubits(), 3);
         assert_eq!(builder.num_parameters(), 4);
@@ -989,8 +953,8 @@ mod tests {
         assert_eq!(params.len(), 6);
         // Check bounds
         for i in 0..3 {
-            assert!(params[2*i] >= 0.0 && params[2*i] <= std::f64::consts::PI);
-            assert!(params[2*i+1] >= 0.0 && params[2*i+1] <= std::f64::consts::FRAC_PI_2);
+            assert!(params[2 * i] >= 0.0 && params[2 * i] <= std::f64::consts::PI);
+            assert!(params[2 * i + 1] >= 0.0 && params[2 * i + 1] <= std::f64::consts::FRAC_PI_2);
         }
     }
 }

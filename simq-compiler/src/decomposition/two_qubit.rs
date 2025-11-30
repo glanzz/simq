@@ -38,12 +38,14 @@
 //! - Vatan & Williams, "Optimal quantum circuits for general two-qubit gates" (2004)
 //! - Shende, Bullock, Markov, "Synthesis of quantum-logic circuits" (2006)
 
-use crate::decomposition::{Decomposer, DecompositionConfig, DecompositionResult, DecompositionMetadata};
-use crate::matrix_computation::{Matrix4, is_unitary_4x4};
+use crate::decomposition::{
+    Decomposer, DecompositionConfig, DecompositionMetadata, DecompositionResult,
+};
+use crate::matrix_computation::{is_unitary_4x4, Matrix4};
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
-use std::sync::Arc;
+use simq_core::{Gate, QuantumError, Result};
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 const ZERO: Complex64 = Complex64::new(0.0, 0.0);
 
@@ -88,9 +90,7 @@ impl TwoQubitDecomposer {
     /// where E is the entangling gate (CNOT, CZ, etc.)
     pub fn decompose_canonical(&self, matrix: &Matrix4) -> Result<CanonicalDecomposition> {
         if !is_unitary_4x4(matrix) {
-            return Err(QuantumError::ValidationError(
-                "Matrix is not unitary".to_string()
-            ));
+            return Err(QuantumError::ValidationError("Matrix is not unitary".to_string()));
         }
 
         // TODO: Implement full canonical decomposition using:
@@ -115,9 +115,18 @@ impl TwoQubitDecomposer {
     pub fn decompose_swap(&self) -> Vec<TwoQubitGateInstruction> {
         match self.entangling_gate {
             EntanglementGate::CNOT => vec![
-                TwoQubitGateInstruction::CNOT { control: 0, target: 1 },
-                TwoQubitGateInstruction::CNOT { control: 1, target: 0 },
-                TwoQubitGateInstruction::CNOT { control: 0, target: 1 },
+                TwoQubitGateInstruction::CNOT {
+                    control: 0,
+                    target: 1,
+                },
+                TwoQubitGateInstruction::CNOT {
+                    control: 1,
+                    target: 0,
+                },
+                TwoQubitGateInstruction::CNOT {
+                    control: 0,
+                    target: 1,
+                },
             ],
             EntanglementGate::CZ => {
                 // CZ can implement SWAP with additional Hadamards
@@ -132,11 +141,11 @@ impl TwoQubitDecomposer {
                     TwoQubitGateInstruction::CZ,
                     TwoQubitGateInstruction::Hadamard { qubit: 1 },
                 ]
-            }
+            },
             _ => {
                 // For other gates, convert to CNOT first
                 vec![]
-            }
+            },
         }
     }
 
@@ -154,9 +163,15 @@ impl TwoQubitDecomposer {
             TwoQubitGateInstruction::SGate { qubit: 0 },
             TwoQubitGateInstruction::SGate { qubit: 1 },
             TwoQubitGateInstruction::Hadamard { qubit: 1 },
-            TwoQubitGateInstruction::CNOT { control: 0, target: 1 },
+            TwoQubitGateInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
             TwoQubitGateInstruction::Hadamard { qubit: 1 },
-            TwoQubitGateInstruction::CNOT { control: 1, target: 0 },
+            TwoQubitGateInstruction::CNOT {
+                control: 1,
+                target: 0,
+            },
             TwoQubitGateInstruction::Hadamard { qubit: 0 },
         ]
     }
@@ -171,13 +186,34 @@ impl TwoQubitDecomposer {
 
         // Decomposition in terms of CNOTs
         vec![
-            TwoQubitGateInstruction::Ry { qubit: 0, angle: PI / 4.0 },
-            TwoQubitGateInstruction::Ry { qubit: 1, angle: PI / 4.0 },
-            TwoQubitGateInstruction::CNOT { control: 0, target: 1 },
-            TwoQubitGateInstruction::Rz { qubit: 1, angle: -PI / 4.0 },
-            TwoQubitGateInstruction::CNOT { control: 1, target: 0 },
-            TwoQubitGateInstruction::Ry { qubit: 0, angle: -PI / 4.0 },
-            TwoQubitGateInstruction::Ry { qubit: 1, angle: -PI / 4.0 },
+            TwoQubitGateInstruction::Ry {
+                qubit: 0,
+                angle: PI / 4.0,
+            },
+            TwoQubitGateInstruction::Ry {
+                qubit: 1,
+                angle: PI / 4.0,
+            },
+            TwoQubitGateInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
+            TwoQubitGateInstruction::Rz {
+                qubit: 1,
+                angle: -PI / 4.0,
+            },
+            TwoQubitGateInstruction::CNOT {
+                control: 1,
+                target: 0,
+            },
+            TwoQubitGateInstruction::Ry {
+                qubit: 0,
+                angle: -PI / 4.0,
+            },
+            TwoQubitGateInstruction::Ry {
+                qubit: 1,
+                angle: -PI / 4.0,
+            },
         ]
     }
 
@@ -198,7 +234,10 @@ impl TwoQubitDecomposer {
     pub fn cz_to_cnot() -> Vec<TwoQubitGateInstruction> {
         vec![
             TwoQubitGateInstruction::Hadamard { qubit: 1 },
-            TwoQubitGateInstruction::CNOT { control: 0, target: 1 },
+            TwoQubitGateInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
             TwoQubitGateInstruction::Hadamard { qubit: 1 },
         ]
     }
@@ -218,11 +257,16 @@ impl TwoQubitDecomposer {
 }
 
 impl Decomposer for TwoQubitDecomposer {
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult> {
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult> {
         if gate.num_qubits() != 2 {
-            return Err(QuantumError::ValidationError(
-                format!("Expected two-qubit gate, got {}-qubit gate", gate.num_qubits())
-            ));
+            return Err(QuantumError::ValidationError(format!(
+                "Expected two-qubit gate, got {}-qubit gate",
+                gate.num_qubits()
+            )));
         }
 
         // Get gate matrix
@@ -231,7 +275,9 @@ impl Decomposer for TwoQubitDecomposer {
         })?;
 
         if matrix.len() != 16 {
-            return Err(QuantumError::ValidationError("Invalid matrix size for two-qubit gate".to_string()));
+            return Err(QuantumError::ValidationError(
+                "Invalid matrix size for two-qubit gate".to_string(),
+            ));
         }
 
         // Convert to Matrix4 format
@@ -257,7 +303,7 @@ impl Decomposer for TwoQubitDecomposer {
         Ok(DecompositionResult {
             gates,
             fidelity: 1.0,
-            depth: 7,  // Typical depth for 3 CNOTs + single-qubit layers
+            depth: 7, // Typical depth for 3 CNOTs + single-qubit layers
             gate_count: decomp.num_entangling * 3 + decomp.single_qubit_layers.len(),
             two_qubit_count: decomp.num_entangling,
             metadata: DecompositionMetadata {
@@ -279,7 +325,7 @@ impl Decomposer for TwoQubitDecomposer {
 
     fn estimate_cost(&self, gate: &dyn Gate) -> Option<usize> {
         if gate.num_qubits() == 2 {
-            Some(3)  // At most 3 entangling gates
+            Some(3) // At most 3 entangling gates
         } else {
             None
         }
@@ -339,7 +385,7 @@ impl CanonicalDecomposition {
         let mut count = self.num_entangling;
         for layer in &self.single_qubit_layers {
             if layer.gate_0.is_some() {
-                count += 3;  // ZYZ = 3 rotations
+                count += 3; // ZYZ = 3 rotations
             }
             if layer.gate_1.is_some() {
                 count += 3;
@@ -390,12 +436,18 @@ mod tests {
         let decomp = CanonicalDecomposition {
             entangling_gate: EntanglementGate::CNOT,
             single_qubit_layers: vec![
-                SingleQubitLayer { gate_0: None, gate_1: None },
-                SingleQubitLayer { gate_0: None, gate_1: None },
+                SingleQubitLayer {
+                    gate_0: None,
+                    gate_1: None,
+                },
+                SingleQubitLayer {
+                    gate_0: None,
+                    gate_1: None,
+                },
             ],
             num_entangling: 3,
         };
 
-        assert_eq!(decomp.depth(), 5);  // 3 CNOTs + 2 layers
+        assert_eq!(decomp.depth(), 5); // 3 CNOTs + 2 layers
     }
 }

@@ -34,50 +34,32 @@ pub const HADAMARD: [[Complex64; 2]; 2] = [
 /// Pauli-X gate matrix (NOT gate)
 /// X = [[0, 1],
 ///      [1, 0]]
-pub const PAULI_X: [[Complex64; 2]; 2] = [
-    [ZERO, ONE],
-    [ONE, ZERO],
-];
+pub const PAULI_X: [[Complex64; 2]; 2] = [[ZERO, ONE], [ONE, ZERO]];
 
 /// Pauli-Y gate matrix
 /// Y = [[0, -i],
 ///      [i,  0]]
-pub const PAULI_Y: [[Complex64; 2]; 2] = [
-    [ZERO, NEG_I],
-    [I, ZERO],
-];
+pub const PAULI_Y: [[Complex64; 2]; 2] = [[ZERO, NEG_I], [I, ZERO]];
 
 /// Pauli-Z gate matrix
 /// Z = [[1,  0],
 ///      [0, -1]]
-pub const PAULI_Z: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, NEG_ONE],
-];
+pub const PAULI_Z: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, NEG_ONE]];
 
 /// Identity gate matrix
 /// I = [[1, 0],
 ///      [0, 1]]
-pub const IDENTITY: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, ONE],
-];
+pub const IDENTITY: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, ONE]];
 
 /// S gate matrix (Phase gate, √Z)
 /// S = [[1, 0],
 ///      [0, i]]
-pub const S_GATE: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, I],
-];
+pub const S_GATE: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, I]];
 
 /// S† gate matrix (adjoint of S gate)
 /// S† = [[1,  0],
 ///       [0, -i]]
-pub const S_GATE_DAGGER: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, NEG_I],
-];
+pub const S_GATE_DAGGER: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, NEG_I]];
 
 /// T gate matrix (π/8 gate, √S)
 /// T = [[1, 0],
@@ -100,12 +82,12 @@ pub const T_GATE_DAGGER: [[Complex64; 2]; 2] = [
 ///             [1-i, 1+i]]
 pub const SX_GATE: [[Complex64; 2]; 2] = [
     [
-        Complex64::new(0.5, 0.5),   // (1+i)/2
-        Complex64::new(0.5, -0.5),  // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
     ],
     [
-        Complex64::new(0.5, -0.5),  // (1-i)/2
-        Complex64::new(0.5, 0.5),   // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
     ],
 ];
 
@@ -114,12 +96,12 @@ pub const SX_GATE: [[Complex64; 2]; 2] = [
 ///              [1+i, 1-i]]
 pub const SX_GATE_DAGGER: [[Complex64; 2]; 2] = [
     [
-        Complex64::new(0.5, -0.5),  // (1-i)/2
-        Complex64::new(0.5, 0.5),   // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
     ],
     [
-        Complex64::new(0.5, 0.5),   // (1+i)/2
-        Complex64::new(0.5, -0.5),  // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
     ],
 ];
 
@@ -257,14 +239,8 @@ pub fn rotation_x(theta: f64) -> [[Complex64; 2]; 2] {
     let sin_val = half_theta.sin();
 
     [
-        [
-            Complex64::new(cos_val, 0.0),
-            Complex64::new(0.0, -sin_val),
-        ],
-        [
-            Complex64::new(0.0, -sin_val),
-            Complex64::new(cos_val, 0.0),
-        ],
+        [Complex64::new(cos_val, 0.0), Complex64::new(0.0, -sin_val)],
+        [Complex64::new(0.0, -sin_val), Complex64::new(cos_val, 0.0)],
     ]
 }
 
@@ -278,14 +254,8 @@ pub fn rotation_y(theta: f64) -> [[Complex64; 2]; 2] {
     let sin_val = half_theta.sin();
 
     [
-        [
-            Complex64::new(cos_val, 0.0),
-            Complex64::new(-sin_val, 0.0),
-        ],
-        [
-            Complex64::new(sin_val, 0.0),
-            Complex64::new(cos_val, 0.0),
-        ],
+        [Complex64::new(cos_val, 0.0), Complex64::new(-sin_val, 0.0)],
+        [Complex64::new(sin_val, 0.0), Complex64::new(cos_val, 0.0)],
     ]
 }
 
@@ -297,14 +267,8 @@ pub fn rotation_z(theta: f64) -> [[Complex64; 2]; 2] {
     let half_theta = theta / 2.0;
 
     [
-        [
-            Complex64::new(half_theta.cos(), -half_theta.sin()),
-            ZERO,
-        ],
-        [
-            ZERO,
-            Complex64::new(half_theta.cos(), half_theta.sin()),
-        ],
+        [Complex64::new(half_theta.cos(), -half_theta.sin()), ZERO],
+        [ZERO, Complex64::new(half_theta.cos(), half_theta.sin())],
     ]
 }
 
@@ -337,14 +301,8 @@ pub fn u2(phi: f64, lambda: f64) -> [[Complex64; 2]; 2] {
     let e_phi_lambda = Complex64::new((phi + lambda).cos(), (phi + lambda).sin());
 
     [
-        [
-            Complex64::new(INV_SQRT2, 0.0),
-            -e_lambda * INV_SQRT2,
-        ],
-        [
-            e_phi * INV_SQRT2,
-            e_phi_lambda * INV_SQRT2,
-        ],
+        [Complex64::new(INV_SQRT2, 0.0), -e_lambda * INV_SQRT2],
+        [e_phi * INV_SQRT2, e_phi_lambda * INV_SQRT2],
     ]
 }
 
@@ -362,14 +320,8 @@ pub fn u3(theta: f64, phi: f64, lambda: f64) -> [[Complex64; 2]; 2] {
     let e_phi_lambda = Complex64::new((phi + lambda).cos(), (phi + lambda).sin());
 
     [
-        [
-            Complex64::new(cos_val, 0.0),
-            -e_lambda * sin_val,
-        ],
-        [
-            e_phi * sin_val,
-            e_phi_lambda * cos_val,
-        ],
+        [Complex64::new(cos_val, 0.0), -e_lambda * sin_val],
+        [e_phi * sin_val, e_phi_lambda * cos_val],
     ]
 }
 

@@ -281,8 +281,10 @@ impl Circuit {
     /// ```
     pub fn validate_dag(&self) -> crate::Result<crate::ValidationReport> {
         use crate::validation::dag::DependencyGraph;
-        use crate::validation::rules::{ValidationRule, CycleDetectionRule, DependencyValidationRule, QubitUsageRule};
         use crate::validation::report::ValidationReport;
+        use crate::validation::rules::{
+            CycleDetectionRule, DependencyValidationRule, QubitUsageRule, ValidationRule,
+        };
 
         // Basic validation first
         self.validate()?;
@@ -408,7 +410,9 @@ impl Circuit {
             .iter()
             .map(|op| registry.serialize_gate_op(op))
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+            .map_err(|e| {
+                QuantumError::SerializationError(format!("Failed to serialize gate: {}", e))
+            })?;
 
         let serialized = SerializedCircuit {
             version: CIRCUIT_FORMAT_VERSION,
@@ -417,8 +421,9 @@ impl Circuit {
             metadata: None,
         };
 
-        bincode::serialize(&serialized)
-            .map_err(|e| QuantumError::SerializationError(format!("Binary serialization failed: {}", e)))
+        bincode::serialize(&serialized).map_err(|e| {
+            QuantumError::SerializationError(format!("Binary serialization failed: {}", e))
+        })
     }
 
     #[cfg(feature = "serialization")]
@@ -439,8 +444,9 @@ impl Circuit {
         use crate::serialization::gate::GateRegistry;
         use crate::serialization::StandardGateRegistry;
 
-        let serialized: SerializedCircuit = bincode::deserialize(bytes)
-            .map_err(|e| QuantumError::DeserializationError(format!("Binary deserialization failed: {}", e)))?;
+        let serialized: SerializedCircuit = bincode::deserialize(bytes).map_err(|e| {
+            QuantumError::DeserializationError(format!("Binary deserialization failed: {}", e))
+        })?;
 
         serialized.check_version()?;
 
@@ -448,8 +454,11 @@ impl Circuit {
         let mut circuit = Circuit::new(serialized.num_qubits);
 
         for op in serialized.operations {
-            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
-                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            let gate_op = registry
+                .create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| {
+                    QuantumError::DeserializationError(format!("Failed to create gate: {}", e))
+                })?;
             circuit.operations.push(gate_op);
         }
 
@@ -481,7 +490,9 @@ impl Circuit {
             .iter()
             .map(|op| registry.serialize_gate_op(op))
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+            .map_err(|e| {
+                QuantumError::SerializationError(format!("Failed to serialize gate: {}", e))
+            })?;
 
         let serialized = SerializedCircuit {
             version: CIRCUIT_FORMAT_VERSION,
@@ -490,8 +501,9 @@ impl Circuit {
             metadata: None,
         };
 
-        serde_json::to_string(&serialized)
-            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+        serde_json::to_string(&serialized).map_err(|e| {
+            QuantumError::SerializationError(format!("JSON serialization failed: {}", e))
+        })
     }
 
     #[cfg(feature = "serialization")]
@@ -510,7 +522,9 @@ impl Circuit {
             .iter()
             .map(|op| registry.serialize_gate_op(op))
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+            .map_err(|e| {
+                QuantumError::SerializationError(format!("Failed to serialize gate: {}", e))
+            })?;
 
         let serialized = SerializedCircuit {
             version: CIRCUIT_FORMAT_VERSION,
@@ -519,8 +533,9 @@ impl Circuit {
             metadata: None,
         };
 
-        serde_json::to_string_pretty(&serialized)
-            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+        serde_json::to_string_pretty(&serialized).map_err(|e| {
+            QuantumError::SerializationError(format!("JSON serialization failed: {}", e))
+        })
     }
 
     #[cfg(feature = "serialization")]
@@ -541,8 +556,9 @@ impl Circuit {
         use crate::serialization::gate::GateRegistry;
         use crate::serialization::StandardGateRegistry;
 
-        let serialized: SerializedCircuit = serde_json::from_str(json)
-            .map_err(|e| QuantumError::DeserializationError(format!("JSON deserialization failed: {}", e)))?;
+        let serialized: SerializedCircuit = serde_json::from_str(json).map_err(|e| {
+            QuantumError::DeserializationError(format!("JSON deserialization failed: {}", e))
+        })?;
 
         serialized.check_version()?;
 
@@ -550,8 +566,11 @@ impl Circuit {
         let mut circuit = Circuit::new(serialized.num_qubits);
 
         for op in serialized.operations {
-            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
-                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            let gate_op = registry
+                .create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| {
+                    QuantumError::DeserializationError(format!("Failed to create gate: {}", e))
+                })?;
             circuit.operations.push(gate_op);
         }
 

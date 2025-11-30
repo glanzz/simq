@@ -5,7 +5,7 @@
 
 use simq_compiler::passes::{GateCommutation, OptimizationPass};
 use simq_core::{Circuit, QubitId};
-use simq_gates::standard::{CNot, CZ, Hadamard, PauliX, PauliY, PauliZ, RotationX, SGate, TGate};
+use simq_gates::standard::{CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, SGate, TGate, CZ};
 use std::sync::Arc;
 
 fn main() {
@@ -78,17 +78,13 @@ fn rotation_gates_example() {
 
     // Add multiple RX gates on q0 - they commute!
     circuit
-        .add_gate(Arc::new(RotationX::new(std::f64::consts::PI / 4.0)), &[
-            QubitId::new(0),
-        ])
+        .add_gate(Arc::new(RotationX::new(std::f64::consts::PI / 4.0)), &[QubitId::new(0)])
         .unwrap();
     circuit
         .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
         .unwrap(); // On different qubit
     circuit
-        .add_gate(Arc::new(RotationX::new(std::f64::consts::PI / 8.0)), &[
-            QubitId::new(0),
-        ])
+        .add_gate(Arc::new(RotationX::new(std::f64::consts::PI / 8.0)), &[QubitId::new(0)])
         .unwrap();
 
     println!("Before commutation:");
@@ -241,7 +237,11 @@ fn complex_optimization_example() {
 /// Helper function to print circuit gates
 fn print_circuit(circuit: &Circuit) {
     for (i, op) in circuit.operations().enumerate() {
-        let qubits: Vec<String> = op.qubits().iter().map(|q| format!("q{}", q.index())).collect();
+        let qubits: Vec<String> = op
+            .qubits()
+            .iter()
+            .map(|q| format!("q{}", q.index()))
+            .collect();
         println!("  [{}] {}({})", i, op.gate().name(), qubits.join(", "));
     }
 }

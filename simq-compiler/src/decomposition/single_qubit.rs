@@ -41,12 +41,14 @@
 //! - Shende & Markov, "On the CNOT-cost of TOFFOLI gates" (2009)
 //! - IBM Qiskit documentation on gate decomposition
 
-use crate::decomposition::{Decomposer, DecompositionConfig, DecompositionResult, DecompositionMetadata};
-use crate::matrix_computation::{Matrix2, is_unitary_2x2, determinant_2x2};
+use crate::decomposition::{
+    Decomposer, DecompositionConfig, DecompositionMetadata, DecompositionResult,
+};
+use crate::matrix_computation::{determinant_2x2, is_unitary_2x2, Matrix2};
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
-use std::sync::Arc;
+use simq_core::{Gate, QuantumError, Result};
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 // Constants
 const EPSILON: f64 = 1e-10;
@@ -88,9 +90,7 @@ impl SingleQubitDecomposer {
     /// Decompose a single-qubit gate into Euler angles
     pub fn decompose_to_angles(&self, matrix: &Matrix2) -> Result<EulerAngles> {
         if !is_unitary_2x2(matrix) {
-            return Err(QuantumError::ValidationError(
-                "Matrix is not unitary".to_string()
-            ));
+            return Err(QuantumError::ValidationError("Matrix is not unitary".to_string()));
         }
 
         match self.basis {
@@ -215,8 +215,12 @@ impl SingleQubitDecomposer {
         }
 
         let sin_half_gamma = (gamma / 2.0).sin();
-        let beta = ((u_normalized[1][0] + u_normalized[0][1]) / (Complex64::new(0.0, 2.0) * sin_half_gamma)).arg();
-        let delta = ((u_normalized[1][0] - u_normalized[0][1]) / (Complex64::new(0.0, 2.0) * sin_half_gamma)).arg();
+        let beta = ((u_normalized[1][0] + u_normalized[0][1])
+            / (Complex64::new(0.0, 2.0) * sin_half_gamma))
+            .arg();
+        let delta = ((u_normalized[1][0] - u_normalized[0][1])
+            / (Complex64::new(0.0, 2.0) * sin_half_gamma))
+            .arg();
 
         Ok(EulerAngles::new(alpha, beta, gamma, delta))
     }
@@ -246,8 +250,12 @@ impl SingleQubitDecomposer {
         }
 
         let sin_half_gamma = (gamma / 2.0).sin();
-        let beta = ((u_normalized[1][0] - u_normalized[0][1]) / (Complex64::new(0.0, -2.0) * sin_half_gamma)).arg();
-        let delta = ((u_normalized[1][0] + u_normalized[0][1]) / (Complex64::new(0.0, -2.0) * sin_half_gamma)).arg();
+        let beta = ((u_normalized[1][0] - u_normalized[0][1])
+            / (Complex64::new(0.0, -2.0) * sin_half_gamma))
+            .arg();
+        let delta = ((u_normalized[1][0] + u_normalized[0][1])
+            / (Complex64::new(0.0, -2.0) * sin_half_gamma))
+            .arg();
 
         Ok(EulerAngles::new(alpha, beta, gamma, delta))
     }
@@ -263,7 +271,7 @@ impl SingleQubitDecomposer {
         // IBM U3(θ, φ, λ) = Rz(φ) Ry(θ) Rz(λ)
         // Maps to our ZYZ angles: θ=gamma, φ=beta, λ=delta
         Ok(EulerAngles {
-            alpha: 0.0,  // Global phase discarded
+            alpha: 0.0, // Global phase discarded
             beta: angles.beta,
             gamma: angles.gamma,
             delta: angles.delta,
@@ -310,11 +318,16 @@ impl SingleQubitDecomposer {
 }
 
 impl Decomposer for SingleQubitDecomposer {
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult> {
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult> {
         if gate.num_qubits() != 1 {
-            return Err(QuantumError::ValidationError(
-                format!("Expected single-qubit gate, got {}-qubit gate", gate.num_qubits())
-            ));
+            return Err(QuantumError::ValidationError(format!(
+                "Expected single-qubit gate, got {}-qubit gate",
+                gate.num_qubits()
+            )));
         }
 
         // Get gate matrix
@@ -353,7 +366,7 @@ impl Decomposer for SingleQubitDecomposer {
         Ok(DecompositionResult {
             gates,
             fidelity: 1.0,
-            depth: 3,  // Typically 3 rotations
+            depth: 3, // Typically 3 rotations
             gate_count: 3,
             two_qubit_count: 0,
             metadata: DecompositionMetadata {
@@ -382,7 +395,7 @@ impl Decomposer for SingleQubitDecomposer {
 
     fn estimate_cost(&self, gate: &dyn Gate) -> Option<usize> {
         if gate.num_qubits() == 1 {
-            Some(3)  // Typically 3 rotations
+            Some(3) // Typically 3 rotations
         } else {
             None
         }
@@ -408,14 +421,17 @@ pub struct EulerAngles {
 impl EulerAngles {
     /// Create new Euler angles
     pub fn new(alpha: f64, beta: f64, gamma: f64, delta: f64) -> Self {
-        Self { alpha, beta, gamma, delta }
+        Self {
+            alpha,
+            beta,
+            gamma,
+            delta,
+        }
     }
 
     /// Check if this represents the identity gate (all angles ≈ 0)
     pub fn is_identity(&self) -> bool {
-        self.beta.abs() < EPSILON
-            && self.gamma.abs() < EPSILON
-            && self.delta.abs() < EPSILON
+        self.beta.abs() < EPSILON && self.gamma.abs() < EPSILON && self.delta.abs() < EPSILON
     }
 
     /// Count non-zero angles (gates needed)

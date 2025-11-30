@@ -429,8 +429,14 @@ mod tests {
     fn hadamard_matrix() -> [[Complex64; 2]; 2] {
         let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
         [
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ]
     }
 

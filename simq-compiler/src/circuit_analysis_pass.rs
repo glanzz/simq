@@ -100,7 +100,8 @@ impl CircuitCharacteristics {
 
             for op in circuit.operations() {
                 let qubits = op.qubits();
-                let current_depth = qubits.iter()
+                let current_depth = qubits
+                    .iter()
                     .map(|q| *qubit_depths.get(q).unwrap_or(&0))
                     .max()
                     .unwrap_or(0);
@@ -125,7 +126,7 @@ impl CircuitCharacteristics {
             match op.num_qubits() {
                 1 => single_qubit += 1,
                 2 => two_qubit += 1,
-                _ => {}
+                _ => {},
             }
         }
 
@@ -193,10 +194,7 @@ impl CircuitCharacteristics {
     }
 
     fn same_rotation_axis(name1: &str, name2: &str) -> bool {
-        matches!(
-            (name1, name2),
-            ("RX", "RX") | ("RY", "RY") | ("RZ", "RZ")
-        )
+        matches!((name1, name2), ("RX", "RX") | ("RY", "RY") | ("RZ", "RZ"))
     }
 
     /// Estimate density of fuseable gate sequences
@@ -215,9 +213,7 @@ impl CircuitCharacteristics {
             let op2 = operations[i + 1];
 
             // Check if consecutive gates on same qubit (potential fusion)
-            if op1.num_qubits() == 1
-                && op2.num_qubits() == 1
-                && op1.qubits()[0] == op2.qubits()[0]
+            if op1.num_qubits() == 1 && op2.num_qubits() == 1 && op1.qubits()[0] == op2.qubits()[0]
             {
                 fuseable_sequences += 1;
             }

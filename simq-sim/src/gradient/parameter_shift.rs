@@ -10,14 +10,14 @@
 //! For s = π/2, this simplifies to:
 //! ∂⟨ψ(θ)|H|ψ(θ)⟩/∂θ = [⟨ψ(θ+π/2)|H|ψ(θ+π/2)⟩ - ⟨ψ(θ-π/2)|H|ψ(θ-π/2)⟩] / 2
 
-use rayon::prelude::*;
-use std::time::Instant;
-use simq_core::Circuit;
-use simq_state::AdaptiveState;
-use simq_state::observable::PauliObservable;
-use crate::Simulator;
+use super::{GradientMethod, GradientResult};
 use crate::error::Result;
-use super::{GradientResult, GradientMethod};
+use crate::Simulator;
+use rayon::prelude::*;
+use simq_core::Circuit;
+use simq_state::observable::PauliObservable;
+use simq_state::AdaptiveState;
+use std::time::Instant;
 
 /// Configuration for parameter shift rule
 #[derive(Debug, Clone)]
@@ -184,14 +184,12 @@ fn evaluate_expectation(
 
     // Compute expectation value
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -214,12 +212,16 @@ where
     if config.parallel {
         observables
             .par_iter()
-            .map(|obs| compute_gradient_parameter_shift(simulator, &circuit_builder, obs, params, config))
+            .map(|obs| {
+                compute_gradient_parameter_shift(simulator, &circuit_builder, obs, params, config)
+            })
             .collect()
     } else {
         observables
             .iter()
-            .map(|obs| compute_gradient_parameter_shift(simulator, &circuit_builder, obs, params, config))
+            .map(|obs| {
+                compute_gradient_parameter_shift(simulator, &circuit_builder, obs, params, config)
+            })
             .collect()
     }
 }
@@ -244,17 +246,23 @@ where
     let mut modified_config = config.clone();
     modified_config.shift = shift;
 
-    compute_gradient_parameter_shift(simulator, circuit_builder, observable, params, &modified_config)
+    compute_gradient_parameter_shift(
+        simulator,
+        circuit_builder,
+        observable,
+        params,
+        &modified_config,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SimulatorConfig;
     use simq_core::QubitId;
     use simq_gates::standard::{Hadamard, RotationY};
     use simq_state::observable::PauliString;
     use std::sync::Arc;
-    use crate::SimulatorConfig;
 
     #[test]
     fn test_parameter_shift_single_param() {
@@ -263,13 +271,18 @@ mod tests {
         // Simple circuit: H - RY(θ) - H
         let circuit_builder = |params: &[f64]| {
             let mut circuit = Circuit::new(1);
-            circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-            circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
             circuit
         };
 
         // Observable: Z
-        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let params = vec![0.5];
         let config = ParameterShiftConfig::default();
@@ -280,7 +293,8 @@ mod tests {
             &observable,
             &params,
             &config,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.gradients.len(), 1);
         assert_eq!(result.num_evaluations, 2);
@@ -293,12 +307,17 @@ mod tests {
 
         let circuit_builder = |params: &[f64]| {
             let mut circuit = Circuit::new(2);
-            circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
-            circuit.add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)]).unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)])
+                .unwrap();
             circuit
         };
 
-        let observable = PauliObservable::from_pauli_string(PauliString::from_str("ZZ").unwrap(), 1.0);
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("ZZ").unwrap(), 1.0);
 
         let params = vec![0.3, 0.7];
         let config = ParameterShiftConfig::default();
@@ -309,7 +328,8 @@ mod tests {
             &observable,
             &params,
             &config,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.gradients.len(), 2);
         assert_eq!(result.num_evaluations, 4); // 2 params × 2 evaluations
@@ -331,7 +351,8 @@ mod tests {
     fn test_zero_params() {
         let simulator = Simulator::new(SimulatorConfig::default());
         let circuit_builder = |_: &[f64]| Circuit::new(1);
-        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let result = compute_gradient_parameter_shift(
             &simulator,
@@ -339,7 +360,8 @@ mod tests {
             &observable,
             &[],
             &ParameterShiftConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.len(), 0);
         assert_eq!(result.num_evaluations, 0);

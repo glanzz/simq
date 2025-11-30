@@ -114,12 +114,7 @@ pub fn apply_cnot_striped(
 ///
 /// This is much faster than 4×4 matrix multiplication.
 /// Only one amplitude needs modification per 4-block.
-pub fn apply_cz_scalar(
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-    num_qubits: usize,
-) {
+pub fn apply_cz_scalar(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
     let dimension = 1usize << num_qubits;
     let mask1 = 1usize << qubit1;
     let mask2 = 1usize << qubit2;
@@ -136,12 +131,7 @@ pub fn apply_cz_scalar(
 /// Apply a CZ gate using nested loops for cache locality
 ///
 /// Uses stride-based iteration to access the |11⟩ state efficiently.
-pub fn apply_cz_striped(
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-    num_qubits: usize,
-) {
+pub fn apply_cz_striped(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
     let dimension = 1usize << num_qubits;
 
     // Order qubits for consistent iteration
@@ -469,10 +459,10 @@ mod tests {
         // Basis: |00⟩ = 0, |01⟩ = 1, |10⟩ = 2, |11⟩ = 3 (q0 is LSB)
         // Start with |10⟩ state (control qubit q1 = 1)
         let mut state = vec![
-            Complex64::new(0.0, 0.0),  // |00⟩
-            Complex64::new(0.0, 0.0),  // |01⟩
-            Complex64::new(1.0, 0.0),  // |10⟩ (q1=1, q0=0)
-            Complex64::new(0.0, 0.0),  // |11⟩
+            Complex64::new(0.0, 0.0), // |00⟩
+            Complex64::new(0.0, 0.0), // |01⟩
+            Complex64::new(1.0, 0.0), // |10⟩ (q1=1, q0=0)
+            Complex64::new(0.0, 0.0), // |11⟩
         ];
 
         // Apply CRX(π/2) with control=1 (q1), target=0 (q0)

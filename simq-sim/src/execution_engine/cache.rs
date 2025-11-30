@@ -1,9 +1,9 @@
 //! Gate matrix caching
 
+use crate::execution_engine::kernels::{Matrix2x2, Matrix4x4};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::execution_engine::kernels::{Matrix2x2, Matrix4x4};
 
 /// Cache key for gate matrices
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

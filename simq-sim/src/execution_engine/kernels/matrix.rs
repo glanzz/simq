@@ -1,7 +1,7 @@
 //! Gate matrix utilities
 
-use num_complex::Complex64;
 use super::{Matrix2x2, Matrix4x4};
+use num_complex::Complex64;
 
 /// Gate matrix wrapper with metadata
 #[derive(Debug, Clone)]

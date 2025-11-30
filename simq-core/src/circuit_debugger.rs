@@ -277,11 +277,7 @@ impl<'a> CircuitDebugger<'a> {
         let mut output = String::new();
 
         // Render the circuit with a marker for current position
-        output.push_str(&format!(
-            "Step {}/{}\n",
-            self.current_step,
-            self.total_gates()
-        ));
+        output.push_str(&format!("Step {}/{}\n", self.current_step, self.total_gates()));
 
         if let Some(gate_op) = self.current_gate() {
             output.push_str(&format!(
@@ -301,10 +297,7 @@ impl<'a> CircuitDebugger<'a> {
             compact: true,
             ..Default::default()
         };
-        output.push_str(&crate::ascii_renderer::render_with_config(
-            self.circuit,
-            &config,
-        ));
+        output.push_str(&crate::ascii_renderer::render_with_config(self.circuit, &config));
 
         output
     }

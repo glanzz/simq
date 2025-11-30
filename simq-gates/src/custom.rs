@@ -47,78 +47,72 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq)]
 pub enum CustomGateError {
     /// Matrix is not unitary (U†U ≠ I)
-    NotUnitary {
-        max_deviation: f64,
-        tolerance: f64,
-    },
+    NotUnitary { max_deviation: f64, tolerance: f64 },
     /// Matrix dimensions are invalid
-    InvalidDimensions {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidDimensions { expected: usize, actual: usize },
     /// Matrix size is not a power of 2
-    InvalidSize {
-        size: usize,
-    },
+    InvalidSize { size: usize },
     /// Matrix contains NaN or infinite values
     InvalidValues,
     /// Gate name is empty or invalid
     InvalidName,
     /// Determinant is not approximately 1
-    InvalidDeterminant {
-        determinant_norm: f64,
-    },
+    InvalidDeterminant { determinant_norm: f64 },
     /// Matrix is not hermitian (when required)
-    NotHermitian {
-        max_deviation: f64,
-    },
+    NotHermitian { max_deviation: f64 },
 }
 
 impl fmt::Display for CustomGateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CustomGateError::NotUnitary { max_deviation, tolerance } => {
+            CustomGateError::NotUnitary {
+                max_deviation,
+                tolerance,
+            } => {
                 write!(
                     f,
                     "Matrix is not unitary: max deviation {:.2e} exceeds tolerance {:.2e}. \
                     Ensure U†U = I where U† is the conjugate transpose.",
                     max_deviation, tolerance
                 )
-            }
+            },
             CustomGateError::InvalidDimensions { expected, actual } => {
                 write!(
                     f,
                     "Invalid matrix dimensions: expected {}×{} ({} elements), got {} elements",
-                    expected, expected, expected * expected, actual
+                    expected,
+                    expected,
+                    expected * expected,
+                    actual
                 )
-            }
+            },
             CustomGateError::InvalidSize { size } => {
                 write!(
                     f,
                     "Matrix size {} is not valid. Size must be 2^n × 2^n for n-qubit gates (e.g., 2, 4, 8, 16, ...)",
                     size
                 )
-            }
+            },
             CustomGateError::InvalidValues => {
                 write!(f, "Matrix contains NaN or infinite values")
-            }
+            },
             CustomGateError::InvalidName => {
                 write!(f, "Gate name cannot be empty")
-            }
+            },
             CustomGateError::InvalidDeterminant { determinant_norm } => {
                 write!(
                     f,
                     "Invalid determinant: |det(U)| = {:.6} (expected 1.0 for unitary matrices)",
                     determinant_norm
                 )
-            }
+            },
             CustomGateError::NotHermitian { max_deviation } => {
                 write!(
                     f,
                     "Matrix is not hermitian: max deviation {:.2e}. Hermitian matrices satisfy A = A†",
                     max_deviation
                 )
-            }
+            },
         }
     }
 }
@@ -263,12 +257,7 @@ impl CustomGate {
             }
         }
 
-        CustomGate::new(
-            format!("C{}", self.name),
-            new_num_qubits,
-            controlled_matrix,
-            1e-10,
-        )
+        CustomGate::new(format!("C{}", self.name), new_num_qubits, controlled_matrix, 1e-10)
     }
 
     /// Get the adjoint (Hermitian conjugate) of this gate
@@ -276,13 +265,8 @@ impl CustomGate {
         let adjoint_matrix = crate::matrix_ops::matrix_adjoint(&self.matrix);
 
         // Adjoint of unitary is also unitary, so this should not fail
-        CustomGate::new(
-            format!("{}†", self.name),
-            self.num_qubits,
-            adjoint_matrix,
-            1e-10,
-        )
-        .expect("Adjoint of unitary gate should be unitary")
+        CustomGate::new(format!("{}†", self.name), self.num_qubits, adjoint_matrix, 1e-10)
+            .expect("Adjoint of unitary gate should be unitary")
     }
 
     /// Compose this gate with another gate
@@ -333,7 +317,11 @@ impl Gate for CustomGate {
                 "Custom {}-qubit gate '{}'{}",
                 self.num_qubits,
                 self.name,
-                if self.is_hermitian { " (Hermitian)" } else { "" }
+                if self.is_hermitian {
+                    " (Hermitian)"
+                } else {
+                    ""
+                }
             )
         }
     }
@@ -453,19 +441,19 @@ impl CustomGateBuilder {
     /// - Matrix validation fails
     /// - Hermitian requirement not met (if required)
     pub fn build(self) -> Result<CustomGate, CustomGateError> {
-        let num_qubits = self.num_qubits.ok_or_else(|| {
-            CustomGateError::InvalidDimensions {
+        let num_qubits = self
+            .num_qubits
+            .ok_or_else(|| CustomGateError::InvalidDimensions {
                 expected: 0,
                 actual: 0,
-            }
-        })?;
+            })?;
 
-        let matrix = self.matrix.ok_or_else(|| {
-            CustomGateError::InvalidDimensions {
+        let matrix = self
+            .matrix
+            .ok_or_else(|| CustomGateError::InvalidDimensions {
                 expected: 0,
                 actual: 0,
-            }
-        })?;
+            })?;
 
         let mut gate = CustomGate::new(self.name, num_qubits, matrix, self.tolerance)?;
 
@@ -838,7 +826,7 @@ pub mod validation {
                 // For larger matrices, use numerical methods or skip
                 // For now, return 1.0 as we already checked unitarity
                 Complex64::new(1.0, 0.0)
-            }
+            },
         }
     }
 
@@ -956,10 +944,7 @@ mod tests {
 
         let result = CustomGate::new("Invalid", 1, matrix, 1e-10);
         assert!(result.is_err());
-        assert!(matches!(
-            result,
-            Err(CustomGateError::InvalidDimensions { .. })
-        ));
+        assert!(matches!(result, Err(CustomGateError::InvalidDimensions { .. })));
     }
 
     #[test]
@@ -1027,7 +1012,9 @@ mod tests {
 
         // S · S† = I
         let identity = s_gate.compose(&s_dag).unwrap();
-        let fidelity = identity.fidelity(&crate::matrix_ops::identity_matrix(2)).unwrap();
+        let fidelity = identity
+            .fidelity(&crate::matrix_ops::identity_matrix(2))
+            .unwrap();
         assert_relative_eq!(fidelity, 1.0, epsilon = 1e-10);
     }
 
@@ -1058,7 +1045,9 @@ mod tests {
 
         // X · X = I
         let x_squared = x_gate.compose(&x_gate).unwrap();
-        let fidelity = x_squared.fidelity(&crate::matrix_ops::identity_matrix(2)).unwrap();
+        let fidelity = x_squared
+            .fidelity(&crate::matrix_ops::identity_matrix(2))
+            .unwrap();
         assert_relative_eq!(fidelity, 1.0, epsilon = 1e-10);
     }
 

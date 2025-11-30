@@ -1,10 +1,10 @@
 //! Parallel execution strategies
 
-use simq_core::{Circuit, GateOp};
-use simq_compiler::execution_plan::ExecutionPlanner;
-use simq_state::AdaptiveState;
-use crate::execution_engine::error::{ExecutionError, Result};
 use crate::execution_engine::config::ParallelStrategy;
+use crate::execution_engine::error::{ExecutionError, Result};
+use simq_compiler::execution_plan::ExecutionPlanner;
+use simq_core::{Circuit, GateOp};
+use simq_state::AdaptiveState;
 
 /// Parallel executor for quantum circuits
 pub struct ParallelExecutor {
@@ -31,18 +31,12 @@ impl ParallelExecutor {
         F: FnMut(&GateOp, &mut AdaptiveState) -> Result<()> + Send + Sync,
     {
         match self.strategy {
-            ParallelStrategy::LayerBased => {
-                self.execute_layer_based(circuit, state, apply_gate)
-            }
+            ParallelStrategy::LayerBased => self.execute_layer_based(circuit, state, apply_gate),
             ParallelStrategy::DataParallel => {
                 self.execute_data_parallel(circuit, state, apply_gate)
-            }
-            ParallelStrategy::Hybrid => {
-                self.execute_hybrid(circuit, state, apply_gate)
-            }
-            ParallelStrategy::TaskBased => {
-                self.execute_task_based(circuit, state, apply_gate)
-            }
+            },
+            ParallelStrategy::Hybrid => self.execute_hybrid(circuit, state, apply_gate),
+            ParallelStrategy::TaskBased => self.execute_task_based(circuit, state, apply_gate),
         }
     }
 
@@ -64,11 +58,9 @@ impl ParallelExecutor {
             // TODO: Implement true parallel execution with state partitioning
             for &gate_idx in &layer.gates {
                 if let Some(op) = operations.get(gate_idx) {
-                    apply_gate(op, state).map_err(|e| {
-                        ExecutionError::ParallelExecutionFailed {
-                            layer: layer_idx,
-                            reason: format!("{}", e),
-                        }
+                    apply_gate(op, state).map_err(|e| ExecutionError::ParallelExecutionFailed {
+                        layer: layer_idx,
+                        reason: format!("{}", e),
                     })?;
                 }
             }

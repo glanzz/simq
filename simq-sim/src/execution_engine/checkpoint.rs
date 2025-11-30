@@ -1,7 +1,7 @@
 //! Checkpointing for resumable execution
 
-use simq_state::AdaptiveState;
 use crate::execution_engine::error::Result;
+use simq_state::AdaptiveState;
 use std::path::PathBuf;
 
 /// A checkpoint of execution state

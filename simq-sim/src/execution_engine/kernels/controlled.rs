@@ -1,9 +1,9 @@
 //! Controlled gate application kernels
 
+use super::Matrix2x2;
+use crate::execution_engine::error::{ExecutionError, Result};
 use num_complex::Complex64;
 use rayon::prelude::*;
-use crate::execution_engine::error::{ExecutionError, Result};
-use super::Matrix2x2;
 
 /// Apply a controlled single-qubit gate
 ///
@@ -29,7 +29,10 @@ pub fn apply_controlled_gate(
     if control == target {
         return Err(ExecutionError::GateApplicationFailed {
             gate: "controlled".to_string(),
-            qubits: vec![simq_core::QubitId::new(control), simq_core::QubitId::new(target)],
+            qubits: vec![
+                simq_core::QubitId::new(control),
+                simq_core::QubitId::new(target),
+            ],
             reason: "Control and target must be different".to_string(),
         });
     }
@@ -87,25 +90,23 @@ fn apply_controlled_parallel(
 ) {
     let state_ptr_addr = state.as_ptr() as usize;
 
-    state
-        .par_chunks_mut(target_stride * 2)
-        .for_each(|chunk| {
-            for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
-                // Reconstruct pointer to avoid borrowing state in closure
-                let state_ptr = state_ptr_addr as *const Complex64;
-                let base_idx = chunk.as_ptr() as usize - state_ptr as usize;
-                let idx0 = base_idx / std::mem::size_of::<Complex64>() + j;
+    state.par_chunks_mut(target_stride * 2).for_each(|chunk| {
+        for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
+            // Reconstruct pointer to avoid borrowing state in closure
+            let state_ptr = state_ptr_addr as *const Complex64;
+            let base_idx = chunk.as_ptr() as usize - state_ptr as usize;
+            let idx0 = base_idx / std::mem::size_of::<Complex64>() + j;
 
-                // Only apply if control qubit is |1⟩
-                if idx0 & control_mask != 0 {
-                    let a = chunk[j];
-                    let b = chunk[j + target_stride];
+            // Only apply if control qubit is |1⟩
+            if idx0 & control_mask != 0 {
+                let a = chunk[j];
+                let b = chunk[j + target_stride];
 
-                    chunk[j] = gate[0][0] * a + gate[0][1] * b;
-                    chunk[j + target_stride] = gate[1][0] * a + gate[1][1] * b;
-                }
+                chunk[j] = gate[0][0] * a + gate[0][1] * b;
+                chunk[j + target_stride] = gate[1][0] * a + gate[1][1] * b;
             }
-        });
+        }
+    });
 }
 
 /// Apply a multi-controlled gate (Toffoli, etc.)
@@ -133,7 +134,10 @@ pub fn apply_multi_controlled(
         if control == target {
             return Err(ExecutionError::GateApplicationFailed {
                 gate: "multi-controlled".to_string(),
-                qubits: vec![simq_core::QubitId::new(control), simq_core::QubitId::new(target)],
+                qubits: vec![
+                    simq_core::QubitId::new(control),
+                    simq_core::QubitId::new(target),
+                ],
                 reason: "Control and target must be different".to_string(),
             });
         }
@@ -213,9 +217,9 @@ fn apply_multi_controlled_parallel(
                 // Safety: we are checking bounds and using raw pointers to avoid borrow checker issues
                 // with disjoint access patterns that the compiler can't see
                 unsafe {
-                    if idx + target_stride < state.len() &&
-                       (idx & control_mask).count_ones() as usize == num_controls {
-                        
+                    if idx + target_stride < state.len()
+                        && (idx & control_mask).count_ones() as usize == num_controls
+                    {
                         let a = *state_ptr.add(idx);
                         let b = *state_ptr.add(idx + target_stride);
 

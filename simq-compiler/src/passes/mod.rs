@@ -127,13 +127,13 @@ impl Default for OptimizationResult {
 
 // Pass implementations
 mod dead_code_elimination;
-mod gate_fusion;
 mod gate_commutation;
-mod template_substitution;
+mod gate_fusion;
 mod template_matching;
+mod template_substitution;
 
 pub use dead_code_elimination::DeadCodeElimination;
-pub use gate_fusion::GateFusion;
 pub use gate_commutation::GateCommutation;
-pub use template_substitution::TemplateSubstitution;
+pub use gate_fusion::GateFusion;
 pub use template_matching::AdvancedTemplateMatching;
+pub use template_substitution::TemplateSubstitution;

@@ -238,10 +238,7 @@ fn test_teleportation_fidelity(num_trials: usize) {
         let phi = rand() * 2.0 * std::f64::consts::PI;
 
         let alpha = Complex64::new((theta / 2.0).cos(), 0.0);
-        let beta = Complex64::new(
-            (theta / 2.0).sin() * phi.cos(),
-            (theta / 2.0).sin() * phi.sin(),
-        );
+        let beta = Complex64::new((theta / 2.0).sin() * phi.cos(), (theta / 2.0).sin() * phi.sin());
 
         // Prepare and teleport
         let sqrt2_inv = 1.0 / 2_f64.sqrt();

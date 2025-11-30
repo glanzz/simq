@@ -35,13 +35,13 @@ fn test_validation_performance_small() {
 
     for i in 0..10 {
         if i % 2 == 0 {
-            circuit.add_gate(h_gate.clone(), &[QubitId::new(i % 5)]).unwrap();
+            circuit
+                .add_gate(h_gate.clone(), &[QubitId::new(i % 5)])
+                .unwrap();
         } else {
-            circuit.add_gate(
-                cnot_gate.clone(),
-                &[QubitId::new(i % 5), QubitId::new((i + 1) % 5)],
-            )
-            .unwrap();
+            circuit
+                .add_gate(cnot_gate.clone(), &[QubitId::new(i % 5), QubitId::new((i + 1) % 5)])
+                .unwrap();
         }
     }
 
@@ -49,7 +49,7 @@ fn test_validation_performance_small() {
     let start = std::time::Instant::now();
     let _report = circuit.validate_dag().unwrap();
     let elapsed = start.elapsed();
-    
+
     // Should complete in < 1ms for small circuits
     assert!(elapsed.as_millis() < 10, "Validation took too long: {:?}", elapsed);
 }
@@ -66,7 +66,9 @@ fn test_dag_construction_performance() {
     });
 
     for i in 0..100 {
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(i % 10)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(i % 10)])
+            .unwrap();
     }
 
     let start = std::time::Instant::now();
@@ -89,7 +91,9 @@ fn test_cycle_detection_performance() {
     });
 
     for i in 0..50 {
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(i % 10)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(i % 10)])
+            .unwrap();
     }
 
     let dag = DependencyGraph::from_circuit(&circuit).unwrap();
@@ -113,7 +117,9 @@ fn test_topological_sort_performance() {
     });
 
     for i in 0..100 {
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(i % 10)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(i % 10)])
+            .unwrap();
     }
 
     let dag = DependencyGraph::from_circuit(&circuit).unwrap();
@@ -136,7 +142,9 @@ fn test_parallelism_analysis_performance() {
 
     // Add parallel gates
     for i in 0..10 {
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(i)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(i)])
+            .unwrap();
     }
 
     // Then sequential gates
@@ -145,11 +153,9 @@ fn test_parallelism_analysis_performance() {
         num_qubits: 2,
     });
     for i in 0..9 {
-        circuit.add_gate(
-            cnot_gate.clone(),
-            &[QubitId::new(i), QubitId::new(i + 1)],
-        )
-        .unwrap();
+        circuit
+            .add_gate(cnot_gate.clone(), &[QubitId::new(i), QubitId::new(i + 1)])
+            .unwrap();
     }
 
     let start = std::time::Instant::now();
@@ -159,4 +165,3 @@ fn test_parallelism_analysis_performance() {
     // Should complete in < 10ms
     assert!(elapsed.as_millis() < 50, "Parallelism analysis took too long: {:?}", elapsed);
 }
-

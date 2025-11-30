@@ -67,7 +67,13 @@ impl Pauli {
     pub fn eigenvalue(self, basis_state: bool) -> f64 {
         match self {
             Pauli::I => 1.0,
-            Pauli::Z => if basis_state { -1.0 } else { 1.0 },
+            Pauli::Z => {
+                if basis_state {
+                    -1.0
+                } else {
+                    1.0
+                }
+            },
             _ => panic!("eigenvalue only valid for diagonal Paulis"),
         }
     }
@@ -259,27 +265,27 @@ impl PauliString {
             match pauli {
                 Pauli::I => {
                     // Identity: no change
-                }
+                },
                 Pauli::X => {
                     // Flip bit
                     new_state ^= 1 << qubit;
-                }
+                },
                 Pauli::Y => {
                     // Flip bit with phase
                     new_state ^= 1 << qubit;
                     // Y|0⟩ = i|1⟩, Y|1⟩ = -i|0⟩
                     phase *= if bit == 0 {
-                        Complex64::new(0.0, 1.0)  // i
+                        Complex64::new(0.0, 1.0) // i
                     } else {
                         Complex64::new(0.0, -1.0) // -i
                     };
-                }
+                },
                 Pauli::Z => {
                     // Phase flip: |0⟩ → |0⟩, |1⟩ → -|1⟩
                     if bit == 1 {
                         phase *= Complex64::new(-1.0, 0.0);
                     }
-                }
+                },
             }
         }
 

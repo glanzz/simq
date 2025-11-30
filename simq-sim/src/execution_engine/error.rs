@@ -1,7 +1,7 @@
 //! Error types for execution engine
 
-use thiserror::Error;
 use simq_core::QubitId;
+use thiserror::Error;
 
 /// Result type for execution engine operations
 pub type Result<T> = std::result::Result<T, ExecutionError>;
@@ -19,42 +19,27 @@ pub enum ExecutionError {
 
     /// Invalid gate matrix
     #[error("Invalid gate matrix for {gate}: {reason}")]
-    InvalidGateMatrix {
-        gate: String,
-        reason: String,
-    },
+    InvalidGateMatrix { gate: String, reason: String },
 
     /// Qubit index out of bounds
     #[error("Qubit index {qubit:?} out of bounds (max: {max})")]
-    QubitOutOfBounds {
-        qubit: QubitId,
-        max: usize,
-    },
+    QubitOutOfBounds { qubit: QubitId, max: usize },
 
     /// State validation failed
     #[error("State validation failed: {reason}")]
-    ValidationFailed {
-        reason: String,
-    },
+    ValidationFailed { reason: String },
 
     /// Checkpoint error
     #[error("Checkpoint operation failed: {reason}")]
-    CheckpointFailed {
-        reason: String,
-    },
+    CheckpointFailed { reason: String },
 
     /// GPU execution error
     #[error("GPU execution failed: {reason}")]
-    GpuError {
-        reason: String,
-    },
+    GpuError { reason: String },
 
     /// Parallel execution error
     #[error("Parallel execution failed on layer {layer}: {reason}")]
-    ParallelExecutionFailed {
-        layer: usize,
-        reason: String,
-    },
+    ParallelExecutionFailed { layer: usize, reason: String },
 
     /// Resource exhaustion
     #[error("Resource exhausted: {resource} (limit: {limit}, requested: {requested})")]
@@ -70,9 +55,7 @@ pub enum ExecutionError {
 
     /// Execution halted by recovery policy
     #[error("Execution halted after {attempts} failed attempts")]
-    ExecutionHalted {
-        attempts: usize,
-    },
+    ExecutionHalted { attempts: usize },
 
     /// Timeout error
     #[error("Execution timeout after {elapsed:?} (limit: {limit:?})")]
@@ -104,14 +87,17 @@ impl ExecutionError {
     /// Get error severity level
     pub fn severity(&self) -> ErrorSeverity {
         match self {
-            ExecutionError::QubitOutOfBounds { .. }
-                | ExecutionError::InvalidGateMatrix { .. } => ErrorSeverity::Critical,
-            ExecutionError::ResourceExhausted { .. }
-                | ExecutionError::ExecutionTimeout { .. } => ErrorSeverity::High,
+            ExecutionError::QubitOutOfBounds { .. } | ExecutionError::InvalidGateMatrix { .. } => {
+                ErrorSeverity::Critical
+            },
+            ExecutionError::ResourceExhausted { .. } | ExecutionError::ExecutionTimeout { .. } => {
+                ErrorSeverity::High
+            },
             ExecutionError::GateApplicationFailed { .. }
-                | ExecutionError::ParallelExecutionFailed { .. } => ErrorSeverity::Medium,
-            ExecutionError::ValidationFailed { .. }
-                | ExecutionError::GpuError { .. } => ErrorSeverity::Low,
+            | ExecutionError::ParallelExecutionFailed { .. } => ErrorSeverity::Medium,
+            ExecutionError::ValidationFailed { .. } | ExecutionError::GpuError { .. } => {
+                ErrorSeverity::Low
+            },
             _ => ErrorSeverity::Medium,
         }
     }

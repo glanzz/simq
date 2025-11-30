@@ -3,10 +3,10 @@
 //! This module provides high-level routines for variational quantum algorithms,
 //! including circuit builders for QAOA and VQE.
 
-use std::sync::Arc;
 use simq_core::circuit::Circuit;
 use simq_core::QubitId;
-use simq_gates::{Hadamard, RotationX, RotationZ, RotationY, CNot};
+use simq_gates::{CNot, Hadamard, RotationX, RotationY, RotationZ};
+use std::sync::Arc;
 
 /// Generate a QAOA circuit for given cost and mixer Hamiltonians.
 /// `depth` is the number of QAOA layers.

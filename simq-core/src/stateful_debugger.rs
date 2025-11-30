@@ -175,10 +175,8 @@ impl<'a> StatefulDebugger<'a> {
         }
 
         if let Some(gate) = self.current_gate() {
-            self.history.push((
-                self.current_step,
-                gate.gate().name().to_string(),
-            ));
+            self.history
+                .push((self.current_step, gate.gate().name().to_string()));
         }
 
         self.current_step += 1;
@@ -215,7 +213,12 @@ impl<'a> StatefulDebugger<'a> {
     /// Create a state snapshot from raw amplitudes
     ///
     /// This is a utility method for use with simq-state.
-    pub fn capture_state(amplitudes: &[Complex64], num_qubits: usize, step: usize, gate_name: Option<String>) -> StateSnapshot {
+    pub fn capture_state(
+        amplitudes: &[Complex64],
+        num_qubits: usize,
+        step: usize,
+        gate_name: Option<String>,
+    ) -> StateSnapshot {
         StateSnapshot {
             step,
             num_qubits,
@@ -225,7 +228,11 @@ impl<'a> StatefulDebugger<'a> {
     }
 
     /// Format state vector for display
-    pub fn format_state_vector(amplitudes: &[Complex64], num_qubits: usize, config: &VisualizationConfig) -> String {
+    pub fn format_state_vector(
+        amplitudes: &[Complex64],
+        num_qubits: usize,
+        config: &VisualizationConfig,
+    ) -> String {
         let snapshot = StateSnapshot {
             step: 0,
             num_qubits,
@@ -236,7 +243,10 @@ impl<'a> StatefulDebugger<'a> {
     }
 
     /// Get measurement probabilities from amplitudes
-    pub fn measurement_probabilities(amplitudes: &[Complex64], num_qubits: usize) -> Vec<(String, f64)> {
+    pub fn measurement_probabilities(
+        amplitudes: &[Complex64],
+        num_qubits: usize,
+    ) -> Vec<(String, f64)> {
         amplitudes
             .iter()
             .enumerate()
@@ -252,7 +262,10 @@ impl<'a> StatefulDebugger<'a> {
     }
 
     /// Find the most likely measurement outcome
-    pub fn most_likely_outcome(amplitudes: &[Complex64], num_qubits: usize) -> Option<(String, f64)> {
+    pub fn most_likely_outcome(
+        amplitudes: &[Complex64],
+        num_qubits: usize,
+    ) -> Option<(String, f64)> {
         amplitudes
             .iter()
             .enumerate()
@@ -599,20 +612,14 @@ mod tests {
     #[test]
     fn test_fidelity() {
         // Identical states should have fidelity 1.0
-        let amplitudes1 = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let amplitudes1 = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
         let amplitudes2 = amplitudes1.clone();
 
         let fid = StatefulDebugger::fidelity(&amplitudes1, &amplitudes2);
         assert!((fid - 1.0).abs() < 1e-10);
 
         // Orthogonal states should have fidelity 0.0
-        let amplitudes3 = vec![
-            Complex64::new(0.0, 0.0),
-            Complex64::new(1.0, 0.0),
-        ];
+        let amplitudes3 = vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)];
 
         let fid2 = StatefulDebugger::fidelity(&amplitudes1, &amplitudes3);
         assert!(fid2.abs() < 1e-10);
@@ -621,10 +628,7 @@ mod tests {
     #[test]
     fn test_purity() {
         // Pure state |0⟩ should have purity 1.0
-        let pure_state = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let pure_state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
         let purity = StatefulDebugger::purity(&pure_state);
         assert!((purity - 1.0).abs() < 1e-10);
 

@@ -50,8 +50,10 @@
 //! - Nielsen & Chuang, Section 4.3: "Controlled operations"
 //! - Amy, Maslov, Mosca, "Polynomial-time T-depth optimization" (2013)
 
-use crate::decomposition::{Decomposer, DecompositionConfig, DecompositionResult, DecompositionMetadata};
-use simq_core::{Gate, Result, QuantumError};
+use crate::decomposition::{
+    Decomposer, DecompositionConfig, DecompositionMetadata, DecompositionResult,
+};
+use simq_core::{Gate, QuantumError, Result};
 use std::sync::Arc;
 
 /// Multi-qubit gate decomposer
@@ -70,9 +72,7 @@ impl MultiQubitDecomposer {
 
     /// Create decomposer with ancilla optimization
     pub fn with_ancillas() -> Self {
-        Self {
-            use_ancillas: true,
-        }
+        Self { use_ancillas: true }
     }
 
     /// Decompose Toffoli gate (CCNOT) using relative-phase construction
@@ -95,26 +95,41 @@ impl MultiQubitDecomposer {
         vec![
             // Apply H to target
             MultiQubitInstruction::H { qubit: 2 },
-
             // First CNOT ladder
-            MultiQubitInstruction::CNOT { control: 1, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 2,
+            },
             MultiQubitInstruction::TDagger { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 0, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 2,
+            },
             MultiQubitInstruction::T { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 1, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 2,
+            },
             MultiQubitInstruction::TDagger { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 0, target: 2 },
-
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 2,
+            },
             // Apply T gates to controls
             MultiQubitInstruction::T { qubit: 1 },
             MultiQubitInstruction::T { qubit: 2 },
-
             // Final CNOT and phase correction
-            MultiQubitInstruction::CNOT { control: 0, target: 1 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
             MultiQubitInstruction::H { qubit: 2 },
             MultiQubitInstruction::T { qubit: 0 },
             MultiQubitInstruction::TDagger { qubit: 1 },
-            MultiQubitInstruction::CNOT { control: 0, target: 1 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
         ]
     }
 
@@ -124,28 +139,53 @@ impl MultiQubitDecomposer {
     pub fn decompose_toffoli_with_ancilla(&self) -> Vec<MultiQubitInstruction> {
         vec![
             // First stage: compute AND of controls into ancilla
-            MultiQubitInstruction::H { qubit: 3 },  // ancilla
-            MultiQubitInstruction::CNOT { control: 0, target: 3 },
+            MultiQubitInstruction::H { qubit: 3 }, // ancilla
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 3,
+            },
             MultiQubitInstruction::TDagger { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 1, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 3,
+            },
             MultiQubitInstruction::T { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 0, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 3,
+            },
             MultiQubitInstruction::TDagger { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 1, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 3,
+            },
             MultiQubitInstruction::H { qubit: 3 },
-
             // Second stage: controlled-X from ancilla to target
-            MultiQubitInstruction::CNOT { control: 3, target: 2 },
-
+            MultiQubitInstruction::CNOT {
+                control: 3,
+                target: 2,
+            },
             // Uncompute ancilla
             MultiQubitInstruction::H { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 1, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 3,
+            },
             MultiQubitInstruction::T { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 0, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 3,
+            },
             MultiQubitInstruction::TDagger { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 1, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 3,
+            },
             MultiQubitInstruction::T { qubit: 3 },
-            MultiQubitInstruction::CNOT { control: 0, target: 3 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 3,
+            },
             MultiQubitInstruction::H { qubit: 3 },
         ]
     }
@@ -162,13 +202,19 @@ impl MultiQubitDecomposer {
         let mut gates = Vec::new();
 
         // CNOT(1, 2)
-        gates.push(MultiQubitInstruction::CNOT { control: 1, target: 2 });
+        gates.push(MultiQubitInstruction::CNOT {
+            control: 1,
+            target: 2,
+        });
 
         // Toffoli(0, 2, 1)
         gates.extend(self.decompose_toffoli_relative_phase());
 
         // CNOT(1, 2)
-        gates.push(MultiQubitInstruction::CNOT { control: 1, target: 2 });
+        gates.push(MultiQubitInstruction::CNOT {
+            control: 1,
+            target: 2,
+        });
 
         gates
     }
@@ -183,7 +229,10 @@ impl MultiQubitDecomposer {
         }
 
         if num_controls == 1 {
-            return vec![MultiQubitInstruction::CNOT { control: 0, target: 1 }];
+            return vec![MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 1,
+            }];
         }
 
         if num_controls == 2 {
@@ -206,7 +255,11 @@ impl MultiQubitDecomposer {
     ///
     /// Uses O(log n) depth but requires n-2 ancilla qubits.
     /// Optimal for large numbers of controls when ancillas are available.
-    pub fn decompose_mcx_logarithmic(&self, num_controls: usize, num_ancillas: usize) -> Vec<MultiQubitInstruction> {
+    pub fn decompose_mcx_logarithmic(
+        &self,
+        num_controls: usize,
+        num_ancillas: usize,
+    ) -> Vec<MultiQubitInstruction> {
         if num_controls <= 2 {
             return self.decompose_mcx_linear(num_controls);
         }
@@ -225,7 +278,10 @@ impl MultiQubitDecomposer {
         // TODO: Implement tree structure
 
         // Apply controlled-X from final ancilla
-        gates.push(MultiQubitInstruction::CNOT { control: num_controls + num_ancillas - 1, target: num_controls });
+        gates.push(MultiQubitInstruction::CNOT {
+            control: num_controls + num_ancillas - 1,
+            target: num_controls,
+        });
 
         // Backward pass: uncompute ANDs
         // TODO: Implement uncomputation
@@ -238,19 +294,37 @@ impl MultiQubitDecomposer {
     /// CCZ can be implemented more efficiently than CCX in some cases.
     pub fn decompose_ccz(&self) -> Vec<MultiQubitInstruction> {
         vec![
-            MultiQubitInstruction::CNOT { control: 1, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 2,
+            },
             MultiQubitInstruction::TDagger { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 0, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 2,
+            },
             MultiQubitInstruction::T { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 1, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 2,
+            },
             MultiQubitInstruction::TDagger { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 0, target: 2 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 2,
+            },
             MultiQubitInstruction::T { qubit: 1 },
             MultiQubitInstruction::T { qubit: 2 },
-            MultiQubitInstruction::CNOT { control: 0, target: 1 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
             MultiQubitInstruction::T { qubit: 0 },
             MultiQubitInstruction::TDagger { qubit: 1 },
-            MultiQubitInstruction::CNOT { control: 0, target: 1 },
+            MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 1,
+            },
         ]
     }
 
@@ -263,11 +337,11 @@ impl MultiQubitDecomposer {
             n if self.use_ancillas => {
                 // Logarithmic depth: O(n log n) gates
                 n * (n as f64).log2() as usize
-            }
+            },
             n => {
                 // Linear depth: O(n²) gates
                 n * n * 4
-            }
+            },
         }
     }
 }
@@ -279,13 +353,18 @@ impl Default for MultiQubitDecomposer {
 }
 
 impl Decomposer for MultiQubitDecomposer {
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult> {
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult> {
         let num_qubits = gate.num_qubits();
 
         if num_qubits < 3 {
-            return Err(QuantumError::ValidationError(
-                format!("Expected 3+ qubit gate, got {}-qubit gate", num_qubits)
-            ));
+            return Err(QuantumError::ValidationError(format!(
+                "Expected 3+ qubit gate, got {}-qubit gate",
+                num_qubits
+            )));
         }
 
         // Determine decomposition strategy based on gate name
@@ -311,7 +390,8 @@ impl Decomposer for MultiQubitDecomposer {
 
         // Count gates
         let gate_count = instructions.len();
-        let two_qubit_count = instructions.iter()
+        let two_qubit_count = instructions
+            .iter()
             .filter(|i| matches!(i, MultiQubitInstruction::CNOT { .. }))
             .count();
 
@@ -321,7 +401,7 @@ impl Decomposer for MultiQubitDecomposer {
         Ok(DecompositionResult {
             gates,
             fidelity: 1.0,
-            depth: gate_count,  // Conservative estimate
+            depth: gate_count, // Conservative estimate
             gate_count,
             two_qubit_count,
             metadata: DecompositionMetadata {
@@ -383,7 +463,8 @@ mod tests {
         assert!(gates.len() <= 20);
 
         // Count CNOTs
-        let cnot_count = gates.iter()
+        let cnot_count = gates
+            .iter()
             .filter(|g| matches!(g, MultiQubitInstruction::CNOT { .. }))
             .count();
 

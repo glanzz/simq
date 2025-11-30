@@ -7,8 +7,8 @@
 //! - Measuring qubits and computing expectation values
 //! - Memory efficiency compared to dense representations
 
-use simq_state::SparseState;
 use num_complex::Complex64;
+use simq_state::SparseState;
 
 fn main() {
     println!("=== SimQ SparseState Implementation (Phase 2.1) ===\n");
@@ -30,7 +30,8 @@ fn example_1_basic_sparse_state() {
     println!("Created 10-qubit state initialized to |0...0⟩");
     println!("  - Dimension: 2^10 = {}", state.dimension());
     println!("  - Non-zero amplitudes: {}", state.num_amplitudes());
-    println!("  - Density: {:.4}% (only {} bytes to store 1 amplitude!)",
+    println!(
+        "  - Density: {:.4}% (only {} bytes to store 1 amplitude!)",
         state.density() * 100.0,
         std::mem::size_of::<Complex64>()
     );
@@ -66,10 +67,22 @@ fn example_2_bell_state_creation() {
 
     // Apply CNOT (qubit 0 control, qubit 1 target)
     let cnot = [
-        Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
     ];
 
     state.apply_two_qubit_gate(&cnot, 0, 1).unwrap();
@@ -83,7 +96,8 @@ fn example_2_bell_state_creation() {
     println!("Verification:");
     println!("  Amplitude |00⟩: {:.4}", amp00.norm());
     println!("  Amplitude |11⟩: {:.4}", amp11.norm());
-    println!("  Both equal to 1/√2 ≈ 0.707? {}\n",
+    println!(
+        "  Both equal to 1/√2 ≈ 0.707? {}\n",
         (amp00.norm() - 0.707).abs() < 0.01 && (amp11.norm() - 0.707).abs() < 0.01
     );
 }
@@ -106,7 +120,7 @@ fn example_3_density_tracking() {
         println!("Added amplitude at index {}", i);
         println!("  Current density: {:.4}%", state.density() * 100.0);
         println!("  Should convert to dense? {}", state.should_convert_to_dense());
-        
+
         if state.should_convert_to_dense() {
             println!("  → Density exceeded threshold! Would convert to dense representation");
             break;
@@ -120,7 +134,7 @@ fn example_4_gate_operations() {
     println!("\n### Example 4: Efficient Gate Operations on Sparse States ###");
 
     let mut state = SparseState::new(8).unwrap();
-    
+
     // Create a product state by applying gates
     let rx_90 = [
         Complex64::new(0.707, 0.0),
@@ -131,7 +145,7 @@ fn example_4_gate_operations() {
 
     println!("8-qubit state, applying RX(π/2) to qubits 0, 2, 4, 6");
     println!("Initial amplitudes: 1 (state |00000000⟩)");
-    
+
     state.apply_single_qubit_gate(&rx_90, 0).unwrap();
     state.apply_single_qubit_gate(&rx_90, 2).unwrap();
     state.apply_single_qubit_gate(&rx_90, 4).unwrap();
@@ -139,7 +153,8 @@ fn example_4_gate_operations() {
 
     println!("After operations: {} non-zero amplitudes", state.num_amplitudes());
     println!("Density: {:.4}%", state.density() * 100.0);
-    println!("For dense representation, would need {} amplitudes (space wasted!)",
+    println!(
+        "For dense representation, would need {} amplitudes (space wasted!)",
         state.dimension()
     );
     println!("With sparse: only storing {} non-zero values\n", state.num_amplitudes());
@@ -150,7 +165,7 @@ fn example_5_measurement_and_collapse() {
     println!("### Example 5: Measurement and State Collapse ###");
 
     let mut state = SparseState::new(2).unwrap();
-    
+
     // Create equal superposition: (|0⟩ + |1⟩ + |2⟩ + |3⟩)/2
     state.set_amplitude(0, Complex64::new(0.5, 0.0));
     state.set_amplitude(1, Complex64::new(0.5, 0.0));
@@ -169,7 +184,7 @@ fn example_5_measurement_and_collapse() {
     // Collapse to outcome 0
     let mut state_collapsed = state.clone();
     let collapse_prob = state_collapsed.measure_and_collapse(0, 0).unwrap();
-    
+
     println!("Collapsed to qubit 0 = 0 with probability {:.4}", collapse_prob);
     println!("Non-zero amplitudes after collapse: {}", state_collapsed.num_amplitudes());
     println!("Remaining states: |00⟩, |01⟩ (equal superposition)\n");
@@ -181,22 +196,22 @@ fn example_6_memory_efficiency() {
 
     let num_qubits = 20;
     let dimension = 1u64 << num_qubits;
-    
+
     let sparse = SparseState::new(num_qubits).unwrap();
-    
+
     let sparse_memory = sparse.num_amplitudes() * std::mem::size_of::<Complex64>();
     let dense_memory = dimension as usize * std::mem::size_of::<Complex64>();
-    
+
     println!("For a {}-qubit system:", num_qubits);
     println!("  Dense representation: 2^{} = {} amplitudes", num_qubits, dimension);
-    println!("  Memory required (dense): {} MB", 
-        (dense_memory as f64) / (1024.0 * 1024.0));
+    println!("  Memory required (dense): {} MB", (dense_memory as f64) / (1024.0 * 1024.0));
     println!("\n  Sparse representation (initial state |0...0⟩):");
     println!("    Non-zero amplitudes: {}", sparse.num_amplitudes());
     println!("    Memory required (sparse): {} bytes", sparse_memory);
-    println!("\n  Memory savings: {:.1}x smaller!", 
-        (dense_memory as f64) / (sparse_memory as f64));
+    println!(
+        "\n  Memory savings: {:.1}x smaller!",
+        (dense_memory as f64) / (sparse_memory as f64)
+    );
     println!("\nThis is why sparse states are crucial for efficient simulation!");
     println!("As gates are applied, density increases gradually.\n");
 }
-

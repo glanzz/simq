@@ -150,11 +150,7 @@ impl Compiler {
     ///
     /// This is useful for testing individual passes or applying
     /// specific optimizations without running the full pipeline.
-    pub fn run_pass(
-        &self,
-        pass: &dyn OptimizationPass,
-        circuit: &mut Circuit,
-    ) -> Result<bool> {
+    pub fn run_pass(&self, pass: &dyn OptimizationPass, circuit: &mut Circuit) -> Result<bool> {
         pass.apply(circuit)
     }
 }
@@ -263,10 +259,7 @@ mod tests {
         let mut circuit = Circuit::new(2);
         compiler.compile(&mut circuit).unwrap();
 
-        assert_eq!(
-            apply_count.load(std::sync::atomic::Ordering::SeqCst),
-            1
-        );
+        assert_eq!(apply_count.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -301,10 +294,7 @@ mod tests {
         compiler.compile(&mut circuit).unwrap();
 
         // Should stop after 4 iterations (3 with changes + 1 with no changes)
-        assert_eq!(
-            apply_count.load(std::sync::atomic::Ordering::SeqCst),
-            4
-        );
+        assert_eq!(apply_count.load(std::sync::atomic::Ordering::SeqCst), 4);
     }
 
     #[test]

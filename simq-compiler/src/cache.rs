@@ -157,7 +157,10 @@ impl CompilationCache {
     /// If the cache is full, evicts the least recently used entry.
     pub fn insert(&mut self, fingerprint: CircuitFingerprint, circuit: Circuit) {
         // Check if we need to evict
-        if self.max_size > 0 && self.cache.len() >= self.max_size && !self.cache.contains_key(&fingerprint) {
+        if self.max_size > 0
+            && self.cache.len() >= self.max_size
+            && !self.cache.contains_key(&fingerprint)
+        {
             if let Some(lru_fingerprint) = self.lru_queue.pop_front() {
                 self.cache.remove(&lru_fingerprint);
                 self.stats.evictions += 1;

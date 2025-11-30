@@ -56,7 +56,8 @@ impl Transpiler {
 
     /// Add custom decomposition rule
     pub fn add_decomposition_rule(&mut self, gate_name: &str, rule: DecompositionRule) {
-        self.decomposition_rules.add_rule(gate_name.to_string(), rule);
+        self.decomposition_rules
+            .add_rule(gate_name.to_string(), rule);
     }
 
     /// Transpile a circuit for a specific backend
@@ -470,10 +471,9 @@ impl QubitMapping {
 
     /// Swap two physical qubits
     pub fn swap(&mut self, phys1: usize, phys2: usize) {
-        if let (Some(log1), Some(log2)) = (
-            self.physical_to_logical[phys1],
-            self.physical_to_logical[phys2],
-        ) {
+        if let (Some(log1), Some(log2)) =
+            (self.physical_to_logical[phys1], self.physical_to_logical[phys2])
+        {
             self.logical_to_physical[log1] = phys2;
             self.logical_to_physical[log2] = phys1;
         }

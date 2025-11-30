@@ -13,8 +13,7 @@ use simq_compiler::passes::{
 };
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{
-    CNot, CZ, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationY, RotationZ, SGate, TGate,
-    Swap,
+    CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationY, RotationZ, SGate, Swap, TGate, CZ,
 };
 use std::sync::Arc;
 
@@ -31,19 +30,19 @@ fn circuit_with_inverse_pairs(num_qubits: usize, pairs_per_qubit: usize) -> Circ
                 0 => {
                     circuit.add_gate(Arc::new(PauliX), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(PauliX), &[qubit]).unwrap();
-                }
+                },
                 1 => {
                     circuit.add_gate(Arc::new(PauliY), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(PauliY), &[qubit]).unwrap();
-                }
+                },
                 2 => {
                     circuit.add_gate(Arc::new(PauliZ), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(PauliZ), &[qubit]).unwrap();
-                }
+                },
                 _ => {
                     circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
-                }
+                },
             }
         }
     }
@@ -99,7 +98,9 @@ fn circuit_with_commuting_cnots(num_qubits: usize) -> Circuit {
     // Add multiple CNOTs with same control, different targets (these commute)
     for target_idx in 1..num_qubits {
         let target = QubitId::new(target_idx);
-        circuit.add_gate(Arc::new(CNot), &[control, target]).unwrap();
+        circuit
+            .add_gate(Arc::new(CNot), &[control, target])
+            .unwrap();
     }
 
     circuit
@@ -174,18 +175,18 @@ fn circuit_with_template_patterns(num_qubits: usize, patterns_per_qubit: usize) 
                     circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(PauliZ), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
-                }
+                },
                 1 => {
                     // H-X-H -> Z pattern
                     circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(PauliX), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
-                }
+                },
                 _ => {
                     // Self-inverse pairs
                     circuit.add_gate(Arc::new(PauliX), &[qubit]).unwrap();
                     circuit.add_gate(Arc::new(PauliX), &[qubit]).unwrap();
-                }
+                },
             }
         }
     }

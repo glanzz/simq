@@ -1,17 +1,17 @@
 //! State validation and verification
 
-use simq_state::AdaptiveState;
 use crate::execution_engine::error::{ExecutionError, Result};
+use simq_state::AdaptiveState;
 
 /// Validate that a quantum state is normalized
 pub fn validate_normalization(state: &AdaptiveState, tolerance: f64) -> Result<()> {
     let norm_sq = match state {
-        AdaptiveState::Dense(dense) => {
-            dense.amplitudes().iter().map(|a| a.norm_sqr()).sum::<f64>()
-        }
-        AdaptiveState::Sparse { state: sparse, .. } => {
-            sparse.amplitudes().values().map(|a| a.norm_sqr()).sum::<f64>()
-        }
+        AdaptiveState::Dense(dense) => dense.amplitudes().iter().map(|a| a.norm_sqr()).sum::<f64>(),
+        AdaptiveState::Sparse { state: sparse, .. } => sparse
+            .amplitudes()
+            .values()
+            .map(|a| a.norm_sqr())
+            .sum::<f64>(),
     };
 
     let norm = norm_sq.sqrt();
@@ -28,12 +28,14 @@ pub fn validate_normalization(state: &AdaptiveState, tolerance: f64) -> Result<(
 /// Validate that amplitudes don't contain NaN or Inf
 pub fn validate_finite(state: &AdaptiveState) -> Result<()> {
     let has_invalid = match state {
-        AdaptiveState::Dense(dense) => {
-            dense.amplitudes().iter().any(|a| !a.re.is_finite() || !a.im.is_finite())
-        }
-        AdaptiveState::Sparse { state: sparse, .. } => {
-            sparse.amplitudes().values().any(|a| !a.re.is_finite() || !a.im.is_finite())
-        }
+        AdaptiveState::Dense(dense) => dense
+            .amplitudes()
+            .iter()
+            .any(|a| !a.re.is_finite() || !a.im.is_finite()),
+        AdaptiveState::Sparse { state: sparse, .. } => sparse
+            .amplitudes()
+            .values()
+            .any(|a| !a.re.is_finite() || !a.im.is_finite()),
     };
 
     if has_invalid {

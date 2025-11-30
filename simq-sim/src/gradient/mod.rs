@@ -6,35 +6,36 @@
 //! - Finite differences (fallback method)
 //! - Batched evaluation (parallel gradient computation)
 
-pub mod parameter_shift;
-pub mod finite_difference;
+pub mod autodiff;
 pub mod batch;
 pub mod batch_advanced;
-pub mod autodiff;
-pub mod vqe_qaoa;
 pub mod classical_optimizers;
 pub mod convergence;
+pub mod finite_difference;
+pub mod parameter_shift;
+pub mod vqe_qaoa;
 
-pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
-pub use finite_difference::{compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod};
+pub use autodiff::{gradient_forward, Dual, HybridAD};
 pub use batch::evaluate_batch_expectation;
-pub use batch_advanced::{AdaptiveBatchEvaluator, BatchConfig, latin_hypercube_sampling, ImportanceSampler, line_search, verify_gradients};
-pub use autodiff::{Dual, gradient_forward, HybridAD};
-pub use vqe_qaoa::{
-    VQEConfig, VQEOptimizer, QAOAConfig, QAOAOptimizer,
-    AdamConfig, AdamOptimizer, MomentumConfig, MomentumOptimizer,
-    OptimizationResult, OptimizationStep, ConvergenceStatus,
-    gradient_descent,
+pub use batch_advanced::{
+    latin_hypercube_sampling, line_search, verify_gradients, AdaptiveBatchEvaluator, BatchConfig,
+    ImportanceSampler,
 };
 pub use classical_optimizers::{
-    LBFGSOptimizer, LBFGSConfig,
-    NelderMeadOptimizer, NelderMeadConfig,
+    LBFGSConfig, LBFGSOptimizer, NelderMeadConfig, NelderMeadOptimizer,
 };
 pub use convergence::{
-    ConvergenceMonitor, MonitorConfig, StepMetrics,
-    StoppingCriterion, ConvergenceReport,
-    progress_callback, energy_logger, target_energy_callback,
-    BestTracker, TrackedOptimizationResult,
+    energy_logger, progress_callback, target_energy_callback, BestTracker, ConvergenceMonitor,
+    ConvergenceReport, MonitorConfig, StepMetrics, StoppingCriterion, TrackedOptimizationResult,
+};
+pub use finite_difference::{
+    compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod,
+};
+pub use parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
+pub use vqe_qaoa::{
+    gradient_descent, AdamConfig, AdamOptimizer, ConvergenceStatus, MomentumConfig,
+    MomentumOptimizer, OptimizationResult, OptimizationStep, QAOAConfig, QAOAOptimizer, VQEConfig,
+    VQEOptimizer,
 };
 
 use simq_core::Circuit;
@@ -177,7 +178,7 @@ where
                 params,
                 &ps_config,
             )
-        }
+        },
 
         GradientMethod::FiniteDifference => {
             // Use finite differences
@@ -193,7 +194,7 @@ where
                 params,
                 &fd_config,
             )
-        }
+        },
 
         GradientMethod::Auto => {
             // Try parameter shift first, fall back to finite differences
@@ -225,9 +226,9 @@ where
                         params,
                         &fd_config,
                     )
-                }
+                },
             }
-        }
+        },
     }
 }
 

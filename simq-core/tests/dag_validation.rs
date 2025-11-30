@@ -64,7 +64,9 @@ fn test_dag_validation_simple() {
     let cnot_gate = Arc::new(CnotGate);
 
     circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
 
     let report = circuit.validate_dag().unwrap();
     assert!(report.is_valid());
@@ -76,8 +78,12 @@ fn test_dag_validation_parallel_gates() {
     let mut circuit = Circuit::new(3);
     let h_gate = Arc::new(HadamardGate);
 
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(1)])
+        .unwrap();
     circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
 
     let report = circuit.validate_dag().unwrap();
@@ -91,7 +97,9 @@ fn test_compute_depth() {
     let cnot_gate = Arc::new(CnotGate);
 
     circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
 
     let depth = circuit.compute_depth().unwrap();
     assert!(depth >= 2);
@@ -104,8 +112,12 @@ fn test_compute_depth_parallel() {
     let mut circuit = Circuit::new(3);
     let h_gate = Arc::new(HadamardGate);
 
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(1)])
+        .unwrap();
     circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
 
     let depth = circuit.compute_depth().unwrap();
@@ -130,12 +142,18 @@ fn test_analyze_parallelism() {
     let cnot_gate = Arc::new(CnotGate);
 
     // Parallel H gates
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(1)])
+        .unwrap();
     circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
 
     // Then CNOT
-    circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
 
     let analysis = circuit.analyze_parallelism().unwrap();
     assert!(analysis.parallelism_factor > 1.0);
@@ -150,7 +168,9 @@ fn test_depth_method() {
     let cnot_gate = Arc::new(CnotGate);
 
     circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
 
     // depth() should use DAG analysis if possible
     let depth = circuit.depth();
@@ -185,7 +205,9 @@ fn test_sequential_circuit_depth() {
     let x_gate = Arc::new(XGate);
 
     circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
     circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
     let depth = circuit.compute_depth().unwrap();
@@ -201,7 +223,9 @@ fn test_bell_state_circuit() {
     let cnot_gate = Arc::new(CnotGate);
 
     circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
 
     let report = circuit.validate_dag().unwrap();
     assert!(report.is_valid());
@@ -221,8 +245,12 @@ fn test_ghz_state_circuit() {
     let cnot_gate = Arc::new(CnotGate);
 
     circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(cnot_gate.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-    circuit.add_gate(cnot_gate, &[QubitId::new(1), QubitId::new(2)]).unwrap();
+    circuit
+        .add_gate(cnot_gate.clone(), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(cnot_gate, &[QubitId::new(1), QubitId::new(2)])
+        .unwrap();
 
     let report = circuit.validate_dag().unwrap();
     assert!(report.is_valid());
@@ -233,4 +261,3 @@ fn test_ghz_state_circuit() {
     let analysis = circuit.analyze_parallelism().unwrap();
     assert_eq!(analysis.num_layers(), 3);
 }
-

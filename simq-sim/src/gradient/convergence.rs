@@ -292,13 +292,7 @@ impl ConvergenceMonitor {
     }
 
     /// Record metrics for a step
-    pub fn record(
-        &mut self,
-        iteration: usize,
-        energy: f64,
-        gradient: &[f64],
-        parameters: &[f64],
-    ) {
+    pub fn record(&mut self, iteration: usize, energy: f64, gradient: &[f64], parameters: &[f64]) {
         if !self.active {
             return;
         }
@@ -306,25 +300,24 @@ impl ConvergenceMonitor {
         let gradient_norm = gradient.iter().map(|g| g * g).sum::<f64>().sqrt();
 
         // Compute changes from previous step
-        let (energy_change, relative_energy_change, parameter_change) = if let Some(prev) =
-            self.history.last()
-        {
-            let e_change = (energy - prev.energy).abs();
-            let rel_change = if prev.energy.abs() > 1e-10 {
-                e_change / prev.energy.abs()
+        let (energy_change, relative_energy_change, parameter_change) =
+            if let Some(prev) = self.history.last() {
+                let e_change = (energy - prev.energy).abs();
+                let rel_change = if prev.energy.abs() > 1e-10 {
+                    e_change / prev.energy.abs()
+                } else {
+                    e_change
+                };
+                let p_change: f64 = parameters
+                    .iter()
+                    .zip(prev.parameters.iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f64>()
+                    .sqrt();
+                (e_change, rel_change, p_change)
             } else {
-                e_change
+                (f64::INFINITY, f64::INFINITY, f64::INFINITY)
             };
-            let p_change: f64 = parameters
-                .iter()
-                .zip(prev.parameters.iter())
-                .map(|(a, b)| (a - b).powi(2))
-                .sum::<f64>()
-                .sqrt();
-            (e_change, rel_change, p_change)
-        } else {
-            (f64::INFINITY, f64::INFINITY, f64::INFINITY)
-        };
 
         let now = Instant::now();
         let step_time = if let Some(prev) = self.history.last() {
@@ -355,7 +348,12 @@ impl ConvergenceMonitor {
             self.consecutive_increases = 0;
         } else {
             self.iterations_without_improvement += 1;
-            if self.history.last().map(|m| energy > m.energy).unwrap_or(false) {
+            if self
+                .history
+                .last()
+                .map(|m| energy > m.energy)
+                .unwrap_or(false)
+            {
                 self.consecutive_increases += 1;
             } else {
                 self.consecutive_increases = 0;
@@ -477,8 +475,7 @@ impl ConvergenceMonitor {
             std_dev
         };
 
-        cv > self.config.oscillation_threshold
-            && sign_changes as f64 > 0.5 * energies.len() as f64
+        cv > self.config.oscillation_threshold && sign_changes as f64 > 0.5 * energies.len() as f64
     }
 
     /// Log a step (when verbose)
@@ -582,7 +579,8 @@ impl ConvergenceMonitor {
 
         // Check for oscillation history
         if self.stopping_criterion == StoppingCriterion::Oscillation {
-            warnings.push("Optimization stopped due to oscillation - consider reducing learning rate");
+            warnings
+                .push("Optimization stopped due to oscillation - consider reducing learning rate");
         }
 
         // Add diagnostics
@@ -670,7 +668,14 @@ impl ConvergenceReport {
         println!("  CONVERGENCE REPORT");
         println!("{:=<60}", "");
 
-        println!("\nStatus: {}", if self.converged { "CONVERGED" } else { "NOT CONVERGED" });
+        println!(
+            "\nStatus: {}",
+            if self.converged {
+                "CONVERGED"
+            } else {
+                "NOT CONVERGED"
+            }
+        );
         println!("Stopping criterion: {}", self.stopping_criterion.description());
 
         println!("\n--- Performance ---");
@@ -708,7 +713,11 @@ impl ConvergenceReport {
     pub fn summary(&self) -> String {
         format!(
             "{} after {} iterations ({:?}): energy {:.8} -> {:.8}",
-            if self.converged { "Converged" } else { "Stopped" },
+            if self.converged {
+                "Converged"
+            } else {
+                "Stopped"
+            },
             self.num_iterations,
             self.total_time,
             self.initial_energy,
@@ -945,9 +954,11 @@ impl TrackedOptimizationResult {
         println!("  Time:            {:?}", self.total_time);
         println!("  Best energy:     {:.8} (iter {})", self.best_energy, self.best_iteration);
         println!("  Final energy:    {:.8}", self.final_energy);
-        println!("  Improvement:     {:.8} ({:.2}%)",
+        println!(
+            "  Improvement:     {:.8} ({:.2}%)",
             self.improvement(),
-            self.relative_improvement() * 100.0);
+            self.relative_improvement() * 100.0
+        );
     }
 }
 

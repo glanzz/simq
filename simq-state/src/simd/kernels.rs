@@ -202,8 +202,6 @@ pub fn compute_probabilities(amplitudes: &[Complex64], output: &mut [f64]) {
 
 #[cfg(test)]
 mod tests {
-    
-    
 
     #[test]
     #[cfg(target_arch = "x86_64")]

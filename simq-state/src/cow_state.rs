@@ -256,7 +256,8 @@ impl CowState {
         qubit2: usize,
     ) -> Result<CowStats> {
         let copied = self.make_unique()?;
-        self.state_mut()?.apply_two_qubit_gate(matrix, qubit1, qubit2)?;
+        self.state_mut()?
+            .apply_two_qubit_gate(matrix, qubit1, qubit2)?;
         Ok(CowStats { copied })
     }
 
@@ -414,11 +415,7 @@ impl fmt::Display for CowState {
             "CowState({} qubits, {} refs, {})",
             self.num_qubits(),
             self.ref_count(),
-            if self.is_shared() {
-                "shared"
-            } else {
-                "unique"
-            }
+            if self.is_shared() { "shared" } else { "unique" }
         )
     }
 }

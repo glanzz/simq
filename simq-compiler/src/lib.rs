@@ -164,95 +164,42 @@
 //! }
 //! ```
 
-pub mod fusion;
-pub mod lazy;
-pub mod matrix_utils;
-pub mod matrix_computation;
-pub mod decomposition;
-pub mod analysis;
-pub mod passes;
-pub mod compiler;
-pub mod pipeline;
-pub mod circuit_analysis_pass;
 pub mod adaptive_pipeline;
-pub mod hardware_aware;
+pub mod analysis;
 pub mod cache;
 pub mod cached_compiler;
+pub mod circuit_analysis_pass;
+pub mod compiler;
+pub mod decomposition;
 pub mod execution_plan;
+pub mod fusion;
+pub mod hardware_aware;
+pub mod lazy;
+pub mod matrix_computation;
+pub mod matrix_utils;
+pub mod passes;
+pub mod pipeline;
 
-pub use fusion::{fuse_single_qubit_gates, FusedGate};
-pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
+pub use adaptive_pipeline::{AdaptiveCompiler, MultiLevelOptimizer};
+pub use analysis::{CircuitAnalysis, GateStatistics, ResourceEstimate};
+pub use cache::{CacheStatistics, CircuitFingerprint, CompilationCache, SharedCompilationCache};
+pub use cached_compiler::{CachedCompiler, CachedOptimizationResult, SharedCachedCompiler};
+pub use circuit_analysis_pass::{CircuitCharacteristics, CircuitSize};
+pub use compiler::{Compiler, CompilerBuilder, CompilerConfig};
 pub use decomposition::{
-    DecompositionConfig,
-    DecompositionResult,
+    BasisGate, BasisGateSet, Decomposer, DecompositionConfig, DecompositionResult,
     UniversalDecomposer,
-    BasisGateSet,
-    BasisGate,
-    Decomposer,
 };
-pub use matrix_computation::{
-    Matrix2,
-    Matrix4,
-    Matrix8,
-    DynamicMatrix,
-    tensor_product_2x2,
-    tensor_product_4x4,
-    controlled_gate_2x2,
-    controlled_gate_4x4,
-    doubly_controlled_gate_2x2,
-    decompose_zyz,
-    gate_fidelity_2x2,
-};
-pub use analysis::{
-    GateStatistics,
-    ResourceEstimate,
-    CircuitAnalysis,
-};
-pub use passes::{
-    OptimizationPass,
-    PassStatistics,
-    OptimizationResult,
-};
-pub use compiler::{
-    Compiler,
-    CompilerConfig,
-    CompilerBuilder,
-};
-pub use pipeline::{
-    create_compiler,
-    OptimizationLevel,
-    PipelineBuilder,
-};
-pub use circuit_analysis_pass::{
-    CircuitCharacteristics,
-    CircuitSize,
-};
-pub use adaptive_pipeline::{
-    AdaptiveCompiler,
-    MultiLevelOptimizer,
-};
+pub use execution_plan::{ExecutionLayer, ExecutionPlan, ExecutionPlanner, ResourceRequirements};
+pub use fusion::{fuse_single_qubit_gates, FusedGate};
 pub use hardware_aware::{
-    HardwareModel,
-    IBMHardware,
-    GoogleHardware,
-    IonQHardware,
-    CostModel,
-    HardwareType,
+    CostModel, GoogleHardware, HardwareModel, HardwareType, IBMHardware, IonQHardware,
 };
-pub use cache::{
-    CircuitFingerprint,
-    CompilationCache,
-    SharedCompilationCache,
-    CacheStatistics,
+pub use lazy::{LazyConfig, LazyExecutor, LazyGate};
+pub use matrix_computation::{
+    controlled_gate_2x2, controlled_gate_4x4, decompose_zyz, doubly_controlled_gate_2x2,
+    gate_fidelity_2x2, tensor_product_2x2, tensor_product_4x4, DynamicMatrix, Matrix2, Matrix4,
+    Matrix8,
 };
-pub use cached_compiler::{
-    CachedCompiler,
-    SharedCachedCompiler,
-    CachedOptimizationResult,
-};
-pub use execution_plan::{
-    ExecutionPlan,
-    ExecutionPlanner,
-    ExecutionLayer,
-    ResourceRequirements,
-};
+pub use passes::{OptimizationPass, OptimizationResult, PassStatistics};
+pub use pipeline::{create_compiler, OptimizationLevel, PipelineBuilder};

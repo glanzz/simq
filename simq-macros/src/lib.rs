@@ -5,8 +5,8 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, LitFloat, Token};
 use syn::parse::{Parse, ParseStream};
+use syn::{parse_macro_input, LitFloat, Token};
 
 /// Macro input for generating cached rotation matrices
 struct CachedRotationInput {
@@ -45,7 +45,9 @@ pub fn cached_rotations(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as CachedRotationInput);
     let gate_type = &input.gate_type;
 
-    let angles: Vec<f64> = input.angles.iter()
+    let angles: Vec<f64> = input
+        .angles
+        .iter()
         .map(|lit| lit.base10_parse::<f64>().expect("Failed to parse angle"))
         .collect();
 
@@ -58,84 +60,88 @@ pub fn cached_rotations(input: TokenStream) -> TokenStream {
     };
 
     // Generate const declarations for each angle
-    let const_declarations: Vec<_> = angles.iter().enumerate().map(|(i, &angle)| {
-        let const_name = syn::Ident::new(
-            &format!("CACHED_{}_{}", gate_type, i),
-            proc_macro2::Span::call_site()
-        );
+    let const_declarations: Vec<_> = angles
+        .iter()
+        .enumerate()
+        .map(|(i, &angle)| {
+            let const_name = syn::Ident::new(
+                &format!("CACHED_{}_{}", gate_type, i),
+                proc_macro2::Span::call_site(),
+            );
 
-        // Compute matrix at compile time
-        let half_theta = angle / 2.0;
-        let cos_val = half_theta.cos();
-        let sin_val = half_theta.sin();
+            // Compute matrix at compile time
+            let half_theta = angle / 2.0;
+            let cos_val = half_theta.cos();
+            let sin_val = half_theta.sin();
 
-        match gate_type.to_string().as_str() {
-            "RX" => quote! {
-                const #const_name: [[Complex64; 2]; 2] = [
-                    [
-                        Complex64::new(#cos_val, 0.0),
-                        Complex64::new(0.0, #(-sin_val)),
-                    ],
-                    [
-                        Complex64::new(0.0, #(-sin_val)),
-                        Complex64::new(#cos_val, 0.0),
-                    ],
-                ];
-            },
-            "RY" => quote! {
-                const #const_name: [[Complex64; 2]; 2] = [
-                    [
-                        Complex64::new(#cos_val, 0.0),
-                        Complex64::new(#(-sin_val), 0.0),
-                    ],
-                    [
-                        Complex64::new(#sin_val, 0.0),
-                        Complex64::new(#cos_val, 0.0),
-                    ],
-                ];
-            },
-            "RZ" => {
-                let re_neg = cos_val;
-                let im_neg = -sin_val;
-                let re_pos = cos_val;
-                let im_pos = sin_val;
-                quote! {
+            match gate_type.to_string().as_str() {
+                "RX" => quote! {
                     const #const_name: [[Complex64; 2]; 2] = [
                         [
-                            Complex64::new(#re_neg, #im_neg),
-                            Complex64::new(0.0, 0.0),
+                            Complex64::new(#cos_val, 0.0),
+                            Complex64::new(0.0, #(-sin_val)),
                         ],
                         [
-                            Complex64::new(0.0, 0.0),
-                            Complex64::new(#re_pos, #im_pos),
+                            Complex64::new(0.0, #(-sin_val)),
+                            Complex64::new(#cos_val, 0.0),
                         ],
                     ];
-                }
-            },
-            _ => unreachable!(),
-        }
-    }).collect();
+                },
+                "RY" => quote! {
+                    const #const_name: [[Complex64; 2]; 2] = [
+                        [
+                            Complex64::new(#cos_val, 0.0),
+                            Complex64::new(#(-sin_val), 0.0),
+                        ],
+                        [
+                            Complex64::new(#sin_val, 0.0),
+                            Complex64::new(#cos_val, 0.0),
+                        ],
+                    ];
+                },
+                "RZ" => {
+                    let re_neg = cos_val;
+                    let im_neg = -sin_val;
+                    let re_pos = cos_val;
+                    let im_pos = sin_val;
+                    quote! {
+                        const #const_name: [[Complex64; 2]; 2] = [
+                            [
+                                Complex64::new(#re_neg, #im_neg),
+                                Complex64::new(0.0, 0.0),
+                            ],
+                            [
+                                Complex64::new(0.0, 0.0),
+                                Complex64::new(#re_pos, #im_pos),
+                            ],
+                        ];
+                    }
+                },
+                _ => unreachable!(),
+            }
+        })
+        .collect();
 
     // Generate angle array
     let angle_array: Vec<_> = angles.iter().map(|&a| quote! { #a }).collect();
 
     // Generate cache array with references to const matrices
-    let cache_refs: Vec<_> = (0..angles.len()).map(|i| {
-        let const_name = syn::Ident::new(
-            &format!("CACHED_{}_{}", gate_type, i),
-            proc_macro2::Span::call_site()
-        );
-        quote! { &#const_name }
-    }).collect();
+    let cache_refs: Vec<_> = (0..angles.len())
+        .map(|i| {
+            let const_name = syn::Ident::new(
+                &format!("CACHED_{}_{}", gate_type, i),
+                proc_macro2::Span::call_site(),
+            );
+            quote! { &#const_name }
+        })
+        .collect();
 
-    let cache_struct_name = syn::Ident::new(
-        &format!("{}Cache", gate_type),
-        proc_macro2::Span::call_site()
-    );
+    let cache_struct_name =
+        syn::Ident::new(&format!("{}Cache", gate_type), proc_macro2::Span::call_site());
 
     let lookup_fn_name = syn::Ident::new(
         &format!("{}_cached", gate_type.to_string().to_lowercase()),
-        proc_macro2::Span::call_site()
+        proc_macro2::Span::call_site(),
     );
 
     let expanded = quote! {
@@ -228,68 +234,69 @@ pub fn cache_rotation_range(input: TokenStream) -> TokenStream {
     };
 
     // Generate const array of matrices
-    let matrix_elements: Vec<_> = angles.iter().map(|&angle| {
-        let half_theta = angle / 2.0;
-        let cos_val = half_theta.cos();
-        let sin_val = half_theta.sin();
+    let matrix_elements: Vec<_> = angles
+        .iter()
+        .map(|&angle| {
+            let half_theta = angle / 2.0;
+            let cos_val = half_theta.cos();
+            let sin_val = half_theta.sin();
 
-        match gate_type.to_string().as_str() {
-            "RX" => quote! {
-                [
-                    [
-                        Complex64::new(#cos_val, 0.0),
-                        Complex64::new(0.0, #(-sin_val)),
-                    ],
-                    [
-                        Complex64::new(0.0, #(-sin_val)),
-                        Complex64::new(#cos_val, 0.0),
-                    ],
-                ]
-            },
-            "RY" => quote! {
-                [
-                    [
-                        Complex64::new(#cos_val, 0.0),
-                        Complex64::new(#(-sin_val), 0.0),
-                    ],
-                    [
-                        Complex64::new(#sin_val, 0.0),
-                        Complex64::new(#cos_val, 0.0),
-                    ],
-                ]
-            },
-            "RZ" => {
-                let re_neg = cos_val;
-                let im_neg = -sin_val;
-                let re_pos = cos_val;
-                let im_pos = sin_val;
-                quote! {
+            match gate_type.to_string().as_str() {
+                "RX" => quote! {
                     [
                         [
-                            Complex64::new(#re_neg, #im_neg),
-                            Complex64::new(0.0, 0.0),
+                            Complex64::new(#cos_val, 0.0),
+                            Complex64::new(0.0, #(-sin_val)),
                         ],
                         [
-                            Complex64::new(0.0, 0.0),
-                            Complex64::new(#re_pos, #im_pos),
+                            Complex64::new(0.0, #(-sin_val)),
+                            Complex64::new(#cos_val, 0.0),
                         ],
                     ]
-                }
-            },
-            _ => unreachable!(),
-        }
-    }).collect();
+                },
+                "RY" => quote! {
+                    [
+                        [
+                            Complex64::new(#cos_val, 0.0),
+                            Complex64::new(#(-sin_val), 0.0),
+                        ],
+                        [
+                            Complex64::new(#sin_val, 0.0),
+                            Complex64::new(#cos_val, 0.0),
+                        ],
+                    ]
+                },
+                "RZ" => {
+                    let re_neg = cos_val;
+                    let im_neg = -sin_val;
+                    let re_pos = cos_val;
+                    let im_pos = sin_val;
+                    quote! {
+                        [
+                            [
+                                Complex64::new(#re_neg, #im_neg),
+                                Complex64::new(0.0, 0.0),
+                            ],
+                            [
+                                Complex64::new(0.0, 0.0),
+                                Complex64::new(#re_pos, #im_pos),
+                            ],
+                        ]
+                    }
+                },
+                _ => unreachable!(),
+            }
+        })
+        .collect();
 
     let angle_array: Vec<_> = angles.iter().map(|&a| quote! { #a }).collect();
 
-    let cache_struct_name = syn::Ident::new(
-        &format!("{}RangeCache", gate_type),
-        proc_macro2::Span::call_site()
-    );
+    let cache_struct_name =
+        syn::Ident::new(&format!("{}RangeCache", gate_type), proc_macro2::Span::call_site());
 
     let lookup_fn_name = syn::Ident::new(
         &format!("{}_range_cached", gate_type.to_string().to_lowercase()),
-        proc_macro2::Span::call_site()
+        proc_macro2::Span::call_site(),
     );
 
     let expanded = quote! {

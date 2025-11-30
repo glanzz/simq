@@ -29,7 +29,7 @@
 //! ```
 
 use num_complex::Complex64;
-use simq_core::{Result, QuantumError};
+use simq_core::{QuantumError, Result};
 
 // Constants
 const ZERO: Complex64 = Complex64::new(0.0, 0.0);
@@ -361,8 +361,8 @@ pub fn determinant_2x2(m: &Matrix2) -> Complex64 {
 /// * `m` - Input matrix
 /// * `terms` - Number of Taylor series terms (default: 20)
 pub fn matrix_exp_2x2(m: &Matrix2, terms: usize) -> Matrix2 {
-    let mut result = [[ONE, ZERO], [ZERO, ONE]];  // Identity
-    let mut term = [[ONE, ZERO], [ZERO, ONE]];    // Current term
+    let mut result = [[ONE, ZERO], [ZERO, ONE]]; // Identity
+    let mut term = [[ONE, ZERO], [ZERO, ONE]]; // Current term
     let mut factorial = 1.0;
 
     for n in 1..=terms {
@@ -391,8 +391,14 @@ pub fn matrix_exp_hermitian_2x2(m: &Matrix2, theta: f64) -> Matrix2 {
 
     // Scale matrix by iθ
     let scaled = [
-        [m[0][0] * Complex64::new(0.0, theta), m[0][1] * Complex64::new(0.0, theta)],
-        [m[1][0] * Complex64::new(0.0, theta), m[1][1] * Complex64::new(0.0, theta)],
+        [
+            m[0][0] * Complex64::new(0.0, theta),
+            m[0][1] * Complex64::new(0.0, theta),
+        ],
+        [
+            m[1][0] * Complex64::new(0.0, theta),
+            m[1][1] * Complex64::new(0.0, theta),
+        ],
     ];
 
     matrix_exp_2x2(&scaled, 20)
@@ -425,10 +431,7 @@ pub fn pauli_z_matrix() -> Matrix2 {
 /// Hadamard matrix
 pub fn hadamard_matrix() -> Matrix2 {
     let inv_sqrt2 = Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0);
-    [
-        [inv_sqrt2, inv_sqrt2],
-        [inv_sqrt2, -inv_sqrt2],
-    ]
+    [[inv_sqrt2, inv_sqrt2], [inv_sqrt2, -inv_sqrt2]]
 }
 
 // ============================================================================
@@ -443,9 +446,7 @@ pub fn hadamard_matrix() -> Matrix2 {
 /// Returns (alpha, beta, gamma, delta)
 pub fn decompose_zyz(u: &Matrix2) -> Result<(f64, f64, f64, f64)> {
     if !is_unitary_2x2(u) {
-        return Err(QuantumError::ValidationError(
-            "Matrix is not unitary".to_string()
-        ));
+        return Err(QuantumError::ValidationError("Matrix is not unitary".to_string()));
     }
 
     // Extract global phase

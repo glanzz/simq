@@ -4,9 +4,9 @@
 //! dramatically improves performance when compiling identical or similar circuits.
 
 use simq_compiler::{
-    CachedCompiler, SharedCachedCompiler,
     cache::CircuitFingerprint,
     pipeline::{create_compiler, OptimizationLevel},
+    CachedCompiler, SharedCachedCompiler,
 };
 use simq_core::{gate::Gate, Circuit, QubitId};
 use std::sync::Arc;
@@ -43,8 +43,7 @@ fn main() {
 
     // Create first circuit
     let mut circuit1 = create_sample_circuit();
-    println!("Circuit 1 fingerprint: 0x{:x}",
-        CircuitFingerprint::compute(&circuit1).value());
+    println!("Circuit 1 fingerprint: 0x{:x}", CircuitFingerprint::compute(&circuit1).value());
 
     // First compilation (cache miss)
     let start = Instant::now();
@@ -103,14 +102,17 @@ fn main() {
     let cached_time = start.elapsed();
 
     println!("\nResults:");
-    println!("  Uncached: {:?} ({:.2} ms/circuit)",
+    println!(
+        "  Uncached: {:?} ({:.2} ms/circuit)",
         uncached_time,
-        uncached_time.as_secs_f64() * 1000.0 / num_circuits as f64);
-    println!("  Cached:   {:?} ({:.2} ms/circuit)",
+        uncached_time.as_secs_f64() * 1000.0 / num_circuits as f64
+    );
+    println!(
+        "  Cached:   {:?} ({:.2} ms/circuit)",
         cached_time,
-        cached_time.as_secs_f64() * 1000.0 / num_circuits as f64);
-    println!("  Speedup:  {:.1}x",
-        uncached_time.as_secs_f64() / cached_time.as_secs_f64());
+        cached_time.as_secs_f64() * 1000.0 / num_circuits as f64
+    );
+    println!("  Speedup:  {:.1}x", uncached_time.as_secs_f64() / cached_time.as_secs_f64());
 
     let stats = cached.cache().statistics();
     println!("\nCache Statistics:");
@@ -208,13 +210,19 @@ fn create_sample_circuit() -> Circuit {
     let mut circuit = Circuit::new(3);
 
     // Inverse pairs (will be optimized away)
-    let x = Arc::new(MockGate { name: "X".to_string() });
+    let x = Arc::new(MockGate {
+        name: "X".to_string(),
+    });
     circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
     circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
 
     // Some other gates
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let z = Arc::new(MockGate { name: "Z".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let z = Arc::new(MockGate {
+        name: "Z".to_string(),
+    });
 
     circuit.add_gate(h.clone(), &[QubitId::new(1)]).unwrap();
     circuit.add_gate(z.clone(), &[QubitId::new(1)]).unwrap();
@@ -228,16 +236,26 @@ fn create_pattern_circuit(pattern: usize) -> Circuit {
     let mut circuit = Circuit::new(2);
 
     let gates = vec![
-        Arc::new(MockGate { name: "H".to_string() }),
-        Arc::new(MockGate { name: "X".to_string() }),
-        Arc::new(MockGate { name: "Y".to_string() }),
-        Arc::new(MockGate { name: "Z".to_string() }),
+        Arc::new(MockGate {
+            name: "H".to_string(),
+        }),
+        Arc::new(MockGate {
+            name: "X".to_string(),
+        }),
+        Arc::new(MockGate {
+            name: "Y".to_string(),
+        }),
+        Arc::new(MockGate {
+            name: "Z".to_string(),
+        }),
     ];
 
     // Create different patterns
     for i in 0..(pattern % 5 + 1) {
         let gate = &gates[i % gates.len()];
-        circuit.add_gate(gate.clone(), &[QubitId::new(i % 2)]).unwrap();
+        circuit
+            .add_gate(gate.clone(), &[QubitId::new(i % 2)])
+            .unwrap();
     }
 
     circuit

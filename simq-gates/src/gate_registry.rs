@@ -193,8 +193,14 @@ mod tests {
         let inv_sqrt2 = 1.0 / SQRT_2;
         let gate = CustomGateBuilder::new("TestH")
             .matrix_2x2([
-                [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-                [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+                [
+                    Complex64::new(inv_sqrt2, 0.0),
+                    Complex64::new(inv_sqrt2, 0.0),
+                ],
+                [
+                    Complex64::new(inv_sqrt2, 0.0),
+                    Complex64::new(-inv_sqrt2, 0.0),
+                ],
             ])
             .build()
             .unwrap();

@@ -1,13 +1,12 @@
 //! Integration tests for the optimization pipeline
 
-use simq_compiler::{
-    Compiler, CompilerBuilder, passes::{
-        DeadCodeElimination, GateFusion, GateCommutation, TemplateSubstitution,
-    },
-};
-use simq_core::{Circuit, QubitId, gate::Gate};
-use std::sync::Arc;
 use num_complex::Complex64;
+use simq_compiler::{
+    passes::{DeadCodeElimination, GateCommutation, GateFusion, TemplateSubstitution},
+    Compiler, CompilerBuilder,
+};
+use simq_core::{gate::Gate, Circuit, QubitId};
+use std::sync::Arc;
 
 // Mock gate for testing
 #[derive(Debug)]
@@ -76,10 +75,18 @@ fn test_full_optimization_pipeline() {
     // - X-X pair (dead code elimination)
     // - H-H pair (template substitution)
     // - Gates on different qubits (commutation opportunities)
-    circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap(); // X-X cancels
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap(); // H-H cancels
+    circuit
+        .add_gate(x_gate.clone(), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(x_gate.clone(), &[QubitId::new(0)])
+        .unwrap(); // X-X cancels
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(h_gate.clone(), &[QubitId::new(1)])
+        .unwrap(); // H-H cancels
     circuit.add_gate(x_gate, &[QubitId::new(2)]).unwrap();
 
     let original_len = circuit.len();
@@ -107,7 +114,9 @@ fn test_compiler_with_no_passes() {
         matrix: Some(pauli_x_matrix()),
     });
 
-    circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(x_gate.clone(), &[QubitId::new(0)])
+        .unwrap();
     circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
     let original_len = circuit.len();
@@ -134,8 +143,12 @@ fn test_fixed_point_iteration() {
 
     // Add multiple X-X pairs
     for _ in 0..5 {
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
     }
 
     assert_eq!(circuit.len(), 10);
@@ -160,7 +173,9 @@ fn test_compiler_statistics() {
         matrix: Some(pauli_x_matrix()),
     });
 
-    circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(x_gate.clone(), &[QubitId::new(0)])
+        .unwrap();
     circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
     let result = compiler.compile(&mut circuit).unwrap();

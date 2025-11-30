@@ -3,8 +3,8 @@
 //! Automatically selects the best backend for a given circuit based on
 //! requirements, capabilities, and available backends.
 
-use crate::{BackendError, QuantumBackend, Result};
 use crate::BackendCapabilities;
+use crate::{BackendError, QuantumBackend, Result};
 use simq_core::Circuit;
 use std::sync::Arc;
 
@@ -130,21 +130,20 @@ impl BackendSelector {
         }
 
         // Filter compatible backends
-        let mut compatible: Vec<_> = self.backends
+        let mut compatible: Vec<_> = self
+            .backends
             .iter()
             .filter(|b| self.is_compatible(b, circuit, criteria))
             .collect();
 
         if compatible.is_empty() {
             return Err(BackendError::Other(
-                "No compatible backends found for circuit".to_string()
+                "No compatible backends found for circuit".to_string(),
             ));
         }
 
         // Score and sort backends
-        compatible.sort_by_key(|b| {
-            std::cmp::Reverse(self.score_backend(b, circuit, criteria))
-        });
+        compatible.sort_by_key(|b| std::cmp::Reverse(self.score_backend(b, circuit, criteria)));
 
         Ok(Arc::clone(compatible[0]))
     }
@@ -250,13 +249,13 @@ impl BackendSelector {
                     if backend.estimate_cost(circuit, 1000).unwrap_or(0.0) == 0.0 {
                         score += 100;
                     }
-                }
+                },
                 BackendFeature::FastExecution => {
                     if backend.backend_type().to_string().contains("Simulator") {
                         score += 50;
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -273,7 +272,7 @@ impl Default for BackendSelector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BackendType, BackendResult};
+    use crate::{BackendResult, BackendType};
     use std::collections::HashMap;
 
     // Mock backend for testing

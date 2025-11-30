@@ -178,10 +178,9 @@ impl TrigTable {
 
         // Linear interpolation between table entries
         let frac = index_f - index as f64;
-        let cos_val = self.cos_values[index] * (1.0 - frac)
-                    + self.cos_values[index + 1] * frac;
-        let sin_val = (self.sin_values[index] * (1.0 - frac)
-                    + self.sin_values[index + 1] * frac) * sign;
+        let cos_val = self.cos_values[index] * (1.0 - frac) + self.cos_values[index + 1] * frac;
+        let sin_val =
+            (self.sin_values[index] * (1.0 - frac) + self.sin_values[index + 1] * frac) * sign;
 
         (cos_val, sin_val)
     }
@@ -225,14 +224,8 @@ impl RotationLookupTable {
             let (cos_val, sin_val) = self.trig_table.lookup(theta, self.config.interpolation);
 
             [
-                [
-                    Complex64::new(cos_val, 0.0),
-                    Complex64::new(0.0, -sin_val),
-                ],
-                [
-                    Complex64::new(0.0, -sin_val),
-                    Complex64::new(cos_val, 0.0),
-                ],
+                [Complex64::new(cos_val, 0.0), Complex64::new(0.0, -sin_val)],
+                [Complex64::new(0.0, -sin_val), Complex64::new(cos_val, 0.0)],
             ]
         } else {
             // Fallback to direct computation for large angles
@@ -253,14 +246,8 @@ impl RotationLookupTable {
             let (cos_val, sin_val) = self.trig_table.lookup(theta, self.config.interpolation);
 
             [
-                [
-                    Complex64::new(cos_val, 0.0),
-                    Complex64::new(-sin_val, 0.0),
-                ],
-                [
-                    Complex64::new(sin_val, 0.0),
-                    Complex64::new(cos_val, 0.0),
-                ],
+                [Complex64::new(cos_val, 0.0), Complex64::new(-sin_val, 0.0)],
+                [Complex64::new(sin_val, 0.0), Complex64::new(cos_val, 0.0)],
             ]
         } else {
             // Fallback to direct computation for large angles
@@ -281,14 +268,8 @@ impl RotationLookupTable {
             let (cos_val, sin_val) = self.trig_table.lookup(theta, self.config.interpolation);
 
             [
-                [
-                    Complex64::new(cos_val, -sin_val),
-                    Complex64::new(0.0, 0.0),
-                ],
-                [
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(cos_val, sin_val),
-                ],
+                [Complex64::new(cos_val, -sin_val), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(cos_val, sin_val)],
             ]
         } else {
             // Fallback to direct computation for large angles
@@ -348,7 +329,11 @@ impl std::fmt::Display for LookupStats {
             self.max_angle.to_degrees(),
             self.angle_step,
             self.angle_step.to_degrees(),
-            if self.interpolation_enabled { "enabled" } else { "disabled" },
+            if self.interpolation_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            },
             self.memory_bytes,
             self.memory_bytes as f64 / 1024.0
         )
@@ -362,9 +347,7 @@ mod tests {
 
     #[test]
     fn test_trig_table_basic() {
-        let config = LookupConfig::new()
-            .max_angle(PI / 4.0)
-            .num_entries(100);
+        let config = LookupConfig::new().max_angle(PI / 4.0).num_entries(100);
 
         let table = TrigTable::new(&config);
 
@@ -378,9 +361,7 @@ mod tests {
 
     #[test]
     fn test_trig_table_negative_angles() {
-        let config = LookupConfig::new()
-            .max_angle(PI / 4.0)
-            .num_entries(100);
+        let config = LookupConfig::new().max_angle(PI / 4.0).num_entries(100);
 
         let table = TrigTable::new(&config);
 
@@ -411,16 +392,8 @@ mod tests {
         // Compare all elements
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_lookup[i][j].re,
-                    matrix_direct[i][j].re,
-                    epsilon = 1e-6
-                );
-                assert_relative_eq!(
-                    matrix_lookup[i][j].im,
-                    matrix_direct[i][j].im,
-                    epsilon = 1e-6
-                );
+                assert_relative_eq!(matrix_lookup[i][j].re, matrix_direct[i][j].re, epsilon = 1e-6);
+                assert_relative_eq!(matrix_lookup[i][j].im, matrix_direct[i][j].im, epsilon = 1e-6);
             }
         }
     }
@@ -456,9 +429,7 @@ mod tests {
 
     #[test]
     fn test_rz_matrix_large_angle_fallback() {
-        let config = LookupConfig::new()
-            .max_angle(PI / 4.0)
-            .num_entries(1000);
+        let config = LookupConfig::new().max_angle(PI / 4.0).num_entries(1000);
 
         let table = RotationLookupTable::new(config);
 
@@ -485,9 +456,7 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let config = LookupConfig::new()
-            .max_angle(PI / 4.0)
-            .num_entries(1024);
+        let config = LookupConfig::new().max_angle(PI / 4.0).num_entries(1024);
 
         let table = RotationLookupTable::new(config);
         let stats = table.stats();

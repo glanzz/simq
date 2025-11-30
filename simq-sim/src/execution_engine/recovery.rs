@@ -10,9 +10,7 @@ pub enum RecoveryPolicy {
     /// Attempt to retry failed gate once
     RetryOnce,
     /// Retry with exponential backoff
-    RetryWithBackoff {
-        max_attempts: usize,
-    },
+    RetryWithBackoff { max_attempts: usize },
     /// Attempt fallback strategy (e.g., CPU if GPU fails)
     Fallback,
 }

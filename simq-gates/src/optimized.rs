@@ -263,16 +263,8 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_opt[i][j].re,
-                    matrix_ref[i][j].re,
-                    epsilon = 1e-6
-                );
-                assert_relative_eq!(
-                    matrix_opt[i][j].im,
-                    matrix_ref[i][j].im,
-                    epsilon = 1e-6
-                );
+                assert_relative_eq!(matrix_opt[i][j].re, matrix_ref[i][j].re, epsilon = 1e-6);
+                assert_relative_eq!(matrix_opt[i][j].im, matrix_ref[i][j].im, epsilon = 1e-6);
             }
         }
     }
@@ -288,16 +280,8 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_opt[i][j].re,
-                    matrix_ref[i][j].re,
-                    epsilon = 1e-10
-                );
-                assert_relative_eq!(
-                    matrix_opt[i][j].im,
-                    matrix_ref[i][j].im,
-                    epsilon = 1e-10
-                );
+                assert_relative_eq!(matrix_opt[i][j].re, matrix_ref[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(matrix_opt[i][j].im, matrix_ref[i][j].im, epsilon = 1e-10);
             }
         }
     }
@@ -313,16 +297,8 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_opt[i][j].re,
-                    matrix_ref[i][j].re,
-                    epsilon = 1e-6
-                );
-                assert_relative_eq!(
-                    matrix_opt[i][j].im,
-                    matrix_ref[i][j].im,
-                    epsilon = 1e-6
-                );
+                assert_relative_eq!(matrix_opt[i][j].re, matrix_ref[i][j].re, epsilon = 1e-6);
+                assert_relative_eq!(matrix_opt[i][j].im, matrix_ref[i][j].im, epsilon = 1e-6);
             }
         }
     }

@@ -7,8 +7,8 @@
 use crate::density_matrix::DensityMatrix;
 use crate::error::{Result, StateError};
 use num_complex::Complex64;
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 /// Configuration for density matrix simulation
 #[derive(Debug, Clone)]

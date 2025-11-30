@@ -1,9 +1,9 @@
 //! Two-qubit gate application kernels
 
-use num_complex::Complex64;
-use rayon::prelude::*;
 use super::Matrix4x4;
 use crate::execution_engine::error::{ExecutionError, Result};
+use num_complex::Complex64;
+use rayon::prelude::*;
 
 /// Apply a general two-qubit gate to a dense state vector
 ///
@@ -43,7 +43,10 @@ pub fn apply_two_qubit_dense(
     if qubit1 == qubit2 {
         return Err(ExecutionError::GateApplicationFailed {
             gate: "two-qubit".to_string(),
-            qubits: vec![simq_core::QubitId::new(qubit1), simq_core::QubitId::new(qubit2)],
+            qubits: vec![
+                simq_core::QubitId::new(qubit1),
+                simq_core::QubitId::new(qubit2),
+            ],
             reason: "Qubits must be different".to_string(),
         });
     }
@@ -89,12 +92,7 @@ fn apply_two_qubit_sequential(
                     let idx = get_two_qubit_indices(base, qubit1, qubit2);
 
                     // Load amplitudes
-                    let a = [
-                        state[idx[0]],
-                        state[idx[1]],
-                        state[idx[2]],
-                        state[idx[3]],
-                    ];
+                    let a = [state[idx[0]], state[idx[1]], state[idx[2]], state[idx[3]]];
 
                     // Apply gate matrix
                     for (out_idx, out) in idx.iter().enumerate() {
@@ -127,40 +125,38 @@ fn apply_two_qubit_parallel(
     // Capture state pointer as usize to avoid Send/Sync issues with raw pointers
     let state_ptr_addr = state.as_mut_ptr() as usize;
 
-    (0..num_chunks)
-        .into_par_iter()
-        .for_each(|chunk_idx| {
-            let base_offset = chunk_idx * chunk_size;
+    (0..num_chunks).into_par_iter().for_each(|chunk_idx| {
+        let base_offset = chunk_idx * chunk_size;
 
-            for j in 0..stride_min {
-                for k in 0..stride_min {
-                    let base = base_offset + j;
+        for j in 0..stride_min {
+            for k in 0..stride_min {
+                let base = base_offset + j;
 
-                    if (base & stride_min == 0) && ((base + k * stride_max) & stride_max == 0) {
-                        let idx = get_two_qubit_indices(base, qubit1, qubit2);
+                if (base & stride_min == 0) && ((base + k * stride_max) & stride_max == 0) {
+                    let idx = get_two_qubit_indices(base, qubit1, qubit2);
 
-                        // Safety: indices are computed to be within bounds
-                        unsafe {
-                            let state_ptr = state_ptr_addr as *mut Complex64;
-                            let a = [
-                                *state_ptr.add(idx[0]),
-                                *state_ptr.add(idx[1]),
-                                *state_ptr.add(idx[2]),
-                                *state_ptr.add(idx[3]),
-                            ];
+                    // Safety: indices are computed to be within bounds
+                    unsafe {
+                        let state_ptr = state_ptr_addr as *mut Complex64;
+                        let a = [
+                            *state_ptr.add(idx[0]),
+                            *state_ptr.add(idx[1]),
+                            *state_ptr.add(idx[2]),
+                            *state_ptr.add(idx[3]),
+                        ];
 
-                            for (out_idx, &out) in idx.iter().enumerate() {
-                                let mut sum = Complex64::new(0.0, 0.0);
-                                for (in_idx, &amp) in a.iter().enumerate() {
-                                    sum += gate[out_idx][in_idx] * amp;
-                                }
-                                *state_ptr.add(out) = sum;
+                        for (out_idx, &out) in idx.iter().enumerate() {
+                            let mut sum = Complex64::new(0.0, 0.0);
+                            for (in_idx, &amp) in a.iter().enumerate() {
+                                sum += gate[out_idx][in_idx] * amp;
                             }
+                            *state_ptr.add(out) = sum;
                         }
                     }
                 }
             }
-        });
+        }
+    });
 }
 
 /// Get the 4 indices for a 2-qubit gate application
@@ -170,10 +166,10 @@ fn get_two_qubit_indices(base: usize, qubit1: usize, qubit2: usize) -> [usize; 4
     let mask2 = 1 << qubit2;
 
     [
-        base,                    // |00⟩
-        base | mask1,           // |10⟩ or |01⟩ depending on qubit order
-        base | mask2,           // |01⟩ or |10⟩ depending on qubit order
-        base | mask1 | mask2,   // |11⟩
+        base,                 // |00⟩
+        base | mask1,         // |10⟩ or |01⟩ depending on qubit order
+        base | mask2,         // |01⟩ or |10⟩ depending on qubit order
+        base | mask1 | mask2, // |11⟩
     ]
 }
 
@@ -206,7 +202,10 @@ pub fn apply_cnot(
     if control == target {
         return Err(ExecutionError::GateApplicationFailed {
             gate: "CNOT".to_string(),
-            qubits: vec![simq_core::QubitId::new(control), simq_core::QubitId::new(target)],
+            qubits: vec![
+                simq_core::QubitId::new(control),
+                simq_core::QubitId::new(target),
+            ],
             reason: "Control and target must be different".to_string(),
         });
     }
@@ -271,7 +270,10 @@ pub fn apply_cz(
     if control == target {
         return Err(ExecutionError::GateApplicationFailed {
             gate: "CZ".to_string(),
-            qubits: vec![simq_core::QubitId::new(control), simq_core::QubitId::new(target)],
+            qubits: vec![
+                simq_core::QubitId::new(control),
+                simq_core::QubitId::new(target),
+            ],
             reason: "Control and target must be different".to_string(),
         });
     }

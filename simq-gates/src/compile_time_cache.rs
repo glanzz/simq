@@ -55,8 +55,8 @@ impl CommonAngles {
 
     /// RX(π/4) - 45° rotation around X-axis
     pub const RX_PI_OVER_4: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.9238795325112867;  // cos(π/8)
-        const SIN: f64 = 0.3826834323650898;  // sin(π/8)
+        const COS: f64 = 0.9238795325112867; // cos(π/8)
+        const SIN: f64 = 0.3826834323650898; // sin(π/8)
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -70,8 +70,8 @@ impl CommonAngles {
 
     /// RX(π/2) - 90° rotation around X-axis
     pub const RX_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476;  // cos(π/4) = 1/√2
-        const SIN: f64 = 0.7071067811865476;  // sin(π/4) = 1/√2
+        const COS: f64 = 0.7071067811865476; // cos(π/4) = 1/√2
+        const SIN: f64 = 0.7071067811865476; // sin(π/4) = 1/√2
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -85,8 +85,8 @@ impl CommonAngles {
 
     /// RX(π) - 180° rotation around X-axis (equivalent to -iX)
     pub const RX_PI: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.0;  // cos(π/2)
-        const SIN: f64 = 1.0;  // sin(π/2)
+        const COS: f64 = 0.0; // cos(π/2)
+        const SIN: f64 = 1.0; // sin(π/2)
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -102,8 +102,8 @@ impl CommonAngles {
 
     /// RY(π/4) - 45° rotation around Y-axis
     pub const RY_PI_OVER_4: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.9238795325112867;  // cos(π/8)
-        const SIN: f64 = 0.3826834323650898;  // sin(π/8)
+        const COS: f64 = 0.9238795325112867; // cos(π/8)
+        const SIN: f64 = 0.3826834323650898; // sin(π/8)
         [
             [Complex64::new(COS, 0.0), Complex64::new(-SIN, 0.0)],
             [Complex64::new(SIN, 0.0), Complex64::new(COS, 0.0)],
@@ -117,8 +117,8 @@ impl CommonAngles {
 
     /// RY(π/2) - 90° rotation around Y-axis
     pub const RY_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476;  // 1/√2
-        const SIN: f64 = 0.7071067811865476;  // 1/√2
+        const COS: f64 = 0.7071067811865476; // 1/√2
+        const SIN: f64 = 0.7071067811865476; // 1/√2
         [
             [Complex64::new(COS, 0.0), Complex64::new(-SIN, 0.0)],
             [Complex64::new(SIN, 0.0), Complex64::new(COS, 0.0)],
@@ -149,8 +149,8 @@ impl CommonAngles {
 
     /// RZ(π/4) - 45° phase rotation
     pub const RZ_PI_OVER_4: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.9238795325112867;  // cos(π/8)
-        const SIN: f64 = 0.3826834323650898;  // sin(π/8)
+        const COS: f64 = 0.9238795325112867; // cos(π/8)
+        const SIN: f64 = 0.3826834323650898; // sin(π/8)
         [
             [Complex64::new(COS, -SIN), Complex64::new(0.0, 0.0)],
             [Complex64::new(0.0, 0.0), Complex64::new(COS, SIN)],
@@ -164,8 +164,8 @@ impl CommonAngles {
 
     /// RZ(π/2) - 90° phase rotation (equivalent to S gate up to global phase)
     pub const RZ_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476;  // 1/√2
-        const SIN: f64 = 0.7071067811865476;  // 1/√2
+        const COS: f64 = 0.7071067811865476; // 1/√2
+        const SIN: f64 = 0.7071067811865476; // 1/√2
         [
             [Complex64::new(COS, -SIN), Complex64::new(0.0, 0.0)],
             [Complex64::new(0.0, 0.0), Complex64::new(COS, SIN)],
@@ -534,7 +534,7 @@ mod tests {
     #[test]
     fn test_vqe_cache_fallback() {
         // Beyond range, should fallback to computation
-        let theta = PI;  // Beyond MAX_ANGLE
+        let theta = PI; // Beyond MAX_ANGLE
         let cached = VQEAngles::rx_cached(theta);
         let computed = crate::matrices::rotation_x(theta);
 
