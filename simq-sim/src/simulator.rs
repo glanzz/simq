@@ -142,8 +142,9 @@ impl Simulator {
             exec_config.use_gpu = self.config.use_gpu;
             let mut engine = ExecutionEngine::new(exec_config);
             engine.execute(&compiled_circuit, &mut state)
-                .map_err(|e| SimulatorError::ExecutionFailed {
-                    message: format!("Execution engine failed: {:?}", e),
+                .map_err(|e| SimulatorError::GateApplicationFailed {
+                    gate_index: 0, // Unknown index
+                    reason: format!("Execution engine failed: {:?}", e),
                 })?;
         }
         let gate_time = gate_start.elapsed();

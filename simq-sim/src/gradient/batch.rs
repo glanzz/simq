@@ -96,7 +96,7 @@ fn evaluate_single_expectation(
         AdaptiveState::Sparse { state: sparse, .. } => {
             // Convert sparse to dense for expectation value
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };
@@ -128,12 +128,11 @@ where
             }
             AdaptiveState::Sparse { state: sparse, .. } => {
                 use simq_state::DenseState;
-                let dense = DenseState::from_sparse(sparse);
+                let dense = DenseState::from_sparse(sparse)?;
                 observable.expectation_value(&dense)
             }
         })
-        .collect::<Result<Vec<f64>, _>>()
-        .map_err(|e| crate::error::SimulatorError::StateError { message: format!("{:?}", e) })?;
+        .collect::<std::result::Result<Vec<f64>, simq_state::error::StateError>>()?;
 
     Ok(expectation_values)
 }
@@ -151,7 +150,7 @@ pub fn batch_gradient<F, G>(
 ) -> Result<Vec<Vec<f64>>>
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
-    G: Fn(&Simulator, F, &PauliObservable, &[f64]) -> Result<Vec<f64>> + Send + Sync,
+    G: Fn(&Simulator, &F, &PauliObservable, &[f64]) -> Result<Vec<f64>> + Send + Sync,
 {
     batch_params
         .par_iter()

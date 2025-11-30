@@ -124,6 +124,9 @@ fn apply_two_qubit_parallel(
     let chunk_size = stride_max * 2;
     let num_chunks = state.len() / chunk_size;
 
+    // Capture state pointer as usize to avoid Send/Sync issues with raw pointers
+    let state_ptr_addr = state.as_mut_ptr() as usize;
+
     (0..num_chunks)
         .into_par_iter()
         .for_each(|chunk_idx| {
@@ -138,14 +141,14 @@ fn apply_two_qubit_parallel(
 
                         // Safety: indices are computed to be within bounds
                         unsafe {
+                            let state_ptr = state_ptr_addr as *mut Complex64;
                             let a = [
-                                *state.get_unchecked(idx[0]),
-                                *state.get_unchecked(idx[1]),
-                                *state.get_unchecked(idx[2]),
-                                *state.get_unchecked(idx[3]),
+                                *state_ptr.add(idx[0]),
+                                *state_ptr.add(idx[1]),
+                                *state_ptr.add(idx[2]),
+                                *state_ptr.add(idx[3]),
                             ];
 
-                            let state_ptr = state.as_mut_ptr();
                             for (out_idx, &out) in idx.iter().enumerate() {
                                 let mut sum = Complex64::new(0.0, 0.0);
                                 for (in_idx, &amp) in a.iter().enumerate() {
@@ -212,12 +215,13 @@ pub fn apply_cnot(
     let target_mask = 1 << target;
 
     if use_parallel && n >= parallel_threshold {
+        let state_ptr_addr = state.as_mut_ptr() as usize;
         (0..n)
             .into_par_iter()
             .step_by(1)
             .filter(|&i| i & control_mask != 0 && i & target_mask == 0)
             .for_each(|i| unsafe {
-                let state_ptr = state.as_mut_ptr();
+                let state_ptr = state_ptr_addr as *mut Complex64;
                 let j = i | target_mask;
                 let temp = *state_ptr.add(i);
                 *state_ptr.add(i) = *state_ptr.add(j);
@@ -326,6 +330,7 @@ pub fn apply_swap(
     let mask2 = 1 << qubit2;
 
     if use_parallel && n >= parallel_threshold {
+        let state_ptr_addr = state.as_mut_ptr() as usize;
         (0..n)
             .into_par_iter()
             .filter(|&i| {
@@ -335,7 +340,7 @@ pub fn apply_swap(
             })
             .for_each(|i| unsafe {
                 let j = (i & !mask1) | mask2;
-                let state_ptr = state.as_mut_ptr();
+                let state_ptr = state_ptr_addr as *mut Complex64;
                 let temp = *state_ptr.add(i);
                 *state_ptr.add(i) = *state_ptr.add(j);
                 *state_ptr.add(j) = temp;

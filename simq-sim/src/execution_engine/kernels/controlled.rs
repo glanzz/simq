@@ -82,11 +82,15 @@ fn apply_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
+    let state_ptr_addr = state.as_ptr() as usize;
+    
     state
         .par_chunks_mut(target_stride * 2)
         .for_each(|chunk| {
             for j in 0..target_stride.min(chunk.len() - target_stride) {
-                let base_idx = chunk.as_ptr() as usize - state.as_ptr() as usize;
+                // Reconstruct pointer to avoid borrowing state in closure
+                let state_ptr = state_ptr_addr as *const Complex64;
+                let base_idx = chunk.as_ptr() as usize - state_ptr as usize;
                 let idx = base_idx / std::mem::size_of::<Complex64>() + j;
 
                 if idx & control_mask != 0 {
@@ -193,16 +197,21 @@ fn apply_multi_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
+    let state_ptr_addr = state.as_mut_ptr() as usize;
+
     (0..state.len())
         .into_par_iter()
         .step_by(target_stride * 2)
         .for_each(|i| {
+            let state_ptr = state_ptr_addr as *mut Complex64;
             for j in 0..target_stride {
                 let idx = i + j;
-                if idx + target_stride < state.len() &&
-                   (idx & control_mask).count_ones() as usize == num_controls {
-                    unsafe {
-                        let state_ptr = state.as_mut_ptr();
+                // Safety: we are checking bounds and using raw pointers to avoid borrow checker issues
+                // with disjoint access patterns that the compiler can't see
+                unsafe {
+                    if idx + target_stride < state.len() &&
+                       (idx & control_mask).count_ones() as usize == num_controls {
+                        
                         let a = *state_ptr.add(idx);
                         let b = *state_ptr.add(idx + target_stride);
 

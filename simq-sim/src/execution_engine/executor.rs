@@ -158,9 +158,21 @@ impl ExecutionEngine {
         timeout_check: Option<(Instant, std::time::Duration)>,
     ) -> Result<()> {
         // Use parallel executor with layer-based execution
-        self.parallel_executor.execute(circuit, state, |gate_op, state| {
+        // We need to temporarily take the parallel executor out of self to avoid
+        // borrowing self mutably (in the closure) while also borrowing parallel_executor
+        let parallel_executor = std::mem::replace(
+            &mut self.parallel_executor,
+            ParallelExecutor::new(self.config.parallel_strategy)
+        );
+
+        let result = parallel_executor.execute(circuit, state, |gate_op, state| {
             self.apply_gate_op(gate_op, state)
-        })?;
+        });
+
+        // Put it back
+        self.parallel_executor = parallel_executor;
+
+        result?;
 
         Ok(())
     }
