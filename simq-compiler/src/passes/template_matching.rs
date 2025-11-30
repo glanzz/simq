@@ -326,6 +326,7 @@ impl OptimizationPass for AdvancedTemplateMatching {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use simq_gates::Hadamard;
 
     #[test]
     fn test_h_z_h_to_x() {

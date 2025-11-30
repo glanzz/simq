@@ -261,7 +261,7 @@ fn bench_complete_workflow(c: &mut Criterion) {
 
     for num_qubits in [5, 10, 20].iter() {
         let model = HardwareNoiseModel::ibm_washington();
-        let timing = model.timing().clone();
+        let timing = *model.timing();
         let mut tracker = QubitTimeTracker::new(*num_qubits, timing);
 
         group.throughput(Throughput::Elements(1));

@@ -632,12 +632,12 @@ fn bench_matrix_multiplication(c: &mut Criterion) {
 
     let hadamard = [
         [
-            Complex64::new(0.7071067811865476, 0.0),
-            Complex64::new(0.7071067811865476, 0.0),
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
         ],
         [
-            Complex64::new(0.7071067811865476, 0.0),
-            Complex64::new(-0.7071067811865476, 0.0),
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            Complex64::new(-std::f64::consts::FRAC_1_SQRT_2, 0.0),
         ],
     ];
 

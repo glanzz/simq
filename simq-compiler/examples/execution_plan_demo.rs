@@ -386,7 +386,7 @@ fn create_large_circuit(num_gates: usize) -> Circuit {
     let num_qubits = (num_gates / 10).max(5);
     let mut circuit = Circuit::new(num_qubits);
 
-    let gates = vec![
+    let gates = [
         Arc::new(MockGate {
             name: "H".to_string(),
         }),

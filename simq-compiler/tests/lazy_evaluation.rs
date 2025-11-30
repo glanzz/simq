@@ -320,7 +320,7 @@ fn test_lazy_executor_batch_processing() {
         executor.execute(&circuit, state.amplitudes_mut()).unwrap();
 
         let stats = executor.stats();
-        let expected_batches = (100 + batch_size - 1) / batch_size;
+        let expected_batches = 100_usize.div_ceil(batch_size);
         assert_eq!(stats.batches_executed, expected_batches);
     }
 }

@@ -85,7 +85,7 @@ fn example_parameterized_circuit() {
     println!("Circuit with repeated RX(π/4) gates");
     println!("Matrix caching should improve performance\n");
 
-    let mut state = StateVector::new(2).unwrap();
+    let mut _state = StateVector::new(2).unwrap();
     let mut executor = LazyExecutor::new(LazyConfig::default());
 
     // Execute multiple times (simulating VQE iterations)
@@ -96,7 +96,7 @@ fn example_parameterized_circuit() {
             .execute(&circuit, fresh_state.amplitudes_mut())
             .unwrap();
         println!("  Iteration {}: {} matrices computed", i, executor.stats().matrices_computed);
-        state = fresh_state; // Keep last state
+        _state = fresh_state; // Keep last state
     }
 
     println!("\nFinal statistics:");

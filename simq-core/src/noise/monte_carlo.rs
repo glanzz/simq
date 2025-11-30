@@ -363,12 +363,12 @@ mod tests {
         let mc = ReadoutErrorMC::from_probabilities(0.02, 0.03).unwrap();
 
         // Measure 0, flip with p=0.02
-        assert_eq!(mc.apply_to_measurement(false, 0.01), true); // Flipped
-        assert_eq!(mc.apply_to_measurement(false, 0.03), false); // Not flipped
+        assert!(mc.apply_to_measurement(false, 0.01)); // Flipped
+        assert!(!mc.apply_to_measurement(false, 0.03)); // Not flipped
 
         // Measure 1, flip with p=0.03
-        assert_eq!(mc.apply_to_measurement(true, 0.02), false); // Flipped
-        assert_eq!(mc.apply_to_measurement(true, 0.04), true); // Not flipped
+        assert!(!mc.apply_to_measurement(true, 0.02)); // Flipped
+        assert!(mc.apply_to_measurement(true, 0.04)); // Not flipped
 
         assert_eq!(mc.probabilities(), (0.02, 0.03));
     }

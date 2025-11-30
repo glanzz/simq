@@ -199,7 +199,7 @@ fn example_identity_elimination() {
     println!("\nOptimized circuit: {} operations", optimized.len());
     println!("  (Identity gate eliminated automatically)");
 
-    if optimized.len() == 0 {
+    if optimized.is_empty() {
         println!("\nThe entire sequence was eliminated as it equals the identity!");
     }
     println!();

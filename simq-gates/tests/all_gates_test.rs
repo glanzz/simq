@@ -22,6 +22,7 @@ fn mult_2x2(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2]) -> [[Complex64; 2]
 }
 
 // Helper function to check if matrix is identity
+#[allow(clippy::needless_range_loop)]
 fn is_identity_2x2(m: &[[Complex64; 2]; 2]) -> bool {
     for i in 0..2 {
         for j in 0..2 {
@@ -486,6 +487,7 @@ fn test_rxx_gate() {
     let rxx_0 = RXX::new(0.0);
     let matrix_0 = rxx_0.matrix();
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
         for j in 0..4 {
             let expected = if i == j { 1.0 } else { 0.0 };
@@ -508,6 +510,7 @@ fn test_ryy_gate() {
     let ryy_0 = RYY::new(0.0);
     let matrix_0 = ryy_0.matrix();
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
         for j in 0..4 {
             let expected = if i == j { 1.0 } else { 0.0 };
@@ -530,6 +533,7 @@ fn test_rzz_gate() {
     let rzz_0 = RZZ::new(0.0);
     let matrix_0 = rzz_0.matrix();
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
         for j in 0..4 {
             let expected = if i == j { 1.0 } else { 0.0 };
@@ -552,6 +556,7 @@ fn test_toffoli_gate() {
     let matrix = Toffoli::matrix();
 
     // Toffoli should leave all states unchanged except |110⟩ and |111⟩
+    #[allow(clippy::needless_range_loop)]
     for i in 0..6 {
         assert_eq!(matrix[i][i].re, 1.0);
     }
@@ -571,6 +576,7 @@ fn test_fredkin_gate() {
     let matrix = Fredkin::matrix();
 
     // Fredkin should leave states unchanged when control is |0⟩ (first 4 states)
+    #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
         assert_eq!(matrix[i][i].re, 1.0);
     }

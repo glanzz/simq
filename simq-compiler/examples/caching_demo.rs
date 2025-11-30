@@ -235,7 +235,7 @@ fn create_sample_circuit() -> Circuit {
 fn create_pattern_circuit(pattern: usize) -> Circuit {
     let mut circuit = Circuit::new(2);
 
-    let gates = vec![
+    let gates = [
         Arc::new(MockGate {
             name: "H".to_string(),
         }),

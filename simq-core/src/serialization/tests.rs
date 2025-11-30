@@ -1,6 +1,5 @@
 //! Tests for serialization functionality
 
-#![cfg(test)]
 #![cfg(feature = "serialization")]
 
 use crate::circuit::Circuit;

@@ -124,7 +124,7 @@ mod tests {
     const ZERO: Complex64 = Complex64::new(0.0, 0.0);
     const ONE: Complex64 = Complex64::new(1.0, 0.0);
     const I: Complex64 = Complex64::new(0.0, 1.0);
-    const INV_SQRT2: f64 = 0.7071067811865476;
+    const INV_SQRT2: f64 = std::f64::consts::FRAC_1_SQRT_2;
 
     #[test]
     fn test_multiply_identity() {

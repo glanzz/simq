@@ -16,8 +16,8 @@ fn main() {
     println!("   Ref count: {}", state1.ref_count());
 
     // Clone is O(1) - just increments reference count
-    let state2 = state1.clone();
-    let state3 = state1.clone();
+    let _state2 = state1.clone();
+    let _state3 = state1.clone();
 
     println!("   After 2 clones:");
     println!("   Ref count: {}", state1.ref_count());
@@ -176,7 +176,7 @@ fn main() {
     );
 
     // Can restore from checkpoint
-    let restored = checkpoint.clone();
+    let _restored = checkpoint.clone();
     println!("   Restored from checkpoint");
     println!("   Checkpoint still has: {} refs", checkpoint.ref_count());
     println!();

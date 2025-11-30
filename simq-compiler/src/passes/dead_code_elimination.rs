@@ -166,6 +166,7 @@ impl OptimizationPass for DeadCodeElimination {
 mod tests {
     use super::*;
     use simq_core::gate::Gate;
+    use simq_core::QubitId;
     use std::sync::Arc;
 
     // Mock gate for testing

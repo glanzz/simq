@@ -61,7 +61,7 @@ fn main() {
 
 /// Teleport a single-qubit state parameterized by Bloch sphere angles
 /// |ψ⟩ = cos(θ/2)|0⟩ + e^(iφ)sin(θ/2)|1⟩
-fn teleport_state(name: &str, angles: (f64, f64)) {
+fn teleport_state(_name: &str, angles: (f64, f64)) {
     let (theta, phi) = angles;
 
     // Step 1: Prepare initial state with 3 qubits
@@ -85,8 +85,6 @@ fn teleport_state(name: &str, angles: (f64, f64)) {
     amplitudes[0b100] = beta * sqrt2_inv; // |ψ=1⟩|Bell=00⟩
     amplitudes[0b111] = beta * sqrt2_inv; // |ψ=1⟩|Bell=11⟩
 
-    let mut state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
-
     println!("Initial state |ψ⟩ coefficients:");
     println!("  α (for |0⟩) = {:.4} + {:.4}i", alpha.re, alpha.im);
     println!("  β (for |1⟩) = {:.4} + {:.4}i", beta.re, beta.im);
@@ -103,8 +101,6 @@ fn teleport_state(name: &str, angles: (f64, f64)) {
     amplitudes[0b100] = Complex64::new(0.0, 0.0);
     amplitudes[0b111] = Complex64::new(0.0, 0.0);
 
-    state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
-
     // Step 3: Alice applies Hadamard to q2
     // H|0⟩ = (|0⟩ + |1⟩)/√2, H|1⟩ = (|0⟩ - |1⟩)/√2
     // After H on q2:
@@ -120,7 +116,7 @@ fn teleport_state(name: &str, angles: (f64, f64)) {
     amplitudes[0b110] = -beta * half;
     amplitudes[0b111] = alpha * half;
 
-    state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
+    let mut state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
 
     // Step 4: Alice measures her two qubits (q2 and q1) - MID-CIRCUIT MEASUREMENT!
     // This is the key feature we're demonstrating
@@ -246,8 +242,6 @@ fn test_teleportation_fidelity(num_trials: usize) {
         amplitudes[0b100] = beta * sqrt2_inv;
         amplitudes[0b111] = beta * sqrt2_inv;
 
-        let mut state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
-
         // Apply CNOT (q2 control, q1 target)
         amplitudes[0b000] = alpha * sqrt2_inv;
         amplitudes[0b011] = alpha * sqrt2_inv;
@@ -255,7 +249,6 @@ fn test_teleportation_fidelity(num_trials: usize) {
         amplitudes[0b110] = beta * sqrt2_inv;
         amplitudes[0b100] = Complex64::new(0.0, 0.0);
         amplitudes[0b111] = Complex64::new(0.0, 0.0);
-        state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
 
         // Apply Hadamard to q2
         let half = 0.5;
@@ -267,7 +260,7 @@ fn test_teleportation_fidelity(num_trials: usize) {
         amplitudes[0b101] = -beta * half;
         amplitudes[0b110] = -beta * half;
         amplitudes[0b111] = alpha * half;
-        state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
+        let mut state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
 
         // Measure Alice's qubits
         let measurement = MidCircuitMeasurement::new(vec![2, 1]);

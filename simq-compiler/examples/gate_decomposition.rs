@@ -59,13 +59,13 @@ fn single_qubit_example() {
 
     // ZXZ decomposition
     println!("ZXZ Decomposition (Rz-Rx-Rz):");
-    let zxz_decomposer = SingleQubitDecomposer::new(EulerBasis::ZXZ);
+    let _zxz_decomposer = SingleQubitDecomposer::new(EulerBasis::ZXZ);
     println!("  - Useful when X rotations are cheaper than Y rotations");
     println!("  - Common in some superconducting qubit architectures\n");
 
     // U3 decomposition (IBM)
     println!("U3 Decomposition (IBM Quantum):");
-    let u3_decomposer = SingleQubitDecomposer::new(EulerBasis::U3);
+    let _u3_decomposer = SingleQubitDecomposer::new(EulerBasis::U3);
     println!("  - IBM's native single-qubit gate");
     println!("  - U3(θ, φ, λ) = Rz(φ) Ry(θ) Rz(λ)");
     println!("  - Discards global phase\n");
