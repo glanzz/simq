@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn test_to_dense_vec() {
-        let mut state = AdaptiveState::new(2).unwrap();
+        let state = AdaptiveState::new(2).unwrap();
         let dense_vec = state.to_dense_vec();
 
         assert_eq!(dense_vec.len(), 4);

@@ -315,7 +315,7 @@ pub fn apply_diagonal_gate_optimized(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::f64::consts::PI;
+    
 
     /// Helper to create a simple test state
     fn create_test_state(num_qubits: usize) -> Vec<Complex64> {
