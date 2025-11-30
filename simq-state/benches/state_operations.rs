@@ -408,6 +408,61 @@ fn bench_dense_state_diagonal_gates(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_two_qubit_gates(c: &mut Criterion) {
+    let mut group = c.benchmark_group("two_qubit_gates");
+
+    for num_qubits in [10, 15, 20].iter() {
+        let size = 1 << num_qubits;
+        group.throughput(Throughput::Elements(size as u64));
+
+        // Benchmark CNOT
+        group.bench_with_input(
+            BenchmarkId::new("cnot", num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                let mut state = DenseState::new(num_qubits).unwrap();
+                b.iter(|| {
+                    state.apply_cnot(black_box(0), black_box(1)).unwrap();
+                })
+            },
+        );
+
+        // Benchmark CZ
+        group.bench_with_input(
+            BenchmarkId::new("cz", num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                let mut state = DenseState::new(num_qubits).unwrap();
+                b.iter(|| {
+                    state.apply_cz(black_box(0), black_box(1)).unwrap();
+                })
+            },
+        );
+
+        // Benchmark General Two-Qubit Gate
+        group.bench_with_input(
+            BenchmarkId::new("general_two_qubit", num_qubits),
+            num_qubits,
+            |b, &num_qubits| {
+                let mut state = DenseState::new(num_qubits).unwrap();
+                // CNOT matrix
+                let cnot_matrix = [
+                    [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)],
+                    [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)],
+                    [Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+                    [Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                ];
+
+                b.iter(|| {
+                    state.apply_two_qubit_gate(black_box(&cnot_matrix), black_box(0), black_box(1)).unwrap();
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_single_qubit_gate_scalar,
@@ -420,5 +475,6 @@ criterion_group!(
     bench_dense_state_creation,
     bench_dense_state_gate_application,
     bench_dense_state_measurement,
+    bench_two_qubit_gates,
 );
 criterion_main!(benches);

@@ -42,3 +42,11 @@ gpu = ["wgpu"]
 [[bench]]
 name = "simulator"
 harness = false
+
+[[bench]]
+name = "vqe"
+harness = false
+
+[[bench]]
+name = "gradient"
+harness = false
