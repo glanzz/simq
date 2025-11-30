@@ -7,7 +7,7 @@
 use rayon::prelude::*;
 use simq_core::Circuit;
 use simq_state::AdaptiveState;
-use simq_state::observable::{PauliObservable, PauliString};
+use simq_state::observable::PauliObservable;
 use crate::Simulator;
 use crate::error::Result;
 
@@ -243,6 +243,7 @@ mod tests {
     use super::*;
     use simq_core::QubitId;
     use simq_gates::standard::RotationY;
+    use simq_state::observable::PauliString;
     use std::sync::Arc;
     use crate::SimulatorConfig;
 
