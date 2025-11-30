@@ -192,7 +192,7 @@ impl Router {
 }
 
 /// Routing strategy for initial qubit mapping
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RoutingStrategy {
     /// Identity mapping (L0→P0, L1→P1, ...)
     Identity,
@@ -201,13 +201,8 @@ pub enum RoutingStrategy {
     HighestDegree,
 
     /// Find densely connected subgraph
+    #[default]
     Subgraph,
-}
-
-impl Default for RoutingStrategy {
-    fn default() -> Self {
-        RoutingStrategy::Subgraph
-    }
 }
 
 /// Represents a SWAP gate insertion

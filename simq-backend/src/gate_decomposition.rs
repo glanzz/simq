@@ -5,10 +5,13 @@
 
 use crate::{BackendError, GateSet, Result};
 use simq_core::{Circuit, GateOp, QubitId};
-use simq_gates::{CNot, Hadamard, PauliX, PauliZ, RotationX, RotationZ, SXGate, TGate, CZ};
+use simq_gates::{CNot, PauliX, RotationX, RotationZ, SXGate, CZ};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::sync::Arc;
+
+/// Type alias for decomposition rule functions
+type DecompositionRule = Box<dyn Fn(&GateOp) -> Result<Vec<GateOp>>>;
 
 /// Gate decomposer that converts gates to a target gate set
 pub struct GateDecomposer {
@@ -16,7 +19,7 @@ pub struct GateDecomposer {
     target_gates: GateSet,
 
     /// Decomposition rules
-    rules: HashMap<String, Box<dyn Fn(&GateOp) -> Result<Vec<GateOp>>>>,
+    rules: HashMap<String, DecompositionRule>,
 }
 
 impl GateDecomposer {
@@ -300,6 +303,7 @@ pub fn analyze_gate_distribution(circuit: &Circuit) -> HashMap<String, usize> {
 mod tests {
     use super::*;
     use simq_core::QubitId;
+    use simq_gates::{Hadamard, PauliZ, TGate};
 
     #[test]
     fn test_ibm_gate_set() {

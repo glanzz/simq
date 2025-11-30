@@ -63,6 +63,7 @@ pub fn apply_phase_gate(
                 *amp *= phase;
             });
     } else {
+        #[allow(clippy::needless_range_loop)]
         for i in 0..n {
             if i & mask != 0 {
                 state[i] *= phase;

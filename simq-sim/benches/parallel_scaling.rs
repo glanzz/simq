@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 fn generate_circuit(num_qubits: usize, depth: usize) -> Circuit {
     let mut circuit = Circuit::new(num_qubits);
-    for d in 0..depth {
+    for _d in 0..depth {
         for q in 0..num_qubits {
             circuit
                 .add_gate(Arc::new(Hadamard), &[QubitId::new(q)])

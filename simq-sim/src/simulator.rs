@@ -52,11 +52,6 @@ impl Simulator {
         Self { config }
     }
 
-    /// Create a simulator with default configuration
-    pub fn default() -> Self {
-        Self::new(SimulatorConfig::default())
-    }
-
     /// Get the simulator configuration
     pub fn config(&self) -> &SimulatorConfig {
         &self.config
@@ -88,7 +83,7 @@ impl Simulator {
         let total_start = Instant::now();
 
         // Validate circuit
-        if circuit.len() == 0 {
+        if circuit.is_empty() {
             return Err(SimulatorError::InvalidCircuit("Empty circuit".to_string()));
         }
 
@@ -134,9 +129,11 @@ impl Simulator {
         let gate_start = Instant::now();
         {
             use crate::execution_engine::{ExecutionConfig, ExecutionEngine};
-            let mut exec_config = ExecutionConfig::default();
-            exec_config.parallel_threshold = self.config.parallel_threshold;
-            exec_config.use_gpu = self.config.use_gpu;
+            let exec_config = ExecutionConfig {
+                parallel_threshold: self.config.parallel_threshold,
+                use_gpu: self.config.use_gpu,
+                ..Default::default()
+            };
             let mut engine = ExecutionEngine::new(exec_config);
             engine.execute(&compiled_circuit, &mut state).map_err(|e| {
                 SimulatorError::GateApplicationFailed {
@@ -202,6 +199,12 @@ impl Simulator {
             let max_amplitudes = self.config.memory_limit / 16;
             (max_amplitudes as f64).log2().floor() as usize
         }
+    }
+}
+
+impl Default for Simulator {
+    fn default() -> Self {
+        Self::new(SimulatorConfig::default())
     }
 }
 

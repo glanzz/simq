@@ -702,8 +702,8 @@ where
             }
         }
 
-        for i in 0..n {
-            centroid[i] /= indices.len() as f64;
+        for item in centroid.iter_mut().take(n) {
+            *item /= indices.len() as f64;
         }
 
         centroid

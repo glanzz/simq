@@ -247,7 +247,7 @@ impl Default for Transpiler {
 }
 
 /// Optimization level for transpilation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptimizationLevel {
     /// No optimization, minimal transpilation
     /// - Only validate circuit
@@ -263,6 +263,7 @@ pub enum OptimizationLevel {
     /// - Light optimizations
     /// - Commutation-based reordering
     /// - Template matching
+    #[default]
     Medium,
 
     /// Heavy optimization (slow, may take several seconds)
@@ -270,12 +271,6 @@ pub enum OptimizationLevel {
     /// - Global resynthesis
     /// - Advanced template matching
     Heavy,
-}
-
-impl Default for OptimizationLevel {
-    fn default() -> Self {
-        OptimizationLevel::Medium
-    }
 }
 
 /// Cost estimate for transpilation
@@ -482,9 +477,10 @@ impl QubitMapping {
 }
 
 /// SWAP insertion strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SwapStrategy {
     /// Greedy: Insert SWAPs along shortest path
+    #[default]
     Greedy,
 
     /// SABRE: Stochastic routing algorithm
@@ -492,12 +488,6 @@ pub enum SwapStrategy {
 
     /// Lookahead: Consider future gates when inserting SWAPs
     Lookahead,
-}
-
-impl Default for SwapStrategy {
-    fn default() -> Self {
-        SwapStrategy::Greedy
-    }
 }
 
 #[cfg(test)]

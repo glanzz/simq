@@ -13,13 +13,12 @@ use simq_core::{Circuit, QubitId};
 use simq_gates::{CNot, Hadamard, RotationY};
 use simq_sim::gradient::{
     compute_gradient_auto, progress_callback, target_energy_callback, ConvergenceMonitor,
-    GradientConfig, GradientMethod, MonitorConfig, StoppingCriterion,
+    MonitorConfig, StoppingCriterion,
 };
 use simq_sim::Simulator;
 use simq_state::observable::{Pauli, PauliObservable, PauliString};
 use simq_state::AdaptiveState;
 use std::sync::Arc;
-use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n{:=<80}", "");
@@ -74,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Compute gradient
         let grad_result =
-            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params)?;
+            compute_gradient_auto(&simulator, circuit_builder, &observable, &params)?;
 
         // Record metrics
         monitor.record(iteration, energy, &grad_result.gradients, &params);
@@ -86,8 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Update parameters
-        for i in 0..params.len() {
-            params[i] -= learning_rate * grad_result.gradients[i];
+        for (param, grad) in params.iter_mut().zip(grad_result.gradients.iter()) {
+            *param -= learning_rate * grad;
         }
     }
 
@@ -119,7 +118,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
         let grad_result =
-            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params2)?;
+            compute_gradient_auto(&simulator, circuit_builder, &observable, &params2)?;
 
         monitor2.record(iteration, energy, &grad_result.gradients, &params2);
 
@@ -127,8 +126,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        for i in 0..params2.len() {
-            params2[i] -= learning_rate * grad_result.gradients[i];
+        for (param, grad) in params2.iter_mut().zip(grad_result.gradients.iter()) {
+            *param -= learning_rate * grad;
         }
     }
 
@@ -158,7 +157,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
         let grad_result =
-            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params3)?;
+            compute_gradient_auto(&simulator, circuit_builder, &observable, &params3)?;
 
         monitor3.record(iteration, energy, &grad_result.gradients, &params3);
 
@@ -181,8 +180,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Very small updates to simulate slow progress
-        for i in 0..params3.len() {
-            params3[i] -= 0.01 * grad_result.gradients[i];
+        for (param, grad) in params3.iter_mut().zip(grad_result.gradients.iter()) {
+            *param -= 0.01 * grad;
         }
     }
 
@@ -216,7 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
         let grad_result =
-            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params4)?;
+            compute_gradient_auto(&simulator, circuit_builder, &observable, &params4)?;
 
         monitor4.record(iteration, energy, &grad_result.gradients, &params4);
 
@@ -227,8 +226,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        for i in 0..params4.len() {
-            params4[i] -= 0.2 * grad_result.gradients[i];
+        for (param, grad) in params4.iter_mut().zip(grad_result.gradients.iter()) {
+            *param -= 0.2 * grad;
         }
     }
 
@@ -258,7 +257,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let result = simulator.run(&circuit)?;
         let energy = compute_expectation(&result, &observable)?;
         let grad_result =
-            compute_gradient_auto(&simulator, &circuit_builder, &observable, &params5)?;
+            compute_gradient_auto(&simulator, circuit_builder, &observable, &params5)?;
 
         monitor5.record(iteration, energy, &grad_result.gradients, &params5);
 
@@ -266,8 +265,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        for i in 0..params5.len() {
-            params5[i] -= 0.15 * grad_result.gradients[i];
+        for (param, grad) in params5.iter_mut().zip(grad_result.gradients.iter()) {
+            *param -= 0.15 * grad;
         }
     }
 

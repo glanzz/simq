@@ -264,15 +264,24 @@ mod tests {
 
     #[test]
     fn test_validation() {
-        let mut config = ExecutionConfig::default();
-        config.parallel_threshold = 0;
+        let config = ExecutionConfig {
+            parallel_threshold: 0,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
 
-        config.parallel_threshold = 1024;
-        config.dense_threshold = 1.5;
+        let config = ExecutionConfig {
+            parallel_threshold: 1024,
+            dense_threshold: 1.5,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
 
-        config.dense_threshold = 0.1;
+        let config = ExecutionConfig {
+            parallel_threshold: 1024,
+            dense_threshold: 0.1,
+            ..Default::default()
+        };
         assert!(config.validate().is_ok());
     }
 

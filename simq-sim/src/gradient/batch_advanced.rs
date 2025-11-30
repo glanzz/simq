@@ -216,6 +216,7 @@ pub fn latin_hypercube_sampling(param_ranges: &[(f64, f64)], num_samples: usize)
         .collect();
 
     // Generate samples
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_samples {
         let mut sample = Vec::with_capacity(num_params);
 

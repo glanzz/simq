@@ -424,7 +424,7 @@ impl QuantumBackend for IBMQuantumBackend {
     }
 
     fn backend_type(&self) -> BackendType {
-        if self.properties.as_ref().map_or(false, |p| p.simulator) {
+        if self.properties.as_ref().is_some_and(|p| p.simulator) {
             BackendType::CloudSimulator
         } else {
             BackendType::Hardware
@@ -583,6 +583,7 @@ struct IBMJobResponse {
 
 #[derive(Debug, Deserialize)]
 struct IBMJobInfo {
+    #[allow(dead_code)]
     id: String,
     status: String,
 }

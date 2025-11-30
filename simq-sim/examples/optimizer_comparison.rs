@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     let gd_result = gradient_descent(
         &simulator,
-        &circuit_builder,
+        circuit_builder,
         &observable,
         &initial_params,
         0.1, // learning rate

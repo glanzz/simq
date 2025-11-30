@@ -72,8 +72,8 @@ impl Graph {
         let mut adjacency: HashMap<usize, Vec<(usize, f64)>> = HashMap::new();
 
         for &(u, v, w) in edges {
-            adjacency.entry(u).or_insert_with(Vec::new).push((v, w));
-            adjacency.entry(v).or_insert_with(Vec::new).push((u, w));
+            adjacency.entry(u).or_default().push((v, w));
+            adjacency.entry(v).or_default().push((u, w));
         }
 
         Self {

@@ -273,10 +273,10 @@ impl ConnectivityGraph {
 
     /// Add an edge between two qubits
     pub fn add_edge(&mut self, q1: usize, q2: usize) {
-        self.edges.entry(q1).or_insert_with(HashSet::new).insert(q2);
+        self.edges.entry(q1).or_default().insert(q2);
 
         if !self.directed {
-            self.edges.entry(q2).or_insert_with(HashSet::new).insert(q1);
+            self.edges.entry(q2).or_default().insert(q1);
         }
     }
 

@@ -294,6 +294,7 @@ pub fn apply_cz(
                 *amp = -*amp;
             });
     } else {
+        #[allow(clippy::needless_range_loop)]
         for i in 0..n {
             if i & both_mask == both_mask {
                 state[i] = -state[i];

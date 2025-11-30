@@ -81,7 +81,7 @@ impl ParallelExecutor {
     {
         // Sequential gate execution, parallelism happens inside gate application
         for op in circuit.operations() {
-            apply_gate(&op, state)?;
+            apply_gate(op, state)?;
         }
         Ok(())
     }

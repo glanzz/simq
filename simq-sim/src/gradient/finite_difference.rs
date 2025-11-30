@@ -142,6 +142,7 @@ where
 }
 
 /// Compute finite difference gradient for a single parameter
+#[allow(clippy::too_many_arguments)]
 fn compute_single_param_fd<F>(
     simulator: &Simulator,
     circuit_builder: &F,

@@ -22,10 +22,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let params = vec![0.5, 1.0, 1.5];
 
     // Build a simple parameterized circuit
-    let circuit_builder = |p: &[f64]| {
-        let circuit = Circuit::new(2);
+    let circuit_builder = |_p: &[f64]| {
         // Add parameterized gates here
-        circuit
+        Circuit::new(2)
     };
 
     // Create observable (Z⊗Z)

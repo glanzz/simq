@@ -2,10 +2,13 @@
 
 #[cfg(feature = "gpu")]
 use wgpu;
+#[cfg(feature = "gpu")]
+use wgpu::util::DeviceExt;
+#[cfg(feature = "gpu")]
 use num_complex::Complex;
 
+
 #[cfg(feature = "gpu")]
-#[derive(Clone)]
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -29,13 +32,18 @@ impl GpuContext {
         let shader_src = include_str!("./shaders/single_qubit_gate.wgsl");
         let shader = self
             .device
-            .create_shader_module(&wgpu::ShaderModuleDescriptor {
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("SingleQubitGate"),
                 source: wgpu::ShaderSource::Wgsl(shader_src.into()),
             });
 
         // Prepare buffers
-        let state_bytes = bytemuck::cast_slice(state);
+        // Convert Complex<f64> to interleaved f64 array (real, imag, real, imag, ...)
+        let state_f64: Vec<f64> = state
+            .iter()
+            .flat_map(|c| [c.re, c.im])
+            .collect();
+        let state_bytes = bytemuck::cast_slice(&state_f64);
         let state_buf = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -54,7 +62,8 @@ impl GpuContext {
                 contents: gate_bytes,
                 usage: wgpu::BufferUsages::UNIFORM,
             });
-        let qubit_bytes = bytemuck::cast_slice(&[qubit as u32]);
+        let qubit_data = [qubit as u32];
+        let qubit_bytes = bytemuck::cast_slice(&qubit_data);
         let qubit_buf = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -144,10 +153,11 @@ impl GpuContext {
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("ComputePass"),
+                timestamp_writes: None,
             });
             cpass.set_pipeline(&compute_pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            let workgroups = ((state.len() as u32) + 63) / 64;
+            let workgroups = (state.len() as u32).div_ceil(64);
             cpass.dispatch_workgroups(workgroups, 1, 1);
         }
         self.queue.submit(Some(encoder.finish()));

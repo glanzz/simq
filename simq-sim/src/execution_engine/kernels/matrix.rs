@@ -69,6 +69,7 @@ fn is_diagonal_2x2(matrix: &Matrix2x2) -> bool {
 }
 
 /// Check if a 4x4 matrix is diagonal
+#[allow(clippy::needless_range_loop)]
 fn is_diagonal_4x4(matrix: &Matrix4x4) -> bool {
     for i in 0..4 {
         for j in 0..4 {

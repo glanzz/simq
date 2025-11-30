@@ -135,7 +135,7 @@ impl ExecutionEngine {
             }
 
             // Execute gate with retry logic
-            self.execute_gate_with_retry(&gate_op, state)?;
+            self.execute_gate_with_retry(gate_op, state)?;
 
             // Adaptive state conversion
             if self.config.adaptive_state {
