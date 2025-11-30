@@ -14,7 +14,7 @@ use simq_sim::gradient::{
 };
 use simq_core::{Circuit, QubitId};
 use simq_state::observable::{PauliObservable, PauliString};
-use simq_gates::standard::{RotationY, RotationZ, CNOT};
+use simq_gates::standard::{RotationY, RotationZ, CNot};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut circuit = Circuit::new(num_qubits);
         circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)]).unwrap();
-        circuit.add_gate(Arc::new(CNOT), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
         circuit.add_gate(Arc::new(RotationZ::new(params[2])), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(Arc::new(RotationZ::new(params[3])), &[QubitId::new(1)]).unwrap();
         circuit
