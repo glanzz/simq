@@ -1,8 +1,8 @@
 //! GPU backend for SimQ using wgpu
 
 #[cfg(feature = "gpu")]
-#[cfg(feature = "gpu")]
 use wgpu;
+use num_complex::Complex;
 
 #[cfg(feature = "gpu")]
 #[derive(Clone)]
