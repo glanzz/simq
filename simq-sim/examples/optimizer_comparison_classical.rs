@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         simq_state::AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
-            let dense = DenseState::from_sparse(sparse);
+            let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
         }
     };
