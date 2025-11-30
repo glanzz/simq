@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         3, // depth
     );
 
-    let simulator = Simulator::new(builder.num_qubits());
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
 
     println!("Problem size: {} numbers → {} qubits", numbers.len(), builder.num_qubits());
@@ -172,7 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             depth,
         );
 
-        let simulator = Simulator::new(builder.num_qubits());
+        let simulator = Simulator::new(Default::default());
         let observable = builder.cost_observable()?;
         let initial_params = random_initial_parameters(depth, Some(42 + depth as u64));
 
@@ -264,7 +264,7 @@ fn run_maxcut_example(graph: &Graph, name: &str, depth: usize) -> Result<(), Box
         depth,
     );
 
-    let simulator = Simulator::new(builder.num_qubits());
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
 
     println!("Graph: {}", name);
@@ -319,7 +319,7 @@ fn run_maxcut_with_mixer(
         depth,
     );
 
-    let simulator = Simulator::new(builder.num_qubits());
+    let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
 
     let initial_params = random_initial_parameters(depth, Some(42));

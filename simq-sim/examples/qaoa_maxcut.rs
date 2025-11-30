@@ -8,7 +8,7 @@
 use simq_sim::Simulator;
 use simq_sim::gradient::{QAOAOptimizer, QAOAConfig, AdamOptimizer, AdamConfig};
 use simq_core::{Circuit, Gate};
-use simq_state::observable::PauliObservable;
+use simq_state::observable::{PauliObservable, PauliString};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("QAOA: MaxCut Problem\n");
@@ -18,15 +18,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Edges: (0,1), (1,2), (0,2)
     // Goal: Maximize the number of edges between different partitions
     let num_qubits = 3;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // MaxCut Hamiltonian: H_C = -0.5 * sum_{(i,j) in E} (I - Z_i Z_j)
     // For triangle: H_C = -0.5 * ((I - Z0Z1) + (I - Z1Z2) + (I - Z0Z2))
     // We'll use the cost observable: Z0Z1 + Z1Z2 + Z0Z2 (minimize to solve MaxCut)
     let observable = {
-        let mut obs = PauliObservable::from_pauli_string("ZZI", 0.5)?; // Z0Z1
-        obs = obs.add(&PauliObservable::from_pauli_string("IZZ", 0.5)?)?; // Z1Z2
-        obs.add(&PauliObservable::from_pauli_string("ZIZ", 0.5)?)?  // Z0Z2
+        let mut obs = PauliObservable::from_pauli_string(PauliString::from_str("ZZI")?, 0.5); // Z0Z1
+        obs = obs.add(&PauliObservable::from_pauli_string(PauliString::from_str("IZZ")?, 0.5))?; // Z1Z2
+        obs.add(&PauliObservable::from_pauli_string(PauliString::from_str("ZIZ")?, 0.5))?  // Z0Z2
     };
 
     // QAOA circuit builder

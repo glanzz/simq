@@ -8,7 +8,7 @@
 use simq_sim::Simulator;
 use simq_sim::gradient::{VQEOptimizer, VQEConfig, AdamOptimizer, AdamConfig};
 use simq_core::{Circuit, Gate};
-use simq_state::observable::PauliObservable;
+use simq_state::observable::{PauliObservable, PauliString};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("VQE: H2 Molecule Ground State Energy\n");
@@ -16,12 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create simulator
     let num_qubits = 2;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // H2 molecule Hamiltonian (simplified, at equilibrium bond length)
     // H = -1.0523 * I - 0.3979 * Z0 - 0.3979 * Z1 - 0.0112 * Z0Z1 + 0.1809 * X0X1
     // We'll optimize the X0X1 term component
-    let observable = PauliObservable::from_pauli_string("XX", -0.1809)?;
+    let observable = PauliObservable::from_pauli_string(PauliString::from_str("XX")?, -0.1809);
 
     // VQE ansatz: Hardware-efficient ansatz
     // Circuit structure: RY(θ0) ⊗ RY(θ1) - CNOT(0,1) - RY(θ2) ⊗ RY(θ3)

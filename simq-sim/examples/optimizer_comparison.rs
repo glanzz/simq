@@ -12,8 +12,10 @@ use simq_sim::gradient::{
     MomentumOptimizer, MomentumConfig,
     gradient_descent,
 };
-use simq_core::{Circuit, Gate};
-use simq_state::observable::PauliObservable;
+use simq_core::{Circuit, QubitId};
+use simq_state::observable::{PauliObservable, PauliString};
+use simq_gates::standard::{RotationY, RotationZ, CNOT};
+use std::sync::Arc;
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,19 +24,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Simple VQE problem: 2-qubit system
     let num_qubits = 2;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // Observable: Z0Z1 (maximize correlation)
-    let observable = PauliObservable::from_pauli_string("ZZ", -1.0)?;
+    let observable = PauliObservable::from_pauli_string(PauliString::from_str("ZZ")?, -1.0);
 
     // Ansatz circuit
     let circuit_builder = |params: &[f64]| {
         let mut circuit = Circuit::new(num_qubits);
-        circuit.add_gate(Gate::RY(0, params[0]));
-        circuit.add_gate(Gate::RY(1, params[1]));
-        circuit.add_gate(Gate::CNOT(0, 1));
-        circuit.add_gate(Gate::RZ(0, params[2]));
-        circuit.add_gate(Gate::RZ(1, params[3]));
+        circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)]).unwrap();
+        circuit.add_gate(Arc::new(CNOT), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit.add_gate(Arc::new(RotationZ::new(params[2])), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(Arc::new(RotationZ::new(params[3])), &[QubitId::new(1)]).unwrap();
         circuit
     };
 
