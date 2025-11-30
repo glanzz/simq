@@ -161,7 +161,7 @@ fn main() {
              circuit_state.ref_count(), checkpoint.ref_count());
 
     // Can restore from checkpoint
-    let mut restored = checkpoint.clone();
+    let restored = checkpoint.clone();
     println!("   Restored from checkpoint");
     println!("   Checkpoint still has: {} refs", checkpoint.ref_count());
     println!();
