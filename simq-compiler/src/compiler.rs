@@ -65,8 +65,6 @@ impl Compiler {
         }
     }
 
-
-
     /// Add an optimization pass to the compiler
     ///
     /// Passes are applied in the order they are added.

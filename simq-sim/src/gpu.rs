@@ -1,12 +1,11 @@
 //! GPU backend for SimQ using wgpu
 
 #[cfg(feature = "gpu")]
+use num_complex::Complex;
+#[cfg(feature = "gpu")]
 use wgpu;
 #[cfg(feature = "gpu")]
 use wgpu::util::DeviceExt;
-#[cfg(feature = "gpu")]
-use num_complex::Complex;
-
 
 #[cfg(feature = "gpu")]
 pub struct GpuContext {
@@ -39,10 +38,7 @@ impl GpuContext {
 
         // Prepare buffers
         // Convert Complex<f64> to interleaved f64 array (real, imag, real, imag, ...)
-        let state_f64: Vec<f64> = state
-            .iter()
-            .flat_map(|c| [c.re, c.im])
-            .collect();
+        let state_f64: Vec<f64> = state.iter().flat_map(|c| [c.re, c.im]).collect();
         let state_bytes = bytemuck::cast_slice(&state_f64);
         let state_buf = self
             .device

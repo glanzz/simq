@@ -975,7 +975,8 @@ impl DenseState {
                 // Check if traced-out qubits match
                 let mut traced_match = true;
                 for q in 0..self.num_qubits() {
-                    if !qubits_to_keep.contains(&q) && ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
+                    if !qubits_to_keep.contains(&q) && ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1)
+                    {
                         traced_match = false;
                         break;
                     }

@@ -344,9 +344,9 @@ mod tests {
         // (Qubit 0 is least significant bit)
         let mut state = vec![
             Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0), // |00⟩: q0=0, q1=0
-            Complex64::new(0.0, 0.0),                // |01⟩: q0=1, q1=0
+            Complex64::new(0.0, 0.0),                             // |01⟩: q0=1, q1=0
             Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0), // |10⟩: q0=0, q1=1
-            Complex64::new(0.0, 0.0),                // |11⟩: q0=1, q1=1
+            Complex64::new(0.0, 0.0),                             // |11⟩: q0=1, q1=1
         ];
 
         // CNOT with control=1, target=0 (control is q1, target is q0)

@@ -484,8 +484,6 @@ impl LazyExecutor {
         }
     }
 
-
-
     /// Execute a circuit on a state vector with lazy evaluation
     ///
     /// This method applies all gates in the circuit to the state vector,

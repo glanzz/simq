@@ -72,8 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let energy = compute_expectation(&result, &observable)?;
 
         // Compute gradient
-        let grad_result =
-            compute_gradient_auto(&simulator, circuit_builder, &observable, &params)?;
+        let grad_result = compute_gradient_auto(&simulator, circuit_builder, &observable, &params)?;
 
         // Record metrics
         monitor.record(iteration, energy, &grad_result.gradients, &params);

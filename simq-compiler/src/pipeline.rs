@@ -11,8 +11,7 @@ use crate::passes::{
 use std::sync::Arc;
 
 /// Optimization level presets
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptimizationLevel {
     /// No optimization
     O0,
@@ -24,7 +23,6 @@ pub enum OptimizationLevel {
     /// Aggressive optimization (all passes with commutation)
     O3,
 }
-
 
 /// Create a compiler with the specified optimization level
 ///

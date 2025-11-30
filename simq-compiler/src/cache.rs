@@ -130,8 +130,6 @@ impl CompilationCache {
         }
     }
 
-
-
     /// Get a cached circuit by fingerprint
     ///
     /// If found, moves the entry to the back of the LRU queue.
@@ -172,12 +170,12 @@ impl CompilationCache {
                 // Move to back of queue
                 self.lru_queue.retain(|fp| *fp != fingerprint);
                 self.lru_queue.push_back(fingerprint);
-            }
+            },
             std::collections::hash_map::Entry::Vacant(e) => {
                 // Insert new entry
                 e.insert(circuit);
                 self.lru_queue.push_back(fingerprint);
-            }
+            },
         }
 
         self.stats.current_size = self.cache.len();
@@ -252,8 +250,6 @@ impl SharedCompilationCache {
             inner: Arc::new(Mutex::new(CompilationCache::new(max_size))),
         }
     }
-
-
 
     /// Get a cached circuit
     pub fn get(&self, fingerprint: CircuitFingerprint) -> Option<Circuit> {

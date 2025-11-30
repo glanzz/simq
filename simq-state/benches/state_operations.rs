@@ -23,8 +23,6 @@ fn hadamard_matrix() -> [[Complex64; 2]; 2] {
     ]
 }
 
-
-
 fn phase_diagonal(theta: f64) -> [Complex64; 2] {
     [
         Complex64::new(1.0, 0.0),

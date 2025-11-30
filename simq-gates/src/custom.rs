@@ -441,19 +441,15 @@ impl CustomGateBuilder {
     /// - Matrix validation fails
     /// - Hermitian requirement not met (if required)
     pub fn build(self) -> Result<CustomGate, CustomGateError> {
-        let num_qubits = self
-            .num_qubits
-            .ok_or(CustomGateError::InvalidDimensions {
-                expected: 0,
-                actual: 0,
-            })?;
+        let num_qubits = self.num_qubits.ok_or(CustomGateError::InvalidDimensions {
+            expected: 0,
+            actual: 0,
+        })?;
 
-        let matrix = self
-            .matrix
-            .ok_or(CustomGateError::InvalidDimensions {
-                expected: 0,
-                actual: 0,
-            })?;
+        let matrix = self.matrix.ok_or(CustomGateError::InvalidDimensions {
+            expected: 0,
+            actual: 0,
+        })?;
 
         let mut gate = CustomGate::new(self.name, num_qubits, matrix, self.tolerance)?;
 
