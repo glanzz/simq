@@ -281,6 +281,7 @@ impl Decomposer for TwoQubitDecomposer {
 
         // Convert to Matrix4 format
         let mut matrix_4x4: Matrix4 = [[ZERO; 4]; 4];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..4 {
             for j in 0..4 {
                 let idx = i * 4 + j;

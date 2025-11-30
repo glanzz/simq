@@ -249,8 +249,8 @@ mod tests {
 
         // Should be |000⟩
         assert_eq!(amplitudes[0], Complex64::new(1.0, 0.0));
-        for i in 1..amplitudes.len() {
-            assert_eq!(amplitudes[i], Complex64::new(0.0, 0.0));
+        for amplitude in amplitudes.iter().skip(1) {
+            assert_eq!(*amplitude, Complex64::new(0.0, 0.0));
         }
     }
 

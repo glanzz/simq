@@ -70,8 +70,8 @@ impl CommonAngles {
 
     /// RX(π/2) - 90° rotation around X-axis
     pub const RX_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476; // cos(π/4) = 1/√2
-        const SIN: f64 = 0.7071067811865476; // sin(π/4) = 1/√2
+        const COS: f64 = std::f64::consts::FRAC_1_SQRT_2; // cos(π/4) = 1/√2
+        const SIN: f64 = std::f64::consts::FRAC_1_SQRT_2; // sin(π/4) = 1/√2
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -117,8 +117,8 @@ impl CommonAngles {
 
     /// RY(π/2) - 90° rotation around Y-axis
     pub const RY_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476; // 1/√2
-        const SIN: f64 = 0.7071067811865476; // 1/√2
+        const COS: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
+        const SIN: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
         [
             [Complex64::new(COS, 0.0), Complex64::new(-SIN, 0.0)],
             [Complex64::new(SIN, 0.0), Complex64::new(COS, 0.0)],
@@ -164,8 +164,8 @@ impl CommonAngles {
 
     /// RZ(π/2) - 90° phase rotation (equivalent to S gate up to global phase)
     pub const RZ_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476; // 1/√2
-        const SIN: f64 = 0.7071067811865476; // 1/√2
+        const COS: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
+        const SIN: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
         [
             [Complex64::new(COS, -SIN), Complex64::new(0.0, 0.0)],
             [Complex64::new(0.0, 0.0), Complex64::new(COS, SIN)],

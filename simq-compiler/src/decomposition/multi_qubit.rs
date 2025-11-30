@@ -199,13 +199,13 @@ impl MultiQubitDecomposer {
     /// CSWAP = CNOT₁₂ · Toffoli₀₂₁ · CNOT₁₂
     /// ```
     pub fn decompose_fredkin(&self) -> Vec<MultiQubitInstruction> {
-        let mut gates = Vec::new();
-
-        // CNOT(1, 2)
-        gates.push(MultiQubitInstruction::CNOT {
-            control: 1,
-            target: 2,
-        });
+        let mut gates = vec![
+            // CNOT(1, 2)
+            MultiQubitInstruction::CNOT {
+                control: 1,
+                target: 2,
+            },
+        ];
 
         // Toffoli(0, 2, 1)
         gates.extend(self.decompose_toffoli_relative_phase());
@@ -272,16 +272,14 @@ impl MultiQubitDecomposer {
         // Use a tree-like structure to compute the AND of all controls
         // Each layer uses ancillas to compute partial ANDs
 
-        let mut gates = Vec::new();
-
         // Forward pass: compute ANDs
         // TODO: Implement tree structure
 
         // Apply controlled-X from final ancilla
-        gates.push(MultiQubitInstruction::CNOT {
+        let gates = vec![MultiQubitInstruction::CNOT {
             control: num_controls + num_ancillas - 1,
             target: num_controls,
-        });
+        }];
 
         // Backward pass: uncompute ANDs
         // TODO: Implement uncomputation

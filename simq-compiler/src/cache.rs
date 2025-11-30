@@ -130,10 +130,7 @@ impl CompilationCache {
         }
     }
 
-    /// Create a cache with default size (100 entries)
-    pub fn default() -> Self {
-        Self::new(100)
-    }
+
 
     /// Get a cached circuit by fingerprint
     ///
@@ -234,6 +231,12 @@ impl CompilationCache {
     }
 }
 
+impl Default for CompilationCache {
+    fn default() -> Self {
+        Self::new(100)
+    }
+}
+
 /// Thread-safe compilation cache
 ///
 /// Wraps CompilationCache in Arc<Mutex<>> for concurrent access.
@@ -250,10 +253,7 @@ impl SharedCompilationCache {
         }
     }
 
-    /// Create a shared cache with default size
-    pub fn default() -> Self {
-        Self::new(100)
-    }
+
 
     /// Get a cached circuit
     pub fn get(&self, fingerprint: CircuitFingerprint) -> Option<Circuit> {
@@ -288,6 +288,12 @@ impl SharedCompilationCache {
     /// Set maximum cache size
     pub fn set_max_size(&self, max_size: usize) {
         self.inner.lock().unwrap().set_max_size(max_size);
+    }
+}
+
+impl Default for SharedCompilationCache {
+    fn default() -> Self {
+        Self::new(100)
     }
 }
 

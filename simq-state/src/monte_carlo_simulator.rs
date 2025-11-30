@@ -237,12 +237,12 @@ impl MonteCarloSimulator {
         let mut norm_sq = 0.0;
 
         // Zero out |1⟩ components and accumulate norm
-        for i in 0..amplitudes.len() {
+        for (i, amp) in amplitudes.iter_mut().enumerate() {
             if (i & stride) != 0 {
                 // This is a |1⟩ component - zero it
-                amplitudes[i] = Complex64::new(0.0, 0.0);
+                *amp = Complex64::new(0.0, 0.0);
             } else {
-                norm_sq += amplitudes[i].norm_sqr();
+                norm_sq += amp.norm_sqr();
             }
         }
 
@@ -265,12 +265,12 @@ impl MonteCarloSimulator {
 
         let mut norm_sq = 0.0;
 
-        for i in 0..amplitudes.len() {
+        for (i, amp) in amplitudes.iter_mut().enumerate() {
             if (i & stride) != 0 {
                 // This is a |1⟩ component - scale it
-                amplitudes[i] *= factor;
+                *amp *= factor;
             }
-            norm_sq += amplitudes[i].norm_sqr();
+            norm_sq += amp.norm_sqr();
         }
 
         // Renormalize

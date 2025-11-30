@@ -17,6 +17,12 @@ type PatternMatcher = fn(&[&GateOp]) -> bool;
 /// A replacement generator function that creates replacement gates
 type ReplacementGenerator = fn(QubitId) -> Vec<(Arc<dyn Gate>, QubitId)>;
 
+/// Type alias for match result
+type MatchResult = Option<(usize, Vec<(Arc<dyn Gate>, QubitId)>)>;
+
+/// Type alias for best match result
+type BestMatch = Option<(usize, usize, Vec<(Arc<dyn Gate>, QubitId)>)>;
+
 /// An advanced template with pattern matching and replacement generation
 struct AdvancedTemplate {
     /// Name of this template
@@ -192,7 +198,7 @@ impl AdvancedTemplateMatching {
         ops: &[GateOp],
         start: usize,
         template: &AdvancedTemplate,
-    ) -> Option<(usize, Vec<(Arc<dyn Gate>, QubitId)>)> {
+    ) -> MatchResult {
         // Check if we have enough gates remaining
         if start + template.min_length > ops.len() {
             return None;
@@ -246,7 +252,7 @@ impl AdvancedTemplateMatching {
             let mut i = 0;
 
             while i < ops.len() {
-                let mut best_match: Option<(usize, usize, Vec<(Arc<dyn Gate>, QubitId)>)> = None;
+                let mut best_match: BestMatch = None;
 
                 // Try all templates, prefer longer matches
                 for (tidx, template) in templates.iter().enumerate() {

@@ -1,4 +1,6 @@
 //! Auto-generated compile-time gate matrices
+#![allow(clippy::excessive_precision)]
+#![allow(clippy::approx_constant)]
 //!
 //! This module contains matrices generated at build time by build.rs.
 //! All matrices are embedded in the binary for zero-cost runtime access.

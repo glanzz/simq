@@ -136,12 +136,10 @@ impl DensityMatrixSimulator {
         self.state.apply_unitary(unitary, qubits)?;
         self.gate_count += 1;
 
-        if self.config.validate_state {
-            if !self.state.is_valid(self.config.tolerance) {
-                return Err(StateError::NotNormalized {
-                    norm: self.state.trace(),
-                });
-            }
+        if self.config.validate_state && !self.state.is_valid(self.config.tolerance) {
+            return Err(StateError::NotNormalized {
+                norm: self.state.trace(),
+            });
         }
 
         Ok(())
@@ -162,12 +160,10 @@ impl DensityMatrixSimulator {
         self.state.apply_kraus_channel(kraus_ops, qubits)?;
         self.noise_ops_applied += 1;
 
-        if self.config.validate_state {
-            if !self.state.is_valid(self.config.tolerance) {
-                return Err(StateError::NotNormalized {
-                    norm: self.state.trace(),
-                });
-            }
+        if self.config.validate_state && !self.state.is_valid(self.config.tolerance) {
+            return Err(StateError::NotNormalized {
+                norm: self.state.trace(),
+            });
         }
 
         Ok(())

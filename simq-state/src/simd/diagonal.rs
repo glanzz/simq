@@ -40,12 +40,12 @@ pub fn apply_diagonal_gate_scalar(
     // For each block of size 2*stride
     for base in (0..dimension).step_by(2 * stride) {
         // Process |0⟩ amplitudes: multiply by diagonal[0]
-        for i in base..(base + stride) {
-            state[i] *= diagonal[0];
+        for amp in state.iter_mut().skip(base).take(stride) {
+            *amp *= diagonal[0];
         }
         // Process |1⟩ amplitudes: multiply by diagonal[1]
-        for i in (base + stride)..(base + 2 * stride) {
-            state[i] *= diagonal[1];
+        for amp in state.iter_mut().take(base + 2 * stride).skip(base + stride) {
+            *amp *= diagonal[1];
         }
     }
 }
@@ -252,8 +252,8 @@ pub fn apply_diagonal_gate_parallel(
         let actual_stride = chunk.len().min(stride);
 
         // Process |0⟩ amplitudes
-        for i in 0..actual_stride {
-            chunk[i] *= diagonal[0];
+        for amp in chunk.iter_mut().take(actual_stride) {
+            *amp *= diagonal[0];
         }
 
         // Process |1⟩ amplitudes (if they exist in this chunk)

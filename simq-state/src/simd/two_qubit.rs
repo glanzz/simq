@@ -121,34 +121,7 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
 
-    fn cnot_matrix() -> [[Complex64; 4]; 4] {
-        [
-            [
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-        ]
-    }
+
 
     #[test]
     fn test_scalar_cnot() {

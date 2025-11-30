@@ -121,9 +121,9 @@ pub fn apply_cz_scalar(state: &mut [Complex64], qubit1: usize, qubit2: usize, nu
     let mask_both = mask1 | mask2;
 
     // Only the |11⟩ state gets a phase shift (multiply by -1)
-    for i in 0..dimension {
+    for (i, amp) in state.iter_mut().enumerate().take(dimension) {
         if (i & mask_both) == mask_both {
-            state[i] = -state[i];
+            *amp = -*amp;
         }
     }
 }
@@ -343,9 +343,9 @@ mod tests {
         // Basis ordering: |00⟩ at idx 0, |01⟩ at idx 1, |10⟩ at idx 2, |11⟩ at idx 3
         // (Qubit 0 is least significant bit)
         let mut state = vec![
-            Complex64::new(0.7071067811865476, 0.0), // |00⟩: q0=0, q1=0
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0), // |00⟩: q0=0, q1=0
             Complex64::new(0.0, 0.0),                // |01⟩: q0=1, q1=0
-            Complex64::new(0.7071067811865476, 0.0), // |10⟩: q0=0, q1=1
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0), // |10⟩: q0=0, q1=1
             Complex64::new(0.0, 0.0),                // |11⟩: q0=1, q1=1
         ];
 
@@ -358,10 +358,10 @@ mod tests {
         apply_cnot_scalar(&mut state, 1, 0, 2);
 
         // After CNOT with control=1, target=0: (|00⟩ + |11⟩)/√2
-        assert_relative_eq!(state[0].re, 0.7071067811865476, epsilon = 1e-10);
+        assert_relative_eq!(state[0].re, std::f64::consts::FRAC_1_SQRT_2, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[2].re, 0.0, epsilon = 1e-10);
-        assert_relative_eq!(state[3].re, 0.7071067811865476, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, std::f64::consts::FRAC_1_SQRT_2, epsilon = 1e-10);
     }
 
     #[test]
@@ -472,7 +472,7 @@ mod tests {
         // Result: |1⟩ ⊗ (|0⟩ - i|1⟩)/√2 = (|10⟩ - i|11⟩)/√2
         apply_crx(&mut state, 1, 0, std::f64::consts::PI / 2.0, 2);
 
-        let inv_sqrt2 = 0.7071067811865476;
+        let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
         assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[2].re, inv_sqrt2, epsilon = 1e-10);
@@ -505,7 +505,7 @@ mod tests {
     #[test]
     fn test_crz_gate() {
         // Test controlled-RZ gate (diagonal gate, only affects phases)
-        let inv_sqrt2 = 0.7071067811865476;
+        let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
         let mut state = vec![
             Complex64::new(inv_sqrt2, 0.0), // |00⟩
             Complex64::new(inv_sqrt2, 0.0), // |01⟩

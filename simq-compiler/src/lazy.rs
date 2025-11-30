@@ -484,10 +484,7 @@ impl LazyExecutor {
         }
     }
 
-    /// Create a lazy executor with default configuration
-    pub fn default() -> Self {
-        Self::new(LazyConfig::default())
-    }
+
 
     /// Execute a circuit on a state vector with lazy evaluation
     ///
@@ -668,6 +665,12 @@ impl std::fmt::Debug for LazyExecutor {
             .field("cache_stats", &self.cache.stats())
             .field("stats", &self.stats)
             .finish()
+    }
+}
+
+impl Default for LazyExecutor {
+    fn default() -> Self {
+        Self::new(LazyConfig::default())
     }
 }
 

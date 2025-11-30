@@ -54,10 +54,10 @@ fn example_2_bell_state_creation() {
 
     // Apply Hadamard to first qubit
     let h_gate = [
-        Complex64::new(0.707106781, 0.0),
-        Complex64::new(0.707106781, 0.0),
-        Complex64::new(0.707106781, 0.0),
-        Complex64::new(-0.707106781, 0.0),
+        Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+        Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+        Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+        Complex64::new(-std::f64::consts::FRAC_1_SQRT_2, 0.0),
     ];
 
     state.apply_single_qubit_gate(&h_gate, 0).unwrap();

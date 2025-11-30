@@ -281,11 +281,7 @@ impl<'a> LatexRenderer<'a> {
                 },
                 None => {
                     // Check if we're a wire passing through a multi-qubit gate
-                    if self.is_wire_through(col, qubit) {
-                        output.push_str("\\qw");
-                    } else {
-                        output.push_str("\\qw");
-                    }
+                    output.push_str("\\qw");
                 },
             }
 
@@ -316,6 +312,7 @@ impl<'a> LatexRenderer<'a> {
         None
     }
 
+    #[allow(dead_code)]
     fn is_wire_through(&self, col: &[(usize, &GateOp)], qubit: usize) -> bool {
         for (_, op) in col {
             let indices: Vec<usize> = op.qubits().iter().map(|q| q.index()).collect();

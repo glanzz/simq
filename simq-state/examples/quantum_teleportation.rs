@@ -201,9 +201,7 @@ fn apply_x_gate(state: &mut DenseState, qubit: usize) {
         if idx & mask == 0 {
             // Swap amplitude at idx with idx | mask
             let partner_idx = idx | mask;
-            let temp = amplitudes[idx];
-            amplitudes[idx] = amplitudes[partner_idx];
-            amplitudes[partner_idx] = temp;
+            amplitudes.swap(idx, partner_idx);
         }
     }
 }
@@ -213,9 +211,9 @@ fn apply_z_gate(state: &mut DenseState, qubit: usize) {
     let mask = 1 << qubit;
     let amplitudes = state.amplitudes_mut();
 
-    for idx in 0..amplitudes.len() {
+    for (idx, amp) in amplitudes.iter_mut().enumerate() {
         if idx & mask != 0 {
-            amplitudes[idx] = -amplitudes[idx];
+            *amp = -*amp;
         }
     }
 }

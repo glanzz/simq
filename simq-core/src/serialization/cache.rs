@@ -1,7 +1,5 @@
 //! Circuit caching infrastructure
 
-#![cfg(feature = "cache")]
-
 use crate::{Circuit, QuantumError, Result};
 use dashmap::DashMap;
 use std::hash::Hash;

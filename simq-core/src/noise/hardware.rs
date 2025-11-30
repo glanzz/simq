@@ -590,7 +590,7 @@ impl HardwareNoiseModel {
             fidelity *= (t1_factor + t2_factor) / 2.0;
         }
 
-        fidelity.max(0.0).min(1.0)
+        fidelity.clamp(0.0, 1.0)
     }
 
     // ===== Hardware Presets =====

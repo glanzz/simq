@@ -1,4 +1,5 @@
 //! Gate matrix computation utilities
+#![allow(clippy::needless_range_loop)]
 //!
 //! This module provides advanced matrix computation operations for quantum gates,
 //! including tensor products, controlled gate generation, matrix exponentiation,

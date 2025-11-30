@@ -13,7 +13,7 @@ const NEG_I: Complex64 = Complex64::new(0.0, -1.0);
 const NEG_ONE: Complex64 = Complex64::new(-1.0, 0.0);
 
 // Common mathematical constants
-const INV_SQRT2: f64 = 0.7071067811865476; // 1/√2
+const INV_SQRT2: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
 
 // Single-qubit gate matrices (2x2)
 
@@ -394,6 +394,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_pauli_x_squaring() {
         // X² = I
         let mut result = [[ZERO; 2]; 2];
@@ -414,6 +415,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_hadamard_self_inverse() {
         // H² = I
         let mut result = [[ZERO; 2]; 2];
@@ -434,6 +436,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_s_gate_squaring() {
         // S² = Z
         let mut result = [[ZERO; 2]; 2];
@@ -454,6 +457,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_t_gate_squaring() {
         // T² = S
         let mut result = [[ZERO; 2]; 2];

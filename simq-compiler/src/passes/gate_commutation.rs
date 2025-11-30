@@ -321,7 +321,7 @@ impl GateCommutation {
     /// Try to swap two adjacent gates if they commute
     ///
     /// Returns true if a swap was made
-    fn try_swap_gates(&self, ops: &mut Vec<GateOp>, i: usize) -> bool {
+    fn try_swap_gates(&self, ops: &mut [GateOp], i: usize) -> bool {
         if i + 1 >= ops.len() {
             return false;
         }

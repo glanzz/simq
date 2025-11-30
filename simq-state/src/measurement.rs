@@ -324,13 +324,11 @@ impl AliasTable {
         }
 
         // Handle remaining (due to floating-point errors)
-        while !large.is_empty() {
-            let l = large.pop().unwrap();
+        while let Some(l) = large.pop() {
             prob[l] = 1.0;
         }
 
-        while !small.is_empty() {
-            let s = small.pop().unwrap();
+        while let Some(s) = small.pop() {
             prob[s] = 1.0;
         }
 
@@ -431,7 +429,7 @@ mod tests {
         let alias_table = AliasTable::new(&probabilities).unwrap();
 
         let mut rng = TestRng::new(42);
-        let mut counts = vec![0; 4];
+        let mut counts = [0; 4];
 
         let shots = 10000;
         for _ in 0..shots {
@@ -452,7 +450,7 @@ mod tests {
         let alias_table = AliasTable::new(&probabilities).unwrap();
 
         let mut rng = TestRng::new(123);
-        let mut counts = vec![0; 4];
+        let mut counts = [0; 4];
 
         let shots = 10000;
         for _ in 0..shots {
@@ -705,8 +703,8 @@ mod mid_circuit_tests {
         // After measuring qubit 0 as |0⟩, state should be |000⟩
         let amps = state.amplitudes();
         assert_relative_eq!(amps[0].norm(), 1.0, epsilon = 1e-10);
-        for i in 1..8 {
-            assert_relative_eq!(amps[i].norm(), 0.0, epsilon = 1e-10);
+        for amp in amps.iter().take(8).skip(1) {
+            assert_relative_eq!(amp.norm(), 0.0, epsilon = 1e-10);
         }
     }
 

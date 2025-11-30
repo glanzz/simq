@@ -723,8 +723,7 @@ impl<'a> AsciiRenderer<'a> {
         let (qubit_gate, qubit_role) = self.analyze_column(col);
 
         // Render each qubit line
-        for q in 0..num_qubits {
-            let line = &mut lines[q];
+        for (q, line) in lines.iter_mut().enumerate().take(num_qubits) {
             let content = self.render_qubit_slot(q, &qubit_gate, &qubit_role, width);
             line.push_str(&content);
         }

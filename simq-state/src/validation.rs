@@ -164,22 +164,22 @@ pub fn validate_unitary_2x2(matrix: &[[Complex64; 2]; 2], tolerance: f64) -> boo
     for i in 0..2 {
         for j in 0..2 {
             let mut sum = Complex64::new(0.0, 0.0);
-            for k in 0..2 {
-                sum += matrix[k][i].conj() * matrix[k][j];
+            for row in matrix.iter().take(2) {
+                sum += row[i].conj() * row[j];
             }
             result[i][j] = sum;
         }
     }
 
     // Check if result is identity matrix
-    for i in 0..2 {
-        for j in 0..2 {
+    for (i, row) in result.iter().enumerate() {
+        for (j, val) in row.iter().enumerate() {
             let expected = if i == j {
                 Complex64::new(1.0, 0.0)
             } else {
                 Complex64::new(0.0, 0.0)
             };
-            let diff = (result[i][j] - expected).norm();
+            let diff = (val - expected).norm();
             if diff > tolerance {
                 return false;
             }

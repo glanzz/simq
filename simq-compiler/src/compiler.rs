@@ -65,10 +65,7 @@ impl Compiler {
         }
     }
 
-    /// Create a compiler with default configuration
-    pub fn default() -> Self {
-        Self::new(CompilerConfig::default())
-    }
+
 
     /// Add an optimization pass to the compiler
     ///
@@ -152,6 +149,12 @@ impl Compiler {
     /// specific optimizations without running the full pipeline.
     pub fn run_pass(&self, pass: &dyn OptimizationPass, circuit: &mut Circuit) -> Result<bool> {
         pass.apply(circuit)
+    }
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new(CompilerConfig::default())
     }
 }
 

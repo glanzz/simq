@@ -362,8 +362,8 @@ impl DependencyGraph {
         while completed.len() < self.num_nodes() {
             // Find all nodes with no remaining dependencies
             let mut current_layer = Vec::new();
-            for i in 0..self.num_nodes() {
-                if !completed.contains(&i) && dependency_count[i] == 0 {
+            for (i, &count) in dependency_count.iter().enumerate().take(self.num_nodes()) {
+                if !completed.contains(&i) && count == 0 {
                     current_layer.push(i);
                     completed.insert(i);
                 }

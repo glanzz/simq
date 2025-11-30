@@ -205,12 +205,15 @@ impl RotationLookupTable {
         let trig_table = TrigTable::new(&config);
         Self { trig_table, config }
     }
+}
 
-    /// Create a lookup table with default configuration
-    pub fn default() -> Self {
+impl Default for RotationLookupTable {
+    fn default() -> Self {
         Self::new(LookupConfig::default())
     }
+}
 
+impl RotationLookupTable {
     /// Get the RX(θ) matrix, using lookup table if possible
     ///
     /// Matrix form:

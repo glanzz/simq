@@ -110,7 +110,26 @@ impl PauliString {
     /// let pauli = PauliString::from_str("XXYZ").unwrap();
     /// assert_eq!(pauli.num_qubits(), 4);
     /// ```
+    /// Create a new Pauli string from a string representation
+    ///
+    /// # Example
+    /// ```
+    /// use simq_state::PauliString;
+    /// use std::str::FromStr;
+    ///
+    /// let pauli = PauliString::from_str("XXYZ").unwrap();
+    /// assert_eq!(pauli.num_qubits(), 4);
+    /// ```
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
+        s.parse()
+    }
+}
+
+impl std::str::FromStr for PauliString {
+    type Err = StateError;
+
+    fn from_str(s: &str) -> Result<Self> {
         let paulis: Result<Vec<_>> = s.chars().map(Pauli::from_char).collect();
         Ok(Self {
             paulis: paulis?,
@@ -118,7 +137,9 @@ impl PauliString {
             phase: 0,
         })
     }
+}
 
+impl PauliString {
     /// Create a Pauli string from a vector of Paulis
     pub fn from_paulis(paulis: Vec<Pauli>) -> Self {
         Self {

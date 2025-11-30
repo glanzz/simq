@@ -345,12 +345,12 @@ impl<'a> StatefulDebugger<'a> {
 
         let target_bit = num_qubits - 1 - target_qubit;
 
-        for i in 0..dimension {
+        for (i, &amp) in amplitudes.iter().enumerate().take(dimension) {
             let target_state = (i >> target_bit) & 1;
             if target_state == 0 {
-                rho_00 += amplitudes[i].conj() * amplitudes[i];
+                rho_00 += amp.conj() * amp;
             } else {
-                rho_11 += amplitudes[i].conj() * amplitudes[i];
+                rho_11 += amp.conj() * amp;
             }
         }
 

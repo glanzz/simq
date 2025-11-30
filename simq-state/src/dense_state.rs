@@ -965,8 +965,7 @@ impl DenseState {
 
             let reduced_i = extract_reduced_idx(idx_bra);
 
-            for idx_ket in 0..self.dimension() {
-                let amp_ket = amplitudes[idx_ket];
+            for (idx_ket, amp_ket) in amplitudes.iter().enumerate() {
                 if amp_ket.norm_sqr() < 1e-14 {
                     continue;
                 }
@@ -976,11 +975,9 @@ impl DenseState {
                 // Check if traced-out qubits match
                 let mut traced_match = true;
                 for q in 0..self.num_qubits() {
-                    if !qubits_to_keep.contains(&q) {
-                        if ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
-                            traced_match = false;
-                            break;
-                        }
+                    if !qubits_to_keep.contains(&q) && ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
+                        traced_match = false;
+                        break;
                     }
                 }
 
@@ -1033,8 +1030,8 @@ mod tests {
         let amps = state.amplitudes();
 
         assert_eq!(amps[0], Complex64::new(1.0, 0.0));
-        for i in 1..amps.len() {
-            assert_eq!(amps[i], Complex64::new(0.0, 0.0));
+        for amp in amps.iter().skip(1) {
+            assert_eq!(*amp, Complex64::new(0.0, 0.0));
         }
     }
 

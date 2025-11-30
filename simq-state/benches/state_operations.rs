@@ -23,16 +23,7 @@ fn hadamard_matrix() -> [[Complex64; 2]; 2] {
     ]
 }
 
-fn rotation_x_matrix(theta: f64) -> [[Complex64; 2]; 2] {
-    let half_theta = theta / 2.0;
-    let cos_val = half_theta.cos();
-    let sin_val = half_theta.sin();
 
-    [
-        [Complex64::new(cos_val, 0.0), Complex64::new(0.0, -sin_val)],
-        [Complex64::new(0.0, -sin_val), Complex64::new(cos_val, 0.0)],
-    ]
-}
 
 fn phase_diagonal(theta: f64) -> [Complex64; 2] {
     [

@@ -507,11 +507,14 @@ impl CustomGateBuilder {
 /// gate.set_parameters(vec![PI / 4.0]).unwrap();
 /// let matrix = gate.matrix_vec().to_vec();
 /// ```
+/// Type alias for matrix generation function
+pub type MatrixFn = Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>;
+
 pub struct ParametricCustomGate {
     name: String,
     num_qubits: usize,
     parameter_names: Vec<String>,
-    matrix_fn: Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>,
+    matrix_fn: MatrixFn,
     current_matrix: Vec<Complex64>,
     tolerance: f64,
     is_hermitian: bool,
@@ -543,7 +546,7 @@ impl ParametricCustomGate {
         name: impl Into<String>,
         num_qubits: usize,
         parameter_names: Vec<String>,
-        matrix_fn: Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>,
+        matrix_fn: MatrixFn,
         initial_params: Vec<f64>,
         tolerance: f64,
     ) -> Result<Self, CustomGateError> {
@@ -621,7 +624,7 @@ pub struct ParametricCustomGateBuilder {
     name: String,
     num_qubits: usize,
     parameter_names: Vec<String>,
-    matrix_fn: Option<Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>>,
+    matrix_fn: Option<MatrixFn>,
     initial_params: Vec<f64>,
     tolerance: f64,
 }
