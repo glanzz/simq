@@ -586,6 +586,63 @@ fn bench_fusion_overhead(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_qaoa_optimization(c: &mut Criterion) {
+    let mut group = c.benchmark_group("qaoa_optimization");
+
+    // Create a QAOA-like circuit (MaxCut ansatz)
+    // Layers of Hadamard -> Cost Hamiltonian (ZZ) -> Mixer Hamiltonian (X)
+    fn create_qaoa_circuit(num_qubits: usize, p: usize) -> Circuit {
+        let mut circuit = Circuit::with_capacity(num_qubits, num_qubits * p * 3);
+        
+        // Initial Hadamard layer
+        for i in 0..num_qubits {
+            circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[QubitId::new(i)]).unwrap();
+        }
+
+        for _layer in 0..p {
+            // Cost Hamiltonian (ZZ interactions for linear connectivity)
+            for i in 0..(num_qubits - 1) {
+                // ZZ(gamma) = CNOT . RZ(gamma) . CNOT
+                let q1 = QubitId::new(i);
+                let q2 = QubitId::new(i + 1);
+                
+                circuit.add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q1, q2]).unwrap();
+                circuit.add_gate(Arc::new(RotationZ::new(0.5)) as Arc<dyn Gate>, &[q2]).unwrap();
+                circuit.add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q1, q2]).unwrap();
+            }
+
+            // Mixer Hamiltonian (RX)
+            for i in 0..num_qubits {
+                circuit.add_gate(Arc::new(RotationX::new(0.5)) as Arc<dyn Gate>, &[QubitId::new(i)]).unwrap();
+            }
+        }
+        
+        circuit
+    }
+
+    for num_qubits in [10, 20].iter() {
+        for p in [1, 3].iter() {
+            let circuit = create_qaoa_circuit(*num_qubits, *p);
+            let total_gates = circuit.len();
+
+            group.bench_with_input(
+                BenchmarkId::new("qaoa_opt", format!("{}q_p{}_{}gates", num_qubits, p, total_gates)),
+                &circuit,
+                |b, circuit| {
+                    let compiler = create_compiler(OptimizationLevel::O3);
+                    b.iter(|| {
+                        let mut c = circuit.clone();
+                        let result = compiler.compile(black_box(&mut c)).unwrap();
+                        black_box((c, result))
+                    })
+                },
+            );
+        }
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     // Individual pass benchmarks
@@ -602,6 +659,7 @@ criterion_group!(
     bench_rotation_fusion,
     bench_mixed_circuit,
     bench_matrix_multiplication,
-    bench_fusion_overhead
+    bench_fusion_overhead,
+    bench_qaoa_optimization
 );
 criterion_main!(benches);
