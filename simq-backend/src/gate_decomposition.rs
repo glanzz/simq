@@ -6,7 +6,7 @@
 use crate::{BackendError, GateSet, Result};
 use simq_core::{Circuit, GateOp, QubitId};
 use simq_gates::{
-    CNot, CZ, PauliX, RotationX, RotationZ, SXGate,
+    CNot, CZ, Hadamard, PauliX, PauliZ, RotationX, RotationZ, SXGate, TGate,
 };
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -506,7 +506,7 @@ mod tests {
 
         // Non-inverse pairs
         let t = GateOp::new(Arc::new(TGate), &[q0]).unwrap();
-        let s = GateOp::new(Arc::new(SGate), &[q0]).unwrap();
+        let s = GateOp::new(Arc::new(SXGate), &[q0]).unwrap();
         assert!(!is_inverse_pair(&t, &s));
     }
 
