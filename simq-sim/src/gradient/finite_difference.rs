@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use std::time::Instant;
 use simq_core::Circuit;
 use simq_state::AdaptiveState;
-use simq_state::observable::PauliObservable;
+use simq_state::observable::{PauliObservable, PauliString};
 use crate::Simulator;
 use crate::error::Result;
 use super::{GradientResult, GradientMethod};
@@ -249,7 +249,7 @@ mod tests {
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
 
         let config = FiniteDifferenceConfig {
@@ -280,7 +280,7 @@ mod tests {
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
 
         let config = FiniteDifferenceConfig {

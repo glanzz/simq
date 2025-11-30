@@ -7,7 +7,7 @@
 use rayon::prelude::*;
 use simq_core::Circuit;
 use simq_state::AdaptiveState;
-use simq_state::observable::PauliObservable;
+use simq_state::observable::{PauliObservable, PauliString};
 use crate::Simulator;
 use crate::error::Result;
 
@@ -256,7 +256,7 @@ mod tests {
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let batch_params = vec![
             vec![0.0],

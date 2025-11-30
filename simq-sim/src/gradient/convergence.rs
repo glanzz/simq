@@ -1017,16 +1017,19 @@ mod tests {
 
     #[test]
     fn test_patience() {
-        let config = MonitorConfig::default().with_patience(3);
+        let config = MonitorConfig::default()
+            .with_patience(3)
+            .with_energy_tolerance(1e-10)  // Set very low to avoid false convergence
+            .with_gradient_tolerance(1e-10); // Set very low to avoid false convergence
 
         let mut monitor = ConvergenceMonitor::new(config);
 
-        // Initial step
+        // Initial step with best energy
         monitor.record(0, 1.0, &[0.1], &[0.5]);
 
-        // No improvement for several steps
+        // No improvement for several steps - slightly increasing energy and gradient to avoid zero changes
         for i in 1..=5 {
-            monitor.record(i, 1.1, &[0.1], &[0.5]);
+            monitor.record(i, 1.1 + (i as f64) * 0.01, &[0.1 + (i as f64) * 0.01], &[0.5]);
         }
 
         assert!(monitor.should_stop());

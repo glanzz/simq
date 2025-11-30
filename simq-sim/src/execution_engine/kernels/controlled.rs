@@ -34,8 +34,11 @@ pub fn apply_controlled_gate(
         });
     }
 
-    let control_mask = 1 << control;
-    let target_stride = 1 << target;
+    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
+    let control_bit = num_qubits - 1 - control;
+    let target_bit = num_qubits - 1 - target;
+    let control_mask = 1 << control_bit;
+    let target_stride = 1 << target_bit;
 
     if use_parallel && n >= parallel_threshold {
         apply_controlled_parallel(control_mask, target_stride, gate, state);
@@ -58,12 +61,12 @@ fn apply_controlled_sequential(
 
     while i < n {
         for j in 0..target_stride {
-            let idx = i + j;
-            // Only apply if control qubit is |1⟩
-            if idx & control_mask != 0 {
-                let idx0 = idx;
-                let idx1 = idx + target_stride;
+            let idx0 = i + j;
+            let idx1 = idx0 + target_stride;
 
+            // Only apply if control qubit is |1⟩
+            // Check the control bit on idx0 (same as idx1 since they differ only in target bit)
+            if idx0 & control_mask != 0 {
                 let a = state[idx0];
                 let b = state[idx1];
 
@@ -83,17 +86,18 @@ fn apply_controlled_parallel(
     state: &mut [Complex64],
 ) {
     let state_ptr_addr = state.as_ptr() as usize;
-    
+
     state
         .par_chunks_mut(target_stride * 2)
         .for_each(|chunk| {
-            for j in 0..target_stride.min(chunk.len() - target_stride) {
+            for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
                 // Reconstruct pointer to avoid borrowing state in closure
                 let state_ptr = state_ptr_addr as *const Complex64;
                 let base_idx = chunk.as_ptr() as usize - state_ptr as usize;
-                let idx = base_idx / std::mem::size_of::<Complex64>() + j;
+                let idx0 = base_idx / std::mem::size_of::<Complex64>() + j;
 
-                if idx & control_mask != 0 {
+                // Only apply if control qubit is |1⟩
+                if idx0 & control_mask != 0 {
                     let a = chunk[j];
                     let b = chunk[j + target_stride];
 

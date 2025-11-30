@@ -211,8 +211,11 @@ pub fn apply_cnot(
         });
     }
 
-    let control_mask = 1 << control;
-    let target_mask = 1 << target;
+    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
+    let control_bit = num_qubits - 1 - control;
+    let target_bit = num_qubits - 1 - target;
+    let control_mask = 1 << control_bit;
+    let target_mask = 1 << target_bit;
 
     if use_parallel && n >= parallel_threshold {
         let state_ptr_addr = state.as_mut_ptr() as usize;
@@ -273,8 +276,11 @@ pub fn apply_cz(
         });
     }
 
-    let control_mask = 1 << control;
-    let target_mask = 1 << target;
+    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
+    let control_bit = num_qubits - 1 - control;
+    let target_bit = num_qubits - 1 - target;
+    let control_mask = 1 << control_bit;
+    let target_mask = 1 << target_bit;
     let both_mask = control_mask | target_mask;
 
     if use_parallel && n >= parallel_threshold {
@@ -326,8 +332,11 @@ pub fn apply_swap(
         return Ok(()); // SWAP on same qubit is identity
     }
 
-    let mask1 = 1 << qubit1;
-    let mask2 = 1 << qubit2;
+    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
+    let bit1 = num_qubits - 1 - qubit1;
+    let bit2 = num_qubits - 1 - qubit2;
+    let mask1 = 1 << bit1;
+    let mask2 = 1 << bit2;
 
     if use_parallel && n >= parallel_threshold {
         let state_ptr_addr = state.as_mut_ptr() as usize;
