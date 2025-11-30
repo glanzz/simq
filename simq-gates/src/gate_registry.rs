@@ -8,6 +8,7 @@
 //! ```rust
 //! use simq_gates::gate_registry::GateRegistry;
 //! use simq_gates::custom::CustomGateBuilder;
+//! use simq_core::gate::Gate;
 //! use num_complex::Complex64;
 //! use std::f64::consts::SQRT_2;
 //!
