@@ -12,33 +12,57 @@ use std::sync::Arc;
 #[derive(Debug)]
 struct GroverOracle;
 impl Gate for GroverOracle {
-    fn name(&self) -> &str { "Oracle" }
-    fn num_qubits(&self) -> usize { 1 }
-    fn description(&self) -> String { "Grover".to_string() }
+    fn name(&self) -> &str {
+        "Oracle"
+    }
+    fn num_qubits(&self) -> usize {
+        1
+    }
+    fn description(&self) -> String {
+        "Grover".to_string()
+    }
 }
 
 #[derive(Debug)]
 struct GroverDiffusion;
 impl Gate for GroverDiffusion {
-    fn name(&self) -> &str { "Diffusion" }
-    fn num_qubits(&self) -> usize { 1 }
-    fn description(&self) -> String { "Diffusion".to_string() }
+    fn name(&self) -> &str {
+        "Diffusion"
+    }
+    fn num_qubits(&self) -> usize {
+        1
+    }
+    fn description(&self) -> String {
+        "Diffusion".to_string()
+    }
 }
 
 #[derive(Debug)]
 struct XXGate(f64);
 impl Gate for XXGate {
-    fn name(&self) -> &str { "XX" }
-    fn num_qubits(&self) -> usize { 2 }
-    fn description(&self) -> String { format!("XX({:.4})", self.0) }
+    fn name(&self) -> &str {
+        "XX"
+    }
+    fn num_qubits(&self) -> usize {
+        2
+    }
+    fn description(&self) -> String {
+        format!("XX({:.4})", self.0)
+    }
 }
 
 #[derive(Debug)]
 struct QFTGate;
 impl Gate for QFTGate {
-    fn name(&self) -> &str { "QFT" }
-    fn num_qubits(&self) -> usize { 1 }
-    fn description(&self) -> String { "QFT".to_string() }
+    fn name(&self) -> &str {
+        "QFT"
+    }
+    fn num_qubits(&self) -> usize {
+        1
+    }
+    fn description(&self) -> String {
+        "QFT".to_string()
+    }
 }
 
 fn main() {
@@ -60,11 +84,19 @@ fn main() {
     // Demo 2: Rotation gates
     println!("2. Rotation Gates:");
     let mut builder = DynamicCircuitBuilder::new(3);
-    builder.apply_gate(Arc::new(RotationX::new(std::f64::consts::PI / 4.0)), &[0]).unwrap();
-    builder.apply_gate(Arc::new(RotationY::new(std::f64::consts::PI / 2.0)), &[1]).unwrap();
-    builder.apply_gate(Arc::new(RotationZ::new(std::f64::consts::PI)), &[2]).unwrap();
+    builder
+        .apply_gate(Arc::new(RotationX::new(std::f64::consts::PI / 4.0)), &[0])
+        .unwrap();
+    builder
+        .apply_gate(Arc::new(RotationY::new(std::f64::consts::PI / 2.0)), &[1])
+        .unwrap();
+    builder
+        .apply_gate(Arc::new(RotationZ::new(std::f64::consts::PI)), &[2])
+        .unwrap();
     builder.apply_gate(Arc::new(Phase::new(0.5)), &[0]).unwrap();
-    builder.apply_gate(Arc::new(U3::new(1.0, 2.0, 3.0)), &[1]).unwrap();
+    builder
+        .apply_gate(Arc::new(U3::new(1.0, 2.0, 3.0)), &[1])
+        .unwrap();
     println!("{}\n", builder.build().to_ascii());
 
     // Demo 3: Two-qubit gates
@@ -104,7 +136,9 @@ fn main() {
     };
     let mut builder = DynamicCircuitBuilder::new(2);
     builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
-    builder.apply_gate(Arc::new(RotationX::new(1.234)), &[1]).unwrap();
+    builder
+        .apply_gate(Arc::new(RotationX::new(1.234)), &[1])
+        .unwrap();
     builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
     println!("{}\n", builder.build().to_ascii_with_config(&config));
 
@@ -126,29 +160,53 @@ fn main() {
     // Demo 8: Custom gates
     println!("8. Custom Gates:");
     let mut circuit = Circuit::new(3);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(2)]).unwrap();
-    circuit.add_gate(Arc::new(GroverOracle), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(GroverOracle), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(Arc::new(GroverOracle), &[QubitId::new(2)]).unwrap();
-    circuit.add_gate(Arc::new(GroverDiffusion), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(GroverDiffusion), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(Arc::new(GroverDiffusion), &[QubitId::new(2)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(2)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(GroverOracle), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(GroverOracle), &[QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(GroverOracle), &[QubitId::new(2)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(GroverDiffusion), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(GroverDiffusion), &[QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(GroverDiffusion), &[QubitId::new(2)])
+        .unwrap();
     println!("{}\n", circuit.to_ascii());
 
     // Demo 9: Parametric custom gate (XX interaction)
     println!("9. Parametric Custom Gate (XX):");
     let mut builder = DynamicCircuitBuilder::new(3);
-    builder.apply_gate(Arc::new(XXGate(std::f64::consts::PI / 4.0)), &[0, 1]).unwrap();
-    builder.apply_gate(Arc::new(XXGate(std::f64::consts::PI / 2.0)), &[1, 2]).unwrap();
+    builder
+        .apply_gate(Arc::new(XXGate(std::f64::consts::PI / 4.0)), &[0, 1])
+        .unwrap();
+    builder
+        .apply_gate(Arc::new(XXGate(std::f64::consts::PI / 2.0)), &[1, 2])
+        .unwrap();
     println!("{}\n", builder.build().to_ascii());
 
     // Demo 10: QFT-like circuit
     println!("10. QFT-like Custom Circuit:");
     let mut circuit = Circuit::new(4);
     for i in 0..4 {
-        circuit.add_gate(Arc::new(QFTGate), &[QubitId::new(i)]).unwrap();
+        circuit
+            .add_gate(Arc::new(QFTGate), &[QubitId::new(i)])
+            .unwrap();
     }
     println!("{}\n", circuit.to_ascii());
 

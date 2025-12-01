@@ -9,7 +9,9 @@
 use simq_compiler::{
     adaptive_pipeline::{AdaptiveCompiler, MultiLevelOptimizer},
     circuit_analysis_pass::CircuitCharacteristics,
-    hardware_aware::{CostModel, HardwareType, IBMHardware, GoogleHardware, IonQHardware, HardwareModel},
+    hardware_aware::{
+        CostModel, GoogleHardware, HardwareModel, HardwareType, IBMHardware, IonQHardware,
+    },
     pipeline::{create_compiler, OptimizationLevel},
 };
 use simq_core::{gate::Gate, Circuit, QubitId};
@@ -100,11 +102,7 @@ fn main() {
     let test_circuit = create_mixed_circuit();
 
     // Compare costs across different hardware platforms
-    let hardware_types = vec![
-        HardwareType::IBM,
-        HardwareType::Google,
-        HardwareType::IonQ,
-    ];
+    let hardware_types = vec![HardwareType::IBM, HardwareType::Google, HardwareType::IonQ];
 
     println!("Circuit cost comparison:");
     for hw_type in hardware_types {
@@ -163,8 +161,10 @@ fn main() {
         println!("{:?}:", level);
         println!("  Initial gates: {}", initial_gates);
         println!("  Final gates: {}", test_circuit.len());
-        println!("  Reduction: {:.1}%",
-            (initial_gates - test_circuit.len()) as f64 / initial_gates as f64 * 100.0);
+        println!(
+            "  Reduction: {:.1}%",
+            (initial_gates - test_circuit.len()) as f64 / initial_gates as f64 * 100.0
+        );
         println!("  Time: {} µs", result.total_time_us);
     }
 
@@ -176,21 +176,31 @@ fn create_sample_circuit() -> Circuit {
     let mut circuit = Circuit::new(3);
 
     // Add some inverse pairs (for DCE)
-    let x = Arc::new(MockGate { name: "X".to_string() });
+    let x = Arc::new(MockGate {
+        name: "X".to_string(),
+    });
     circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
     circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
 
     // Add diagonal gates (for commutation)
-    let z = Arc::new(MockGate { name: "Z".to_string() });
-    let s = Arc::new(MockGate { name: "S".to_string() });
-    let t = Arc::new(MockGate { name: "T".to_string() });
+    let z = Arc::new(MockGate {
+        name: "Z".to_string(),
+    });
+    let s = Arc::new(MockGate {
+        name: "S".to_string(),
+    });
+    let t = Arc::new(MockGate {
+        name: "T".to_string(),
+    });
 
     circuit.add_gate(z.clone(), &[QubitId::new(1)]).unwrap();
     circuit.add_gate(s.clone(), &[QubitId::new(1)]).unwrap();
     circuit.add_gate(t.clone(), &[QubitId::new(1)]).unwrap();
 
     // Add fuseable gates
-    let h = Arc::new(MockGate { name: "H".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
     circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
     circuit.add_gate(s.clone(), &[QubitId::new(2)]).unwrap();
 
@@ -207,20 +217,34 @@ fn create_mixed_circuit() -> Circuit {
     let mut circuit = Circuit::new(3);
 
     // Single-qubit gates
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let rz = Arc::new(MockGate { name: "RZ".to_string() });
-    let rx = Arc::new(MockGate { name: "RX".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let rz = Arc::new(MockGate {
+        name: "RZ".to_string(),
+    });
+    let rx = Arc::new(MockGate {
+        name: "RX".to_string(),
+    });
 
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
     circuit.add_gate(rz.clone(), &[QubitId::new(1)]).unwrap();
     circuit.add_gate(rx.clone(), &[QubitId::new(2)]).unwrap();
 
     // Two-qubit gates
-    let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
-    let cz = Arc::new(MockGate { name: "CZ".to_string() });
+    let cnot = Arc::new(MockGate {
+        name: "CNOT".to_string(),
+    });
+    let cz = Arc::new(MockGate {
+        name: "CZ".to_string(),
+    });
 
-    circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-    circuit.add_gate(cz.clone(), &[QubitId::new(1), QubitId::new(2)]).unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(cz.clone(), &[QubitId::new(1), QubitId::new(2)])
+        .unwrap();
 
     // More single-qubit gates
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();

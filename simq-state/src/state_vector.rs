@@ -67,13 +67,11 @@ impl StateVector {
         let dimension = 1 << num_qubits;
 
         // Create aligned layout
-        let layout = Layout::from_size_align(
-            dimension * std::mem::size_of::<Complex64>(),
-            SIMD_ALIGNMENT,
-        )
-        .map_err(|_| StateError::AllocationError {
-            size: dimension * std::mem::size_of::<Complex64>(),
-        })?;
+        let layout =
+            Layout::from_size_align(dimension * std::mem::size_of::<Complex64>(), SIMD_ALIGNMENT)
+                .map_err(|_| StateError::AllocationError {
+                size: dimension * std::mem::size_of::<Complex64>(),
+            })?;
 
         // Allocate aligned memory
         let data = unsafe {
@@ -124,11 +122,7 @@ impl StateVector {
 
         // Copy amplitudes
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                amplitudes.as_ptr(),
-                state.data.as_ptr(),
-                dimension,
-            );
+            std::ptr::copy_nonoverlapping(amplitudes.as_ptr(), state.data.as_ptr(), dimension);
         }
 
         Ok(state)
@@ -182,11 +176,7 @@ impl StateVector {
     /// The L2 norm of the state vector
     pub fn norm(&self) -> f64 {
         let amplitudes = self.amplitudes();
-        amplitudes
-            .iter()
-            .map(|a| a.norm_sqr())
-            .sum::<f64>()
-            .sqrt()
+        amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>().sqrt()
     }
 
     /// Normalize the state vector
@@ -259,8 +249,8 @@ mod tests {
 
         // Should be |000⟩
         assert_eq!(amplitudes[0], Complex64::new(1.0, 0.0));
-        for i in 1..amplitudes.len() {
-            assert_eq!(amplitudes[i], Complex64::new(0.0, 0.0));
+        for amplitude in amplitudes.iter().skip(1) {
+            assert_eq!(*amplitude, Complex64::new(0.0, 0.0));
         }
     }
 

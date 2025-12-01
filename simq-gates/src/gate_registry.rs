@@ -142,7 +142,7 @@ impl GateRegistry {
         }
 
         println!("Registered Custom Gates:");
-        println!("{:<20} {:<10} {:<12} {}", "Name", "Qubits", "Hermitian", "Description");
+        println!("{:<20} {:<10} {:<12} Description", "Name", "Qubits", "Hermitian");
         println!("{}", "-".repeat(70));
 
         for info in self.list_gates() {
@@ -193,8 +193,14 @@ mod tests {
         let inv_sqrt2 = 1.0 / SQRT_2;
         let gate = CustomGateBuilder::new("TestH")
             .matrix_2x2([
-                [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-                [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+                [
+                    Complex64::new(inv_sqrt2, 0.0),
+                    Complex64::new(inv_sqrt2, 0.0),
+                ],
+                [
+                    Complex64::new(inv_sqrt2, 0.0),
+                    Complex64::new(-inv_sqrt2, 0.0),
+                ],
             ])
             .build()
             .unwrap();

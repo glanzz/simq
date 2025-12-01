@@ -4,8 +4,9 @@
 //! and optimize complex gate patterns with proper gate replacement.
 
 use simq_compiler::{
-    create_compiler, OptimizationLevel,
+    create_compiler,
     passes::{AdvancedTemplateMatching, OptimizationPass},
+    OptimizationLevel,
 };
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{Hadamard, PauliX, PauliY, PauliZ};
@@ -126,7 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(2)])?;
         circuit.add_gate(Arc::new(PauliX), &[QubitId::new(2)])?;
         circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(2)])?; // H-X-H → Z
-        circuit.add_gate(Arc::new(PauliZ), &[QubitId::new(2)])?;   // Z-Z → I
+        circuit.add_gate(Arc::new(PauliZ), &[QubitId::new(2)])?; // Z-Z → I
 
         println!("Before optimization: {} gates", circuit.len());
         println!("{}", circuit);

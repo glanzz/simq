@@ -1,4 +1,6 @@
 //! Auto-generated compile-time gate matrices
+#![allow(clippy::excessive_precision)]
+#![allow(clippy::approx_constant)]
 //!
 //! This module contains matrices generated at build time by build.rs.
 //! All matrices are embedded in the binary for zero-cost runtime access.
@@ -77,7 +79,7 @@ impl GeneratedAngleCache {
     pub fn rx_qaoa(theta: f64) -> [[Complex64; 2]; 2] {
         use std::f64::consts::PI;
 
-        if theta < 0.0 || theta > PI {
+        if !(0.0..=PI).contains(&theta) {
             // Out of range - compute directly
             return crate::matrices::rotation_x(theta);
         }
@@ -93,7 +95,7 @@ impl GeneratedAngleCache {
     pub fn rz_qaoa(theta: f64) -> [[Complex64; 2]; 2] {
         use std::f64::consts::PI;
 
-        if theta < 0.0 || theta > PI {
+        if !(0.0..=PI).contains(&theta) {
             return crate::matrices::rotation_z(theta);
         }
 
@@ -167,7 +169,7 @@ impl EnhancedUniversalCache {
 
         // Level 5: QAOA range
         use std::f64::consts::PI;
-        if theta >= 0.0 && theta <= PI {
+        if (0.0..=PI).contains(&theta) {
             return GeneratedAngleCache::rx_qaoa(theta);
         }
 
@@ -209,7 +211,7 @@ impl EnhancedUniversalCache {
         }
 
         use std::f64::consts::PI;
-        if theta >= 0.0 && theta <= PI {
+        if (0.0..=PI).contains(&theta) {
             return GeneratedAngleCache::rz_qaoa(theta);
         }
 

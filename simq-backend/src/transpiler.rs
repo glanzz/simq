@@ -56,7 +56,8 @@ impl Transpiler {
 
     /// Add custom decomposition rule
     pub fn add_decomposition_rule(&mut self, gate_name: &str, rule: DecompositionRule) {
-        self.decomposition_rules.add_rule(gate_name.to_string(), rule);
+        self.decomposition_rules
+            .add_rule(gate_name.to_string(), rule);
     }
 
     /// Transpile a circuit for a specific backend
@@ -246,7 +247,7 @@ impl Default for Transpiler {
 }
 
 /// Optimization level for transpilation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptimizationLevel {
     /// No optimization, minimal transpilation
     /// - Only validate circuit
@@ -262,6 +263,7 @@ pub enum OptimizationLevel {
     /// - Light optimizations
     /// - Commutation-based reordering
     /// - Template matching
+    #[default]
     Medium,
 
     /// Heavy optimization (slow, may take several seconds)
@@ -269,12 +271,6 @@ pub enum OptimizationLevel {
     /// - Global resynthesis
     /// - Advanced template matching
     Heavy,
-}
-
-impl Default for OptimizationLevel {
-    fn default() -> Self {
-        OptimizationLevel::Medium
-    }
 }
 
 /// Cost estimate for transpilation
@@ -470,10 +466,9 @@ impl QubitMapping {
 
     /// Swap two physical qubits
     pub fn swap(&mut self, phys1: usize, phys2: usize) {
-        if let (Some(log1), Some(log2)) = (
-            self.physical_to_logical[phys1],
-            self.physical_to_logical[phys2],
-        ) {
+        if let (Some(log1), Some(log2)) =
+            (self.physical_to_logical[phys1], self.physical_to_logical[phys2])
+        {
             self.logical_to_physical[log1] = phys2;
             self.logical_to_physical[log2] = phys1;
         }
@@ -482,9 +477,10 @@ impl QubitMapping {
 }
 
 /// SWAP insertion strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SwapStrategy {
     /// Greedy: Insert SWAPs along shortest path
+    #[default]
     Greedy,
 
     /// SABRE: Stochastic routing algorithm
@@ -492,12 +488,6 @@ pub enum SwapStrategy {
 
     /// Lookahead: Consider future gates when inserting SWAPs
     Lookahead,
-}
-
-impl Default for SwapStrategy {
-    fn default() -> Self {
-        SwapStrategy::Greedy
-    }
 }
 
 #[cfg(test)]

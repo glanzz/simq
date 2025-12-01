@@ -5,12 +5,13 @@
 
 use crate::{BackendError, GateSet, Result};
 use simq_core::{Circuit, GateOp, QubitId};
-use simq_gates::{
-    CNot, CZ, Hadamard, PauliX, PauliZ, RotationX, RotationZ, SXGate, TGate,
-};
+use simq_gates::{CNot, PauliX, RotationX, RotationZ, SXGate, CZ};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::sync::Arc;
+
+/// Type alias for decomposition rule functions
+type DecompositionRule = Box<dyn Fn(&GateOp) -> Result<Vec<GateOp>>>;
 
 /// Gate decomposer that converts gates to a target gate set
 pub struct GateDecomposer {
@@ -18,7 +19,7 @@ pub struct GateDecomposer {
     target_gates: GateSet,
 
     /// Decomposition rules
-    rules: HashMap<String, Box<dyn Fn(&GateOp) -> Result<Vec<GateOp>>>>,
+    rules: HashMap<String, DecompositionRule>,
 }
 
 impl GateDecomposer {
@@ -69,52 +70,34 @@ impl GateDecomposer {
     /// Register IBM decomposition rules
     fn register_ibm_rules(&mut self) {
         // H → RZ(π/2) SX RZ(π/2)
-        self.add_rule("H", |op| {
-            decompose_h_to_ibm(op.qubits()[0])
-        });
+        self.add_rule("H", |op| decompose_h_to_ibm(op.qubits()[0]));
 
         // Y → RZ(π) X
-        self.add_rule("Y", |op| {
-            decompose_y_to_ibm(op.qubits()[0])
-        });
+        self.add_rule("Y", |op| decompose_y_to_ibm(op.qubits()[0]));
 
         // Z → RZ(π)
-        self.add_rule("Z", |op| {
-            decompose_z_to_ibm(op.qubits()[0])
-        });
+        self.add_rule("Z", |op| decompose_z_to_ibm(op.qubits()[0]));
 
         // T → RZ(π/4)
-        self.add_rule("T", |op| {
-            decompose_t_to_ibm(op.qubits()[0])
-        });
+        self.add_rule("T", |op| decompose_t_to_ibm(op.qubits()[0]));
 
         // S → RZ(π/2)
-        self.add_rule("S", |op| {
-            decompose_s_to_ibm(op.qubits()[0])
-        });
+        self.add_rule("S", |op| decompose_s_to_ibm(op.qubits()[0]));
 
         // CZ → H CNOT H
-        self.add_rule("CZ", |op| {
-            decompose_cz_to_ibm(op.qubits()[0], op.qubits()[1])
-        });
+        self.add_rule("CZ", |op| decompose_cz_to_ibm(op.qubits()[0], op.qubits()[1]));
 
         // SWAP → CNOT CNOT CNOT
-        self.add_rule("SWAP", |op| {
-            decompose_swap_to_ibm(op.qubits()[0], op.qubits()[1])
-        });
+        self.add_rule("SWAP", |op| decompose_swap_to_ibm(op.qubits()[0], op.qubits()[1]));
     }
 
     /// Register Rigetti decomposition rules
     fn register_rigetti_rules(&mut self) {
         // H → RZ(π/2) RX(π/2) RZ(π/2)
-        self.add_rule("H", |op| {
-            decompose_h_to_rigetti(op.qubits()[0])
-        });
+        self.add_rule("H", |op| decompose_h_to_rigetti(op.qubits()[0]));
 
         // CNOT → RZ(π/2) RX(π/2) CZ RX(π/2) RZ(π/2)
-        self.add_rule("CNOT", |op| {
-            decompose_cnot_to_rigetti(op.qubits()[0], op.qubits()[1])
-        });
+        self.add_rule("CNOT", |op| decompose_cnot_to_rigetti(op.qubits()[0], op.qubits()[1]));
     }
 
     /// Add a decomposition rule
@@ -320,6 +303,7 @@ pub fn analyze_gate_distribution(circuit: &Circuit) -> HashMap<String, usize> {
 mod tests {
     use super::*;
     use simq_core::QubitId;
+    use simq_gates::{Hadamard, PauliZ, TGate};
 
     #[test]
     fn test_ibm_gate_set() {
@@ -465,12 +449,8 @@ mod tests {
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
 
-        circuit
-            .add_gate(Arc::new(Hadamard), &[q0])
-            .unwrap();
-        circuit
-            .add_gate(Arc::new(TGate), &[q1])
-            .unwrap();
+        circuit.add_gate(Arc::new(Hadamard), &[q0]).unwrap();
+        circuit.add_gate(Arc::new(TGate), &[q1]).unwrap();
 
         // Original circuit has 2 gates
         assert_eq!(circuit.len(), 2);

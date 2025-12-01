@@ -92,7 +92,7 @@ impl BackendCapabilities {
             supports_conditional: true,
             supports_reset: true,
             supports_parametric: false,
-            cost_per_shot: Some(0.00003), // Example cost
+            cost_per_shot: Some(0.00003),  // Example cost
             average_queue_time: Some(120), // 2 minutes
             metadata: HashMap::new(),
         }
@@ -273,10 +273,10 @@ impl ConnectivityGraph {
 
     /// Add an edge between two qubits
     pub fn add_edge(&mut self, q1: usize, q2: usize) {
-        self.edges.entry(q1).or_insert_with(HashSet::new).insert(q2);
+        self.edges.entry(q1).or_default().insert(q2);
 
         if !self.directed {
-            self.edges.entry(q2).or_insert_with(HashSet::new).insert(q1);
+            self.edges.entry(q2).or_default().insert(q1);
         }
     }
 

@@ -110,10 +110,10 @@ impl OptimizationPass for GateFusion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_complex::Complex64;
     use simq_core::gate::Gate;
     use simq_core::QubitId;
     use std::sync::Arc;
-    use num_complex::Complex64;
 
     // Mock gate for testing
     #[derive(Debug)]
@@ -166,7 +166,9 @@ mod tests {
             matrix: Some(pauli_x_matrix()),
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -187,8 +189,12 @@ mod tests {
             matrix: Some(hadamard_matrix()),
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
 
         assert_eq!(circuit.len(), 3);
@@ -210,7 +216,9 @@ mod tests {
         });
 
         // Add only 2 gates (less than min_size)
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -232,8 +240,12 @@ mod tests {
             matrix: None,
         });
 
-        circuit.add_gate(no_matrix_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(no_matrix_gate, &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(no_matrix_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(no_matrix_gate, &[QubitId::new(0)])
+            .unwrap();
 
         assert_eq!(circuit.len(), 2);
 

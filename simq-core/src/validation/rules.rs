@@ -1,7 +1,7 @@
 //! Validation rules for circuit validation
 
-use crate::Circuit;
 use crate::validation::dag::DependencyGraph;
+use crate::Circuit;
 
 /// Validation rule that can check circuit properties
 pub trait ValidationRule: Send + Sync {
@@ -283,4 +283,3 @@ mod tests {
         assert!(result.is_valid());
     }
 }
-

@@ -4,12 +4,12 @@
 //! or multiple observables in parallel, which is critical for optimization
 //! algorithms like VQE and QAOA.
 
+use crate::error::Result;
+use crate::Simulator;
 use rayon::prelude::*;
 use simq_core::Circuit;
-use simq_state::AdaptiveState;
 use simq_state::observable::PauliObservable;
-use crate::Simulator;
-use crate::error::Result;
+use simq_state::AdaptiveState;
 
 /// Batch evaluation result
 #[derive(Debug, Clone)]
@@ -90,15 +90,13 @@ fn evaluate_single_expectation(
 
     // Convert to dense state for expectation value computation
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             // Convert sparse to dense for expectation value
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -123,14 +121,12 @@ where
     let expectation_values: Vec<f64> = observables
         .iter()
         .map(|observable| match &result.state {
-            AdaptiveState::Dense(dense) => {
-                observable.expectation_value(dense)
-            }
+            AdaptiveState::Dense(dense) => observable.expectation_value(dense),
             AdaptiveState::Sparse { state: sparse, .. } => {
                 use simq_state::DenseState;
                 let dense = DenseState::from_sparse(sparse)?;
                 observable.expectation_value(&dense)
-            }
+            },
         })
         .collect::<std::result::Result<Vec<f64>, simq_state::error::StateError>>()?;
 
@@ -179,7 +175,7 @@ pub fn grid_search<F>(
     circuit_builder: F,
     observable: &PauliObservable,
     param_ranges: &[(f64, f64)], // (min, max) for each parameter
-    num_points: usize,            // Number of points per dimension
+    num_points: usize,           // Number of points per dimension
 ) -> Result<GridSearchResult>
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
@@ -189,12 +185,8 @@ where
     generate_grid(param_ranges, num_points, &mut vec![], &mut param_grid);
 
     // Evaluate all grid points
-    let batch_result = evaluate_batch_expectation(
-        simulator,
-        circuit_builder,
-        observable,
-        &param_grid,
-    )?;
+    let batch_result =
+        evaluate_batch_expectation(simulator, circuit_builder, observable, &param_grid)?;
 
     // Find optimal point
     let (min_idx, &optimal_value) = batch_result
@@ -241,11 +233,11 @@ fn generate_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SimulatorConfig;
     use simq_core::QubitId;
     use simq_gates::standard::RotationY;
     use simq_state::observable::PauliString;
     use std::sync::Arc;
-    use crate::SimulatorConfig;
 
     #[test]
     fn test_batch_evaluation() {
@@ -253,11 +245,14 @@ mod tests {
 
         let circuit_builder = |params: &[f64]| {
             let mut circuit = Circuit::new(1);
-            circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
             circuit
         };
 
-        let observable = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let batch_params = vec![
             vec![0.0],
@@ -265,12 +260,9 @@ mod tests {
             vec![std::f64::consts::PI],
         ];
 
-        let result = evaluate_batch_expectation(
-            &simulator,
-            circuit_builder,
-            &observable,
-            &batch_params,
-        ).unwrap();
+        let result =
+            evaluate_batch_expectation(&simulator, circuit_builder, &observable, &batch_params)
+                .unwrap();
 
         assert_eq!(result.values.len(), 3);
         assert_eq!(result.num_evaluations, 3);

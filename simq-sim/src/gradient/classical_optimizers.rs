@@ -54,7 +54,7 @@ fn compute_expectation(
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -205,12 +205,7 @@ where
                 // First iteration: use steepest descent
                 gradient.iter().map(|&g| -g).collect()
             } else {
-                self.compute_lbfgs_direction(
-                    &gradient,
-                    &s_history,
-                    &y_history,
-                    &rho_history,
-                )
+                self.compute_lbfgs_direction(&gradient, &s_history, &y_history, &rho_history)
             };
 
             // Line search to find optimal step size
@@ -613,7 +608,8 @@ where
                 // Try expansion
                 let expanded = self.expand(&reflected, &centroid);
                 let expanded_circuit = (self.circuit_builder)(&expanded);
-                let expanded_energy = compute_expectation(simulator, &expanded_circuit, observable)?;
+                let expanded_energy =
+                    compute_expectation(simulator, &expanded_circuit, observable)?;
 
                 if expanded_energy < reflected_energy {
                     simplex[worst_idx] = expanded;
@@ -706,8 +702,8 @@ where
             }
         }
 
-        for i in 0..n {
-            centroid[i] /= indices.len() as f64;
+        for item in centroid.iter_mut().take(n) {
+            *item /= indices.len() as f64;
         }
 
         centroid

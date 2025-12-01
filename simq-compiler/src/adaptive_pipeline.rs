@@ -6,9 +6,7 @@
 
 use crate::circuit_analysis_pass::CircuitCharacteristics;
 use crate::compiler::{Compiler, CompilerBuilder};
-use crate::passes::{
-    AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion,
-};
+use crate::passes::{AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion};
 use simq_core::Circuit;
 use std::sync::Arc;
 
@@ -162,7 +160,8 @@ impl MultiLevelOptimizer {
         let result_o1 = compiler_o1.compile(circuit).unwrap();
 
         if self.verbose {
-            println!("After O1: {} gates (removed: {})",
+            println!(
+                "After O1: {} gates (removed: {})",
                 circuit.len(),
                 original_size - circuit.len()
             );
@@ -178,16 +177,17 @@ impl MultiLevelOptimizer {
         let result_o2 = compiler_o2.compile(circuit).unwrap();
 
         if self.verbose {
-            println!("After O2: {} gates (removed: {})",
-                circuit.len(),
-                after_o1 - circuit.len()
-            );
+            println!("After O2: {} gates (removed: {})", circuit.len(), after_o1 - circuit.len());
         }
 
         // Level 3: Fine optimization (aggressive)
         // Only apply if circuit is small enough (to avoid long compilation times)
         let chars = CircuitCharacteristics::analyze(circuit);
-        if matches!(chars.size_category(), crate::circuit_analysis_pass::CircuitSize::Small | crate::circuit_analysis_pass::CircuitSize::Medium) {
+        if matches!(
+            chars.size_category(),
+            crate::circuit_analysis_pass::CircuitSize::Small
+                | crate::circuit_analysis_pass::CircuitSize::Medium
+        ) {
             if self.verbose {
                 println!("\n=== Level 3: Fine Optimization ===");
             }
@@ -197,7 +197,8 @@ impl MultiLevelOptimizer {
             let _result_o3 = compiler_o3.compile(circuit).unwrap();
 
             if self.verbose {
-                println!("After O3: {} gates (removed: {})",
+                println!(
+                    "After O3: {} gates (removed: {})",
                     circuit.len(),
                     after_o2 - circuit.len()
                 );
@@ -208,7 +209,8 @@ impl MultiLevelOptimizer {
 
         if self.verbose {
             println!("\n=== Summary ===");
-            println!("Total gates removed: {} ({:.1}%)",
+            println!(
+                "Total gates removed: {} ({:.1}%)",
                 original_size - circuit.len(),
                 (original_size - circuit.len()) as f64 / original_size as f64 * 100.0
             );

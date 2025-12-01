@@ -168,9 +168,9 @@ impl HardwareModel for GoogleHardware {
             "S" | "T" | "S†" | "T†" => 1.0,
 
             // Two-qubit gates
-            "CZ" => 8.0,      // Native, cheaper than CNOT
-            "iSWAP" => 8.0,   // Native
-            "SWAP" => 9.0,    // Native or low-cost
+            "CZ" => 8.0,           // Native, cheaper than CNOT
+            "iSWAP" => 8.0,        // Native
+            "SWAP" => 9.0,         // Native or low-cost
             "CNOT" | "CX" => 10.0, // Requires decomposition
 
             // Three-qubit gates

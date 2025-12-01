@@ -33,9 +33,15 @@ impl Gate for MockGate {
 fn create_redundant_circuit(num_qubits: usize, redundancy: usize) -> Circuit {
     let mut circuit = Circuit::new(num_qubits);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let x = Arc::new(MockGate { name: "X".to_string() });
-    let t = Arc::new(MockGate { name: "T".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let x = Arc::new(MockGate {
+        name: "X".to_string(),
+    });
+    let t = Arc::new(MockGate {
+        name: "T".to_string(),
+    });
 
     for q in 0..num_qubits {
         let qubit = QubitId::new(q);
@@ -60,9 +66,15 @@ fn create_redundant_circuit(num_qubits: usize, redundancy: usize) -> Circuit {
 fn create_mixed_circuit(num_qubits: usize, depth: usize) -> Circuit {
     let mut circuit = Circuit::new(num_qubits);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
-    let t = Arc::new(MockGate { name: "T".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let cnot = Arc::new(MockGate {
+        name: "CNOT".to_string(),
+    });
+    let t = Arc::new(MockGate {
+        name: "T".to_string(),
+    });
 
     for layer in 0..depth {
         // Single-qubit gates (parallel)
@@ -73,12 +85,11 @@ fn create_mixed_circuit(num_qubits: usize, depth: usize) -> Circuit {
         }
 
         // Two-qubit gates (creates dependencies)
-        for q in 0..num_qubits-1 {
+        for q in 0..num_qubits - 1 {
             if (layer + q) % 2 == 0 {
-                circuit.add_gate(
-                    cnot.clone(),
-                    &[QubitId::new(q), QubitId::new(q + 1)]
-                ).unwrap();
+                circuit
+                    .add_gate(cnot.clone(), &[QubitId::new(q), QubitId::new(q + 1)])
+                    .unwrap();
             }
         }
     }
@@ -101,7 +112,8 @@ fn measure_compilation_only(circuit: &Circuit, iterations: usize) -> (f64, f64) 
     }
 
     let avg = times.iter().sum::<f64>() / times.len() as f64;
-    let std_dev = (times.iter().map(|t| (t - avg).powi(2)).sum::<f64>() / times.len() as f64).sqrt();
+    let std_dev =
+        (times.iter().map(|t| (t - avg).powi(2)).sum::<f64>() / times.len() as f64).sqrt();
 
     (avg, std_dev)
 }
@@ -157,7 +169,8 @@ fn measure_cached_compilation(circuit: &Circuit, iterations: usize) -> (f64, f64
     }
 
     let avg = times.iter().sum::<f64>() / times.len() as f64;
-    let std_dev = (times.iter().map(|t| (t - avg).powi(2)).sum::<f64>() / times.len() as f64).sqrt();
+    let std_dev =
+        (times.iter().map(|t| (t - avg).powi(2)).sum::<f64>() / times.len() as f64).sqrt();
 
     (avg, std_dev)
 }
@@ -194,7 +207,11 @@ fn main() {
         let total_overhead_pct = ((total_avg - compile_only_avg) / compile_only_avg) * 100.0;
 
         println!("Compilation only:");
-        println!("  Time: {:.2} µs ± {:.2} µs", compile_only_avg / 1000.0, compile_only_std / 1000.0);
+        println!(
+            "  Time: {:.2} µs ± {:.2} µs",
+            compile_only_avg / 1000.0,
+            compile_only_std / 1000.0
+        );
 
         println!("\nCompilation + Planning:");
         println!("  Compilation: {:.2} µs", compile_avg / 1000.0);
@@ -227,8 +244,7 @@ fn main() {
         let avg = times.iter().sum::<f64>() / times.len() as f64;
         let throughput = (circuit.len() as f64 / avg) * 1_000_000_000.0; // gates/second
 
-        println!("{} gates: {:.2} µs ({:.0} gates/s)",
-            circuit.len(), avg / 1000.0, throughput);
+        println!("{} gates: {:.2} µs ({:.0} gates/s)", circuit.len(), avg / 1000.0, throughput);
     }
 
     println!("\n=== Summary ===\n");

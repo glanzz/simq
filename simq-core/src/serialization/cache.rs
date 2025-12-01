@@ -1,7 +1,5 @@
 //! Circuit caching infrastructure
 
-#![cfg(feature = "cache")]
-
 use crate::{Circuit, QuantumError, Result};
 use dashmap::DashMap;
 use std::hash::Hash;
@@ -104,14 +102,14 @@ impl Default for MemoryCache {
 impl CircuitCache for MemoryCache {
     fn get(&self, key: &CircuitKey) -> Option<Circuit> {
         let result = self.cache.get(key).map(|entry| entry.value().clone());
-        
+
         // Update stats
         if result.is_some() {
             *self.stats.entry("hits".to_string()).or_insert(0) += 1;
         } else {
             *self.stats.entry("misses".to_string()).or_insert(0) += 1;
         }
-        
+
         result
     }
 
@@ -148,8 +146,9 @@ impl FileCache {
     /// Create a new file cache
     pub fn new<P: AsRef<Path>>(cache_dir: P) -> Result<Self> {
         let cache_dir = cache_dir.as_ref().to_path_buf();
-        std::fs::create_dir_all(&cache_dir)
-            .map_err(|e| QuantumError::CacheError(format!("Failed to create cache directory: {}", e)))?;
+        std::fs::create_dir_all(&cache_dir).map_err(|e| {
+            QuantumError::CacheError(format!("Failed to create cache directory: {}", e))
+        })?;
 
         Ok(Self {
             cache_dir,
@@ -206,8 +205,9 @@ impl CircuitCache for FileCache {
 
         // Ensure directory exists
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| QuantumError::CacheError(format!("Failed to create cache directory: {}", e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                QuantumError::CacheError(format!("Failed to create cache directory: {}", e))
+            })?;
         }
 
         // Serialize and write
@@ -323,4 +323,3 @@ mod tests {
         assert_eq!(stats.hits, 1);
     }
 }
-

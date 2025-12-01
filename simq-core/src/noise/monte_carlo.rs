@@ -278,18 +278,10 @@ impl ReadoutErrorMC {
     pub fn apply_to_measurement(&self, measured_bit: bool, random_value: f64) -> bool {
         if measured_bit {
             // Measured 1, flip to 0 with probability p10
-            if random_value < self.p10 {
-                false
-            } else {
-                true
-            }
+            random_value >= self.p10
         } else {
             // Measured 0, flip to 1 with probability p01
-            if random_value < self.p01 {
-                true
-            } else {
-                false
-            }
+            random_value < self.p01
         }
     }
 
@@ -344,14 +336,14 @@ mod tests {
         match mc.get_operation(0) {
             PauliOperation::NoJump { sqrt_1_minus_gamma } => {
                 assert!((sqrt_1_minus_gamma - (0.9_f64).sqrt()).abs() < 1e-10);
-            }
+            },
             _ => panic!("Expected NoJump"),
         }
 
         match mc.get_operation(1) {
             PauliOperation::JumpToZero { sqrt_gamma } => {
                 assert!((sqrt_gamma - (0.1_f64).sqrt()).abs() < 1e-10);
-            }
+            },
             _ => panic!("Expected JumpToZero"),
         }
     }
@@ -371,12 +363,12 @@ mod tests {
         let mc = ReadoutErrorMC::from_probabilities(0.02, 0.03).unwrap();
 
         // Measure 0, flip with p=0.02
-        assert_eq!(mc.apply_to_measurement(false, 0.01), true); // Flipped
-        assert_eq!(mc.apply_to_measurement(false, 0.03), false); // Not flipped
+        assert!(mc.apply_to_measurement(false, 0.01)); // Flipped
+        assert!(!mc.apply_to_measurement(false, 0.03)); // Not flipped
 
         // Measure 1, flip with p=0.03
-        assert_eq!(mc.apply_to_measurement(true, 0.02), false); // Flipped
-        assert_eq!(mc.apply_to_measurement(true, 0.04), true); // Not flipped
+        assert!(!mc.apply_to_measurement(true, 0.02)); // Flipped
+        assert!(mc.apply_to_measurement(true, 0.04)); // Not flipped
 
         assert_eq!(mc.probabilities(), (0.02, 0.03));
     }

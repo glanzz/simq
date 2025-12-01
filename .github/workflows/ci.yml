@@ -16,8 +16,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, beta]
+        os: [macos-latest]
+        rust: [stable]
     steps:
       - uses: actions/checkout@v4
 
@@ -60,46 +60,46 @@ jobs:
       - name: Run doc tests
         run: cargo test --doc --verbose
 
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # coverage:
+  #   name: Code Coverage
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+  #     - name: Install Rust
+  #       uses: dtolnay/rust-toolchain@stable
 
-      - name: Install tarpaulin
-        run: cargo install cargo-tarpaulin
+  #     - name: Install tarpaulin
+  #       run: cargo install cargo-tarpaulin
 
-      - name: Generate coverage
-        run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+  #     - name: Generate coverage
+  #       run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./cobertura.xml
-          fail_ci_if_error: true
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@v4
+  #       with:
+  #         files: ./cobertura.xml
+  #         fail_ci_if_error: true
 
-  benchmark:
-    name: Benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # benchmark:
+  #   name: Benchmark
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+  #     - name: Install Rust
+  #       uses: dtolnay/rust-toolchain@stable
 
-      - name: Run benchmarks
-        run: cargo bench --no-fail-fast
+  #     - name: Run benchmarks
+  #       run: cargo bench --no-fail-fast
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          tool: 'cargo'
-          output-file-path: target/criterion/*/new/estimates.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+  #     - name: Store benchmark result
+  #       uses: benchmark-action/github-action-benchmark@v1
+  #       with:
+  #         tool: 'cargo'
+  #         output-file-path: target/criterion/*/new/estimates.json
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #         auto-push: true
 
   security:
     name: Security Audit

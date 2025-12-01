@@ -4,10 +4,10 @@
 //! adjacent single-qubit gates into fused gates, reducing circuit depth.
 
 use simq_compiler::fusion::{fuse_single_qubit_gates, FusionConfig};
+use simq_core::gate::Gate;
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationZ, SGate, TGate};
 use std::sync::Arc;
-use simq_core::gate::Gate;
 
 fn main() {
     println!("=== Gate Fusion Optimization Example ===\n");
@@ -37,15 +37,29 @@ fn example_simple_fusion() {
     let q1 = QubitId::new(1);
 
     // Add a sequence of gates on q0
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap();
 
     // Add gates on q1
-    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q1]).unwrap();
-    circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1]).unwrap();
-    circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1]).unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q1])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1])
+        .unwrap();
 
     println!("Original circuit:");
     println!("  Qubits: {}", circuit.num_qubits());
@@ -76,11 +90,21 @@ fn example_rotation_fusion() {
     let q0 = QubitId::new(0);
 
     // Add multiple rotation gates
-    circuit.add_gate(Arc::new(RotationX::new(0.5)) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(RotationZ::new(0.25)) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(RotationX::new(0.3)) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(RotationZ::new(0.1)) as Arc<dyn Gate>, &[q0]).unwrap();
+    circuit
+        .add_gate(Arc::new(RotationX::new(0.5)) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(RotationZ::new(0.25)) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(RotationX::new(0.3)) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(RotationZ::new(0.1)) as Arc<dyn Gate>, &[q0])
+        .unwrap();
 
     println!("Original circuit with {} operations", circuit.len());
 
@@ -101,23 +125,41 @@ fn example_mixed_circuit() {
     let q2 = QubitId::new(2);
 
     // Single-qubit gates on q0
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[q0]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[q0])
+        .unwrap();
 
     // Two-qubit gate (breaks fusion chain)
-    circuit.add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1]).unwrap();
+    circuit
+        .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+        .unwrap();
 
     // More single-qubit gates on q0 (new fusion chain)
-    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap();
 
     // Single-qubit gates on q1
-    circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1]).unwrap();
-    circuit.add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q1]).unwrap();
+    circuit
+        .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q1])
+        .unwrap();
 
     // Gate on q2
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q2]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q2])
+        .unwrap();
 
     println!("Original circuit: {} operations", circuit.len());
 
@@ -136,10 +178,18 @@ fn example_identity_elimination() {
     let q0 = QubitId::new(0);
 
     // Add gates that cancel out (X * X = I)
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap(); // Cancels with previous X
-    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap(); // Cancels with first H
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+        .unwrap(); // Cancels with previous X
+    circuit
+        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+        .unwrap(); // Cancels with first H
 
     println!("Original circuit: {} operations", circuit.len());
     println!("  (Contains H, X, X, H - which simplifies to identity)");
@@ -149,7 +199,7 @@ fn example_identity_elimination() {
     println!("\nOptimized circuit: {} operations", optimized.len());
     println!("  (Identity gate eliminated automatically)");
 
-    if optimized.len() == 0 {
+    if optimized.is_empty() {
         println!("\nThe entire sequence was eliminated as it equals the identity!");
     }
     println!();
@@ -164,7 +214,9 @@ fn example_custom_config() {
 
     // Add 5 T gates
     for _ in 0..5 {
-        circuit.add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[q0])
+            .unwrap();
     }
 
     println!("Original circuit: {} T gates", circuit.len());
@@ -189,8 +241,12 @@ fn example_custom_config() {
 
     // Configuration that disables identity elimination
     let mut circuit_xx = Circuit::new(1);
-    circuit_xx.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
-    circuit_xx.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
+    circuit_xx
+        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+        .unwrap();
+    circuit_xx
+        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+        .unwrap();
 
     let config_no_elim = FusionConfig {
         eliminate_identity: false,

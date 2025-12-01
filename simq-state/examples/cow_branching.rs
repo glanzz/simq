@@ -16,8 +16,8 @@ fn main() {
     println!("   Ref count: {}", state1.ref_count());
 
     // Clone is O(1) - just increments reference count
-    let state2 = state1.clone();
-    let state3 = state1.clone();
+    let _state2 = state1.clone();
+    let _state3 = state1.clone();
 
     println!("   After 2 clones:");
     println!("   Ref count: {}", state1.ref_count());
@@ -52,8 +52,12 @@ fn main() {
     println!("   Branch2 mutated: copied={} | refs={}", stats2.copied, branch2.ref_count());
 
     // Now all three are independent
-    println!("   Final ref counts: base={}, b1={}, b2={}",
-             base_state.ref_count(), branch1.ref_count(), branch2.ref_count());
+    println!(
+        "   Final ref counts: base={}, b1={}, b2={}",
+        base_state.ref_count(),
+        branch1.ref_count(),
+        branch2.ref_count()
+    );
     println!();
 
     // Example 3: Exploring measurement outcomes
@@ -65,10 +69,16 @@ fn main() {
     superposition.apply_single_qubit_gate(&hadamard, 1).unwrap();
 
     println!("   Created superposition state");
-    println!("   Density: {:.2}%",
-             superposition.get_all_probabilities().iter()
-                 .filter(|&&p| p > 1e-10)
-                 .count() as f64 / superposition.dimension() as f64 * 100.0);
+    println!(
+        "   Density: {:.2}%",
+        superposition
+            .get_all_probabilities()
+            .iter()
+            .filter(|&&p| p > 1e-10)
+            .count() as f64
+            / superposition.dimension() as f64
+            * 100.0
+    );
 
     // Branch to explore different measurement outcomes
     let mut outcome_0 = superposition.branch();
@@ -153,15 +163,20 @@ fn main() {
 
     // Apply some gates
     for qubit in 0..3 {
-        circuit_state.apply_single_qubit_gate(&hadamard, qubit).unwrap();
+        circuit_state
+            .apply_single_qubit_gate(&hadamard, qubit)
+            .unwrap();
     }
 
     println!("   Applied 3 gates to circuit");
-    println!("   Circuit refs: {}, Checkpoint refs: {}",
-             circuit_state.ref_count(), checkpoint.ref_count());
+    println!(
+        "   Circuit refs: {}, Checkpoint refs: {}",
+        circuit_state.ref_count(),
+        checkpoint.ref_count()
+    );
 
     // Can restore from checkpoint
-    let restored = checkpoint.clone();
+    let _restored = checkpoint.clone();
     println!("   Restored from checkpoint");
     println!("   Checkpoint still has: {} refs", checkpoint.ref_count());
     println!();

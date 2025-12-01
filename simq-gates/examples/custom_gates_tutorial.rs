@@ -1,3 +1,5 @@
+use num_complex::Complex64;
+use simq_core::gate::Gate;
 /// Comprehensive example demonstrating custom quantum gate creation and usage
 ///
 /// This example showcases:
@@ -8,11 +10,8 @@
 /// - Advanced validation features
 ///
 /// Run with: cargo run --example custom_gates_tutorial --release
-
 use simq_gates::custom::{CustomGateBuilder, ParametricCustomGateBuilder};
 use simq_gates::gate_registry::GateRegistry;
-use simq_core::gate::Gate;
-use num_complex::Complex64;
 use std::f64::consts::{PI, SQRT_2};
 
 fn main() {
@@ -35,8 +34,14 @@ fn example_1_basic_custom_gates() {
     let inv_sqrt2 = 1.0 / SQRT_2;
     let hadamard = CustomGateBuilder::new("CustomH")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .description("Custom Hadamard gate with normalized entries")
         .build()
@@ -298,7 +303,9 @@ fn example_5_gate_composition() {
         Complex64::new(1.0, 0.0),
     ];
 
-    let fidelity = x_squared.fidelity(&identity).expect("Failed to compute fidelity");
+    let fidelity = x_squared
+        .fidelity(&identity)
+        .expect("Failed to compute fidelity");
     println!("Fidelity with identity: {:.6}", fidelity);
 
     // Create adjoint
@@ -343,7 +350,9 @@ fn example_6_controlled_gates() {
     println!("Qubits: {}", pauli_x.num_qubits());
 
     // Create controlled version
-    let controlled_x = pauli_x.controlled().expect("Failed to create controlled gate");
+    let controlled_x = pauli_x
+        .controlled()
+        .expect("Failed to create controlled gate");
 
     println!("\nControlled gate: {}", controlled_x.name());
     println!("Qubits: {}", controlled_x.num_qubits());

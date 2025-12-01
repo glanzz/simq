@@ -9,7 +9,6 @@
 use crate::passes::OptimizationPass;
 use simq_core::{gate::Gate, Circuit, GateOp, QubitId, Result};
 use simq_gates::standard::{PauliX, PauliY, PauliZ};
-use simq_gates::Hadamard;
 use std::sync::Arc;
 
 /// A pattern matcher function that checks if a sequence matches
@@ -17,6 +16,12 @@ type PatternMatcher = fn(&[&GateOp]) -> bool;
 
 /// A replacement generator function that creates replacement gates
 type ReplacementGenerator = fn(QubitId) -> Vec<(Arc<dyn Gate>, QubitId)>;
+
+/// Type alias for match result
+type MatchResult = Option<(usize, Vec<(Arc<dyn Gate>, QubitId)>)>;
+
+/// Type alias for best match result
+type BestMatch = Option<(usize, usize, Vec<(Arc<dyn Gate>, QubitId)>)>;
 
 /// An advanced template with pattern matching and replacement generation
 struct AdvancedTemplate {
@@ -104,9 +109,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "X"
-                        && ops[1].gate().name() == "X"
+                    ops.len() == 2 && ops[0].gate().name() == "X" && ops[1].gate().name() == "X"
                 },
                 generator: |_| vec![], // Identity - remove both gates
                 description: "X is self-inverse",
@@ -117,9 +120,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "Y"
-                        && ops[1].gate().name() == "Y"
+                    ops.len() == 2 && ops[0].gate().name() == "Y" && ops[1].gate().name() == "Y"
                 },
                 generator: |_| vec![],
                 description: "Y is self-inverse",
@@ -130,9 +131,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "Z"
-                        && ops[1].gate().name() == "Z"
+                    ops.len() == 2 && ops[0].gate().name() == "Z" && ops[1].gate().name() == "Z"
                 },
                 generator: |_| vec![],
                 description: "Z is self-inverse",
@@ -143,9 +142,7 @@ impl AdvancedTemplateMatching {
                 min_length: 2,
                 max_length: 2,
                 matcher: |ops| {
-                    ops.len() == 2
-                        && ops[0].gate().name() == "H"
-                        && ops[1].gate().name() == "H"
+                    ops.len() == 2 && ops[0].gate().name() == "H" && ops[1].gate().name() == "H"
                 },
                 generator: |_| vec![],
                 description: "Hadamard is self-inverse",
@@ -201,7 +198,7 @@ impl AdvancedTemplateMatching {
         ops: &[GateOp],
         start: usize,
         template: &AdvancedTemplate,
-    ) -> Option<(usize, Vec<(Arc<dyn Gate>, QubitId)>)> {
+    ) -> MatchResult {
         // Check if we have enough gates remaining
         if start + template.min_length > ops.len() {
             return None;
@@ -255,7 +252,7 @@ impl AdvancedTemplateMatching {
             let mut i = 0;
 
             while i < ops.len() {
-                let mut best_match: Option<(usize, usize, Vec<(Arc<dyn Gate>, QubitId)>)> = None;
+                let mut best_match: BestMatch = None;
 
                 // Try all templates, prefer longer matches
                 for (tidx, template) in templates.iter().enumerate() {
@@ -329,6 +326,7 @@ impl OptimizationPass for AdvancedTemplateMatching {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use simq_gates::Hadamard;
 
     #[test]
     fn test_h_z_h_to_x() {

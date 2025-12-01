@@ -4,12 +4,11 @@
 //! requirements, capabilities, and available backends.
 
 use crate::{BackendError, QuantumBackend, Result};
-use crate::BackendCapabilities;
 use simq_core::Circuit;
 use std::sync::Arc;
 
 /// Criteria for backend selection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SelectionCriteria {
     /// Maximum allowed circuit depth
     pub max_depth: Option<usize>,
@@ -47,19 +46,6 @@ pub enum BackendFeature {
 
     /// Free to use
     Free,
-}
-
-impl Default for SelectionCriteria {
-    fn default() -> Self {
-        Self {
-            max_depth: None,
-            max_qubits: None,
-            required_gates: Vec::new(),
-            prefer_features: Vec::new(),
-            max_cost_per_shot: None,
-            prefer_simulation: false,
-        }
-    }
 }
 
 impl SelectionCriteria {
@@ -130,21 +116,20 @@ impl BackendSelector {
         }
 
         // Filter compatible backends
-        let mut compatible: Vec<_> = self.backends
+        let mut compatible: Vec<_> = self
+            .backends
             .iter()
             .filter(|b| self.is_compatible(b, circuit, criteria))
             .collect();
 
         if compatible.is_empty() {
             return Err(BackendError::Other(
-                "No compatible backends found for circuit".to_string()
+                "No compatible backends found for circuit".to_string(),
             ));
         }
 
         // Score and sort backends
-        compatible.sort_by_key(|b| {
-            std::cmp::Reverse(self.score_backend(b, circuit, criteria))
-        });
+        compatible.sort_by_key(|b| std::cmp::Reverse(self.score_backend(b, circuit, criteria)));
 
         Ok(Arc::clone(compatible[0]))
     }
@@ -227,7 +212,7 @@ impl BackendSelector {
 
         // Prefer backends with more qubits (but not too many more)
         let qubit_diff = caps.max_qubits as i32 - circuit.num_qubits() as i32;
-        if qubit_diff >= 0 && qubit_diff < 10 {
+        if (0..10).contains(&qubit_diff) {
             score += 100 - qubit_diff * 5;
         }
 
@@ -250,13 +235,13 @@ impl BackendSelector {
                     if backend.estimate_cost(circuit, 1000).unwrap_or(0.0) == 0.0 {
                         score += 100;
                     }
-                }
+                },
                 BackendFeature::FastExecution => {
                     if backend.backend_type().to_string().contains("Simulator") {
                         score += 50;
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -273,7 +258,7 @@ impl Default for BackendSelector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BackendType, BackendResult};
+    use crate::{BackendCapabilities, BackendResult, BackendType};
     use std::collections::HashMap;
 
     // Mock backend for testing

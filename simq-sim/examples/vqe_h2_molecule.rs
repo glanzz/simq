@@ -5,11 +5,11 @@
 //!
 //! Run with: cargo run --example vqe_h2_molecule
 
-use simq_sim::Simulator;
-use simq_sim::gradient::{VQEOptimizer, VQEConfig, AdamOptimizer, AdamConfig};
 use simq_core::{Circuit, QubitId};
+use simq_gates::standard::{CNot, RotationY};
+use simq_sim::gradient::{AdamConfig, AdamOptimizer, VQEConfig, VQEOptimizer};
+use simq_sim::Simulator;
 use simq_state::observable::{PauliObservable, PauliString};
-use simq_gates::standard::{RotationY, CNot};
 use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,15 +31,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut circuit = Circuit::new(num_qubits);
 
         // Layer 1: Single-qubit rotations
-        circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(RotationY::new(params[1])), &[QubitId::new(1)])
+            .unwrap();
 
         // Entangling layer
-        circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
 
         // Layer 2: Single-qubit rotations
-        circuit.add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(Arc::new(RotationY::new(params[3])), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(RotationY::new(params[3])), &[QubitId::new(1)])
+            .unwrap();
 
         circuit
     };
@@ -72,15 +82,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, &p) in result.parameters.iter().enumerate() {
         println!("  θ{} = {:.6}", i, p);
     }
-    println!("\nGradient norm:   {:.8}", result.gradient.iter().map(|g| g * g).sum::<f64>().sqrt());
+    println!(
+        "\nGradient norm:   {:.8}",
+        result.gradient.iter().map(|g| g * g).sum::<f64>().sqrt()
+    );
 
     // Show optimization trajectory
     println!("\nOptimization trajectory (first 10 steps):");
     println!("{:-<60}", "");
     println!("{:>4} {:>15} {:>15} {:>15}", "Iter", "Energy", "Grad Norm", "Energy Change");
     for step in result.history.iter().take(10) {
-        println!("{:>4} {:>15.8} {:>15.8} {:>15.8}",
-            step.iteration, step.energy, step.gradient_norm, step.energy_change);
+        println!(
+            "{:>4} {:>15.8} {:>15.8} {:>15.8}",
+            step.iteration, step.energy, step.gradient_norm, step.energy_change
+        );
     }
 
     println!("\n\nMethod 2: VQE with Adam optimizer\n");
@@ -111,12 +126,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Compare methods
     println!("\n\nComparison\n");
     println!("{:-<60}", "");
-    println!("{:20} {:>15} {:>10} {:>12}", "Method", "Final Energy", "Iterations", "Time (ms)");
+    println!(
+        "{:20} {:>15} {:>10} {:>12}",
+        "Method", "Final Energy", "Iterations", "Time (ms)"
+    );
     println!("{:-<60}", "");
-    println!("{:20} {:>15.8} {:>10} {:>12}",
-        "Adaptive GD", result.energy, result.num_iterations, result.total_time.as_millis());
-    println!("{:20} {:>15.8} {:>10} {:>12}",
-        "Adam", adam_result.energy, adam_result.num_iterations, adam_result.total_time.as_millis());
+    println!(
+        "{:20} {:>15.8} {:>10} {:>12}",
+        "Adaptive GD",
+        result.energy,
+        result.num_iterations,
+        result.total_time.as_millis()
+    );
+    println!(
+        "{:20} {:>15.8} {:>10} {:>12}",
+        "Adam",
+        adam_result.energy,
+        adam_result.num_iterations,
+        adam_result.total_time.as_millis()
+    );
 
     println!("\n✓ VQE optimization complete!");
 

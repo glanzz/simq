@@ -141,14 +141,22 @@ impl std::fmt::Display for ExecutionPlan {
         writeln!(f, "  Circuit depth: {} layers", self.depth)?;
         writeln!(f, "  Total gates: {}", self.gate_count)?;
         writeln!(f, "  Parallelism factor: {:.2}", self.parallelism_factor)?;
-        writeln!(f, "  Parallelization efficiency: {:.1}%",
-            self.parallelization_efficiency() * 100.0)?;
+        writeln!(
+            f,
+            "  Parallelization efficiency: {:.1}%",
+            self.parallelization_efficiency() * 100.0
+        )?;
         writeln!(f, "  Estimated execution time: {:.2} units", self.total_time)?;
         writeln!(f, "  Critical path length: {}", self.critical_path_length)?;
         writeln!(f, "\nLayer breakdown:")?;
         for (i, layer) in self.layers.iter().enumerate() {
-            writeln!(f, "  Layer {}: {} gates, {:.2} time units",
-                i, layer.len(), layer.estimated_time)?;
+            writeln!(
+                f,
+                "  Layer {}: {} gates, {:.2} time units",
+                i,
+                layer.len(),
+                layer.estimated_time
+            )?;
         }
         Ok(())
     }
@@ -356,10 +364,11 @@ impl ExecutionPlanner {
 
             // Add newly ready gates
             for (idx, gate_deps) in deps.iter() {
-                if !scheduled.contains(idx) && !ready_queue.contains(idx) {
-                    if gate_deps.iter().all(|&dep| scheduled.contains(&dep)) {
-                        ready_queue.push(*idx);
-                    }
+                if !scheduled.contains(idx)
+                    && !ready_queue.contains(idx)
+                    && gate_deps.iter().all(|&dep| scheduled.contains(&dep))
+                {
+                    ready_queue.push(*idx);
                 }
             }
 
@@ -421,7 +430,9 @@ mod tests {
     fn test_simple_plan() {
         let mut circuit = Circuit::new(2);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(h.clone(), &[QubitId::new(1)]).unwrap();
 
@@ -438,7 +449,9 @@ mod tests {
     fn test_sequential_plan() {
         let mut circuit = Circuit::new(1);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
@@ -456,8 +469,12 @@ mod tests {
     fn test_mixed_parallelism() {
         let mut circuit = Circuit::new(3);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
-        let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        let cnot = Arc::new(MockGate {
+            name: "CNOT".to_string(),
+        });
 
         // Layer 1: H on all qubits (parallel)
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
@@ -465,7 +482,9 @@ mod tests {
         circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
 
         // Layer 2: CNOT (sequential with layer 1)
-        circuit.add_gate(cnot, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(cnot, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
 
         let planner = ExecutionPlanner::new();
         let plan = planner.generate_plan(&circuit);
@@ -477,7 +496,9 @@ mod tests {
     #[test]
     fn test_parallelization_efficiency() {
         let mut circuit = Circuit::new(4);
-        let h = Arc::new(MockGate { name: "H".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
 
         // Perfect parallelization: all gates in one layer
         for i in 0..4 {
@@ -495,12 +516,20 @@ mod tests {
     fn test_resource_estimation() {
         let mut circuit = Circuit::new(5);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
-        let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        let cnot = Arc::new(MockGate {
+            name: "CNOT".to_string(),
+        });
 
         circuit.add_gate(h, &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-        circuit.add_gate(cnot, &[QubitId::new(2), QubitId::new(3)]).unwrap();
+        circuit
+            .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(cnot, &[QubitId::new(2), QubitId::new(3)])
+            .unwrap();
 
         let planner = ExecutionPlanner::new();
         let plan = planner.generate_plan(&circuit);

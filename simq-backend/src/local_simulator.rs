@@ -82,10 +82,10 @@ impl LocalSimulatorBackend {
         let capabilities = BackendCapabilities {
             max_qubits: config.max_qubits,
             max_circuit_depth: None, // No depth limit for simulator
-            max_shots: None,          // No shot limit
+            max_shots: None,         // No shot limit
             supported_gates: crate::GateSet::universal(),
             native_gates: crate::GateSet::universal(), // All gates are native
-            connectivity: None,       // All-to-all connectivity
+            connectivity: None,                        // All-to-all connectivity
             supports_mid_circuit_measurement: true,
             supports_conditional: true,
             supports_reset: true,
@@ -96,10 +96,7 @@ impl LocalSimulatorBackend {
                 let mut meta = HashMap::new();
                 meta.insert("type".to_string(), "local_simulator".to_string());
                 meta.insert("parallel".to_string(), config.parallel.to_string());
-                meta.insert(
-                    "sparse_threshold".to_string(),
-                    config.sparse_threshold.to_string(),
-                );
+                meta.insert("sparse_threshold".to_string(), config.sparse_threshold.to_string());
                 meta
             },
         };
@@ -166,7 +163,7 @@ impl LocalSimulatorBackend {
                 }
 
                 Ok(probs)
-            }
+            },
             AdaptiveState::Sparse { state, .. } => {
                 let num_qubits = state.num_qubits();
                 let mut probs = Vec::new();
@@ -180,16 +177,12 @@ impl LocalSimulatorBackend {
                 }
 
                 Ok(probs)
-            }
+            },
         }
     }
 
     /// Sample once from probability distribution
-    fn sample_once<R: rand::Rng>(
-        &self,
-        probabilities: &[(String, f64)],
-        rng: &mut R,
-    ) -> String {
+    fn sample_once<R: rand::Rng>(&self, probabilities: &[(String, f64)], rng: &mut R) -> String {
         let mut cumulative = 0.0;
         let random_value: f64 = rng.gen();
 
@@ -340,7 +333,9 @@ mod tests {
 
         // Create a simple 2-qubit circuit with a gate
         let mut circuit = CircuitBuilder::<2>::new();
-        circuit.apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]]).unwrap();
+        circuit
+            .apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]])
+            .unwrap();
         let circuit = circuit.build();
 
         // Execute with 100 shots
@@ -370,7 +365,9 @@ mod tests {
         let backend2 = LocalSimulatorBackend::with_config(config);
 
         let mut circuit = CircuitBuilder::<2>::new();
-        circuit.apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]]).unwrap();
+        circuit
+            .apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]])
+            .unwrap();
         let circuit = circuit.build();
 
         let result1 = backend1.execute(&circuit, 100).unwrap();

@@ -5,16 +5,14 @@
 //!
 //! Run with: cargo run --example optimizer_comparison_classical
 
-use simq_sim::Simulator;
-use simq_sim::gradient::{
-    LBFGSOptimizer, LBFGSConfig,
-    NelderMeadOptimizer, NelderMeadConfig,
-    AdamOptimizer, AdamConfig,
-    VQEOptimizer, VQEConfig,
-};
 use simq_core::{Circuit, QubitId};
-use simq_state::observable::{PauliObservable, PauliString, Pauli};
-use simq_gates::{Hadamard, RotationY, CNot};
+use simq_gates::{CNot, Hadamard, RotationY};
+use simq_sim::gradient::{
+    AdamConfig, AdamOptimizer, LBFGSConfig, LBFGSOptimizer, NelderMeadConfig, NelderMeadOptimizer,
+    VQEConfig, VQEOptimizer,
+};
+use simq_sim::Simulator;
+use simq_state::observable::{Pauli, PauliObservable, PauliString};
 use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -70,14 +68,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let init_circuit = circuit_builder(&initial_params);
     let init_result = simulator.run(&init_circuit)?;
     let init_energy = match &init_result.state {
-        simq_state::AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        simq_state::AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         simq_state::AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
     println!("Initial energy: {:.8}\n", init_energy);
 
@@ -110,11 +106,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Time:            {:?}", lbfgs_result.total_time);
     println!("   Status:          {:?}", lbfgs_result.status);
     println!("   Converged:       {}", lbfgs_result.converged());
-    println!("   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
+    println!(
+        "   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
         lbfgs_result.parameters[0],
         lbfgs_result.parameters[1],
         lbfgs_result.parameters[2],
-        lbfgs_result.parameters[3]);
+        lbfgs_result.parameters[3]
+    );
     println!();
 
     // ========================================================================
@@ -141,11 +139,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Time:            {:?}", nm_result.total_time);
     println!("   Status:          {:?}", nm_result.status);
     println!("   Converged:       {}", nm_result.converged());
-    println!("   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
+    println!(
+        "   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
         nm_result.parameters[0],
         nm_result.parameters[1],
         nm_result.parameters[2],
-        nm_result.parameters[3]);
+        nm_result.parameters[3]
+    );
     println!();
 
     // ========================================================================
@@ -174,11 +174,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Time:            {:?}", adam_result.total_time);
     println!("   Status:          {:?}", adam_result.status);
     println!("   Converged:       {}", adam_result.converged());
-    println!("   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
+    println!(
+        "   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
         adam_result.parameters[0],
         adam_result.parameters[1],
         adam_result.parameters[2],
-        adam_result.parameters[3]);
+        adam_result.parameters[3]
+    );
     println!();
 
     // ========================================================================
@@ -208,11 +210,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Time:            {:?}", vqe_result.total_time);
     println!("   Status:          {:?}", vqe_result.status);
     println!("   Converged:       {}", vqe_result.converged());
-    println!("   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
+    println!(
+        "   Optimal params:  [{:.4}, {:.4}, {:.4}, {:.4}]",
         vqe_result.parameters[0],
         vqe_result.parameters[1],
         vqe_result.parameters[2],
-        vqe_result.parameters[3]);
+        vqe_result.parameters[3]
+    );
     println!();
 
     // ========================================================================
@@ -223,37 +227,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  SUMMARY COMPARISON");
     println!("{:=<80}\n", "");
 
-    println!("{:<25} {:>15} {:>10} {:>12} {:>12}",
-        "Optimizer", "Final Energy", "Iterations", "Time (ms)", "Converged");
+    println!(
+        "{:<25} {:>15} {:>10} {:>12} {:>12}",
+        "Optimizer", "Final Energy", "Iterations", "Time (ms)", "Converged"
+    );
     println!("{:-<80}", "");
 
-    println!("{:<25} {:>15.8} {:>10} {:>12} {:>12}",
+    println!(
+        "{:<25} {:>15.8} {:>10} {:>12} {:>12}",
         "L-BFGS",
         lbfgs_result.energy,
         lbfgs_result.num_iterations,
         lbfgs_result.total_time.as_millis(),
-        if lbfgs_result.converged() { "Yes" } else { "No" });
+        if lbfgs_result.converged() {
+            "Yes"
+        } else {
+            "No"
+        }
+    );
 
-    println!("{:<25} {:>15.8} {:>10} {:>12} {:>12}",
+    println!(
+        "{:<25} {:>15.8} {:>10} {:>12} {:>12}",
         "Nelder-Mead",
         nm_result.energy,
         nm_result.num_iterations,
         nm_result.total_time.as_millis(),
-        if nm_result.converged() { "Yes" } else { "No" });
+        if nm_result.converged() { "Yes" } else { "No" }
+    );
 
-    println!("{:<25} {:>15.8} {:>10} {:>12} {:>12}",
+    println!(
+        "{:<25} {:>15.8} {:>10} {:>12} {:>12}",
         "Adam",
         adam_result.energy,
         adam_result.num_iterations,
         adam_result.total_time.as_millis(),
-        if adam_result.converged() { "Yes" } else { "No" });
+        if adam_result.converged() { "Yes" } else { "No" }
+    );
 
-    println!("{:<25} {:>15.8} {:>10} {:>12} {:>12}",
+    println!(
+        "{:<25} {:>15.8} {:>10} {:>12} {:>12}",
         "Gradient Descent",
         vqe_result.energy,
         vqe_result.num_iterations,
         vqe_result.total_time.as_millis(),
-        if vqe_result.converged() { "Yes" } else { "No" });
+        if vqe_result.converged() { "Yes" } else { "No" }
+    );
 
     println!("\n{:=<80}", "");
     println!("  RECOMMENDATIONS");

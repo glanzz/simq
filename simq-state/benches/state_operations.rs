@@ -4,32 +4,21 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use num_complex::Complex64;
-use simq_state::simd::{apply_single_qubit_gate, apply_diagonal_gate, norm_simd, normalize_simd};
-use simq_state::simd::single_qubit::apply_gate_scalar;
 use simq_state::simd::diagonal::apply_diagonal_gate_scalar;
-use simq_state::{StateVector, DenseState};
+use simq_state::simd::single_qubit::apply_gate_scalar;
+use simq_state::simd::{apply_diagonal_gate, apply_single_qubit_gate, norm_simd};
+use simq_state::{DenseState, StateVector};
 
 fn hadamard_matrix() -> [[Complex64; 2]; 2] {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     [
-        [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-        [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
-    ]
-}
-
-fn rotation_x_matrix(theta: f64) -> [[Complex64; 2]; 2] {
-    let half_theta = theta / 2.0;
-    let cos_val = half_theta.cos();
-    let sin_val = half_theta.sin();
-
-    [
         [
-            Complex64::new(cos_val, 0.0),
-            Complex64::new(0.0, -sin_val),
+            Complex64::new(inv_sqrt2, 0.0),
+            Complex64::new(inv_sqrt2, 0.0),
         ],
         [
-            Complex64::new(0.0, -sin_val),
-            Complex64::new(cos_val, 0.0),
+            Complex64::new(inv_sqrt2, 0.0),
+            Complex64::new(-inv_sqrt2, 0.0),
         ],
     ]
 }
@@ -197,7 +186,9 @@ fn bench_dense_state_gate_application(c: &mut Criterion) {
                 let h = hadamard_matrix();
 
                 b.iter(|| {
-                    state.apply_single_qubit_gate(black_box(&h), black_box(0)).unwrap();
+                    state
+                        .apply_single_qubit_gate(black_box(&h), black_box(0))
+                        .unwrap();
                 })
             },
         );
@@ -292,7 +283,10 @@ fn bench_diagonal_gate_vs_general(c: &mut Criterion) {
                 // Phase gate as full matrix
                 let phase_matrix = [
                     [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-                    [Complex64::new(0.0, 0.0), Complex64::new(theta.cos(), theta.sin())],
+                    [
+                        Complex64::new(0.0, 0.0),
+                        Complex64::new(theta.cos(), theta.sin()),
+                    ],
                 ];
 
                 b.iter(|| {
@@ -379,12 +373,20 @@ fn bench_dense_state_diagonal_gates(c: &mut Criterion) {
                 let mut state = DenseState::new(num_qubits).unwrap();
                 let theta = std::f64::consts::PI / 4.0;
                 let rz_matrix = [
-                    [Complex64::new(theta.cos(), -theta.sin()), Complex64::new(0.0, 0.0)],
-                    [Complex64::new(0.0, 0.0), Complex64::new(theta.cos(), theta.sin())],
+                    [
+                        Complex64::new(theta.cos(), -theta.sin()),
+                        Complex64::new(0.0, 0.0),
+                    ],
+                    [
+                        Complex64::new(0.0, 0.0),
+                        Complex64::new(theta.cos(), theta.sin()),
+                    ],
                 ];
 
                 b.iter(|| {
-                    state.apply_single_qubit_gate(black_box(&rz_matrix), black_box(0)).unwrap();
+                    state
+                        .apply_single_qubit_gate(black_box(&rz_matrix), black_box(0))
+                        .unwrap();
                 })
             },
         );
@@ -399,7 +401,9 @@ fn bench_dense_state_diagonal_gates(c: &mut Criterion) {
                 let rz_diag = rotation_z_diagonal(theta);
 
                 b.iter(|| {
-                    state.apply_diagonal_gate(black_box(rz_diag), black_box(0)).unwrap();
+                    state
+                        .apply_diagonal_gate(black_box(rz_diag), black_box(0))
+                        .unwrap();
                 })
             },
         );

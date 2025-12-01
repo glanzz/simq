@@ -4,13 +4,13 @@
 //! when computing rotation gate matrices for small angles, which is common in
 //! variational quantum algorithms like VQE and QAOA.
 
+use simq_core::gate::Gate;
 use simq_gates::lookup::{LookupConfig, RotationLookupTable};
 use simq_gates::matrices;
 use simq_gates::optimized::{
-    create_global_lookup_table, create_high_precision_table, create_compact_table,
+    create_compact_table, create_global_lookup_table, create_high_precision_table,
     OptimizedRotationX, OptimizedRotationY, OptimizedRotationZ,
 };
-use simq_core::gate::Gate;
 use std::f64::consts::PI;
 use std::time::Instant;
 
@@ -37,7 +37,11 @@ fn main() {
 
     // Test with a small angle
     let small_angle: f64 = 0.01; // ~0.57 degrees
-    println!("Testing with small angle: {} rad ({:.2}°)", small_angle, small_angle.to_degrees());
+    println!(
+        "Testing with small angle: {} rad ({:.2}°)",
+        small_angle,
+        small_angle.to_degrees()
+    );
 
     let matrix_lookup = table.rx_matrix(small_angle);
     let matrix_direct = matrices::rotation_x(small_angle);
@@ -54,7 +58,11 @@ fn main() {
 
     // Test with a large angle (should fall back to direct computation)
     let large_angle: f64 = PI;
-    println!("\n\nTesting with large angle: {} rad ({:.2}°)", large_angle, large_angle.to_degrees());
+    println!(
+        "\n\nTesting with large angle: {} rad ({:.2}°)",
+        large_angle,
+        large_angle.to_degrees()
+    );
     println!("(This will automatically use direct computation)");
 
     let matrix_large = table.rx_matrix(large_angle);
@@ -118,11 +126,13 @@ fn main() {
     println!("\n\n--- PART 4: Performance Comparison ---\n");
 
     let num_iterations = 100_000;
-    let test_angles: Vec<f64> = (0..100)
-        .map(|i| i as f64 * 0.005)
-        .collect();
+    let test_angles: Vec<f64> = (0..100).map(|i| i as f64 * 0.005).collect();
 
-    println!("Running {} iterations with {} different angles", num_iterations, test_angles.len());
+    println!(
+        "Running {} iterations with {} different angles",
+        num_iterations,
+        test_angles.len()
+    );
     println!("(Total matrix computations: {})\n", num_iterations * test_angles.len());
 
     // Benchmark direct computation
@@ -180,10 +190,16 @@ fn main() {
     let speedup_interp = direct_time.as_secs_f64() / interp_time.as_secs_f64();
 
     println!("Direct computation:           {:>10.2} ms  (baseline)", direct_time.as_millis());
-    println!("Lookup (no interpolation):    {:>10.2} ms  ({:.2}× speedup)",
-             lookup_time.as_millis(), speedup_no_interp);
-    println!("Lookup (with interpolation):  {:>10.2} ms  ({:.2}× speedup)",
-             interp_time.as_millis(), speedup_interp);
+    println!(
+        "Lookup (no interpolation):    {:>10.2} ms  ({:.2}× speedup)",
+        lookup_time.as_millis(),
+        speedup_no_interp
+    );
+    println!(
+        "Lookup (with interpolation):  {:>10.2} ms  ({:.2}× speedup)",
+        interp_time.as_millis(),
+        speedup_interp
+    );
 
     println!("\n\n--- ACCURACY ANALYSIS ---\n");
 
@@ -202,12 +218,16 @@ fn main() {
         max_errors_interp.push(error_interp);
     }
 
-    let avg_error_no_interp = max_errors_no_interp.iter().sum::<f64>() / max_errors_no_interp.len() as f64;
+    let avg_error_no_interp =
+        max_errors_no_interp.iter().sum::<f64>() / max_errors_no_interp.len() as f64;
     let avg_error_interp = max_errors_interp.iter().sum::<f64>() / max_errors_interp.len() as f64;
 
     println!("Average maximum error (no interpolation): {:.2e}", avg_error_no_interp);
     println!("Average maximum error (with interpolation): {:.2e}", avg_error_interp);
-    println!("\nInterpolation improves accuracy by {:.2}×", avg_error_no_interp / avg_error_interp);
+    println!(
+        "\nInterpolation improves accuracy by {:.2}×",
+        avg_error_no_interp / avg_error_interp
+    );
 
     // ========================================================================
     // Part 6: Use Case Recommendation

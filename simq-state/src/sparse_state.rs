@@ -370,7 +370,9 @@ impl SparseState {
                 let contribution_1 = gate_matrix[1] * amp; // |1⟩ ← |0⟩ (top-right)
 
                 if contribution_0.norm_sqr() > 1e-14 {
-                    *new_amplitudes.entry(basis_idx).or_insert(Complex64::new(0.0, 0.0)) += contribution_0;
+                    *new_amplitudes
+                        .entry(basis_idx)
+                        .or_insert(Complex64::new(0.0, 0.0)) += contribution_0;
                 }
                 if contribution_1.norm_sqr() > 1e-14 {
                     *new_amplitudes
@@ -388,7 +390,9 @@ impl SparseState {
                         .or_insert(Complex64::new(0.0, 0.0)) += contribution_0;
                 }
                 if contribution_1.norm_sqr() > 1e-14 {
-                    *new_amplitudes.entry(basis_idx).or_insert(Complex64::new(0.0, 0.0)) += contribution_1;
+                    *new_amplitudes
+                        .entry(basis_idx)
+                        .or_insert(Complex64::new(0.0, 0.0)) += contribution_1;
                 }
             }
         }
@@ -418,7 +422,11 @@ impl SparseState {
     ) -> Result<()> {
         if qubit0 >= self.num_qubits || qubit1 >= self.num_qubits {
             return Err(StateError::InvalidQubitIndex {
-                index: if qubit0 >= self.num_qubits { qubit0 } else { qubit1 },
+                index: if qubit0 >= self.num_qubits {
+                    qubit0
+                } else {
+                    qubit1
+                },
                 num_qubits: self.num_qubits,
             });
         }
@@ -665,18 +673,18 @@ impl SparseState {
                 // Check if traced-out qubits match
                 let mut traced_match = true;
                 for q in 0..self.num_qubits {
-                    if !qubits_to_keep.contains(&q) {
-                        if ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
-                            traced_match = false;
-                            break;
-                        }
+                    if !qubits_to_keep.contains(&q) && ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1)
+                    {
+                        traced_match = false;
+                        break;
                     }
                 }
 
                 if traced_match {
                     // Contribution: ⟨bra|ket⟩ = amp_bra* × amp_ket
                     let matrix_element = amp_bra.conj() * amp_ket;
-                    rho[(reduced_i as usize) * reduced_dim + (reduced_j as usize)] += matrix_element;
+                    rho[(reduced_i as usize) * reduced_dim + (reduced_j as usize)] +=
+                        matrix_element;
                 }
             }
         }
@@ -961,7 +969,7 @@ mod tests {
 
         // Should get maximally mixed on two qubits with correlations
         // The reduced state should have diagonal: [0.5, 0, 0, 0.5] in basis |00⟩, |01⟩, |10⟩, |11⟩
-        assert!((rho[0].re - 0.5).abs() < 1e-10);  // |00⟩⟨00|
+        assert!((rho[0].re - 0.5).abs() < 1e-10); // |00⟩⟨00|
         assert!((rho[15].re - 0.5).abs() < 1e-10); // |11⟩⟨11|
         assert!((rho[5].norm() - 0.0).abs() < 1e-10); // |01⟩⟨01|
         assert!((rho[10].norm() - 0.0).abs() < 1e-10); // |10⟩⟨10|

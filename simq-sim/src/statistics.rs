@@ -86,26 +86,39 @@ impl std::fmt::Display for ExecutionStatistics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Execution Statistics:")?;
         writeln!(f, "  Total time: {:?}", self.total_time)?;
-        writeln!(f, "    Compilation: {:?} ({:.1}%)",
+        writeln!(
+            f,
+            "    Compilation: {:?} ({:.1}%)",
             self.compilation_time,
-            self.compilation_overhead_percent())?;
+            self.compilation_overhead_percent()
+        )?;
         writeln!(f, "    Initialization: {:?}", self.initialization_time)?;
         writeln!(f, "    Gate application: {:?}", self.gate_application_time)?;
         writeln!(f, "    Measurement: {:?}", self.measurement_time)?;
 
         writeln!(f, "\n  Gates:")?;
         writeln!(f, "    Original: {}", self.gates_executed)?;
-        writeln!(f, "    Optimized: {} ({:.1}% reduction)",
+        writeln!(
+            f,
+            "    Optimized: {} ({:.1}% reduction)",
             self.optimized_gates,
-            self.optimization_ratio() * 100.0)?;
+            self.optimization_ratio() * 100.0
+        )?;
         writeln!(f, "    Execution rate: {:.0} gates/sec", self.gates_per_second())?;
 
         writeln!(f, "\n  Memory:")?;
         writeln!(f, "    Peak usage: {:.2} MB", self.peak_memory_mb())?;
 
         writeln!(f, "\n  State:")?;
-        writeln!(f, "    Final representation: {}",
-            if self.final_is_sparse { "sparse" } else { "dense" })?;
+        writeln!(
+            f,
+            "    Final representation: {}",
+            if self.final_is_sparse {
+                "sparse"
+            } else {
+                "dense"
+            }
+        )?;
         writeln!(f, "    Final density: {:.2}%", self.final_density * 100.0)?;
         writeln!(f, "    Sparse→Dense conversions: {}", self.sparse_to_dense_conversions)?;
 

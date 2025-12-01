@@ -121,9 +121,7 @@ impl LazyGate {
     /// Get the gate matrix for a single-qubit gate, computing it if necessary
     pub fn matrix_1q(&self) -> Result<[[Complex64; 2]; 2]> {
         if self.gate.num_qubits() != 1 {
-            return Err(QuantumError::ValidationError(
-                "Expected single-qubit gate".to_string(),
-            ));
+            return Err(QuantumError::ValidationError("Expected single-qubit gate".to_string()));
         }
 
         // Check if already computed
@@ -161,9 +159,7 @@ impl LazyGate {
     /// Get the gate matrix for a two-qubit gate, computing it if necessary
     pub fn matrix_2q(&self) -> Result<[[Complex64; 4]; 4]> {
         if self.gate.num_qubits() != 2 {
-            return Err(QuantumError::ValidationError(
-                "Expected two-qubit gate".to_string(),
-            ));
+            return Err(QuantumError::ValidationError("Expected two-qubit gate".to_string()));
         }
 
         // Check if already computed
@@ -188,24 +184,9 @@ impl LazyGate {
 
         // Convert to 2D array
         let matrix = [
-            [
-                matrix_vec[0],
-                matrix_vec[1],
-                matrix_vec[2],
-                matrix_vec[3],
-            ],
-            [
-                matrix_vec[4],
-                matrix_vec[5],
-                matrix_vec[6],
-                matrix_vec[7],
-            ],
-            [
-                matrix_vec[8],
-                matrix_vec[9],
-                matrix_vec[10],
-                matrix_vec[11],
-            ],
+            [matrix_vec[0], matrix_vec[1], matrix_vec[2], matrix_vec[3]],
+            [matrix_vec[4], matrix_vec[5], matrix_vec[6], matrix_vec[7]],
+            [matrix_vec[8], matrix_vec[9], matrix_vec[10], matrix_vec[11]],
             [
                 matrix_vec[12],
                 matrix_vec[13],
@@ -225,14 +206,8 @@ impl std::fmt::Debug for LazyGate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LazyGate")
             .field("gate", &self.gate.name())
-            .field(
-                "matrix_1q_computed",
-                &self.matrix_1q.borrow().is_some(),
-            )
-            .field(
-                "matrix_2q_computed",
-                &self.matrix_2q.borrow().is_some(),
-            )
+            .field("matrix_1q_computed", &self.matrix_1q.borrow().is_some())
+            .field("matrix_2q_computed", &self.matrix_2q.borrow().is_some())
             .finish()
     }
 }
@@ -304,10 +279,7 @@ impl MatrixCache {
     }
 
     /// Get or compute a single-qubit gate matrix
-    pub fn get_or_compute_1q(
-        &mut self,
-        gate: &Arc<dyn Gate>,
-    ) -> Result<[[Complex64; 2]; 2]> {
+    pub fn get_or_compute_1q(&mut self, gate: &Arc<dyn Gate>) -> Result<[[Complex64; 2]; 2]> {
         let key = MatrixCacheKey::from_gate(gate);
 
         // Check cache
@@ -320,10 +292,7 @@ impl MatrixCache {
 
         // Compute matrix
         let matrix_vec = gate.matrix().ok_or_else(|| {
-            QuantumError::ValidationError(format!(
-                "Gate {} does not provide a matrix",
-                gate.name()
-            ))
+            QuantumError::ValidationError(format!("Gate {} does not provide a matrix", gate.name()))
         })?;
 
         if matrix_vec.len() != 4 {
@@ -352,10 +321,7 @@ impl MatrixCache {
     }
 
     /// Get or compute a two-qubit gate matrix
-    pub fn get_or_compute_2q(
-        &mut self,
-        gate: &Arc<dyn Gate>,
-    ) -> Result<[[Complex64; 4]; 4]> {
+    pub fn get_or_compute_2q(&mut self, gate: &Arc<dyn Gate>) -> Result<[[Complex64; 4]; 4]> {
         let key = MatrixCacheKey::from_gate(gate);
 
         // Check cache
@@ -368,10 +334,7 @@ impl MatrixCache {
 
         // Compute matrix
         let matrix_vec = gate.matrix().ok_or_else(|| {
-            QuantumError::ValidationError(format!(
-                "Gate {} does not provide a matrix",
-                gate.name()
-            ))
+            QuantumError::ValidationError(format!("Gate {} does not provide a matrix", gate.name()))
         })?;
 
         if matrix_vec.len() != 16 {
@@ -382,24 +345,9 @@ impl MatrixCache {
         }
 
         let matrix = [
-            [
-                matrix_vec[0],
-                matrix_vec[1],
-                matrix_vec[2],
-                matrix_vec[3],
-            ],
-            [
-                matrix_vec[4],
-                matrix_vec[5],
-                matrix_vec[6],
-                matrix_vec[7],
-            ],
-            [
-                matrix_vec[8],
-                matrix_vec[9],
-                matrix_vec[10],
-                matrix_vec[11],
-            ],
+            [matrix_vec[0], matrix_vec[1], matrix_vec[2], matrix_vec[3]],
+            [matrix_vec[4], matrix_vec[5], matrix_vec[6], matrix_vec[7]],
+            [matrix_vec[8], matrix_vec[9], matrix_vec[10], matrix_vec[11]],
             [
                 matrix_vec[12],
                 matrix_vec[13],
@@ -423,11 +371,7 @@ impl MatrixCache {
 
     /// Evict least recently used entry
     fn evict_lru(&mut self) {
-        if let Some((lru_key, _)) = self
-            .access_order
-            .iter()
-            .min_by_key(|(_, &count)| count)
-        {
+        if let Some((lru_key, _)) = self.access_order.iter().min_by_key(|(_, &count)| count) {
             let lru_key = lru_key.clone();
             self.cache_1q.remove(&lru_key);
             self.cache_2q.remove(&lru_key);
@@ -540,11 +484,6 @@ impl LazyExecutor {
         }
     }
 
-    /// Create a lazy executor with default configuration
-    pub fn default() -> Self {
-        Self::new(LazyConfig::default())
-    }
-
     /// Execute a circuit on a state vector with lazy evaluation
     ///
     /// This method applies all gates in the circuit to the state vector,
@@ -565,7 +504,10 @@ impl LazyExecutor {
 
         // Apply fusion if enabled
         let circuit = if self.config.enable_fusion {
-            match crate::fusion::fuse_single_qubit_gates(circuit, Some(self.config.fusion_config.clone())) {
+            match crate::fusion::fuse_single_qubit_gates(
+                circuit,
+                Some(self.config.fusion_config.clone()),
+            ) {
                 Ok(fused) => {
                     let original_len = circuit.len();
                     let fused_len = fused.len();
@@ -573,7 +515,7 @@ impl LazyExecutor {
                         self.stats.gates_fused += original_len - fused_len;
                     }
                     fused
-                }
+                },
                 Err(_) => circuit.clone(),
             }
         } else {
@@ -617,7 +559,10 @@ impl LazyExecutor {
             1 => {
                 // Single-qubit gate
                 let matrix = if self.config.enable_caching {
-                    let cached = self.cache.cache_1q.contains_key(&MatrixCacheKey::from_gate(gate));
+                    let cached = self
+                        .cache
+                        .cache_1q
+                        .contains_key(&MatrixCacheKey::from_gate(gate));
                     let result = self.cache.get_or_compute_1q(gate)?;
 
                     if cached {
@@ -641,11 +586,14 @@ impl LazyExecutor {
                     qubits[0].index(),
                     num_qubits,
                 );
-            }
+            },
             2 => {
                 // Two-qubit gate
                 let matrix = if self.config.enable_caching {
-                    let cached = self.cache.cache_2q.contains_key(&MatrixCacheKey::from_gate(gate));
+                    let cached = self
+                        .cache
+                        .cache_2q
+                        .contains_key(&MatrixCacheKey::from_gate(gate));
                     let result = self.cache.get_or_compute_2q(gate)?;
 
                     if cached {
@@ -670,13 +618,13 @@ impl LazyExecutor {
                     qubits[1].index(),
                     num_qubits,
                 );
-            }
+            },
             n => {
                 return Err(QuantumError::ValidationError(format!(
                     "Lazy executor only supports 1 and 2-qubit gates, got {} qubits",
                     n
                 )));
-            }
+            },
         }
 
         Ok(())
@@ -715,6 +663,12 @@ impl std::fmt::Debug for LazyExecutor {
             .field("cache_stats", &self.cache.stats())
             .field("stats", &self.stats)
             .finish()
+    }
+}
+
+impl Default for LazyExecutor {
+    fn default() -> Self {
+        Self::new(LazyConfig::default())
     }
 }
 

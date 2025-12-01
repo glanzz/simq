@@ -130,10 +130,7 @@ impl Gate for FusedGate {
     }
 
     fn description(&self) -> String {
-        format!(
-            "Fused gate: {}",
-            self.component_gates.join(" → ")
-        )
+        format!("Fused gate: {}", self.component_gates.join(" → "))
     }
 
     fn matrix(&self) -> Option<Vec<Complex64>> {
@@ -243,10 +240,10 @@ fn find_fusion_chains(circuit: &Circuit, config: &FusionConfig) -> Vec<FusionCha
                 } else {
                     chain.push(op_idx);
                 }
-            }
+            },
             None => {
                 current_chains[qubit_idx] = Some(vec![op_idx]);
-            }
+            },
         }
 
         qubit_last_op[qubit_idx] = Some(op_idx);
@@ -278,10 +275,7 @@ fn find_fusion_chains(circuit: &Circuit, config: &FusionConfig) -> Vec<FusionCha
 /// and identity elimination is enabled
 fn fuse_gates(gates: &[&GateOp], config: &FusionConfig) -> Option<Arc<dyn Gate>> {
     assert!(!gates.is_empty(), "Cannot fuse empty gate sequence");
-    assert!(
-        gates.iter().all(|g| g.num_qubits() == 1),
-        "All gates must be single-qubit"
-    );
+    assert!(gates.iter().all(|g| g.num_qubits() == 1), "All gates must be single-qubit");
 
     // Extract matrices from gates
     let matrices: Vec<[[Complex64; 2]; 2]> = gates
@@ -343,10 +337,7 @@ fn fuse_gates(gates: &[&GateOp], config: &FusionConfig) -> Option<Arc<dyn Gate>>
 /// let circuit = /* ... build circuit ... */;
 /// let optimized = fuse_single_qubit_gates(&circuit, None).unwrap();
 /// ```
-pub fn fuse_single_qubit_gates(
-    circuit: &Circuit,
-    config: Option<FusionConfig>,
-) -> Result<Circuit> {
+pub fn fuse_single_qubit_gates(circuit: &Circuit, config: Option<FusionConfig>) -> Result<Circuit> {
     let config = config.unwrap_or_default();
 
     // Find all fusion opportunities
@@ -409,12 +400,20 @@ mod tests {
         let q1 = QubitId::new(1);
 
         // Three gates on q0 that should be fused
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
 
         // One gate on q1 (not fused, too small)
-        circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1]).unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1])
+            .unwrap();
 
         circuit
     }
@@ -426,18 +425,30 @@ mod tests {
         let q2 = QubitId::new(2);
 
         // Chain on q0
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
 
         // Chain on q1
-        circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1]).unwrap();
-        circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1]).unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1])
+            .unwrap();
 
         // Single gate on q2
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q2]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q2])
+            .unwrap();
 
         // More on q0
-        circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q0])
+            .unwrap();
 
         circuit
     }

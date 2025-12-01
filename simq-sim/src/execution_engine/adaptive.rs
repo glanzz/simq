@@ -1,7 +1,7 @@
 //! Adaptive execution strategies
 
-use simq_state::AdaptiveState;
 use crate::execution_engine::config::ExecutionMode;
+use simq_state::AdaptiveState;
 
 /// Adaptive strategy selector
 pub struct AdaptiveStrategy {

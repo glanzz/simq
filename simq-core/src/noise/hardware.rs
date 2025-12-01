@@ -59,10 +59,10 @@ pub struct QubitProperties {
 impl Default for QubitProperties {
     fn default() -> Self {
         Self {
-            t1: 100.0,              // 100μs
-            t2: 80.0,               // 80μs
-            readout_p01: 0.01,      // 1%
-            readout_p10: 0.02,      // 2%
+            t1: 100.0,                          // 100μs
+            t2: 80.0,                           // 80μs
+            readout_p01: 0.01,                  // 1%
+            readout_p10: 0.02,                  // 2%
             single_qubit_gate_fidelity: 0.9995, // 99.95%
         }
     }
@@ -84,9 +84,9 @@ pub struct GateTiming {
 impl Default for GateTiming {
     fn default() -> Self {
         Self {
-            single_qubit_gate_time: 0.02,  // 20ns
-            two_qubit_gate_time: 0.1,      // 100ns
-            measurement_time: 1.0,          // 1μs
+            single_qubit_gate_time: 0.02, // 20ns
+            two_qubit_gate_time: 0.1,     // 100ns
+            measurement_time: 1.0,        // 1μs
         }
     }
 }
@@ -104,8 +104,8 @@ pub struct TwoQubitGateProperties {
 impl Default for TwoQubitGateProperties {
     fn default() -> Self {
         Self {
-            fidelity: 0.99,  // 99%
-            duration: 0.1,   // 100ns
+            fidelity: 0.99, // 99%
+            duration: 0.1,  // 100ns
         }
     }
 }
@@ -123,8 +123,8 @@ pub struct CrosstalkProperties {
 impl Default for CrosstalkProperties {
     fn default() -> Self {
         Self {
-            zz_coupling: 0.0,        // No crosstalk by default
-            spectator_error: 0.0,    // No spectator errors
+            zz_coupling: 0.0,     // No crosstalk by default
+            spectator_error: 0.0, // No spectator errors
         }
     }
 }
@@ -293,7 +293,11 @@ impl HardwareNoiseModel {
     }
 
     /// Get crosstalk properties between two qubits
-    pub fn crosstalk_properties(&self, qubit1: usize, qubit2: usize) -> Option<&CrosstalkProperties> {
+    pub fn crosstalk_properties(
+        &self,
+        qubit1: usize,
+        qubit2: usize,
+    ) -> Option<&CrosstalkProperties> {
         let key = if qubit1 < qubit2 {
             (qubit1, qubit2)
         } else {
@@ -303,7 +307,11 @@ impl HardwareNoiseModel {
     }
 
     /// Get two-qubit gate properties
-    pub fn two_qubit_gate_properties(&self, qubit1: usize, qubit2: usize) -> Option<&TwoQubitGateProperties> {
+    pub fn two_qubit_gate_properties(
+        &self,
+        qubit1: usize,
+        qubit2: usize,
+    ) -> Option<&TwoQubitGateProperties> {
         let key = if qubit1 < qubit2 {
             (qubit1, qubit2)
         } else {
@@ -418,7 +426,11 @@ impl HardwareNoiseModel {
     /// let model = HardwareNoiseModel::ibm_washington();
     /// let (amp_damp, phase_damp) = model.idle_noise(0, 5.0)?; // 5μs idle
     /// ```
-    pub fn idle_noise(&self, qubit: usize, idle_time_us: f64) -> Result<(AmplitudeDamping, PhaseDamping)> {
+    pub fn idle_noise(
+        &self,
+        qubit: usize,
+        idle_time_us: f64,
+    ) -> Result<(AmplitudeDamping, PhaseDamping)> {
         if qubit >= self.num_qubits {
             return Err(crate::QuantumError::ValidationError(format!(
                 "Qubit {} out of range for {}-qubit device",
@@ -470,7 +482,8 @@ impl HardwareNoiseModel {
         }
 
         // Get gate properties or use defaults
-        let gate_props = self.two_qubit_gate_properties(control, target)
+        let gate_props = self
+            .two_qubit_gate_properties(control, target)
             .cloned()
             .unwrap_or_default();
 
@@ -559,7 +572,8 @@ impl HardwareNoiseModel {
 
         // Two-qubit gate contributions
         for &(q1, q2) in two_qubit_gates {
-            let gate_fidelity = self.two_qubit_gate_properties(q1, q2)
+            let gate_fidelity = self
+                .two_qubit_gate_properties(q1, q2)
                 .map(|props| props.fidelity)
                 .unwrap_or(0.99);
             fidelity *= gate_fidelity;
@@ -576,7 +590,7 @@ impl HardwareNoiseModel {
             fidelity *= (t1_factor + t2_factor) / 2.0;
         }
 
-        fidelity.max(0.0).min(1.0)
+        fidelity.clamp(0.0, 1.0)
     }
 
     // ===== Hardware Presets =====
@@ -589,15 +603,15 @@ impl HardwareNoiseModel {
 
         // Typical IBM quantum parameters
         for qubit in 0..127 {
-            model.set_qubit_t1(qubit, 100.0);     // ~100μs T1
-            model.set_qubit_t2(qubit, 80.0);      // ~80μs T2
+            model.set_qubit_t1(qubit, 100.0); // ~100μs T1
+            model.set_qubit_t2(qubit, 80.0); // ~80μs T2
             model.set_readout_error(qubit, 0.015, 0.02); // ~1.5-2%
             model.set_single_qubit_fidelity(qubit, 0.9995); // ~99.95%
         }
 
         model.timing.single_qubit_gate_time = 0.02; // 20ns
-        model.timing.two_qubit_gate_time = 0.3;     // 300ns CNOT
-        model.timing.measurement_time = 1.0;         // 1μs
+        model.timing.two_qubit_gate_time = 0.3; // 300ns CNOT
+        model.timing.measurement_time = 1.0; // 1μs
 
         model
     }
@@ -608,15 +622,15 @@ impl HardwareNoiseModel {
 
         // Typical Google quantum parameters
         for qubit in 0..53 {
-            model.set_qubit_t1(qubit, 20.0);      // ~20μs T1
-            model.set_qubit_t2(qubit, 15.0);      // ~15μs T2
+            model.set_qubit_t1(qubit, 20.0); // ~20μs T1
+            model.set_qubit_t2(qubit, 15.0); // ~15μs T2
             model.set_readout_error(qubit, 0.03, 0.03); // ~3%
             model.set_single_qubit_fidelity(qubit, 0.9996); // ~99.96%
         }
 
         model.timing.single_qubit_gate_time = 0.025; // 25ns
-        model.timing.two_qubit_gate_time = 0.012;    // 12ns iSWAP
-        model.timing.measurement_time = 0.5;          // 500ns
+        model.timing.two_qubit_gate_time = 0.012; // 12ns iSWAP
+        model.timing.measurement_time = 0.5; // 500ns
 
         model
     }
@@ -630,14 +644,14 @@ impl HardwareNoiseModel {
         // Trapped ions: excellent coherence, slower gates
         for qubit in 0..25 {
             model.set_qubit_t1(qubit, 100_000.0); // ~100ms T1 (excellent!)
-            model.set_qubit_t2(qubit, 50_000.0);  // ~50ms T2
+            model.set_qubit_t2(qubit, 50_000.0); // ~50ms T2
             model.set_readout_error(qubit, 0.001, 0.001); // ~0.1%
             model.set_single_qubit_fidelity(qubit, 0.9999); // ~99.99%
         }
 
-        model.timing.single_qubit_gate_time = 10.0;  // 10μs (slower)
-        model.timing.two_qubit_gate_time = 200.0;    // 200μs (much slower)
-        model.timing.measurement_time = 100.0;        // 100μs
+        model.timing.single_qubit_gate_time = 10.0; // 10μs (slower)
+        model.timing.two_qubit_gate_time = 200.0; // 200μs (much slower)
+        model.timing.measurement_time = 100.0; // 100μs
 
         model
     }
@@ -649,8 +663,8 @@ impl HardwareNoiseModel {
         let mut model = Self::new(5);
 
         for qubit in 0..5 {
-            model.set_qubit_t1(qubit, 80.0);       // ~80μs T1
-            model.set_qubit_t2(qubit, 60.0);       // ~60μs T2
+            model.set_qubit_t1(qubit, 80.0); // ~80μs T1
+            model.set_qubit_t2(qubit, 60.0); // ~60μs T2
             model.set_readout_error(qubit, 0.02, 0.025); // ~2-2.5%
             model.set_single_qubit_fidelity(qubit, 0.9994); // ~99.94%
         }

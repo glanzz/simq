@@ -1,9 +1,9 @@
 //! Sparse state gate application kernels
 
-use num_complex::Complex64;
-use ahash::AHashMap;
 use super::Matrix2x2;
 use crate::execution_engine::error::Result;
+use ahash::AHashMap;
+use num_complex::Complex64;
 
 /// Apply a single-qubit gate to a sparse state
 pub fn apply_single_qubit_sparse(
@@ -18,10 +18,16 @@ pub fn apply_single_qubit_sparse(
     // Process all existing amplitudes
     for (&idx, &_amp) in amplitudes.iter() {
         let idx0 = idx & !mask; // Clear qubit bit
-        let idx1 = idx | mask;   // Set qubit bit
+        let idx1 = idx | mask; // Set qubit bit
 
-        let amp0 = amplitudes.get(&idx0).copied().unwrap_or(Complex64::new(0.0, 0.0));
-        let amp1 = amplitudes.get(&idx1).copied().unwrap_or(Complex64::new(0.0, 0.0));
+        let amp0 = amplitudes
+            .get(&idx0)
+            .copied()
+            .unwrap_or(Complex64::new(0.0, 0.0));
+        let amp1 = amplitudes
+            .get(&idx1)
+            .copied()
+            .unwrap_or(Complex64::new(0.0, 0.0));
 
         let new0 = gate[0][0] * amp0 + gate[0][1] * amp1;
         let new1 = gate[1][0] * amp0 + gate[1][1] * amp1;
@@ -65,10 +71,22 @@ pub fn apply_two_qubit_sparse(
         let idx11 = base | mask1 | mask2;
 
         let amp = [
-            amplitudes.get(&idx00).copied().unwrap_or(Complex64::new(0.0, 0.0)),
-            amplitudes.get(&idx01).copied().unwrap_or(Complex64::new(0.0, 0.0)),
-            amplitudes.get(&idx10).copied().unwrap_or(Complex64::new(0.0, 0.0)),
-            amplitudes.get(&idx11).copied().unwrap_or(Complex64::new(0.0, 0.0)),
+            amplitudes
+                .get(&idx00)
+                .copied()
+                .unwrap_or(Complex64::new(0.0, 0.0)),
+            amplitudes
+                .get(&idx01)
+                .copied()
+                .unwrap_or(Complex64::new(0.0, 0.0)),
+            amplitudes
+                .get(&idx10)
+                .copied()
+                .unwrap_or(Complex64::new(0.0, 0.0)),
+            amplitudes
+                .get(&idx11)
+                .copied()
+                .unwrap_or(Complex64::new(0.0, 0.0)),
         ];
 
         let indices = [idx00, idx01, idx10, idx11];

@@ -127,9 +127,7 @@ fn bench_probability_computation(c: &mut Criterion) {
             |b, &num_qubits| {
                 let state = create_random_state(num_qubits, 42);
 
-                b.iter(|| {
-                    black_box(state.get_all_probabilities())
-                });
+                b.iter(|| black_box(state.get_all_probabilities()));
             },
         );
     }
@@ -156,7 +154,9 @@ fn bench_alias_table_construction(c: &mut Criterion) {
                     // (actual AliasTable is private, so we measure the sample operation)
                     let measurement = ComputationalBasis::new().with_collapse(false);
                     let mut rng = BenchRng::new(123);
-                    measurement.sample(black_box(&state), 1, &mut || rng.next()).unwrap();
+                    measurement
+                        .sample(black_box(&state), 1, &mut || rng.next())
+                        .unwrap();
                     black_box(&probabilities)
                 });
             },

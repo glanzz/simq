@@ -5,12 +5,12 @@
 //!
 //! Run with: cargo run --example qaoa_comprehensive
 
-use simq_sim::Simulator;
+use simq_sim::gradient::{AdamConfig, AdamOptimizer};
 use simq_sim::qaoa::{
-    QAOACircuitBuilder, ProblemType, MixerType, Graph,
-    evaluate_maxcut_solution, random_initial_parameters,
+    evaluate_maxcut_solution, random_initial_parameters, Graph, MixerType, ProblemType,
+    QAOACircuitBuilder,
 };
-use simq_sim::gradient::{AdamOptimizer, AdamConfig};
+use simq_sim::Simulator;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n{:=<80}", "");
@@ -145,8 +145,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            println!("  |{}⟩: {:.1}% → A={:.1}, B={:.1}, |diff|={:.1}",
-                bitstring, prob * 100.0, sum_a, sum_b, (sum_a - sum_b).abs());
+            println!(
+                "  |{}⟩: {:.1}% → A={:.1}, B={:.1}, |diff|={:.1}",
+                bitstring,
+                prob * 100.0,
+                sum_a,
+                sum_b,
+                (sum_a - sum_b).abs()
+            );
         }
     }
 
@@ -162,7 +168,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Problem: MaxCut on K4 (complete graph, 4 vertices)");
     println!("Comparing QAOA performance for different depths\n");
 
-    println!("{:<10} {:<15} {:<15} {:<12}", "Depth (p)", "Final Cost", "Iterations", "Time (ms)");
+    println!(
+        "{:<10} {:<15} {:<15} {:<12}",
+        "Depth (p)", "Final Cost", "Iterations", "Time (ms)"
+    );
     println!("{:-<60}", "");
 
     for depth in [1, 2, 3, 4] {
@@ -185,11 +194,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
         let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
-        println!("{:<10} {:<15.8} {:<15} {:<12}",
+        println!(
+            "{:<10} {:<15.8} {:<15} {:<12}",
             depth,
             result.energy,
             result.num_iterations,
-            result.total_time.as_millis());
+            result.total_time.as_millis()
+        );
     }
 
     // ========================================================================
@@ -203,10 +214,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Custom Hamiltonian: H = Z0 + 0.5*Z0*Z1 + 0.3*Z1*Z2 + 0.2*Z2");
 
     let custom_terms = vec![
-        (vec![0], 1.0),           // Z0
-        (vec![0, 1], 0.5),        // Z0*Z1
-        (vec![1, 2], 0.3),        // Z1*Z2
-        (vec![2], 0.2),           // Z2
+        (vec![0], 1.0),    // Z0
+        (vec![0, 1], 0.5), // Z0*Z1
+        (vec![1, 2], 0.3), // Z1*Z2
+        (vec![2], 0.2),    // Z2
     ];
 
     let builder = QAOACircuitBuilder::new(
@@ -257,12 +268,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // Helper function to run MaxCut example
-fn run_maxcut_example(graph: &Graph, name: &str, depth: usize) -> Result<(), Box<dyn std::error::Error>> {
-    let builder = QAOACircuitBuilder::new(
-        ProblemType::MaxCut(graph.clone()),
-        MixerType::StandardX,
-        depth,
-    );
+fn run_maxcut_example(
+    graph: &Graph,
+    name: &str,
+    depth: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let builder =
+        QAOACircuitBuilder::new(ProblemType::MaxCut(graph.clone()), MixerType::StandardX, depth);
 
     let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
@@ -301,8 +313,12 @@ fn run_maxcut_example(graph: &Graph, name: &str, depth: usize) -> Result<(), Box
     let bits: Vec<bool> = bitstring.chars().map(|c| c == '1').collect();
     let cut_value = evaluate_maxcut_solution(graph, &bits);
 
-    println!("  Best solution: |{}⟩ ({:.1}%) → cut value = {:.1}",
-        bitstring, best_prob * 100.0, cut_value);
+    println!(
+        "  Best solution: |{}⟩ ({:.1}%) → cut value = {:.1}",
+        bitstring,
+        best_prob * 100.0,
+        cut_value
+    );
 
     Ok(())
 }
@@ -313,11 +329,7 @@ fn run_maxcut_with_mixer(
     mixer: MixerType,
     depth: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let builder = QAOACircuitBuilder::new(
-        ProblemType::MaxCut(graph.clone()),
-        mixer,
-        depth,
-    );
+    let builder = QAOACircuitBuilder::new(ProblemType::MaxCut(graph.clone()), mixer, depth);
 
     let simulator = Simulator::new(Default::default());
     let observable = builder.cost_observable()?;
@@ -332,8 +344,10 @@ fn run_maxcut_with_mixer(
     let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
     let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
-    println!("  Cost: {:.6}, Iterations: {}, Time: {:?}",
-        result.energy, result.num_iterations, result.total_time);
+    println!(
+        "  Cost: {:.6}, Iterations: {}, Time: {:?}",
+        result.energy, result.num_iterations, result.total_time
+    );
 
     Ok(())
 }

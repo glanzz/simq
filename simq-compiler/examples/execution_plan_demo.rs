@@ -52,7 +52,8 @@ fn main() {
 
     println!("\nLayer breakdown:");
     for (i, layer) in plan.layers.iter().enumerate() {
-        println!("  Layer {}: {} gates, {} qubits, {:.2} µs",
+        println!(
+            "  Layer {}: {} gates, {} qubits, {:.2} µs",
             i,
             layer.gates.len(),
             layer.qubits.len(),
@@ -109,12 +110,18 @@ fn main() {
     println!("  Depth: {}, Time: {:.2} µs", opt_plan.depth, opt_plan.total_time);
 
     println!("\nImprovements:");
-    println!("  Gate reduction: {:.1}%",
-        100.0 * (1.0 - opt_circuit.len() as f64 / unopt_circuit.len() as f64));
-    println!("  Depth reduction: {:.1}%",
-        100.0 * (1.0 - opt_plan.depth as f64 / unopt_plan.depth as f64));
-    println!("  Time reduction: {:.1}%",
-        100.0 * (1.0 - opt_plan.total_time / unopt_plan.total_time));
+    println!(
+        "  Gate reduction: {:.1}%",
+        100.0 * (1.0 - opt_circuit.len() as f64 / unopt_circuit.len() as f64)
+    );
+    println!(
+        "  Depth reduction: {:.1}%",
+        100.0 * (1.0 - opt_plan.depth as f64 / unopt_plan.depth as f64)
+    );
+    println!(
+        "  Time reduction: {:.1}%",
+        100.0 * (1.0 - opt_plan.total_time / unopt_plan.total_time)
+    );
 
     // ===================================================================
     // 4. Layer Visualization
@@ -142,14 +149,16 @@ fn main() {
 
     // Custom timing (e.g., hardware-specific)
     let mut custom_planner = ExecutionPlanner::new();
-    custom_planner.set_gate_time("H", 0.05);  // Fast single-qubit
-    custom_planner.set_gate_time("CNOT", 0.5);  // Slower two-qubit
+    custom_planner.set_gate_time("H", 0.05); // Fast single-qubit
+    custom_planner.set_gate_time("CNOT", 0.5); // Slower two-qubit
 
     let custom_plan = custom_planner.generate_plan(&circuit);
     println!("\nWith custom gate times:");
     println!("  Total time: {:.2} µs", custom_plan.total_time);
-    println!("  Difference: {:.1}%",
-        100.0 * (custom_plan.total_time / default_plan.total_time - 1.0));
+    println!(
+        "  Difference: {:.1}%",
+        100.0 * (custom_plan.total_time / default_plan.total_time - 1.0)
+    );
 
     // ===================================================================
     // 6. Large Circuit Analysis
@@ -172,11 +181,9 @@ fn main() {
 
 /// Print a concise summary of an execution plan
 fn print_plan_summary(plan: &simq_compiler::execution_plan::ExecutionPlan) {
-    println!("  Gates: {}, Depth: {}, Parallelism: {:.2}x, Time: {:.2} µs",
-        plan.gate_count,
-        plan.depth,
-        plan.parallelism_factor,
-        plan.total_time
+    println!(
+        "  Gates: {}, Depth: {}, Parallelism: {:.2}x, Time: {:.2} µs",
+        plan.gate_count, plan.depth, plan.parallelism_factor, plan.total_time
     );
 }
 
@@ -187,8 +194,12 @@ fn visualize_plan(plan: &simq_compiler::execution_plan::ExecutionPlan, circuit: 
     println!("Layer visualization (Q = qubit, G = gate):\n");
 
     for (layer_idx, layer) in plan.layers.iter().enumerate() {
-        println!("Layer {} ({} gates, {:.2} µs):",
-            layer_idx, layer.gates.len(), layer.estimated_time);
+        println!(
+            "Layer {} ({} gates, {:.2} µs):",
+            layer_idx,
+            layer.gates.len(),
+            layer.estimated_time
+        );
 
         // Show which qubits are active in this layer
         for q in 0..num_qubits {
@@ -208,8 +219,12 @@ fn visualize_plan(plan: &simq_compiler::execution_plan::ExecutionPlan, circuit: 
 fn create_simple_circuit() -> Circuit {
     let mut circuit = Circuit::new(3);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let cnot = Arc::new(MockGate {
+        name: "CNOT".to_string(),
+    });
 
     // Layer 1: Hadamards on all qubits (parallel)
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
@@ -217,8 +232,12 @@ fn create_simple_circuit() -> Circuit {
     circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
 
     // Layer 2: CNOTs (some parallel)
-    circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-    circuit.add_gate(cnot.clone(), &[QubitId::new(1), QubitId::new(2)]).unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(1), QubitId::new(2)])
+        .unwrap();
 
     circuit
 }
@@ -227,7 +246,9 @@ fn create_simple_circuit() -> Circuit {
 fn create_sequential_circuit() -> Circuit {
     let mut circuit = Circuit::new(2);
 
-    let x = Arc::new(MockGate { name: "X".to_string() });
+    let x = Arc::new(MockGate {
+        name: "X".to_string(),
+    });
 
     // All gates on qubit 0
     for _ in 0..10 {
@@ -241,7 +262,9 @@ fn create_sequential_circuit() -> Circuit {
 fn create_parallel_circuit() -> Circuit {
     let mut circuit = Circuit::new(10);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
 
     // All gates on different qubits (can all run in parallel)
     for i in 0..10 {
@@ -255,15 +278,23 @@ fn create_parallel_circuit() -> Circuit {
 fn create_mixed_circuit() -> Circuit {
     let mut circuit = Circuit::new(4);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let cnot = Arc::new(MockGate {
+        name: "CNOT".to_string(),
+    });
 
     // Some parallel, some sequential
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
     circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
 
-    circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-    circuit.add_gate(cnot.clone(), &[QubitId::new(2), QubitId::new(3)]).unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(2), QubitId::new(3)])
+        .unwrap();
 
     circuit.add_gate(h.clone(), &[QubitId::new(1)]).unwrap();
     circuit.add_gate(h.clone(), &[QubitId::new(3)]).unwrap();
@@ -275,15 +306,19 @@ fn create_mixed_circuit() -> Circuit {
 fn create_circuit_with_redundancy() -> Circuit {
     let mut circuit = Circuit::new(3);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let x = Arc::new(MockGate { name: "X".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let x = Arc::new(MockGate {
+        name: "X".to_string(),
+    });
 
     // Inverse pairs (H-H, X-X)
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();  // Cancels
+    circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap(); // Cancels
 
     circuit.add_gate(x.clone(), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(x.clone(), &[QubitId::new(1)]).unwrap();  // Cancels
+    circuit.add_gate(x.clone(), &[QubitId::new(1)]).unwrap(); // Cancels
 
     // Some useful gates
     circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
@@ -296,8 +331,12 @@ fn create_circuit_with_redundancy() -> Circuit {
 fn create_visualization_circuit() -> Circuit {
     let mut circuit = Circuit::new(4);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let x = Arc::new(MockGate { name: "X".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let x = Arc::new(MockGate {
+        name: "X".to_string(),
+    });
 
     // Layer 0: Q0, Q2
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
@@ -319,15 +358,25 @@ fn create_visualization_circuit() -> Circuit {
 fn create_mixed_gates_circuit() -> Circuit {
     let mut circuit = Circuit::new(4);
 
-    let h = Arc::new(MockGate { name: "H".to_string() });
-    let t = Arc::new(MockGate { name: "T".to_string() });
-    let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+    let h = Arc::new(MockGate {
+        name: "H".to_string(),
+    });
+    let t = Arc::new(MockGate {
+        name: "T".to_string(),
+    });
+    let cnot = Arc::new(MockGate {
+        name: "CNOT".to_string(),
+    });
 
     circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
     circuit.add_gate(t.clone(), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
     circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
-    circuit.add_gate(cnot.clone(), &[QubitId::new(2), QubitId::new(3)]).unwrap();
+    circuit
+        .add_gate(cnot.clone(), &[QubitId::new(2), QubitId::new(3)])
+        .unwrap();
 
     circuit
 }
@@ -337,11 +386,19 @@ fn create_large_circuit(num_gates: usize) -> Circuit {
     let num_qubits = (num_gates / 10).max(5);
     let mut circuit = Circuit::new(num_qubits);
 
-    let gates = vec![
-        Arc::new(MockGate { name: "H".to_string() }),
-        Arc::new(MockGate { name: "X".to_string() }),
-        Arc::new(MockGate { name: "T".to_string() }),
-        Arc::new(MockGate { name: "CNOT".to_string() }),
+    let gates = [
+        Arc::new(MockGate {
+            name: "H".to_string(),
+        }),
+        Arc::new(MockGate {
+            name: "X".to_string(),
+        }),
+        Arc::new(MockGate {
+            name: "T".to_string(),
+        }),
+        Arc::new(MockGate {
+            name: "CNOT".to_string(),
+        }),
     ];
 
     for i in 0..num_gates {
@@ -350,12 +407,16 @@ fn create_large_circuit(num_gates: usize) -> Circuit {
 
         if gate.num_qubits() == 1 {
             let qubit = i % num_qubits;
-            circuit.add_gate(gate.clone(), &[QubitId::new(qubit)]).unwrap();
+            circuit
+                .add_gate(gate.clone(), &[QubitId::new(qubit)])
+                .unwrap();
         } else {
             let q1 = i % num_qubits;
             let q2 = (i + 1) % num_qubits;
             if q1 != q2 {
-                circuit.add_gate(gate.clone(), &[QubitId::new(q1), QubitId::new(q2)]).unwrap();
+                circuit
+                    .add_gate(gate.clone(), &[QubitId::new(q1), QubitId::new(q2)])
+                    .unwrap();
             }
         }
     }

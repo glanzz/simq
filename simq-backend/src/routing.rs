@@ -41,15 +41,15 @@ impl Router {
             RoutingStrategy::Identity => {
                 // Simple identity mapping: L0→P0, L1→P1, ...
                 Ok(QubitMapping::identity(num_logical_qubits))
-            }
+            },
             RoutingStrategy::HighestDegree => {
                 // Map to physical qubits with highest degree (most connections)
                 self.highest_degree_mapping(num_logical_qubits, connectivity)
-            }
+            },
             RoutingStrategy::Subgraph => {
                 // Find densely connected subgraph
                 self.subgraph_mapping(num_logical_qubits, connectivity)
-            }
+            },
         }
     }
 
@@ -192,7 +192,7 @@ impl Router {
 }
 
 /// Routing strategy for initial qubit mapping
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RoutingStrategy {
     /// Identity mapping (L0→P0, L1→P1, ...)
     Identity,
@@ -201,13 +201,8 @@ pub enum RoutingStrategy {
     HighestDegree,
 
     /// Find densely connected subgraph
+    #[default]
     Subgraph,
-}
-
-impl Default for RoutingStrategy {
-    fn default() -> Self {
-        RoutingStrategy::Subgraph
-    }
 }
 
 /// Represents a SWAP gate insertion
@@ -379,9 +374,7 @@ mod tests {
 
         // Qubit 2 has highest degree (3 connections: 1, 3, 4)
         // Should be included in mapping
-        let physical_qubits: Vec<_> = (0..3)
-            .filter_map(|l| mapping.get_physical(l))
-            .collect();
+        let physical_qubits: Vec<_> = (0..3).filter_map(|l| mapping.get_physical(l)).collect();
 
         assert!(physical_qubits.contains(&2)); // Highest degree qubit
         assert_eq!(physical_qubits.len(), 3);
@@ -465,9 +458,7 @@ mod tests {
         let mapping = router.initial_mapping(4, &connectivity).unwrap();
 
         // Should map to a connected subgraph
-        let physical_qubits: Vec<_> = (0..4)
-            .filter_map(|l| mapping.get_physical(l))
-            .collect();
+        let physical_qubits: Vec<_> = (0..4).filter_map(|l| mapping.get_physical(l)).collect();
 
         assert_eq!(physical_qubits.len(), 4);
 

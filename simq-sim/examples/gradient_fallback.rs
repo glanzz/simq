@@ -4,11 +4,9 @@
 //! mechanism. It shows how the system automatically tries parameter shift rule
 //! first and falls back to finite differences if needed.
 
-use simq_sim::gradient::{
-    compute_gradient, compute_gradient_auto, GradientConfig, GradientMethod,
-};
-use simq_sim::Simulator;
 use simq_core::Circuit;
+use simq_sim::gradient::{compute_gradient, compute_gradient_auto, GradientConfig, GradientMethod};
+use simq_sim::Simulator;
 use simq_state::observable::PauliObservable;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,22 +22,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let params = vec![0.5, 1.0, 1.5];
 
     // Build a simple parameterized circuit
-    let circuit_builder = |p: &[f64]| {
-        let circuit = Circuit::new(2);
+    let circuit_builder = |_p: &[f64]| {
         // Add parameterized gates here
-        circuit
+        Circuit::new(2)
     };
 
     // Create observable (Z⊗Z)
     let observable = PauliObservable::new();
 
     // Compute gradient with automatic fallback
-    let result = compute_gradient_auto(
-        &simulator,
-        circuit_builder,
-        &observable,
-        &params,
-    )?;
+    let result = compute_gradient_auto(&simulator, circuit_builder, &observable, &params)?;
 
     println!("Gradient: {:?}", result.gradients);
     println!("Method used: {:?}", result.method_used);
@@ -58,13 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cache_circuits: true,
     };
 
-    let result = compute_gradient(
-        &simulator,
-        circuit_builder,
-        &observable,
-        &params,
-        &config,
-    )?;
+    let result = compute_gradient(&simulator, circuit_builder, &observable, &params, &config)?;
 
     println!("Gradient: {:?}", result.gradients);
     println!("Method used: {:?}", result.method_used);
@@ -80,13 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    let result = compute_gradient(
-        &simulator,
-        circuit_builder,
-        &observable,
-        &params,
-        &ps_config,
-    )?;
+    let result = compute_gradient(&simulator, circuit_builder, &observable, &params, &ps_config)?;
 
     println!("Gradient: {:?}", result.gradients);
     println!("Method used: {:?}", result.method_used);
@@ -102,13 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    let result = compute_gradient(
-        &simulator,
-        circuit_builder,
-        &observable,
-        &params,
-        &fd_config,
-    )?;
+    let result = compute_gradient(&simulator, circuit_builder, &observable, &params, &fd_config)?;
 
     println!("Gradient: {:?}", result.gradients);
     println!("Method used: {:?}", result.method_used);
@@ -124,12 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for iteration in 0..num_iterations {
         // Compute gradient
-        let grad_result = compute_gradient_auto(
-            &simulator,
-            circuit_builder,
-            &observable,
-            &params,
-        )?;
+        let grad_result = compute_gradient_auto(&simulator, circuit_builder, &observable, &params)?;
 
         // Gradient descent update
         for (p, g) in params.iter_mut().zip(grad_result.gradients.iter()) {

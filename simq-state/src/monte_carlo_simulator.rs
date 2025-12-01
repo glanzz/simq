@@ -39,8 +39,8 @@
 use crate::dense_state::DenseState;
 use crate::error::{Result, StateError};
 use num_complex::Complex64;
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use simq_core::noise::{MonteCarloSampler, PauliOperation};
 
 /// Configuration for Monte Carlo simulation
@@ -191,7 +191,7 @@ impl MonteCarloSimulator {
             PauliOperation::Identity => {
                 // No-op
                 Ok(())
-            }
+            },
             PauliOperation::X => {
                 // Pauli X (bit flip)
                 let x_gate = [
@@ -199,7 +199,7 @@ impl MonteCarloSimulator {
                     [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
                 ];
                 self.state.apply_single_qubit_gate(&x_gate, qubit)
-            }
+            },
             PauliOperation::Y => {
                 // Pauli Y
                 let y_gate = [
@@ -207,7 +207,7 @@ impl MonteCarloSimulator {
                     [Complex64::new(0.0, 1.0), Complex64::new(0.0, 0.0)],
                 ];
                 self.state.apply_single_qubit_gate(&y_gate, qubit)
-            }
+            },
             PauliOperation::Z => {
                 // Pauli Z (phase flip)
                 let z_gate = [
@@ -215,16 +215,16 @@ impl MonteCarloSimulator {
                     [Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0)],
                 ];
                 self.state.apply_single_qubit_gate(&z_gate, qubit)
-            }
+            },
             PauliOperation::JumpToZero { sqrt_gamma: _ } => {
                 // For amplitude damping: project to |0⟩ and renormalize
                 // This is state-dependent, handled specially
                 self.apply_amplitude_damping_jump(qubit)
-            }
+            },
             PauliOperation::NoJump { sqrt_1_minus_gamma } => {
                 // For amplitude damping: apply decay to |1⟩ component
                 self.apply_amplitude_damping_no_jump(qubit, sqrt_1_minus_gamma)
-            }
+            },
         }
     }
 
@@ -237,12 +237,12 @@ impl MonteCarloSimulator {
         let mut norm_sq = 0.0;
 
         // Zero out |1⟩ components and accumulate norm
-        for i in 0..amplitudes.len() {
+        for (i, amp) in amplitudes.iter_mut().enumerate() {
             if (i & stride) != 0 {
                 // This is a |1⟩ component - zero it
-                amplitudes[i] = Complex64::new(0.0, 0.0);
+                *amp = Complex64::new(0.0, 0.0);
             } else {
-                norm_sq += amplitudes[i].norm_sqr();
+                norm_sq += amp.norm_sqr();
             }
         }
 
@@ -265,12 +265,12 @@ impl MonteCarloSimulator {
 
         let mut norm_sq = 0.0;
 
-        for i in 0..amplitudes.len() {
+        for (i, amp) in amplitudes.iter_mut().enumerate() {
             if (i & stride) != 0 {
                 // This is a |1⟩ component - scale it
-                amplitudes[i] *= factor;
+                *amp *= factor;
             }
-            norm_sq += amplitudes[i].norm_sqr();
+            norm_sq += amp.norm_sqr();
         }
 
         // Renormalize

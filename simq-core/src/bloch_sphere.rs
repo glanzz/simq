@@ -97,7 +97,10 @@ impl BlochVector {
 
         // Handle near-zero vector
         if r < 1e-10 {
-            return BlochAngles { theta: 0.0, phi: 0.0 };
+            return BlochAngles {
+                theta: 0.0,
+                phi: 0.0,
+            };
         }
 
         // θ = arccos(z/r)
@@ -217,7 +220,8 @@ impl BlochRenderer {
         // Header
         output.push_str("Bloch Sphere Visualization\n");
         if self.config.show_coords {
-            output.push_str(&format!("State: ({:.3}, {:.3}, {:.3})\n", vector.x, vector.y, vector.z));
+            output
+                .push_str(&format!("State: ({:.3}, {:.3}, {:.3})\n", vector.x, vector.y, vector.z));
         }
         output.push('\n');
 

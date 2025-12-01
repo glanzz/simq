@@ -278,15 +278,11 @@ impl<'a> LatexRenderer<'a> {
             match gate_for_qubit {
                 Some((op, role)) => {
                     self.write_gate(output, op, qubit, role);
-                }
+                },
                 None => {
                     // Check if we're a wire passing through a multi-qubit gate
-                    if self.is_wire_through(col, qubit) {
-                        output.push_str("\\qw");
-                    } else {
-                        output.push_str("\\qw");
-                    }
-                }
+                    output.push_str("\\qw");
+                },
             }
 
             // Add slice marker if enabled
@@ -316,6 +312,7 @@ impl<'a> LatexRenderer<'a> {
         None
     }
 
+    #[allow(dead_code)]
     fn is_wire_through(&self, col: &[(usize, &GateOp)], qubit: usize) -> bool {
         for (_, op) in col {
             let indices: Vec<usize> = op.qubits().iter().map(|q| q.index()).collect();
@@ -381,42 +378,42 @@ impl<'a> LatexRenderer<'a> {
         match role {
             GateRole::Single => {
                 self.write_single_gate(output, op);
-            }
+            },
             GateRole::Control => {
                 // Find target qubit offset
                 let target_idx = indices.last().unwrap();
                 let offset = (*target_idx as isize) - (qubit as isize);
                 let _ = write!(output, "\\ctrl{{{}}}", offset);
-            }
+            },
             GateRole::Target => {
                 match name_upper.as_str() {
                     "CNOT" | "CX" | "CCNOT" | "CCX" | "TOFFOLI" => {
                         output.push_str("\\targ{}");
-                    }
+                    },
                     "CZ" => {
                         // CZ shows control on both ends
                         let first_idx = indices.first().unwrap();
                         let offset = (*first_idx as isize) - (qubit as isize);
                         let _ = write!(output, "\\ctrl{{{}}}", offset);
-                    }
+                    },
                     "CY" => {
                         output.push_str("\\gate{Y}");
-                    }
+                    },
                     _ => {
                         // Generic controlled gate - show base gate
                         let base = name_upper.trim_start_matches('C');
                         let _ = write!(output, "\\gate{{{}}}", base);
-                    }
+                    },
                 }
-            }
+            },
             GateRole::SwapFirst => {
                 let other_idx = indices.last().unwrap();
                 let offset = (*other_idx as isize) - (qubit as isize);
                 let _ = write!(output, "\\swap{{{}}}", offset);
-            }
+            },
             GateRole::SwapSecond => {
                 output.push_str("\\targX{}");
-            }
+            },
             GateRole::Multi(pos) => {
                 // Multi-qubit gate spanning multiple qubits
                 if pos == 0 {
@@ -427,7 +424,7 @@ impl<'a> LatexRenderer<'a> {
                     // Ghost entry for multi-span gate
                     output.push_str("\\ghost{}");
                 }
-            }
+            },
         }
     }
 
@@ -451,7 +448,7 @@ impl<'a> LatexRenderer<'a> {
                 // Parametric or custom gate
                 let gate_text = self.format_gate_text(op);
                 let _ = write!(output, "\\gate{{{}}}", gate_text);
-            }
+            },
         }
     }
 
@@ -660,10 +657,7 @@ mod tests {
     fn test_cnot_gate() {
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("CNOT", 2)),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
 
         let latex = render(&circuit);
@@ -675,10 +669,7 @@ mod tests {
     fn test_swap_gate() {
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("SWAP", 2)),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(MockGate::new("SWAP", 2)), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
 
         let latex = render(&circuit);

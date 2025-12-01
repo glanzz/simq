@@ -1,16 +1,17 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use simq_compiler::{
+    create_compiler,
     fusion::fuse_single_qubit_gates,
     passes::{
         AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion,
         OptimizationPass,
     },
-    create_compiler, OptimizationLevel,
+    OptimizationLevel,
 };
+use simq_core::gate::Gate;
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationZ, SGate, TGate};
 use std::sync::Arc;
-use simq_core::gate::Gate;
 
 /// Create a circuit with many single-qubit gates that can be fused
 fn create_fuseable_circuit(num_qubits: usize, gates_per_qubit: usize) -> Circuit {
@@ -45,9 +46,13 @@ fn create_rotation_circuit(num_qubits: usize, rotations_per_qubit: usize) -> Cir
         for i in 0..rotations_per_qubit {
             let angle = (i as f64) * 0.1;
             if i % 2 == 0 {
-                circuit.add_gate(Arc::new(RotationX::new(angle)) as Arc<dyn Gate>, &[qubit]).unwrap();
+                circuit
+                    .add_gate(Arc::new(RotationX::new(angle)) as Arc<dyn Gate>, &[qubit])
+                    .unwrap();
             } else {
-                circuit.add_gate(Arc::new(RotationZ::new(angle)) as Arc<dyn Gate>, &[qubit]).unwrap();
+                circuit
+                    .add_gate(Arc::new(RotationZ::new(angle)) as Arc<dyn Gate>, &[qubit])
+                    .unwrap();
             }
         }
     }
@@ -63,22 +68,34 @@ fn create_mixed_circuit(num_qubits: usize, gates_per_qubit: usize) -> Circuit {
         let qubit = QubitId::new(qubit_idx);
 
         // Add some single-qubit gates
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[qubit]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
 
         // Add a two-qubit gate if possible (breaks fusion chain)
         if qubit_idx + 1 < num_qubits {
             let next_qubit = QubitId::new(qubit_idx + 1);
-            circuit.add_gate(
-                Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
-                &[qubit, next_qubit]
-            ).unwrap();
+            circuit
+                .add_gate(
+                    Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
+                    &[qubit, next_qubit],
+                )
+                .unwrap();
         }
 
         // Add more single-qubit gates
-        circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
     }
 
     circuit
@@ -94,24 +111,40 @@ fn create_self_inverse_circuit(num_qubits: usize, pairs_per_qubit: usize) -> Cir
             match i % 4 {
                 0 => {
                     // X-X pairs
-                    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
                 1 => {
                     // Y-Y pairs
-                    circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
                 2 => {
                     // H-H pairs
-                    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
                 _ => {
                     // Z-Z pairs
-                    circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
             }
         }
     }
@@ -129,22 +162,40 @@ fn create_template_circuit(num_qubits: usize, patterns_per_qubit: usize) -> Circ
             match i % 3 {
                 0 => {
                     // H-Z-H → X
-                    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
                 1 => {
                     // H-X-H → Z
-                    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
                 _ => {
                     // X-Y-X → Y
-                    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit]).unwrap();
-                    circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
-                }
+                    circuit
+                        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                    circuit
+                        .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+                        .unwrap();
+                },
             }
         }
     }
@@ -161,9 +212,13 @@ fn create_commutation_circuit(num_qubits: usize) -> Circuit {
         for qubit_idx in 0..num_qubits {
             let qubit = QubitId::new(qubit_idx);
             if round % 2 == 0 {
-                circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
+                circuit
+                    .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+                    .unwrap();
             } else {
-                circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
+                circuit
+                    .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+                    .unwrap();
             }
         }
     }
@@ -179,31 +234,55 @@ fn create_realistic_circuit(num_qubits: usize) -> Circuit {
         let qubit = QubitId::new(qubit_idx);
 
         // Start with some single-qubit gates
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(RotationZ::new(0.5)) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(RotationZ::new(0.5)) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
 
         // Some that can be fused
-        circuit.add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit]).unwrap();
+        circuit
+            .add_gate(Arc::new(SGate) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(TGate) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
 
         // Self-inverse pair
-        circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit]).unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
 
         // Template pattern: H-Z-H
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit]).unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qubit])
+            .unwrap();
 
         // Add entangling gates
         if qubit_idx + 1 < num_qubits {
             let next_qubit = QubitId::new(qubit_idx + 1);
-            circuit.add_gate(
-                Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
-                &[qubit, next_qubit]
-            ).unwrap();
+            circuit
+                .add_gate(
+                    Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
+                    &[qubit, next_qubit],
+                )
+                .unwrap();
         }
     }
 
@@ -223,7 +302,10 @@ fn bench_dead_code_elimination(c: &mut Criterion) {
             let total_gates = circuit.len();
 
             group.bench_with_input(
-                BenchmarkId::new("self_inverse", format!("{}q_{}pairs_{}gates", num_qubits, pairs, total_gates)),
+                BenchmarkId::new(
+                    "self_inverse",
+                    format!("{}q_{}pairs_{}gates", num_qubits, pairs, total_gates),
+                ),
                 &circuit,
                 |b, circuit| {
                     b.iter(|| {
@@ -250,7 +332,10 @@ fn bench_template_matching(c: &mut Criterion) {
             let total_gates = circuit.len();
 
             group.bench_with_input(
-                BenchmarkId::new("patterns", format!("{}q_{}pat_{}gates", num_qubits, patterns, total_gates)),
+                BenchmarkId::new(
+                    "patterns",
+                    format!("{}q_{}pat_{}gates", num_qubits, patterns, total_gates),
+                ),
                 &circuit,
                 |b, circuit| {
                     b.iter(|| {
@@ -302,7 +387,10 @@ fn bench_gate_fusion_pass(c: &mut Criterion) {
             let total_gates = circuit.len();
 
             group.bench_with_input(
-                BenchmarkId::new("fusion", format!("{}q_{}gpq_{}gates", num_qubits, gates_per_qubit, total_gates)),
+                BenchmarkId::new(
+                    "fusion",
+                    format!("{}q_{}gpq_{}gates", num_qubits, gates_per_qubit, total_gates),
+                ),
                 &circuit,
                 |b, circuit| {
                     b.iter(|| {
@@ -328,7 +416,12 @@ fn bench_optimization_levels(c: &mut Criterion) {
         let total_gates = circuit.len();
 
         // Benchmark each optimization level
-        for level in [OptimizationLevel::O0, OptimizationLevel::O1, OptimizationLevel::O2, OptimizationLevel::O3] {
+        for level in [
+            OptimizationLevel::O0,
+            OptimizationLevel::O1,
+            OptimizationLevel::O2,
+            OptimizationLevel::O3,
+        ] {
             let compiler = create_compiler(level);
             let level_name = match level {
                 OptimizationLevel::O0 => "O0",
@@ -471,7 +564,10 @@ fn bench_gate_fusion(c: &mut Criterion) {
             let total_gates = circuit.len();
 
             group.bench_with_input(
-                BenchmarkId::new("fuseable", format!("{}q_{}g_total{}", num_qubits, gates_per_qubit, total_gates)),
+                BenchmarkId::new(
+                    "fuseable",
+                    format!("{}q_{}g_total{}", num_qubits, gates_per_qubit, total_gates),
+                ),
                 &circuit,
                 |b, circuit| {
                     b.iter(|| {
@@ -535,8 +631,14 @@ fn bench_matrix_multiplication(c: &mut Criterion) {
     use simq_compiler::matrix_utils::multiply_2x2;
 
     let hadamard = [
-        [Complex64::new(0.7071067811865476, 0.0), Complex64::new(0.7071067811865476, 0.0)],
-        [Complex64::new(0.7071067811865476, 0.0), Complex64::new(-0.7071067811865476, 0.0)],
+        [
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+        ],
+        [
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            Complex64::new(-std::f64::consts::FRAC_1_SQRT_2, 0.0),
+        ],
     ];
 
     let pauli_x = [
@@ -559,10 +661,9 @@ fn bench_fusion_overhead(c: &mut Criterion) {
     let no_fusion = {
         let mut circuit = Circuit::new(10);
         for i in 0..10 {
-            circuit.add_gate(
-                Arc::new(Hadamard) as Arc<dyn Gate>,
-                &[QubitId::new(i)]
-            ).unwrap();
+            circuit
+                .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[QubitId::new(i)])
+                .unwrap();
         }
         circuit
     };

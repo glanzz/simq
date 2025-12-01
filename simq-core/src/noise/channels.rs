@@ -120,32 +120,14 @@ impl NoiseChannel for DepolarizingChannel {
             )
             .unwrap(),
             // K₁ = √(p/3) X
-            KrausOperator::new(
-                Self::pauli_x()
-                    .iter()
-                    .map(|&x| x * sqrt_p_over_3)
-                    .collect(),
-                2,
-            )
-            .unwrap(),
+            KrausOperator::new(Self::pauli_x().iter().map(|&x| x * sqrt_p_over_3).collect(), 2)
+                .unwrap(),
             // K₂ = √(p/3) Y
-            KrausOperator::new(
-                Self::pauli_y()
-                    .iter()
-                    .map(|&x| x * sqrt_p_over_3)
-                    .collect(),
-                2,
-            )
-            .unwrap(),
+            KrausOperator::new(Self::pauli_y().iter().map(|&x| x * sqrt_p_over_3).collect(), 2)
+                .unwrap(),
             // K₃ = √(p/3) Z
-            KrausOperator::new(
-                Self::pauli_z()
-                    .iter()
-                    .map(|&x| x * sqrt_p_over_3)
-                    .collect(),
-                2,
-            )
-            .unwrap(),
+            KrausOperator::new(Self::pauli_z().iter().map(|&x| x * sqrt_p_over_3).collect(), 2)
+                .unwrap(),
         ]
     }
 
@@ -216,9 +198,7 @@ impl AmplitudeDamping {
     /// Computes γ = 1 - exp(-gate_time/T1)
     pub fn from_t1(t1: f64, gate_time: f64) -> Result<Self> {
         if t1 <= 0.0 {
-            return Err(crate::QuantumError::ValidationError(
-                "T1 must be positive".to_string(),
-            ));
+            return Err(crate::QuantumError::ValidationError("T1 must be positive".to_string()));
         }
         if gate_time < 0.0 {
             return Err(crate::QuantumError::ValidationError(
@@ -338,9 +318,7 @@ impl PhaseDamping {
     /// Computes λ = (1 - exp(-gate_time/T2))/2
     pub fn from_t2(t2: f64, gate_time: f64) -> Result<Self> {
         if t2 <= 0.0 {
-            return Err(crate::QuantumError::ValidationError(
-                "T2 must be positive".to_string(),
-            ));
+            return Err(crate::QuantumError::ValidationError("T2 must be positive".to_string()));
         }
         if gate_time < 0.0 {
             return Err(crate::QuantumError::ValidationError(

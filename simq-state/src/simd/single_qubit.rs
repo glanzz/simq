@@ -341,9 +341,9 @@ pub fn apply_gate_parallel(
 
     // Determine chunk size for parallel execution
     // We want chunks that are cache-friendly and provide good load balancing
-    let num_pairs = dimension / 2;
+    let num_pairs: usize = dimension / 2;
     let num_threads = rayon::current_num_threads();
-    let pairs_per_thread = (num_pairs + num_threads - 1) / num_threads;
+    let pairs_per_thread = num_pairs.div_ceil(num_threads);
 
     // Create ranges for parallel processing
     // Each range processes a contiguous block of "low" indices
@@ -429,8 +429,14 @@ mod tests {
     fn hadamard_matrix() -> [[Complex64; 2]; 2] {
         let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
         [
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ]
     }
 

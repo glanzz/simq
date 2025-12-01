@@ -7,15 +7,19 @@
 //! - Support for both full and partial qubit measurement
 //! - Mid-circuit measurement with partial collapse
 
-use crate::error::{Result, StateError};
 use crate::dense_state::DenseState;
+use crate::error::{Result, StateError};
 use num_complex::Complex64;
 use std::collections::HashMap;
 
 /// Trait for quantum measurements
 pub trait Measurement {
     /// Perform a measurement on the quantum state
-    fn measure(&self, state: &mut DenseState, rng: &mut dyn FnMut() -> f64) -> Result<MeasurementResult>;
+    fn measure(
+        &self,
+        state: &mut DenseState,
+        rng: &mut dyn FnMut() -> f64,
+    ) -> Result<MeasurementResult>;
 }
 
 /// Result of a quantum measurement
@@ -106,9 +110,7 @@ impl SamplingResult {
     pub fn to_bitstring_counts(&self, num_qubits: usize) -> HashMap<String, usize> {
         self.counts
             .iter()
-            .map(|(&outcome, &count)| {
-                (format!("{:0width$b}", outcome, width = num_qubits), count)
-            })
+            .map(|(&outcome, &count)| (format!("{:0width$b}", outcome, width = num_qubits), count))
             .collect()
     }
 }
@@ -246,7 +248,11 @@ impl Default for ComputationalBasis {
 }
 
 impl Measurement for ComputationalBasis {
-    fn measure(&self, state: &mut DenseState, rng: &mut dyn FnMut() -> f64) -> Result<MeasurementResult> {
+    fn measure(
+        &self,
+        state: &mut DenseState,
+        rng: &mut dyn FnMut() -> f64,
+    ) -> Result<MeasurementResult> {
         self.measure_once(state, rng)
     }
 }
@@ -318,13 +324,11 @@ impl AliasTable {
         }
 
         // Handle remaining (due to floating-point errors)
-        while !large.is_empty() {
-            let l = large.pop().unwrap();
+        while let Some(l) = large.pop() {
             prob[l] = 1.0;
         }
 
-        while !small.is_empty() {
-            let s = small.pop().unwrap();
+        while let Some(s) = small.pop() {
             prob[s] = 1.0;
         }
 
@@ -410,7 +414,9 @@ mod tests {
         let mut rng = TestRng::new(42);
 
         let measurement = ComputationalBasis::new();
-        let result = measurement.measure_once(&mut state, &mut || rng.next()).unwrap();
+        let result = measurement
+            .measure_once(&mut state, &mut || rng.next())
+            .unwrap();
 
         // |00⟩ state should always measure to 0
         assert_eq!(result.outcome, 0);
@@ -423,7 +429,7 @@ mod tests {
         let alias_table = AliasTable::new(&probabilities).unwrap();
 
         let mut rng = TestRng::new(42);
-        let mut counts = vec![0; 4];
+        let mut counts = [0; 4];
 
         let shots = 10000;
         for _ in 0..shots {
@@ -444,7 +450,7 @@ mod tests {
         let alias_table = AliasTable::new(&probabilities).unwrap();
 
         let mut rng = TestRng::new(123);
-        let mut counts = vec![0; 4];
+        let mut counts = [0; 4];
 
         let shots = 10000;
         for _ in 0..shots {
@@ -458,7 +464,9 @@ mod tests {
             assert!(
                 (freq - prob).abs() < 0.02,
                 "Outcome {} frequency {} too far from {}",
-                i, freq, prob
+                i,
+                freq,
+                prob
             );
         }
     }
@@ -477,7 +485,9 @@ mod tests {
         let measurement = ComputationalBasis::new().with_collapse(false);
         let mut rng = TestRng::new(42);
 
-        let result = measurement.sample(&state, 1000, &mut || rng.next()).unwrap();
+        let result = measurement
+            .sample(&state, 1000, &mut || rng.next())
+            .unwrap();
 
         assert_eq!(result.shots, 1000);
 
@@ -645,10 +655,10 @@ mod mid_circuit_tests {
         // Create (|00⟩ + |01⟩)/√2 where qubit 1 is |0⟩, qubit 0 is |+⟩
         // In little-endian (q0 is LSB): |q1=0⟩ ⊗ |q0=+⟩
         let amplitudes = vec![
-            Complex64::new(1.0 / 2_f64.sqrt(), 0.0),  // |00⟩
-            Complex64::new(1.0 / 2_f64.sqrt(), 0.0),  // |01⟩
-            Complex64::new(0.0, 0.0),                   // |10⟩
-            Complex64::new(0.0, 0.0),                   // |11⟩
+            Complex64::new(1.0 / 2_f64.sqrt(), 0.0), // |00⟩
+            Complex64::new(1.0 / 2_f64.sqrt(), 0.0), // |01⟩
+            Complex64::new(0.0, 0.0),                // |10⟩
+            Complex64::new(0.0, 0.0),                // |11⟩
         ];
         let mut state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
 
@@ -693,8 +703,8 @@ mod mid_circuit_tests {
         // After measuring qubit 0 as |0⟩, state should be |000⟩
         let amps = state.amplitudes();
         assert_relative_eq!(amps[0].norm(), 1.0, epsilon = 1e-10);
-        for i in 1..8 {
-            assert_relative_eq!(amps[i].norm(), 0.0, epsilon = 1e-10);
+        for amp in amps.iter().take(8).skip(1) {
+            assert_relative_eq!(amp.norm(), 0.0, epsilon = 1e-10);
         }
     }
 
@@ -703,10 +713,10 @@ mod mid_circuit_tests {
         // Create (|00⟩ + |01⟩ + |10⟩ + |11⟩)/2 = |+⟩ ⊗ |+⟩
         // Both qubits in equal superposition
         let amplitudes = vec![
-            Complex64::new(0.5, 0.0),  // |00⟩
-            Complex64::new(0.5, 0.0),  // |01⟩
-            Complex64::new(0.5, 0.0),  // |10⟩
-            Complex64::new(0.5, 0.0),  // |11⟩
+            Complex64::new(0.5, 0.0), // |00⟩
+            Complex64::new(0.5, 0.0), // |01⟩
+            Complex64::new(0.5, 0.0), // |10⟩
+            Complex64::new(0.5, 0.0), // |11⟩
         ];
         let mut state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
 

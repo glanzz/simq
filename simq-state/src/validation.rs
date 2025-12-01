@@ -104,10 +104,7 @@ pub fn validate_normalization(amplitudes: &[Complex64], tolerance: f64) -> Valid
     let message = if valid {
         format!("State is normalized (norm = {:.10})", norm)
     } else {
-        format!(
-            "State normalization error: norm = {:.10}, error = {:.2e}",
-            norm, norm_error
-        )
+        format!("State normalization error: norm = {:.10}, error = {:.2e}", norm, norm_error)
     };
 
     ValidationResult {
@@ -136,10 +133,7 @@ pub fn validate_probabilities(probabilities: &[f64], tolerance: f64) -> Validati
     let message = if valid {
         format!("Probabilities sum to 1.0 (sum = {:.10})", total)
     } else {
-        format!(
-            "Probability sum error: sum = {:.10}, error = {:.2e}",
-            total, error
-        )
+        format!("Probability sum error: sum = {:.10}, error = {:.2e}", total, error)
     };
 
     ValidationResult {
@@ -170,22 +164,22 @@ pub fn validate_unitary_2x2(matrix: &[[Complex64; 2]; 2], tolerance: f64) -> boo
     for i in 0..2 {
         for j in 0..2 {
             let mut sum = Complex64::new(0.0, 0.0);
-            for k in 0..2 {
-                sum += matrix[k][i].conj() * matrix[k][j];
+            for row in matrix.iter().take(2) {
+                sum += row[i].conj() * row[j];
             }
             result[i][j] = sum;
         }
     }
 
     // Check if result is identity matrix
-    for i in 0..2 {
-        for j in 0..2 {
+    for (i, row) in result.iter().enumerate() {
+        for (j, val) in row.iter().enumerate() {
             let expected = if i == j {
                 Complex64::new(1.0, 0.0)
             } else {
                 Complex64::new(0.0, 0.0)
             };
-            let diff = (result[i][j] - expected).norm();
+            let diff = (val - expected).norm();
             if diff > tolerance {
                 return false;
             }
@@ -221,7 +215,10 @@ pub fn check_finite(amplitudes: &[Complex64]) -> bool {
 ///
 /// # Returns
 /// Validation result or error if state is invalid
-pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Result<ValidationResult> {
+pub fn validate_state(
+    amplitudes: &[Complex64],
+    policy: ValidationPolicy,
+) -> Result<ValidationResult> {
     match policy {
         ValidationPolicy::None => Ok(ValidationResult {
             valid: true,
@@ -235,9 +232,7 @@ pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Res
         ValidationPolicy::Critical | ValidationPolicy::Strict => {
             // Check for NaN/infinity
             if !check_finite(amplitudes) {
-                return Err(StateError::NotNormalized {
-                    norm: f64::NAN,
-                });
+                return Err(StateError::NotNormalized { norm: f64::NAN });
             }
 
             // Check normalization
@@ -248,7 +243,7 @@ pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Res
             }
 
             Ok(result)
-        }
+        },
     }
 }
 

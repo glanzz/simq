@@ -233,11 +233,7 @@ impl QubitTimeTracker {
 
     /// Update the total time to the maximum qubit time
     fn update_total_time(&mut self) {
-        self.total_time = self
-            .qubit_times
-            .iter()
-            .copied()
-            .fold(0.0, f64::max);
+        self.total_time = self.qubit_times.iter().copied().fold(0.0, f64::max);
     }
 
     /// Get timing information
@@ -297,9 +293,9 @@ mod tests {
 
         // Operate on qubit 0
         tracker.apply_single_qubit_gate(0); // t=0.02
-        // Operate on qubit 1
+                                            // Operate on qubit 1
         tracker.apply_single_qubit_gate(1); // t=0.02
-        // Operate on qubit 0 again
+                                            // Operate on qubit 0 again
         tracker.apply_single_qubit_gate(0); // t=0.04
 
         // Qubits 1 and 2 are now idle relative to the total time
@@ -458,7 +454,7 @@ mod tests {
 
         assert!(idle0.abs() < TOLERANCE); // Should be 0
         assert!((idle1 - 0.02).abs() < TOLERANCE); // total(0.12) - t1(0.1) = 0.02
-        assert!((idle2 - 0.1).abs() < TOLERANCE);  // total(0.12) - t2(0.02) = 0.1
+        assert!((idle2 - 0.1).abs() < TOLERANCE); // total(0.12) - t2(0.02) = 0.1
         assert!((idle3 - 0.12).abs() < TOLERANCE); // total(0.12) - t3(0) = 0.12
     }
 }

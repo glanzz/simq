@@ -9,8 +9,8 @@
 //!
 //! We implement both forward-mode and reverse-mode AD using dual numbers.
 
-use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt;
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 /// Dual number for forward-mode automatic differentiation
 ///
@@ -63,18 +63,12 @@ impl Dual {
 
     /// Compute sin(x)
     pub fn sin(self) -> Self {
-        Self::new(
-            self.value.sin(),
-            self.value.cos() * self.derivative,
-        )
+        Self::new(self.value.sin(), self.value.cos() * self.derivative)
     }
 
     /// Compute cos(x)
     pub fn cos(self) -> Self {
-        Self::new(
-            self.value.cos(),
-            -self.value.sin() * self.derivative,
-        )
+        Self::new(self.value.cos(), -self.value.sin() * self.derivative)
     }
 
     /// Compute exp(x)
@@ -85,27 +79,18 @@ impl Dual {
 
     /// Compute ln(x)
     pub fn ln(self) -> Self {
-        Self::new(
-            self.value.ln(),
-            self.derivative / self.value,
-        )
+        Self::new(self.value.ln(), self.derivative / self.value)
     }
 
     /// Compute x^n
     pub fn powi(self, n: i32) -> Self {
-        Self::new(
-            self.value.powi(n),
-            (n as f64) * self.value.powi(n - 1) * self.derivative,
-        )
+        Self::new(self.value.powi(n), (n as f64) * self.value.powi(n - 1) * self.derivative)
     }
 
     /// Compute sqrt(x)
     pub fn sqrt(self) -> Self {
         let sqrt_val = self.value.sqrt();
-        Self::new(
-            sqrt_val,
-            self.derivative / (2.0 * sqrt_val),
-        )
+        Self::new(sqrt_val, self.derivative / (2.0 * sqrt_val))
     }
 
     /// Compute abs(x)
@@ -124,10 +109,7 @@ impl Add for Dual {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Self::new(
-            self.value + other.value,
-            self.derivative + other.derivative,
-        )
+        Self::new(self.value + other.value, self.derivative + other.derivative)
     }
 }
 
@@ -143,10 +125,7 @@ impl Sub for Dual {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Self::new(
-            self.value - other.value,
-            self.derivative - other.derivative,
-        )
+        Self::new(self.value - other.value, self.derivative - other.derivative)
     }
 }
 
@@ -285,14 +264,28 @@ pub struct ReverseTape {
 #[derive(Debug, Clone)]
 enum Operation {
     #[allow(dead_code)]
-    Input { index: usize },
-    Add { lhs: usize, rhs: usize },
-    Mul { lhs: usize, rhs: usize },
-    Sin { arg: usize },
+    Input {
+        index: usize,
+    },
+    Add {
+        lhs: usize,
+        rhs: usize,
+    },
+    Mul {
+        lhs: usize,
+        rhs: usize,
+    },
+    Sin {
+        arg: usize,
+    },
     #[allow(dead_code)]
-    Cos { arg: usize },
+    Cos {
+        arg: usize,
+    },
     #[allow(dead_code)]
-    Exp { arg: usize },
+    Exp {
+        arg: usize,
+    },
 }
 
 impl ReverseTape {
@@ -368,29 +361,29 @@ impl ReverseTape {
             match *op {
                 Operation::Input { .. } => {
                     // Nothing to do for inputs
-                }
+                },
                 Operation::Add { lhs, rhs } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[lhs] += adj;
                     self.adjoints[rhs] += adj;
-                }
+                },
                 Operation::Mul { lhs, rhs } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[lhs] += adj * self.values[rhs];
                     self.adjoints[rhs] += adj * self.values[lhs];
-                }
+                },
                 Operation::Sin { arg } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[arg] += adj * self.values[arg].cos();
-                }
+                },
                 Operation::Cos { arg } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[arg] -= adj * self.values[arg].sin();
-                }
+                },
                 Operation::Exp { arg } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[arg] += adj * self.values[arg].exp();
-                }
+                },
             }
         }
 
@@ -480,9 +473,7 @@ mod tests {
     #[test]
     fn test_gradient_forward() {
         // f(x, y) = x² + xy + y²
-        let f = |vars: &[Dual]| {
-            vars[0] * vars[0] + vars[0] * vars[1] + vars[1] * vars[1]
-        };
+        let f = |vars: &[Dual]| vars[0] * vars[0] + vars[0] * vars[1] + vars[1] * vars[1];
 
         let x = vec![2.0, 3.0];
         let grad = gradient_forward(f, &x);
@@ -496,9 +487,7 @@ mod tests {
     #[test]
     fn test_gradient_forward_complex() {
         // f(x, y, z) = sin(x) * exp(y) + z²
-        let f = |vars: &[Dual]| {
-            vars[0].sin() * vars[1].exp() + vars[2] * vars[2]
-        };
+        let f = |vars: &[Dual]| vars[0].sin() * vars[1].exp() + vars[2] * vars[2];
 
         let x = vec![1.0, 0.0, 2.0];
         let grad = gradient_forward(f, &x);

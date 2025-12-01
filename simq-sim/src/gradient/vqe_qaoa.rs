@@ -28,14 +28,12 @@ fn compute_expectation(
     let result = simulator.run(circuit)?;
 
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -247,24 +245,15 @@ where
             let energy = compute_expectation(simulator, &circuit, observable)?;
 
             // Compute gradient
-            let grad_result = compute_gradient_auto(
-                simulator,
-                &self.circuit_builder,
-                observable,
-                &params,
-            )?;
+            let grad_result =
+                compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
             let gradient = grad_result.gradients.clone();
             let gradient_norm = grad_result.norm();
             let energy_change = (energy - prev_energy).abs();
 
             // Check convergence
-            let status = self.check_convergence(
-                iteration,
-                energy,
-                prev_energy,
-                gradient_norm,
-            );
+            let status = self.check_convergence(iteration, energy, prev_energy, gradient_norm);
 
             // Record step
             let step = OptimizationStep {
@@ -302,11 +291,8 @@ where
 
             // Adaptive learning rate
             if self.config.adaptive_learning_rate {
-                learning_rate = self.adapt_learning_rate(
-                    learning_rate,
-                    gradient_norm,
-                    energy_change,
-                );
+                learning_rate =
+                    self.adapt_learning_rate(learning_rate, gradient_norm, energy_change);
             }
 
             // Gradient descent update
@@ -320,12 +306,8 @@ where
         // Max iterations reached
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad = compute_gradient_auto(
-            simulator,
-            &self.circuit_builder,
-            observable,
-            &params,
-        )?;
+        let final_grad =
+            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -367,12 +349,7 @@ where
     }
 
     /// Adapt learning rate based on progress
-    fn adapt_learning_rate(
-        &self,
-        current_lr: f64,
-        gradient_norm: f64,
-        energy_change: f64,
-    ) -> f64 {
+    fn adapt_learning_rate(&self, current_lr: f64, gradient_norm: f64, energy_change: f64) -> f64 {
         // Simple adaptive strategy:
         // - Increase LR if gradient is large and energy is changing
         // - Decrease LR if gradient is small or energy change is small
@@ -474,12 +451,8 @@ where
             // Compute energy and gradient
             let circuit = (self.circuit_builder)(&params);
             let energy = compute_expectation(simulator, &circuit, observable)?;
-            let grad_result = compute_gradient_auto(
-                simulator,
-                &self.circuit_builder,
-                observable,
-                &params,
-            )?;
+            let grad_result =
+                compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
             let gradient = grad_result.gradients.clone();
             let gradient_norm = grad_result.norm();
@@ -541,12 +514,8 @@ where
         // Max iterations reached
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad = compute_gradient_auto(
-            simulator,
-            &self.circuit_builder,
-            observable,
-            &params,
-        )?;
+        let final_grad =
+            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -578,19 +547,17 @@ where
             for _iteration in 0..self.config.max_iterations {
                 let circuit = (self.circuit_builder)(&params);
                 let _energy = compute_expectation(simulator, &circuit, observable)?;
-                let grad_result = compute_gradient_auto(
-                    simulator,
-                    &self.circuit_builder,
-                    observable,
-                    &params,
-                )?;
+                let grad_result =
+                    compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
                 // Update only this layer's parameters
                 let gamma_idx = layer_start_idx;
                 let beta_idx = layer_start_idx + 1;
 
-                params[gamma_idx] -= self.config.gamma_learning_rate * grad_result.gradients[gamma_idx];
-                params[beta_idx] -= self.config.beta_learning_rate * grad_result.gradients[beta_idx];
+                params[gamma_idx] -=
+                    self.config.gamma_learning_rate * grad_result.gradients[gamma_idx];
+                params[beta_idx] -=
+                    self.config.beta_learning_rate * grad_result.gradients[beta_idx];
 
                 // Simple convergence check for this layer
                 if grad_result.gradients[gamma_idx].abs() < self.config.gradient_tolerance
@@ -604,12 +571,8 @@ where
         // Final evaluation
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad = compute_gradient_auto(
-            simulator,
-            &self.circuit_builder,
-            observable,
-            &params,
-        )?;
+        let final_grad =
+            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -749,12 +712,8 @@ where
             // Compute energy and gradient
             let circuit = (self.circuit_builder)(&params);
             let energy = compute_expectation(simulator, &circuit, observable)?;
-            let grad_result = compute_gradient_auto(
-                simulator,
-                &self.circuit_builder,
-                observable,
-                &params,
-            )?;
+            let grad_result =
+                compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
             let gradient = grad_result.gradients.clone();
             let gradient_norm = grad_result.norm();
@@ -817,7 +776,8 @@ where
                 let v_hat = self.v[i] / (1.0 - self.config.beta2.powi(self.t as i32));
 
                 // Update parameter
-                params[i] -= self.config.learning_rate * m_hat / (v_hat.sqrt() + self.config.epsilon);
+                params[i] -=
+                    self.config.learning_rate * m_hat / (v_hat.sqrt() + self.config.epsilon);
             }
 
             prev_energy = energy;
@@ -826,12 +786,8 @@ where
         // Max iterations reached
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad = compute_gradient_auto(
-            simulator,
-            &self.circuit_builder,
-            observable,
-            &params,
-        )?;
+        let final_grad =
+            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -936,12 +892,8 @@ where
             // Compute energy and gradient
             let circuit = (self.circuit_builder)(&params);
             let energy = compute_expectation(simulator, &circuit, observable)?;
-            let grad_result = compute_gradient_auto(
-                simulator,
-                &self.circuit_builder,
-                observable,
-                &params,
-            )?;
+            let grad_result =
+                compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
             let gradient = grad_result.gradients.clone();
             let gradient_norm = grad_result.norm();
@@ -1003,12 +955,8 @@ where
         // Max iterations reached
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad = compute_gradient_auto(
-            simulator,
-            &self.circuit_builder,
-            observable,
-            &params,
-        )?;
+        let final_grad =
+            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
 
         Ok(OptimizationResult {
             parameters: params,

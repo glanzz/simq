@@ -130,11 +130,6 @@ impl CompilationCache {
         }
     }
 
-    /// Create a cache with default size (100 entries)
-    pub fn default() -> Self {
-        Self::new(100)
-    }
-
     /// Get a cached circuit by fingerprint
     ///
     /// If found, moves the entry to the back of the LRU queue.
@@ -157,7 +152,10 @@ impl CompilationCache {
     /// If the cache is full, evicts the least recently used entry.
     pub fn insert(&mut self, fingerprint: CircuitFingerprint, circuit: Circuit) {
         // Check if we need to evict
-        if self.max_size > 0 && self.cache.len() >= self.max_size && !self.cache.contains_key(&fingerprint) {
+        if self.max_size > 0
+            && self.cache.len() >= self.max_size
+            && !self.cache.contains_key(&fingerprint)
+        {
             if let Some(lru_fingerprint) = self.lru_queue.pop_front() {
                 self.cache.remove(&lru_fingerprint);
                 self.stats.evictions += 1;
@@ -165,16 +163,19 @@ impl CompilationCache {
         }
 
         // Insert or update
-        if self.cache.contains_key(&fingerprint) {
-            // Update existing entry
-            self.cache.insert(fingerprint, circuit);
-            // Move to back of queue
-            self.lru_queue.retain(|fp| *fp != fingerprint);
-            self.lru_queue.push_back(fingerprint);
-        } else {
-            // Insert new entry
-            self.cache.insert(fingerprint, circuit);
-            self.lru_queue.push_back(fingerprint);
+        match self.cache.entry(fingerprint) {
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                // Update existing entry
+                e.insert(circuit);
+                // Move to back of queue
+                self.lru_queue.retain(|fp| *fp != fingerprint);
+                self.lru_queue.push_back(fingerprint);
+            },
+            std::collections::hash_map::Entry::Vacant(e) => {
+                // Insert new entry
+                e.insert(circuit);
+                self.lru_queue.push_back(fingerprint);
+            },
         }
 
         self.stats.current_size = self.cache.len();
@@ -228,6 +229,12 @@ impl CompilationCache {
     }
 }
 
+impl Default for CompilationCache {
+    fn default() -> Self {
+        Self::new(100)
+    }
+}
+
 /// Thread-safe compilation cache
 ///
 /// Wraps CompilationCache in Arc<Mutex<>> for concurrent access.
@@ -242,11 +249,6 @@ impl SharedCompilationCache {
         Self {
             inner: Arc::new(Mutex::new(CompilationCache::new(max_size))),
         }
-    }
-
-    /// Create a shared cache with default size
-    pub fn default() -> Self {
-        Self::new(100)
     }
 
     /// Get a cached circuit
@@ -282,6 +284,12 @@ impl SharedCompilationCache {
     /// Set maximum cache size
     pub fn set_max_size(&self, max_size: usize) {
         self.inner.lock().unwrap().set_max_size(max_size);
+    }
+}
+
+impl Default for SharedCompilationCache {
+    fn default() -> Self {
+        Self::new(100)
     }
 }
 

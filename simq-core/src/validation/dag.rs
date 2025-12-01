@@ -89,10 +89,10 @@ impl DependencyGraph {
     /// efficient dependency tracking.
     pub fn from_circuit(circuit: &Circuit) -> Result<Self> {
         let num_ops = circuit.len();
-        
+
         // Pre-allocate nodes vector
         let mut nodes = Vec::with_capacity(num_ops);
-        
+
         // Build nodes
         for (i, op) in circuit.operations().enumerate() {
             let qubits: Vec<usize> = op.qubits().iter().map(|q| q.index()).collect();
@@ -114,7 +114,7 @@ impl DependencyGraph {
 
         // Pre-allocate edges vector (estimate: roughly num_ops edges for typical circuits)
         let mut edges = Vec::with_capacity(num_ops);
-        
+
         // Build edges by analyzing qubit dependencies
         // For quantum circuits, gates typically both read and write to qubits
         // So we create dependencies based on qubit usage order
@@ -362,8 +362,8 @@ impl DependencyGraph {
         while completed.len() < self.num_nodes() {
             // Find all nodes with no remaining dependencies
             let mut current_layer = Vec::new();
-            for i in 0..self.num_nodes() {
-                if !completed.contains(&i) && dependency_count[i] == 0 {
+            for (i, &count) in dependency_count.iter().enumerate().take(self.num_nodes()) {
+                if !completed.contains(&i) && count == 0 {
                     current_layer.push(i);
                     completed.insert(i);
                 }
@@ -460,7 +460,7 @@ impl DependencyGraph {
             dot.push_str(&format!("  {} [label=\"{}\"];\n", i, label));
         }
 
-        dot.push_str("\n");
+        dot.push('\n');
 
         // Add edges
         for edge in &self.edges {
@@ -525,8 +525,12 @@ mod tests {
             num_qubits: 2,
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
 
         circuit
@@ -597,4 +601,3 @@ mod tests {
         assert!(dag.is_acyclic());
     }
 }
-

@@ -11,22 +11,17 @@ use crate::passes::{
 use std::sync::Arc;
 
 /// Optimization level presets
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptimizationLevel {
     /// No optimization
     O0,
     /// Basic optimization (dead code elimination only)
     O1,
     /// Standard optimization (dead code + fusion + templates)
+    #[default]
     O2,
     /// Aggressive optimization (all passes with commutation)
     O3,
-}
-
-impl Default for OptimizationLevel {
-    fn default() -> Self {
-        Self::O2
-    }
 }
 
 /// Create a compiler with the specified optimization level
@@ -155,7 +150,9 @@ impl PipelineBuilder {
 
     /// Add advanced template matching pass (recommended over basic template substitution)
     pub fn with_advanced_template_matching(mut self) -> Self {
-        self.builder = self.builder.add_pass(Arc::new(AdvancedTemplateMatching::new()));
+        self.builder = self
+            .builder
+            .add_pass(Arc::new(AdvancedTemplateMatching::new()));
         self
     }
 

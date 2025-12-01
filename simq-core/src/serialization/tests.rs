@@ -1,6 +1,5 @@
 //! Tests for serialization functionality
 
-#![cfg(test)]
 #![cfg(feature = "serialization")]
 
 use crate::circuit::Circuit;
@@ -81,9 +80,7 @@ fn test_circuit_serialization_json() {
         name: "H".to_string(),
         num_qubits: 1,
     });
-    circuit
-        .add_gate(gate, &[QubitId::new(0)])
-        .unwrap();
+    circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
 
     // Serialize to JSON
     let json = circuit.to_json().unwrap();
@@ -100,9 +97,7 @@ fn test_circuit_serialization_binary() {
         name: "H".to_string(),
         num_qubits: 1,
     });
-    circuit
-        .add_gate(gate, &[QubitId::new(0)])
-        .unwrap();
+    circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
 
     // Serialize to binary
     let bytes = circuit.to_bytes().unwrap();
@@ -172,4 +167,3 @@ fn test_memory_cache() {
     assert_eq!(cached_circuit.num_qubits(), circuit.num_qubits());
     assert_eq!(cached_circuit.len(), circuit.len());
 }
-

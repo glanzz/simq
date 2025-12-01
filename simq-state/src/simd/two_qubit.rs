@@ -30,7 +30,7 @@ pub fn apply_gate_scalar(
     let stride_low = 1usize << low;
     let stride_high = 1usize << high;
     let outer_step = stride_high * 2; // 1 << (high+1)
-    let mid_step = stride_low * 2;    // 1 << (low+1)
+    let mid_step = stride_low * 2; // 1 << (low+1)
 
     // Flatten matrix to local copy for fast access
     let mut m = [[Complex64::new(0.0, 0.0); 4]; 4];
@@ -68,10 +68,22 @@ pub fn apply_gate_scalar(
                 let mut r2 = Complex64::new(0.0, 0.0);
                 let mut r3 = Complex64::new(0.0, 0.0);
 
-                r0 += m[0][0] * a0; r0 += m[0][1] * a1; r0 += m[0][2] * a2; r0 += m[0][3] * a3;
-                r1 += m[1][0] * a0; r1 += m[1][1] * a1; r1 += m[1][2] * a2; r1 += m[1][3] * a3;
-                r2 += m[2][0] * a0; r2 += m[2][1] * a1; r2 += m[2][2] * a2; r2 += m[2][3] * a3;
-                r3 += m[3][0] * a0; r3 += m[3][1] * a1; r3 += m[3][2] * a2; r3 += m[3][3] * a3;
+                r0 += m[0][0] * a0;
+                r0 += m[0][1] * a1;
+                r0 += m[0][2] * a2;
+                r0 += m[0][3] * a3;
+                r1 += m[1][0] * a0;
+                r1 += m[1][1] * a1;
+                r1 += m[1][2] * a2;
+                r1 += m[1][3] * a3;
+                r2 += m[2][0] * a0;
+                r2 += m[2][1] * a1;
+                r2 += m[2][2] * a2;
+                r2 += m[2][3] * a3;
+                r3 += m[3][0] * a0;
+                r3 += m[3][1] * a1;
+                r3 += m[3][2] * a2;
+                r3 += m[3][3] * a3;
 
                 // Store back
                 state[i00] = r0;
@@ -108,35 +120,6 @@ pub unsafe fn apply_gate_avx2(
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-
-    fn cnot_matrix() -> [[Complex64; 4]; 4] {
-        [
-            [
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-        ]
-    }
 
     #[test]
     fn test_scalar_cnot() {

@@ -102,19 +102,19 @@ impl GateCommutation {
             (1, 1) => {
                 // Single qubit gates on same qubit already handled above
                 false
-            }
+            },
             (1, 2) | (2, 1) => {
                 // Check if single-qubit gate commutes with two-qubit gate
                 Self::single_two_qubit_commute(gate1, gate2)
-            }
+            },
             (2, 2) => {
                 // Two-qubit gate commutation rules
                 Self::two_qubit_commute(gate1, gate2)
-            }
+            },
             _ => {
                 // Conservative: multi-qubit gates (3+) don't commute unless disjoint
                 false
-            }
+            },
         }
     }
 
@@ -164,7 +164,7 @@ impl GateCommutation {
             name,
             "Z" | "S" | "T" | "S†" | "T†"
             | "RZ" | "P" | "U1"  // Parameterized diagonal gates
-            | "Pauli-Z" | "CZ"   // Alternative names
+            | "Pauli-Z" | "CZ" // Alternative names
         )
     }
 
@@ -321,7 +321,7 @@ impl GateCommutation {
     /// Try to swap two adjacent gates if they commute
     ///
     /// Returns true if a swap was made
-    fn try_swap_gates(&self, ops: &mut Vec<GateOp>, i: usize) -> bool {
+    fn try_swap_gates(&self, ops: &mut [GateOp], i: usize) -> bool {
         if i + 1 >= ops.len() {
             return false;
         }
@@ -531,8 +531,12 @@ mod tests {
 
         // Add: X(q0), H(q1), X(q1), H(q0)
         // Should reorder to group operations on same qubit
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 

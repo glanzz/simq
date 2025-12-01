@@ -4,15 +4,15 @@
 //! production use cases including adaptive batching, distributed evaluation,
 //! and optimization-specific batch strategies.
 
-use rayon::prelude::*;
-use std::time::{Duration, Instant};
-use simq_core::Circuit;
-use simq_state::AdaptiveState;
-use simq_state::observable::PauliObservable;
-use crate::Simulator;
-use crate::error::Result;
 use super::batch::BatchResult;
+use crate::error::Result;
+use crate::Simulator;
 use rand::distributions::Distribution;
+use rayon::prelude::*;
+use simq_core::Circuit;
+use simq_state::observable::PauliObservable;
+use simq_state::AdaptiveState;
+use std::time::{Duration, Instant};
 
 /// Configuration for advanced batch evaluation
 #[derive(Debug, Clone)]
@@ -119,7 +119,8 @@ impl AdaptiveBatchEvaluator {
             }
 
             // Progress callback
-            if self.config.progress_frequency > 0 && processed % self.config.progress_frequency == 0 {
+            if self.config.progress_frequency > 0 && processed % self.config.progress_frequency == 0
+            {
                 eprintln!("Progress: {}/{} evaluations", processed, total_params);
             }
         }
@@ -161,10 +162,8 @@ impl AdaptiveBatchEvaluator {
             None => per_eval,
             Some(prev) => {
                 // Exponential moving average
-                Duration::from_secs_f64(
-                    0.7 * prev.as_secs_f64() + 0.3 * per_eval.as_secs_f64()
-                )
-            }
+                Duration::from_secs_f64(0.7 * prev.as_secs_f64() + 0.3 * per_eval.as_secs_f64())
+            },
         });
 
         self.successful_batch_sizes.push(batch_size);
@@ -185,14 +184,12 @@ fn evaluate_single(
     let result = simulator.run(circuit)?;
 
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -201,12 +198,9 @@ fn evaluate_single(
 /// Latin Hypercube Sampling for parameter space exploration
 ///
 /// More efficient than grid search for high-dimensional spaces.
-pub fn latin_hypercube_sampling(
-    param_ranges: &[(f64, f64)],
-    num_samples: usize,
-) -> Vec<Vec<f64>> {
-    use rand::Rng;
+pub fn latin_hypercube_sampling(param_ranges: &[(f64, f64)], num_samples: usize) -> Vec<Vec<f64>> {
     use rand::seq::SliceRandom;
+    use rand::Rng;
 
     let num_params = param_ranges.len();
     let mut rng = rand::thread_rng();
@@ -222,6 +216,7 @@ pub fn latin_hypercube_sampling(
         .collect();
 
     // Generate samples
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_samples {
         let mut sample = Vec::with_capacity(num_params);
 
@@ -259,13 +254,17 @@ impl ImportanceSampler {
     /// Create a new importance sampler
     pub fn new(centers: Vec<Vec<f64>>, weights: Vec<f64>, radius: f64) -> Self {
         assert_eq!(centers.len(), weights.len());
-        Self { centers, weights, radius }
+        Self {
+            centers,
+            weights,
+            radius,
+        }
     }
 
     /// Sample parameters from important regions
     pub fn sample(&self, num_samples: usize) -> Vec<Vec<f64>> {
-        use rand::Rng;
         use rand::distributions::WeightedIndex;
+        use rand::Rng;
 
         let mut rng = rand::thread_rng();
         let dist = WeightedIndex::new(&self.weights).unwrap();
@@ -299,7 +298,8 @@ pub fn line_search<F>(
     start_point: &[f64],
     direction: &[f64],
     step_sizes: &[f64],
-) -> Result<(f64, f64)> // (best_step, best_value)
+) -> Result<(f64, f64)>
+// (best_step, best_value)
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
 {
@@ -343,8 +343,10 @@ pub fn verify_gradients<F>(
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
 {
+    use super::finite_difference::{
+        compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod,
+    };
     use super::parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
-    use super::finite_difference::{compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod};
 
     // Compute using both methods in parallel
     let (ps_result, fd_result) = rayon::join(

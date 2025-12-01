@@ -53,7 +53,9 @@ fn example_basis_state() {
     let measurement = ComputationalBasis::new();
     let mut rng = SimpleRng::new(42);
 
-    let result = measurement.measure_once(&mut state, &mut || rng.next()).unwrap();
+    let result = measurement
+        .measure_once(&mut state, &mut || rng.next())
+        .unwrap();
 
     println!("Measurement outcome: {}", result.as_bitstring(2));
     println!("Probability: {:.4}", result.probability);
@@ -77,7 +79,9 @@ fn example_superposition() {
     let measurement = ComputationalBasis::new();
     let mut rng = SimpleRng::new(42);
 
-    let result = measurement.measure_once(&mut state, &mut || rng.next()).unwrap();
+    let result = measurement
+        .measure_once(&mut state, &mut || rng.next())
+        .unwrap();
 
     println!("Measurement outcome: {}", result.as_bitstring(1));
     println!("Probability: {:.4}", result.probability);
@@ -91,10 +95,10 @@ fn example_sampling() {
 
     // Create a 2-qubit state with unequal superposition
     let amplitudes = vec![
-        Complex64::new(0.6, 0.0),  // |00⟩
-        Complex64::new(0.8, 0.0),  // |01⟩
-        Complex64::new(0.0, 0.0),  // |10⟩
-        Complex64::new(0.0, 0.0),  // |11⟩
+        Complex64::new(0.6, 0.0), // |00⟩
+        Complex64::new(0.8, 0.0), // |01⟩
+        Complex64::new(0.0, 0.0), // |10⟩
+        Complex64::new(0.0, 0.0), // |11⟩
     ];
     let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
 
@@ -105,7 +109,9 @@ fn example_sampling() {
     let mut rng = SimpleRng::new(42);
 
     let shots = 10000;
-    let result = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+    let result = measurement
+        .sample(&state, shots, &mut || rng.next())
+        .unwrap();
 
     println!("\nSampling with {} shots:", shots);
     println!("Outcome counts:");
@@ -127,10 +133,10 @@ fn example_bell_state() {
 
     // Create Bell state |Φ+⟩ = (|00⟩ + |11⟩) / √2
     let amplitudes = vec![
-        Complex64::new(1.0 / 2_f64.sqrt(), 0.0),  // |00⟩
-        Complex64::new(0.0, 0.0),                   // |01⟩
-        Complex64::new(0.0, 0.0),                   // |10⟩
-        Complex64::new(1.0 / 2_f64.sqrt(), 0.0),  // |11⟩
+        Complex64::new(1.0 / 2_f64.sqrt(), 0.0), // |00⟩
+        Complex64::new(0.0, 0.0),                // |01⟩
+        Complex64::new(0.0, 0.0),                // |10⟩
+        Complex64::new(1.0 / 2_f64.sqrt(), 0.0), // |11⟩
     ];
     let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
 
@@ -140,7 +146,9 @@ fn example_bell_state() {
     let mut rng = SimpleRng::new(42);
 
     let shots = 1000;
-    let result = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+    let result = measurement
+        .sample(&state, shots, &mut || rng.next())
+        .unwrap();
 
     println!("\nSampling with {} shots:", shots);
     println!("Expected: 50% |00⟩, 50% |11⟩");
@@ -180,12 +188,17 @@ fn example_performance() {
     let mut rng = SimpleRng::new(123);
 
     let start = std::time::Instant::now();
-    let result = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+    let result = measurement
+        .sample(&state, shots, &mut || rng.next())
+        .unwrap();
     let elapsed = start.elapsed();
 
     println!("\nBatch sampling:");
     println!("  Time: {:?}", elapsed);
-    println!("  Throughput: {:.2} shots/ms", shots as f64 / elapsed.as_micros() as f64 * 1000.0);
+    println!(
+        "  Throughput: {:.2} shots/ms",
+        shots as f64 / elapsed.as_micros() as f64 * 1000.0
+    );
     println!("  Unique outcomes: {}", result.counts.len());
 
     // Show top 5 outcomes

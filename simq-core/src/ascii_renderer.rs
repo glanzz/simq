@@ -362,7 +362,7 @@ fn get_terminal_size_stty() -> Option<usize> {
         .and_then(|output| {
             if output.status.success() {
                 String::from_utf8(output.stdout).ok().and_then(|s| {
-                    let parts: Vec<&str> = s.trim().split_whitespace().collect();
+                    let parts: Vec<&str> = s.split_whitespace().collect();
                     if parts.len() >= 2 {
                         parts[1].parse().ok()
                     } else {
@@ -554,7 +554,12 @@ impl<'a> AsciiRenderer<'a> {
         target_col
     }
 
-    fn update_qubit_positions(&self, op: &GateOp, col: usize, qubit_column: &mut HashMap<usize, usize>) {
+    fn update_qubit_positions(
+        &self,
+        op: &GateOp,
+        col: usize,
+        qubit_column: &mut HashMap<usize, usize>,
+    ) {
         // Update all qubits the gate acts on
         for &qubit in op.qubits() {
             qubit_column.insert(qubit.index(), col);
@@ -686,7 +691,10 @@ impl<'a> AsciiRenderer<'a> {
 
         // Render each column
         for (col_idx, col) in columns.iter().enumerate() {
-            let width = col_widths.get(col_idx).copied().unwrap_or(self.config.min_gate_width);
+            let width = col_widths
+                .get(col_idx)
+                .copied()
+                .unwrap_or(self.config.min_gate_width);
             self.render_column(&mut lines, col, width);
 
             // Add wire between columns
@@ -715,14 +723,16 @@ impl<'a> AsciiRenderer<'a> {
         let (qubit_gate, qubit_role) = self.analyze_column(col);
 
         // Render each qubit line
-        for q in 0..num_qubits {
-            let line = &mut lines[q];
+        for (q, line) in lines.iter_mut().enumerate().take(num_qubits) {
             let content = self.render_qubit_slot(q, &qubit_gate, &qubit_role, width);
             line.push_str(&content);
         }
     }
 
-    fn analyze_column<'b>(&self, col: &[(usize, &'b GateOp)]) -> (HashMap<usize, &'b GateOp>, HashMap<usize, QubitRole>) {
+    fn analyze_column<'b>(
+        &self,
+        col: &[(usize, &'b GateOp)],
+    ) -> (HashMap<usize, &'b GateOp>, HashMap<usize, QubitRole>) {
         let mut qubit_gate: HashMap<usize, &GateOp> = HashMap::new();
         let mut qubit_role: HashMap<usize, QubitRole> = HashMap::new();
 
@@ -734,7 +744,7 @@ impl<'a> AsciiRenderer<'a> {
                 qubit_gate.insert(q, *op);
                 qubit_role.insert(q, QubitRole::Single);
             } else {
-                self.analyze_multi_qubit_gate(*op, &mut qubit_gate, &mut qubit_role);
+                self.analyze_multi_qubit_gate(op, &mut qubit_gate, &mut qubit_role);
             }
         }
 
@@ -806,38 +816,38 @@ impl<'a> AsciiRenderer<'a> {
                 let sym = self.gate_symbol(op);
                 let boxed = format!("{}{}{}", self.symbols.bracket_l, sym, self.symbols.bracket_r);
                 center_with_wire(&boxed, width, self.config.wire_char())
-            }
+            },
 
             Some(QubitRole::Control) => {
                 center_with_wire(self.symbols.control, width, self.config.wire_char())
-            }
+            },
 
             Some(QubitRole::Target) => {
                 let op = qubit_gate[&qubit];
                 let sym = self.get_target_symbol(op);
                 center_with_wire(&sym, width, self.config.wire_char())
-            }
+            },
 
             Some(QubitRole::SwapEnd) => {
                 center_with_wire(self.symbols.swap, width, self.config.wire_char())
-            }
+            },
 
             Some(QubitRole::Multi) => {
                 let op = qubit_gate[&qubit];
                 let sym = self.gate_symbol(op);
                 let boxed = format!("{}{}{}", self.symbols.bracket_l, sym, self.symbols.bracket_r);
                 center_with_wire(&boxed, width, self.config.wire_char())
-            }
+            },
 
             Some(QubitRole::Wire) => {
                 center_with_wire(&self.symbols.wire_v.to_string(), width, self.config.wire_char())
-            }
+            },
 
             None => {
                 // Empty slot - just wire
                 let wire = self.config.wire_char();
                 (0..width).map(|_| wire).collect()
-            }
+            },
         }
     }
 
@@ -853,7 +863,7 @@ impl<'a> AsciiRenderer<'a> {
                 // For other controlled gates, show the base gate
                 let base = name.trim_start_matches('C');
                 format!("{}{}{}", self.symbols.bracket_l, base, self.symbols.bracket_r)
-            }
+            },
         }
     }
 }
@@ -899,7 +909,7 @@ impl GateType {
                 } else {
                     QubitRole::Target
                 }
-            }
+            },
             GateType::Swap => QubitRole::SwapEnd,
             GateType::ControlledSwap => {
                 if index == 0 {
@@ -907,7 +917,7 @@ impl GateType {
                 } else {
                     QubitRole::SwapEnd
                 }
-            }
+            },
             GateType::Symmetric => QubitRole::Multi,
         }
     }
@@ -1125,10 +1135,7 @@ mod tests {
     fn test_controlled_gate() {
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("CNOT", 2)),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
 
         let ascii = render(&circuit);
@@ -1141,10 +1148,7 @@ mod tests {
     fn test_swap_gate() {
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("SWAP", 2)),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(MockGate::new("SWAP", 2)), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
 
         let ascii = render(&circuit);
@@ -1172,10 +1176,7 @@ mod tests {
     fn test_non_adjacent_multi_qubit() {
         let mut circuit = Circuit::new(4);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("CNOT", 2)),
-                &[QubitId::new(0), QubitId::new(3)],
-            )
+            .add_gate(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(3)])
             .unwrap();
 
         let ascii = render(&circuit);

@@ -1,7 +1,7 @@
 //! Telemetry and metrics collection
 
-use std::time::{Duration, Instant};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 /// Telemetry data for execution profiling
 #[derive(Debug, Default, Clone)]
@@ -34,7 +34,10 @@ impl ExecutionTelemetry {
     }
 
     pub fn inc_gate_type(&mut self, gate_name: &str) {
-        *self.gate_type_counts.entry(gate_name.to_string()).or_insert(0) += 1;
+        *self
+            .gate_type_counts
+            .entry(gate_name.to_string())
+            .or_insert(0) += 1;
     }
 
     pub fn record_memory(&mut self, bytes: usize) {

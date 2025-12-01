@@ -260,43 +260,19 @@ impl BasisGateSet {
     /// Get the gates in this basis set
     pub fn gates(&self) -> Vec<BasisGate> {
         match self {
-            BasisGateSet::IBM => vec![
-                BasisGate::U1,
-                BasisGate::U2,
-                BasisGate::U3,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::IBM => vec![BasisGate::U1, BasisGate::U2, BasisGate::U3, BasisGate::CNOT],
 
-            BasisGateSet::IBMQiskit => vec![
-                BasisGate::RZ,
-                BasisGate::SX,
-                BasisGate::X,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::IBMQiskit => {
+                vec![BasisGate::RZ, BasisGate::SX, BasisGate::X, BasisGate::CNOT]
+            },
 
-            BasisGateSet::Google => vec![
-                BasisGate::PhasedXZ,
-                BasisGate::SqrtISWAP,
-                BasisGate::SYC,
-            ],
+            BasisGateSet::Google => vec![BasisGate::PhasedXZ, BasisGate::SqrtISWAP, BasisGate::SYC],
 
-            BasisGateSet::GoogleCirq => vec![
-                BasisGate::PhasedXZ,
-                BasisGate::FSIM,
-                BasisGate::CZ,
-            ],
+            BasisGateSet::GoogleCirq => vec![BasisGate::PhasedXZ, BasisGate::FSIM, BasisGate::CZ],
 
-            BasisGateSet::IonQ => vec![
-                BasisGate::GPI,
-                BasisGate::GPI2,
-                BasisGate::MS,
-            ],
+            BasisGateSet::IonQ => vec![BasisGate::GPI, BasisGate::GPI2, BasisGate::MS],
 
-            BasisGateSet::Rigetti => vec![
-                BasisGate::RZ,
-                BasisGate::RX,
-                BasisGate::CZ,
-            ],
+            BasisGateSet::Rigetti => vec![BasisGate::RZ, BasisGate::RX, BasisGate::CZ],
 
             BasisGateSet::Braket => vec![
                 BasisGate::RX,
@@ -306,25 +282,15 @@ impl BasisGateSet {
                 BasisGate::CZ,
             ],
 
-            BasisGateSet::CliffordT | BasisGateSet::StrictCliffordT => vec![
-                BasisGate::H,
-                BasisGate::S,
-                BasisGate::T,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::CliffordT | BasisGateSet::StrictCliffordT => {
+                vec![BasisGate::H, BasisGate::S, BasisGate::T, BasisGate::CNOT]
+            },
 
-            BasisGateSet::Universal => vec![
-                BasisGate::H,
-                BasisGate::T,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::Universal => vec![BasisGate::H, BasisGate::T, BasisGate::CNOT],
 
-            BasisGateSet::Rotation => vec![
-                BasisGate::RX,
-                BasisGate::RY,
-                BasisGate::RZ,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::Rotation => {
+                vec![BasisGate::RX, BasisGate::RY, BasisGate::RZ, BasisGate::CNOT]
+            },
 
             BasisGateSet::Pauli => vec![
                 BasisGate::X,
@@ -335,7 +301,7 @@ impl BasisGateSet {
                 BasisGate::CNOT,
             ],
 
-            BasisGateSet::All => vec![],  // All gates allowed
+            BasisGateSet::All => vec![], // All gates allowed
 
             BasisGateSet::Custom(custom) => {
                 let mut gates = Vec::new();
@@ -343,7 +309,7 @@ impl BasisGateSet {
                 gates.extend(custom.two_qubit.iter().copied());
                 gates.extend(custom.multi_qubit.iter().copied());
                 gates
-            }
+            },
         }
     }
 
@@ -364,17 +330,34 @@ impl BasisGateSet {
     pub fn single_qubit_gates(&self) -> Vec<BasisGate> {
         self.gates()
             .into_iter()
-            .filter(|g| matches!(
-                g,
-                BasisGate::I | BasisGate::X | BasisGate::Y | BasisGate::Z |
-                BasisGate::H | BasisGate::S | BasisGate::SDagger |
-                BasisGate::T | BasisGate::TDagger |
-                BasisGate::SX | BasisGate::SXDagger |
-                BasisGate::SY | BasisGate::SYDagger |
-                BasisGate::RX | BasisGate::RY | BasisGate::RZ |
-                BasisGate::Phase | BasisGate::U1 | BasisGate::U2 | BasisGate::U3 |
-                BasisGate::PhasedXZ | BasisGate::GPI | BasisGate::GPI2
-            ))
+            .filter(|g| {
+                matches!(
+                    g,
+                    BasisGate::I
+                        | BasisGate::X
+                        | BasisGate::Y
+                        | BasisGate::Z
+                        | BasisGate::H
+                        | BasisGate::S
+                        | BasisGate::SDagger
+                        | BasisGate::T
+                        | BasisGate::TDagger
+                        | BasisGate::SX
+                        | BasisGate::SXDagger
+                        | BasisGate::SY
+                        | BasisGate::SYDagger
+                        | BasisGate::RX
+                        | BasisGate::RY
+                        | BasisGate::RZ
+                        | BasisGate::Phase
+                        | BasisGate::U1
+                        | BasisGate::U2
+                        | BasisGate::U3
+                        | BasisGate::PhasedXZ
+                        | BasisGate::GPI
+                        | BasisGate::GPI2
+                )
+            })
             .collect()
     }
 
@@ -382,14 +365,25 @@ impl BasisGateSet {
     pub fn two_qubit_gates(&self) -> Vec<BasisGate> {
         self.gates()
             .into_iter()
-            .filter(|g| matches!(
-                g,
-                BasisGate::CNOT | BasisGate::CY | BasisGate::CZ |
-                BasisGate::CPhase | BasisGate::SWAP | BasisGate::ISWAP |
-                BasisGate::SqrtISWAP | BasisGate::FSIM | BasisGate::SYC |
-                BasisGate::MS | BasisGate::RXX | BasisGate::RYY | BasisGate::RZZ |
-                BasisGate::ECR
-            ))
+            .filter(|g| {
+                matches!(
+                    g,
+                    BasisGate::CNOT
+                        | BasisGate::CY
+                        | BasisGate::CZ
+                        | BasisGate::CPhase
+                        | BasisGate::SWAP
+                        | BasisGate::ISWAP
+                        | BasisGate::SqrtISWAP
+                        | BasisGate::FSIM
+                        | BasisGate::SYC
+                        | BasisGate::MS
+                        | BasisGate::RXX
+                        | BasisGate::RYY
+                        | BasisGate::RZZ
+                        | BasisGate::ECR
+                )
+            })
             .collect()
     }
 
@@ -410,7 +404,7 @@ impl BasisGateSet {
             BasisGateSet::Custom(custom) => {
                 // Return first two-qubit gate
                 custom.two_qubit.iter().next().copied()
-            }
+            },
         }
     }
 
@@ -459,26 +453,50 @@ impl BasisGate {
     pub fn num_qubits(&self) -> usize {
         match self {
             // Single-qubit
-            BasisGate::I | BasisGate::X | BasisGate::Y | BasisGate::Z |
-            BasisGate::H | BasisGate::S | BasisGate::SDagger |
-            BasisGate::T | BasisGate::TDagger |
-            BasisGate::SX | BasisGate::SXDagger |
-            BasisGate::SY | BasisGate::SYDagger |
-            BasisGate::RX | BasisGate::RY | BasisGate::RZ |
-            BasisGate::Phase | BasisGate::U1 | BasisGate::U2 | BasisGate::U3 |
-            BasisGate::PhasedXZ | BasisGate::GPI | BasisGate::GPI2 => 1,
+            BasisGate::I
+            | BasisGate::X
+            | BasisGate::Y
+            | BasisGate::Z
+            | BasisGate::H
+            | BasisGate::S
+            | BasisGate::SDagger
+            | BasisGate::T
+            | BasisGate::TDagger
+            | BasisGate::SX
+            | BasisGate::SXDagger
+            | BasisGate::SY
+            | BasisGate::SYDagger
+            | BasisGate::RX
+            | BasisGate::RY
+            | BasisGate::RZ
+            | BasisGate::Phase
+            | BasisGate::U1
+            | BasisGate::U2
+            | BasisGate::U3
+            | BasisGate::PhasedXZ
+            | BasisGate::GPI
+            | BasisGate::GPI2 => 1,
 
             // Two-qubit
-            BasisGate::CNOT | BasisGate::CY | BasisGate::CZ |
-            BasisGate::CPhase | BasisGate::SWAP | BasisGate::ISWAP |
-            BasisGate::SqrtISWAP | BasisGate::FSIM | BasisGate::SYC |
-            BasisGate::MS | BasisGate::RXX | BasisGate::RYY | BasisGate::RZZ |
-            BasisGate::ECR => 2,
+            BasisGate::CNOT
+            | BasisGate::CY
+            | BasisGate::CZ
+            | BasisGate::CPhase
+            | BasisGate::SWAP
+            | BasisGate::ISWAP
+            | BasisGate::SqrtISWAP
+            | BasisGate::FSIM
+            | BasisGate::SYC
+            | BasisGate::MS
+            | BasisGate::RXX
+            | BasisGate::RYY
+            | BasisGate::RZZ
+            | BasisGate::ECR => 2,
 
             // Multi-qubit
             BasisGate::Toffoli => 3,
             BasisGate::Fredkin => 3,
-            BasisGate::MCX | BasisGate::MCZ => 2,  // Minimum, can be more
+            BasisGate::MCX | BasisGate::MCZ => 2, // Minimum, can be more
         }
     }
 
@@ -486,10 +504,21 @@ impl BasisGate {
     pub fn is_parameterized(&self) -> bool {
         matches!(
             self,
-            BasisGate::RX | BasisGate::RY | BasisGate::RZ |
-            BasisGate::Phase | BasisGate::U1 | BasisGate::U2 | BasisGate::U3 |
-            BasisGate::CPhase | BasisGate::RXX | BasisGate::RYY | BasisGate::RZZ |
-            BasisGate::PhasedXZ | BasisGate::FSIM | BasisGate::GPI | BasisGate::GPI2
+            BasisGate::RX
+                | BasisGate::RY
+                | BasisGate::RZ
+                | BasisGate::Phase
+                | BasisGate::U1
+                | BasisGate::U2
+                | BasisGate::U3
+                | BasisGate::CPhase
+                | BasisGate::RXX
+                | BasisGate::RYY
+                | BasisGate::RZZ
+                | BasisGate::PhasedXZ
+                | BasisGate::FSIM
+                | BasisGate::GPI
+                | BasisGate::GPI2
         )
     }
 
@@ -497,10 +526,19 @@ impl BasisGate {
     pub fn is_clifford(&self) -> bool {
         matches!(
             self,
-            BasisGate::I | BasisGate::X | BasisGate::Y | BasisGate::Z |
-            BasisGate::H | BasisGate::S | BasisGate::SDagger |
-            BasisGate::SX | BasisGate::SXDagger |
-            BasisGate::CNOT | BasisGate::CY | BasisGate::CZ | BasisGate::SWAP
+            BasisGate::I
+                | BasisGate::X
+                | BasisGate::Y
+                | BasisGate::Z
+                | BasisGate::H
+                | BasisGate::S
+                | BasisGate::SDagger
+                | BasisGate::SX
+                | BasisGate::SXDagger
+                | BasisGate::CNOT
+                | BasisGate::CY
+                | BasisGate::CZ
+                | BasisGate::SWAP
         )
     }
 

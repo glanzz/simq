@@ -193,10 +193,7 @@ impl SimulatorConfig {
         }
 
         if self.optimization_level > 3 {
-            return Err(format!(
-                "optimization_level must be 0-3, got {}",
-                self.optimization_level
-            ));
+            return Err(format!("optimization_level must be 0-3, got {}", self.optimization_level));
         }
 
         Ok(())

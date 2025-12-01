@@ -160,7 +160,8 @@ impl ResourceEstimate {
         // Each sparse entry needs: 8 bytes (key) + 16 bytes (value) + overhead
         let sparse_entry_size = 32;
         let sparse_density = 0.01f64.max(1.0 / state_size as f64);
-        let sparse_memory_bytes_min = (state_size as f64 * sparse_density * sparse_entry_size as f64) as usize;
+        let sparse_memory_bytes_min =
+            (state_size as f64 * sparse_density * sparse_entry_size as f64) as usize;
 
         // Time estimates (very rough)
         let stats = GateStatistics::from_circuit(circuit)?;
@@ -175,7 +176,8 @@ impl ResourceEstimate {
 
         // Scale by state size (larger states take longer)
         let state_scale = (num_qubits as f64).exp2() / 1024.0; // normalize to 10 qubits
-        let estimated_time_us = (single_qubit_time + two_qubit_time + multi_qubit_time) * state_scale.max(1.0);
+        let estimated_time_us =
+            (single_qubit_time + two_qubit_time + multi_qubit_time) * state_scale.max(1.0);
 
         Ok(Self {
             dense_memory_bytes,
@@ -243,7 +245,11 @@ impl std::fmt::Display for ResourceEstimate {
         writeln!(f, "    Depth: {}", self.depth)?;
         writeln!(f, "  Memory requirements:")?;
         writeln!(f, "    Dense state: {}", Self::format_memory(self.dense_memory_bytes))?;
-        writeln!(f, "    Sparse state (min): {}", Self::format_memory(self.sparse_memory_bytes_min))?;
+        writeln!(
+            f,
+            "    Sparse state (min): {}",
+            Self::format_memory(self.sparse_memory_bytes_min)
+        )?;
         writeln!(f, "  Estimated execution time: {}", Self::format_time(self.estimated_time_us))?;
 
         // Memory feasibility check
@@ -322,7 +328,7 @@ impl std::fmt::Display for CircuitAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use simq_core::{Circuit, QubitId, gate::Gate};
+    use simq_core::{gate::Gate, Circuit, QubitId};
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -356,8 +362,12 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 

@@ -1,16 +1,18 @@
 //! Benchmark parallel scaling for SimQ simulator
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use simq_sim::{Simulator, config::SimulatorConfig};
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::Hadamard;
+use simq_sim::{config::SimulatorConfig, Simulator};
 use std::sync::Arc;
 
 fn generate_circuit(num_qubits: usize, depth: usize) -> Circuit {
     let mut circuit = Circuit::new(num_qubits);
-    for d in 0..depth {
+    for _d in 0..depth {
         for q in 0..num_qubits {
-            circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(q)]).unwrap();
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(q)])
+                .unwrap();
         }
     }
     circuit
@@ -33,12 +35,16 @@ fn bench_parallel_scaling(c: &mut Criterion) {
             ..Default::default()
         };
         let simulator = Simulator::new(config.clone());
-        group.bench_with_input(BenchmarkId::new("CPU_Serial", num_qubits), &num_qubits, |b, &_|
-            b.iter(|| simulator.run(&circuit)));
+        group.bench_with_input(BenchmarkId::new("CPU_Serial", num_qubits), &num_qubits, |b, &_| {
+            b.iter(|| simulator.run(&circuit))
+        });
 
         // Rayon parallel: sweep thread counts and thresholds
         for &threads in &thread_counts {
-            rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build_global()
+                .ok();
             for &threshold in &thresholds {
                 let config = SimulatorConfig {
                     parallel_threshold: threshold,
@@ -47,8 +53,11 @@ fn bench_parallel_scaling(c: &mut Criterion) {
                 };
                 let simulator = Simulator::new(config.clone());
                 let label = format!("CPU_Rayon_{}thr_thresh{}", threads, threshold);
-                group.bench_with_input(BenchmarkId::new(label, num_qubits), &num_qubits, |b, &_|
-                    b.iter(|| simulator.run(&circuit)));
+                group.bench_with_input(
+                    BenchmarkId::new(label, num_qubits),
+                    &num_qubits,
+                    |b, &_| b.iter(|| simulator.run(&circuit)),
+                );
             }
         }
 
@@ -59,8 +68,9 @@ fn bench_parallel_scaling(c: &mut Criterion) {
             ..Default::default()
         };
         let simulator = Simulator::new(config.clone());
-        group.bench_with_input(BenchmarkId::new("GPU", num_qubits), &num_qubits, |b, &_|
-            b.iter(|| simulator.run(&circuit)));
+        group.bench_with_input(BenchmarkId::new("GPU", num_qubits), &num_qubits, |b, &_| {
+            b.iter(|| simulator.run(&circuit))
+        });
     }
     group.finish();
 }
