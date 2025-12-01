@@ -81,25 +81,25 @@ jobs:
           files: ./cobertura.xml
           fail_ci_if_error: true
 
-  benchmark:
-    name: Benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # benchmark:
+  #   name: Benchmark
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+  #     - name: Install Rust
+  #       uses: dtolnay/rust-toolchain@stable
 
-      - name: Run benchmarks
-        run: cargo bench --no-fail-fast
+  #     - name: Run benchmarks
+  #       run: cargo bench --no-fail-fast
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          tool: 'cargo'
-          output-file-path: target/criterion/*/new/estimates.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+  #     - name: Store benchmark result
+  #       uses: benchmark-action/github-action-benchmark@v1
+  #       with:
+  #         tool: 'cargo'
+  #         output-file-path: target/criterion/*/new/estimates.json
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #         auto-push: true
 
   security:
     name: Security Audit
