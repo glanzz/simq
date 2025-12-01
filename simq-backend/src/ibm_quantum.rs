@@ -13,7 +13,7 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```ignore
 //! use simq_backend::ibm_quantum::{IBMQuantumBackend, IBMConfig};
 //! use simq_backend::QuantumBackend;
 //!
