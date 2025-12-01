@@ -1,6 +1,5 @@
 //! Low-level SIMD kernels for common operations
 
-use approx::assert_relative_eq;
 use num_complex::Complex64;
 
 #[cfg(target_arch = "x86_64")]
