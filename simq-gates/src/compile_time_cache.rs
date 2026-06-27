@@ -338,25 +338,29 @@ impl VQEAngles {
         cache
     }
 
-    /// Const-compatible cosine approximation (Taylor series)
-    /// Accurate for small angles (0 to π/4)
+    /// Const-compatible cosine approximation (Taylor series, 7 terms)
     const fn const_cos(x: f64) -> f64 {
-        // Taylor series: cos(x) ≈ 1 - x²/2! + x⁴/4! - x⁶/6!
         let x2 = x * x;
         let x4 = x2 * x2;
         let x6 = x4 * x2;
+        let x8 = x4 * x4;
+        let x10 = x8 * x2;
+        let x12 = x8 * x4;
         1.0 - x2 / 2.0 + x4 / 24.0 - x6 / 720.0
+            + x8 / 40320.0 - x10 / 3628800.0 + x12 / 479001600.0
     }
 
-    /// Const-compatible sine approximation (Taylor series)
-    /// Accurate for small angles (0 to π/4)
+    /// Const-compatible sine approximation (Taylor series, 7 terms)
     const fn const_sin(x: f64) -> f64 {
-        // Taylor series: sin(x) ≈ x - x³/3! + x⁵/5! - x⁷/7!
         let x2 = x * x;
         let x3 = x * x2;
         let x5 = x3 * x2;
         let x7 = x5 * x2;
+        let x9 = x7 * x2;
+        let x11 = x9 * x2;
+        let x13 = x11 * x2;
         x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0
+            + x9 / 362880.0 - x11 / 39916800.0 + x13 / 6227020800.0
     }
 
     /// Lookup RX matrix with nearest neighbor
@@ -367,7 +371,12 @@ impl VQEAngles {
         if abs_theta <= Self::MAX_ANGLE {
             let index = (abs_theta / Self::STEP).round() as usize;
             let index = index.min(Self::NUM_ENTRIES - 1);
-            Self::RX_CACHE[index]
+            let mut m = Self::RX_CACHE[index];
+            if theta < 0.0 {
+                m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
+                m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
+            }
+            m
         } else {
             // Fallback to runtime computation
             crate::matrices::rotation_x(theta)
@@ -382,7 +391,12 @@ impl VQEAngles {
         if abs_theta <= Self::MAX_ANGLE {
             let index = (abs_theta / Self::STEP).round() as usize;
             let index = index.min(Self::NUM_ENTRIES - 1);
-            Self::RY_CACHE[index]
+            let mut m = Self::RY_CACHE[index];
+            if theta < 0.0 {
+                m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
+                m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
+            }
+            m
         } else {
             crate::matrices::rotation_y(theta)
         }
@@ -396,7 +410,12 @@ impl VQEAngles {
         if abs_theta <= Self::MAX_ANGLE {
             let index = (abs_theta / Self::STEP).round() as usize;
             let index = index.min(Self::NUM_ENTRIES - 1);
-            Self::RZ_CACHE[index]
+            let mut m = Self::RZ_CACHE[index];
+            if theta < 0.0 {
+                m[0][0] = Complex64::new(m[0][0].re, -m[0][0].im);
+                m[1][1] = Complex64::new(m[1][1].re, -m[1][1].im);
+            }
+            m
         } else {
             crate::matrices::rotation_z(theta)
         }
