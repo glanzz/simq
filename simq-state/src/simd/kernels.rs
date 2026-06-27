@@ -28,8 +28,8 @@ pub unsafe fn norm_sse2(vec: &[Complex64]) -> f64 {
     }
 
     // Horizontal add
-    let sum_array = [0.0f64; 2];
-    _mm_storeu_pd(sum_array.as_ptr() as *mut f64, sum);
+    let mut sum_array = [0.0f64; 2];
+    _mm_storeu_pd(sum_array.as_mut_ptr(), sum);
 
     (sum_array[0] + sum_array[1]).sqrt()
 }
@@ -65,8 +65,8 @@ pub unsafe fn norm_avx2(vec: &[Complex64]) -> f64 {
     }
 
     // Horizontal add
-    let sum_array = [0.0f64; 4];
-    _mm256_storeu_pd(sum_array.as_ptr() as *mut f64, sum);
+    let mut sum_array = [0.0f64; 4];
+    _mm256_storeu_pd(sum_array.as_mut_ptr(), sum);
 
     (sum_array[0] + sum_array[1] + sum_array[2] + sum_array[3] + scalar_sum).sqrt()
 }
@@ -127,8 +127,8 @@ pub unsafe fn compute_probabilities_avx2(amplitudes: &[Complex64], output: &mut 
         let summed_128 = _mm256_hadd_pd(z_sq, shuffled);
 
         // Extract results
-        let temp = [0.0f64; 4];
-        _mm256_storeu_pd(temp.as_ptr() as *mut f64, summed_128);
+        let mut temp = [0.0f64; 4];
+        _mm256_storeu_pd(temp.as_mut_ptr(), summed_128);
 
         // Store norm squared values
         *out_ptr.add(i) = temp[0];
@@ -165,8 +165,8 @@ pub unsafe fn compute_probabilities_sse2(amplitudes: &[Complex64], output: &mut 
         let z_sq = _mm_mul_pd(z, z);
 
         // Horizontal add: re^2 + im^2
-        let temp = [0.0f64; 2];
-        _mm_storeu_pd(temp.as_ptr() as *mut f64, z_sq);
+        let mut temp = [0.0f64; 2];
+        _mm_storeu_pd(temp.as_mut_ptr(), z_sq);
 
         *out_ptr.add(i) = temp[0] + temp[1];
 

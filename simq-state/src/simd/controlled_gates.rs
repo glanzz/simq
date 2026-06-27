@@ -57,50 +57,20 @@ pub fn apply_cnot_striped(
     num_qubits: usize,
 ) {
     let dimension = 1usize << num_qubits;
-
-    // Order qubits so control < target for consistent iteration
-    let (q_low, q_high, is_control_low) = if control < target {
-        (control, target, true)
-    } else {
-        (target, control, false)
-    };
-
-    let stride_low = 1usize << q_low;
-    let stride_high = 1usize << q_high;
-    let block_high = stride_high * 2;
-    let block_low = stride_low * 2;
+    let mask_control = 1usize << control;
+    let stride_target = 1usize << target;
+    let block_target = stride_target << 1;
 
     let mut base = 0usize;
     while base < dimension {
-        let mut mid = 0usize;
-        while mid < stride_high {
-            let block_base = base + mid;
-
-            for k in 0..stride_low {
-                let idx1 = block_base + k;
-                let idx2 = idx1 + stride_low;
-
-                // Determine which basis state we're in
-                let bit_low = (idx1 >> q_low) & 1;
-                let bit_high = (idx1 >> q_high) & 1;
-
-                // Apply CNOT only when control bit is 1
-                let apply_gate = if is_control_low {
-                    bit_low == 1
-                } else {
-                    bit_high == 1
-                };
-
-                if apply_gate {
-                    // Swap the two amplitudes (corresponds to flipping the target)
-                    state.swap(idx1, idx2);
-                }
+        for k in 0..stride_target {
+            let idx0 = base + k;
+            let idx1 = idx0 + stride_target;
+            if (idx0 & mask_control) != 0 {
+                state.swap(idx0, idx1);
             }
-
-            mid += block_low;
         }
-
-        base += block_high;
+        base += block_target;
     }
 }
 
