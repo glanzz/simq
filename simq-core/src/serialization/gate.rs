@@ -107,20 +107,71 @@ impl GateRegistry for StandardGateRegistry {
 }
 
 impl StandardGateRegistry {
-    /// Create a standard gate by name
-    fn create_standard_gate(&self, name: &str, _parameters: &[f64]) -> Result<Arc<dyn Gate>> {
-        // This is a placeholder implementation
-        // In a real implementation, this would create actual gate instances
-        // from simq-gates crate
+    fn create_standard_gate(&self, name: &str, parameters: &[f64]) -> Result<Arc<dyn Gate>> {
+        let name_upper = name.to_uppercase();
+        let (num_qubits, params) = match name_upper.as_str() {
+            "H" | "HADAMARD" => (1, vec![]),
+            "X" | "PAULIX" | "NOT" => (1, vec![]),
+            "Y" | "PAULIY" => (1, vec![]),
+            "Z" | "PAULIZ" => (1, vec![]),
+            "S" | "SGATE" => (1, vec![]),
+            "T" | "TGATE" => (1, vec![]),
+            "SX" | "SQRTX" => (1, vec![]),
+            "I" | "ID" | "IDENTITY" => (1, vec![]),
+            "RX" | "ROTATIONX" => (1, parameters.to_vec()),
+            "RY" | "ROTATIONY" => (1, parameters.to_vec()),
+            "RZ" | "ROTATIONZ" => (1, parameters.to_vec()),
+            "P" | "PHASE" => (1, parameters.to_vec()),
+            "U1" => (1, parameters.to_vec()),
+            "U2" => (1, parameters.to_vec()),
+            "U3" => (1, parameters.to_vec()),
+            "CNOT" | "CX" => (2, vec![]),
+            "CZ" => (2, vec![]),
+            "CY" => (2, vec![]),
+            "SWAP" => (2, vec![]),
+            "ISWAP" => (2, vec![]),
+            "ECR" => (2, vec![]),
+            "TOFFOLI" | "CCX" | "CCNOT" => (3, vec![]),
+            "FREDKIN" | "CSWAP" => (3, vec![]),
+            _ => {
+                return Err(QuantumError::UnknownGateType(format!(
+                    "Unknown gate type: '{}'",
+                    name
+                )));
+            }
+        };
 
-        // For now, we'll return an error indicating that gate creation
-        // requires actual gate implementations
-        // This will be implemented when simq-gates crate provides concrete gates
+        Ok(Arc::new(DeserializedGate {
+            name: name.to_string(),
+            num_qubits,
+            parameters: params,
+        }))
+    }
+}
 
-        Err(QuantumError::UnknownGateType(format!(
-            "Gate '{}' not found. Gate implementations are required from simq-gates crate",
-            name
-        )))
+#[derive(Debug)]
+struct DeserializedGate {
+    name: String,
+    num_qubits: usize,
+    parameters: Vec<f64>,
+}
+
+impl Gate for DeserializedGate {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn num_qubits(&self) -> usize {
+        self.num_qubits
+    }
+
+    fn description(&self) -> String {
+        if self.parameters.is_empty() {
+            format!("{}-qubit gate '{}'", self.num_qubits, self.name)
+        } else {
+            let params: Vec<String> = self.parameters.iter().map(|p| format!("{}", p)).collect();
+            format!("{}({})", self.name, params.join(", "))
+        }
     }
 }
 

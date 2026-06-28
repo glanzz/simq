@@ -66,8 +66,8 @@ pub fn apply_two_qubit_sparse(
     // Process each 4-dimensional subspace
     for &base in &basis_states {
         let idx00 = base;
-        let idx01 = base | mask1;
-        let idx10 = base | mask2;
+        let idx01 = base | mask2;
+        let idx10 = base | mask1;
         let idx11 = base | mask1 | mask2;
 
         let amp = [
