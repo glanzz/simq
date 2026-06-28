@@ -221,21 +221,24 @@ impl Transpiler {
     /// Estimate the cost of the transpiled circuit
     pub fn estimate_cost(
         &self,
-        _circuit: &Circuit,
-        _capabilities: &BackendCapabilities,
+        circuit: &Circuit,
+        capabilities: &BackendCapabilities,
     ) -> TranspilationCost {
-        // Estimate based on circuit structure
-        let num_gates = 0; // TODO: Get from circuit when API available
-        let depth = 0; // TODO: Get from circuit when API available
-        let num_swaps = 0; // TODO: Estimate from connectivity
+        let original_gates = circuit.len();
+        let original_depth = circuit.depth();
 
-        // Naive cost model - refine based on actual backend
+        let transpiled = self.transpile(circuit, capabilities);
+        let (transpiled_gates, transpiled_depth) = match transpiled {
+            Ok(ref tc) => (tc.len(), tc.depth()),
+            Err(_) => (original_gates, original_depth),
+        };
+
         TranspilationCost {
-            original_gates: num_gates,
-            transpiled_gates: num_gates,
-            original_depth: depth,
-            transpiled_depth: depth,
-            swap_gates: num_swaps,
+            original_gates,
+            transpiled_gates,
+            original_depth,
+            transpiled_depth,
+            swap_gates: 0,
         }
     }
 }
