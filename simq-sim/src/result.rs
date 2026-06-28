@@ -141,7 +141,7 @@ impl MeasurementCounts {
     /// Get outcomes sorted by frequency (descending)
     pub fn sorted(&self) -> Vec<(&String, usize)> {
         let mut sorted: Vec<_> = self.counts.iter().map(|(bs, &count)| (bs, count)).collect();
-        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
         sorted
     }
 
