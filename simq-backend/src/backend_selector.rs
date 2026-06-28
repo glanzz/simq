@@ -237,8 +237,9 @@ impl BackendSelector {
                     }
                 },
                 BackendFeature::FastExecution
-                    if backend.backend_type().to_string().contains("Simulator") => {
-                        score += 50;
+                    if backend.backend_type().to_string().contains("Simulator") =>
+                {
+                    score += 50;
                 },
                 _ => {},
             }
