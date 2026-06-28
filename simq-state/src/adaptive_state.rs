@@ -73,9 +73,12 @@ impl AdaptiveState {
     /// # Returns
     /// A new adaptive state with custom threshold
     pub fn with_threshold(num_qubits: usize, threshold: f32) -> Result<Self> {
+        let clamped = threshold.clamp(0.0, 1.0);
+        let mut state = SparseState::new(num_qubits)?;
+        state.set_density_threshold(clamped);
         Ok(Self::Sparse {
-            state: SparseState::new(num_qubits)?,
-            threshold: threshold.clamp(0.0, 1.0),
+            state,
+            threshold: clamped,
         })
     }
 

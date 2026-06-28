@@ -108,7 +108,7 @@ impl Router {
         let mut qubit_degrees: Vec<_> = (0..connectivity.num_qubits())
             .map(|q| (q, connectivity.degree(q)))
             .collect();
-        qubit_degrees.sort_by(|a, b| b.1.cmp(&a.1));
+        qubit_degrees.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Map logical qubits to highest degree physical qubits
         let mapping: Vec<_> = qubit_degrees

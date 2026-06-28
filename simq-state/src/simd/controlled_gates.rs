@@ -57,50 +57,38 @@ pub fn apply_cnot_striped(
     num_qubits: usize,
 ) {
     let dimension = 1usize << num_qubits;
+    let mask_control = 1usize << control;
+    let mask_target = 1usize << target;
 
-    // Order qubits so control < target for consistent iteration
-    let (q_low, q_high, is_control_low) = if control < target {
-        (control, target, true)
+    let (q_low, q_high) = if control < target {
+        (control, target)
     } else {
-        (target, control, false)
+        (target, control)
     };
 
     let stride_low = 1usize << q_low;
     let stride_high = 1usize << q_high;
-    let block_high = stride_high * 2;
-    let block_low = stride_low * 2;
+    let block_low = stride_low << 1;
+    let block_high = stride_high << 1;
 
-    let mut base = 0usize;
-    while base < dimension {
+    // Enumerate all indices where both q_low and q_high bits are 0
+    let mut hi = 0usize;
+    while hi < dimension {
         let mut mid = 0usize;
         while mid < stride_high {
-            let block_base = base + mid;
-
-            for k in 0..stride_low {
-                let idx1 = block_base + k;
-                let idx2 = idx1 + stride_low;
-
-                // Determine which basis state we're in
-                let bit_low = (idx1 >> q_low) & 1;
-                let bit_high = (idx1 >> q_high) & 1;
-
-                // Apply CNOT only when control bit is 1
-                let apply_gate = if is_control_low {
-                    bit_low == 1
-                } else {
-                    bit_high == 1
-                };
-
-                if apply_gate {
-                    // Swap the two amplitudes (corresponds to flipping the target)
-                    state.swap(idx1, idx2);
-                }
+            let mut lo = 0usize;
+            while lo < stride_low {
+                let base = hi + mid + lo;
+                // base has bits q_low=0 and q_high=0
+                // Set control bit to 1, then swap target=0 and target=1 states
+                let idx_ctrl1_tgt0 = base | mask_control;
+                let idx_ctrl1_tgt1 = idx_ctrl1_tgt0 | mask_target;
+                state.swap(idx_ctrl1_tgt0, idx_ctrl1_tgt1);
+                lo += 1;
             }
-
             mid += block_low;
         }
-
-        base += block_high;
+        hi += block_high;
     }
 }
 
@@ -134,7 +122,6 @@ pub fn apply_cz_scalar(state: &mut [Complex64], qubit1: usize, qubit2: usize, nu
 pub fn apply_cz_striped(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
     let dimension = 1usize << num_qubits;
 
-    // Order qubits for consistent iteration
     let (q_low, q_high) = if qubit1 < qubit2 {
         (qubit1, qubit2)
     } else {
@@ -143,31 +130,22 @@ pub fn apply_cz_striped(state: &mut [Complex64], qubit1: usize, qubit2: usize, n
 
     let stride_low = 1usize << q_low;
     let stride_high = 1usize << q_high;
-    let block_high = stride_high * 2;
-    let block_low = stride_low * 2;
+    let block_low = stride_low << 1;
+    let block_high = stride_high << 1;
 
-    // Phase shift for |11⟩ state (both qubits set to 1)
-    let phase = Complex64::new(-1.0, 0.0);
-
-    let mut base = 0usize;
-    while base < dimension {
+    let mut hi = 0usize;
+    while hi < dimension {
         let mut mid = 0usize;
         while mid < stride_high {
-            let block_base = base + mid;
-
-            // The |11⟩ state is at idx1 + stride_low when both low and high
-            // qubit bits are 1, which happens in the second half of each block
-            let idx_11 = block_base + stride_low + stride_high;
-
-            // Apply phase to the |11⟩ state
-            if idx_11 < dimension {
-                state[idx_11] *= phase;
+            let mut lo = 0usize;
+            while lo < stride_low {
+                let idx = hi + mid + lo + stride_low + stride_high;
+                state[idx] = -state[idx];
+                lo += 1;
             }
-
             mid += block_low;
         }
-
-        base += block_high;
+        hi += block_high;
     }
 }
 

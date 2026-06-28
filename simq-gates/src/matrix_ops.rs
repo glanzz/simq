@@ -153,35 +153,29 @@ pub fn embed_gate_matrix_vec(
             }
         }
     } else {
-        // For multi-qubit gates, use a more general approach
-        // This is less efficient but more general
+        let mut gate_mask: usize = 0;
+        for &qubit in qubit_indices {
+            gate_mask |= 1 << qubit;
+        }
+        let non_gate_mask = !gate_mask & ((1 << num_qubits) - 1);
+
         for i in 0..system_size {
             for j in 0..system_size {
-                // Extract the relevant qubit bits
-                let mut gate_input = 0;
-                let mut gate_output = 0;
-                let mut matches = true;
+                if (i & non_gate_mask) != (j & non_gate_mask) {
+                    continue;
+                }
 
+                let mut gate_row = 0;
+                let mut gate_col = 0;
                 for (idx, &qubit) in qubit_indices.iter().enumerate() {
                     let mask = 1 << qubit;
                     let i_bit = (i & mask) >> qubit;
                     let j_bit = (j & mask) >> qubit;
-                    gate_input |= i_bit << idx;
-                    gate_output |= j_bit << idx;
-
-                    // Check if non-gate qubits match
-                    if (i ^ (i_bit << qubit)) != (j ^ (j_bit << qubit)) {
-                        matches = false;
-                        break;
-                    }
+                    gate_row |= i_bit << (num_gate_qubits - 1 - idx);
+                    gate_col |= j_bit << (num_gate_qubits - 1 - idx);
                 }
 
-                if matches {
-                    let gate_idx = gate_input * gate_size + gate_output;
-                    result[i * system_size + j] = gate_matrix[gate_idx];
-                } else {
-                    result[i * system_size + j] = Complex64::new(0.0, 0.0);
-                }
+                result[i * system_size + j] = gate_matrix[gate_row * gate_size + gate_col];
             }
         }
     }

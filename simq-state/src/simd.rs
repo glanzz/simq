@@ -59,16 +59,19 @@ pub fn apply_single_qubit_gate(
         return;
     }
 
-    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
-    {
-        unsafe {
-            single_qubit::apply_gate_sse2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "avx2")
+    ))]
+    unsafe {
+        single_qubit::apply_gate_sse2(state, matrix, qubit, num_qubits);
     }
 
-    // Fallback to scalar implementation
-    single_qubit::apply_gate_scalar(state, matrix, qubit, num_qubits);
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        single_qubit::apply_gate_scalar(state, matrix, qubit, num_qubits);
+    }
 }
 
 /// Apply a 4×4 matrix to a state vector (two-qubit gate)
@@ -100,8 +103,10 @@ pub fn apply_two_qubit_gate(
         return;
     }
 
-    // Fallback to scalar implementation
-    two_qubit::apply_gate_scalar(state, matrix, qubit1, qubit2, num_qubits);
+    #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
+    {
+        two_qubit::apply_gate_scalar(state, matrix, qubit1, qubit2, num_qubits);
+    }
 }
 
 /// Compute the norm of a complex vector using SIMD
@@ -120,15 +125,19 @@ pub fn norm_simd(vec: &[Complex64]) -> f64 {
         }
     }
 
-    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
-    {
-        unsafe {
-            return kernels::norm_sse2(vec);
-        }
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "avx2")
+    ))]
+    unsafe {
+        kernels::norm_sse2(vec)
     }
 
-    // Scalar fallback
-    vec.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt()
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        vec.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt()
+    }
 }
 
 /// Normalize a complex vector using SIMD

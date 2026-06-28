@@ -236,10 +236,10 @@ impl BackendSelector {
                         score += 100;
                     }
                 },
-                BackendFeature::FastExecution => {
-                    if backend.backend_type().to_string().contains("Simulator") {
-                        score += 50;
-                    }
+                BackendFeature::FastExecution
+                    if backend.backend_type().to_string().contains("Simulator") =>
+                {
+                    score += 50;
                 },
                 _ => {},
             }

@@ -300,6 +300,10 @@ impl Gate for Identity {
         true
     }
 
+    fn is_diagonal(&self) -> bool {
+        true
+    }
+
     fn matrix(&self) -> Option<Vec<Complex64>> {
         Some(Self::matrix_vec())
     }
@@ -393,6 +397,10 @@ impl Gate for CZ {
     }
 
     fn is_hermitian(&self) -> bool {
+        true
+    }
+
+    fn is_diagonal(&self) -> bool {
         true
     }
 
