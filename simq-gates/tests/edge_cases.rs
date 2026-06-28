@@ -31,7 +31,10 @@ mod custom_gate_edge_cases {
         let err = CustomGate::new("Bad", 1, matrix, 1e-10).unwrap_err();
         assert!(matches!(
             err,
-            CustomGateError::InvalidDimensions { expected: 2, actual: 3 }
+            CustomGateError::InvalidDimensions {
+                expected: 2,
+                actual: 3
+            }
         ));
     }
 
@@ -69,9 +72,12 @@ mod custom_gate_edge_cases {
         ];
         let err = CustomGate::new("NonU", 1, matrix, 1e-10).unwrap_err();
         match err {
-            CustomGateError::NotUnitary { max_deviation, tolerance } => {
+            CustomGateError::NotUnitary {
+                max_deviation,
+                tolerance,
+            } => {
                 assert!(max_deviation > tolerance);
-            }
+            },
             _ => panic!("expected NotUnitary, got {:?}", err),
         }
     }
@@ -95,28 +101,14 @@ mod custom_gate_edge_cases {
         // H * H * H = H  (since H^2 = I)
         let h2 = h.compose(&h).unwrap();
         let h3 = h2.compose(&h).unwrap();
-        let fid = h3
-            .fidelity(h.matrix_vec())
-            .unwrap();
+        let fid = h3.fidelity(h.matrix_vec()).unwrap();
         assert!((fid - 1.0).abs() < 1e-8);
     }
 
     #[test]
     fn compose_mismatched_qubit_count() {
-        let id1 = CustomGate::new(
-            "I1",
-            1,
-            matrix_ops::identity_matrix(2),
-            1e-10,
-        )
-        .unwrap();
-        let id2 = CustomGate::new(
-            "I2",
-            2,
-            matrix_ops::identity_matrix(4),
-            1e-10,
-        )
-        .unwrap();
+        let id1 = CustomGate::new("I1", 1, matrix_ops::identity_matrix(2), 1e-10).unwrap();
+        let id2 = CustomGate::new("I2", 2, matrix_ops::identity_matrix(4), 1e-10).unwrap();
         let err = id1.compose(&id2).unwrap_err();
         assert!(matches!(err, CustomGateError::InvalidDimensions { .. }));
     }
@@ -168,21 +160,13 @@ mod custom_gate_edge_cases {
 
         let s_dag = s.adjoint();
         let s_dag_dag = s_dag.adjoint();
-        let fid = s_dag_dag
-            .fidelity(s.matrix_vec())
-            .unwrap();
+        let fid = s_dag_dag.fidelity(s.matrix_vec()).unwrap();
         assert!((fid - 1.0).abs() < 1e-8);
     }
 
     #[test]
     fn fidelity_mismatched_size() {
-        let gate = CustomGate::new(
-            "I",
-            1,
-            matrix_ops::identity_matrix(2),
-            1e-10,
-        )
-        .unwrap();
+        let gate = CustomGate::new("I", 1, matrix_ops::identity_matrix(2), 1e-10).unwrap();
         let big = matrix_ops::identity_matrix(4);
         let err = gate.fidelity(&big).unwrap_err();
         assert!(matches!(err, CustomGateError::InvalidDimensions { .. }));
@@ -213,13 +197,7 @@ mod custom_gate_edge_cases {
 
     #[test]
     fn custom_gate_debug_impl() {
-        let gate = CustomGate::new(
-            "Test",
-            1,
-            matrix_ops::identity_matrix(2),
-            1e-10,
-        )
-        .unwrap();
+        let gate = CustomGate::new("Test", 1, matrix_ops::identity_matrix(2), 1e-10).unwrap();
         let dbg = format!("{:?}", gate);
         assert!(dbg.contains("Test"));
         assert!(dbg.contains("matrix_size"));
@@ -315,9 +293,7 @@ mod error_display {
             CustomGateError::InvalidDeterminant {
                 determinant_norm: 2.0,
             },
-            CustomGateError::NotHermitian {
-                max_deviation: 0.1,
-            },
+            CustomGateError::NotHermitian { max_deviation: 0.1 },
         ];
 
         for e in &errors {
@@ -384,12 +360,14 @@ mod parametric_gate_edge_cases {
     #[test]
     fn parametric_builder_no_params() {
         let err = ParametricCustomGateBuilder::new("Bad", 1)
-            .with_matrix_fn(|_| vec![
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-            ])
+            .with_matrix_fn(|_| {
+                vec![
+                    Complex64::new(1.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(1.0, 0.0),
+                ]
+            })
             .build()
             .unwrap_err();
         assert!(matches!(err, CustomGateError::InvalidName));
@@ -913,11 +891,7 @@ mod standard_gate_edge_cases {
 
     #[test]
     fn multi_qubit_gates_are_unitary() {
-        let gates: Vec<Box<dyn Gate>> = vec![
-            Box::new(CNot),
-            Box::new(CZ),
-            Box::new(Swap),
-        ];
+        let gates: Vec<Box<dyn Gate>> = vec![Box::new(CNot), Box::new(CZ), Box::new(Swap)];
 
         for gate in &gates {
             assert_eq!(gate.num_qubits(), 2, "gate {} should be 2-qubit", gate.name());

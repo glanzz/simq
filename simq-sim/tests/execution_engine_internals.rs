@@ -3,12 +3,16 @@ use simq_core::circuit::Circuit;
 use simq_core::QubitId;
 use simq_gates::standard::*;
 use simq_sim::execution_engine::adaptive::AdaptiveStrategy;
-use simq_sim::execution_engine::cache::{CachedMatrix, GateCacheKey, GateMatrixCache, OrderedFloat};
+use simq_sim::execution_engine::cache::{
+    CachedMatrix, GateCacheKey, GateMatrixCache, OrderedFloat,
+};
 use simq_sim::execution_engine::checkpoint::CheckpointManager;
 use simq_sim::execution_engine::config::{ExecutionConfig, ExecutionMode, ParallelStrategy};
 use simq_sim::execution_engine::recovery::RecoveryPolicy;
 use simq_sim::execution_engine::telemetry::{ExecutionMetrics, ExecutionTelemetry};
-use simq_sim::execution_engine::validation::{validate_finite, validate_normalization, validate_state};
+use simq_sim::execution_engine::validation::{
+    validate_finite, validate_normalization, validate_state,
+};
 use simq_sim::execution_engine::ExecutionEngine;
 use simq_state::{AdaptiveState, DenseState, SparseState};
 use std::sync::Arc;
@@ -89,7 +93,10 @@ fn cache_insert_and_get() {
         params: vec![],
     };
     let isqrt2 = 1.0 / 2.0_f64.sqrt();
-    let matrix = [[c(isqrt2, 0.0), c(isqrt2, 0.0)], [c(isqrt2, 0.0), c(-isqrt2, 0.0)]];
+    let matrix = [
+        [c(isqrt2, 0.0), c(isqrt2, 0.0)],
+        [c(isqrt2, 0.0), c(-isqrt2, 0.0)],
+    ];
     cache.insert(key.clone(), CachedMatrix::Single(matrix));
 
     let got = cache.get(&key);
@@ -537,8 +544,7 @@ fn execution_engine_runs_simple_circuit() {
 
 #[test]
 fn execution_engine_telemetry_access() {
-    let config = ExecutionConfig::new()
-        .with_mode(ExecutionMode::Sequential);
+    let config = ExecutionConfig::new().with_mode(ExecutionMode::Sequential);
     let mut engine = ExecutionEngine::new(config);
     let mut circuit = Circuit::new(1);
     circuit.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();

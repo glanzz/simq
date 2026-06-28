@@ -1,12 +1,16 @@
 use ahash::AHashMap;
 use num_complex::Complex64;
-use simq_sim::execution_engine::kernels::controlled::{apply_controlled_gate, apply_multi_controlled};
+use simq_sim::execution_engine::kernels::controlled::{
+    apply_controlled_gate, apply_multi_controlled,
+};
 use simq_sim::execution_engine::kernels::diagonal::{apply_diagonal_gate, apply_phase_gate};
 use simq_sim::execution_engine::kernels::matrix::{common, GateMatrix, GateMatrixData};
 use simq_sim::execution_engine::kernels::single_qubit::{
     apply_hadamard, apply_pauli_x, apply_pauli_z, apply_single_qubit_dense,
 };
-use simq_sim::execution_engine::kernels::sparse::{apply_single_qubit_sparse, apply_two_qubit_sparse};
+use simq_sim::execution_engine::kernels::sparse::{
+    apply_single_qubit_sparse, apply_two_qubit_sparse,
+};
 use simq_sim::execution_engine::kernels::two_qubit::{
     apply_cnot, apply_cz, apply_swap, apply_two_qubit_dense,
 };
@@ -44,12 +48,7 @@ fn norm_sq(state: &[Complex64]) -> f64 {
 }
 
 fn assert_close(a: Complex64, b: Complex64, tol: f64) {
-    assert!(
-        (a - b).norm() < tol,
-        "Expected {:?} to be close to {:?}",
-        a,
-        b
-    );
+    assert!((a - b).norm() < tol, "Expected {:?} to be close to {:?}", a, b);
 }
 
 // ============================================================================
@@ -464,7 +463,7 @@ fn gate_matrix_data_variants() {
     let h = common::hadamard();
     let gm = GateMatrix::single(h);
     match &gm.data {
-        GateMatrixData::Single(_) => {}
+        GateMatrixData::Single(_) => {},
         _ => panic!("Expected Single variant"),
     }
 }

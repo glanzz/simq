@@ -3,8 +3,8 @@
 
 use num_complex::Complex64;
 use simq_compiler::passes::{
-    AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion,
-    OptimizationPass, TemplateSubstitution,
+    AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion, OptimizationPass,
+    TemplateSubstitution,
 };
 use simq_core::{gate::Gate, Circuit, QubitId};
 use std::sync::Arc;

@@ -27,7 +27,11 @@ fn mult_2x2(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2]) -> [[Complex64; 2]
 fn is_identity_2x2(m: &[[Complex64; 2]; 2]) -> bool {
     for i in 0..2 {
         for j in 0..2 {
-            let expected = if i == j { Complex64::new(1.0, 0.0) } else { Complex64::new(0.0, 0.0) };
+            let expected = if i == j {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
             if (m[i][j] - expected).norm() > EPSILON {
                 return false;
             }
@@ -162,9 +166,17 @@ fn dagger_gates_are_inverse() {
 #[test]
 fn all_single_qubit_gates_are_unitary() {
     let gates: Vec<Box<dyn Gate>> = vec![
-        Box::new(Hadamard), Box::new(PauliX), Box::new(PauliY), Box::new(PauliZ),
-        Box::new(SGate), Box::new(SGateDagger), Box::new(TGate), Box::new(TGateDagger),
-        Box::new(SXGate), Box::new(SXGateDagger), Box::new(Identity),
+        Box::new(Hadamard),
+        Box::new(PauliX),
+        Box::new(PauliY),
+        Box::new(PauliZ),
+        Box::new(SGate),
+        Box::new(SGateDagger),
+        Box::new(TGate),
+        Box::new(TGateDagger),
+        Box::new(SXGate),
+        Box::new(SXGateDagger),
+        Box::new(Identity),
     ];
     for gate in &gates {
         assert_eq!(gate.num_qubits(), 1, "{} should be single-qubit", gate.name());
@@ -265,8 +277,10 @@ fn rotation_x_at_special_angles() {
     let x = PauliX::matrix();
     for i in 0..2 {
         for j in 0..2 {
-            assert!((m[i][j].norm() - x[i][j].norm()).abs() < EPSILON,
-                "RX(π) should match X up to global phase");
+            assert!(
+                (m[i][j].norm() - x[i][j].norm()).abs() < EPSILON,
+                "RX(π) should match X up to global phase"
+            );
         }
     }
 
@@ -341,8 +355,10 @@ fn rotation_additivity() {
     let expected = rx_ab.matrix_uncached();
     for i in 0..2 {
         for j in 0..2 {
-            assert!((composed[i][j] - expected[i][j]).norm() < EPSILON,
-                "RX(a)*RX(b) should equal RX(a+b)");
+            assert!(
+                (composed[i][j] - expected[i][j]).norm() < EPSILON,
+                "RX(a)*RX(b) should equal RX(a+b)"
+            );
         }
     }
 }
@@ -353,7 +369,11 @@ fn rotation_2pi_is_minus_identity() {
     let m = rx.matrix();
     for i in 0..2 {
         for j in 0..2 {
-            let expected = if i == j { Complex64::new(-1.0, 0.0) } else { Complex64::new(0.0, 0.0) };
+            let expected = if i == j {
+                Complex64::new(-1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
             assert!((m[i][j] - expected).norm() < EPSILON);
         }
     }
@@ -440,7 +460,11 @@ fn two_qubit_rotation_zero_angle_is_identity() {
     let flat = rxx_ref.matrix().unwrap();
     for i in 0..4 {
         for j in 0..4 {
-            let expected = if i == j { Complex64::new(1.0, 0.0) } else { Complex64::new(0.0, 0.0) };
+            let expected = if i == j {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
             assert!((flat[i * 4 + j] - expected).norm() < EPSILON, "RXX(0) should be identity");
         }
     }
@@ -476,8 +500,14 @@ fn custom_gate_builder_hadamard_clone() {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     let custom_h = CustomGateBuilder::new("MyH")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .build()
         .unwrap();
@@ -502,8 +532,14 @@ fn custom_gate_with_description() {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     let gate = CustomGateBuilder::new("MyGate")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .description("A custom Hadamard-like gate")
         .build()
@@ -516,8 +552,14 @@ fn custom_gate_build_arc() {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     let gate: Arc<dyn Gate> = CustomGateBuilder::new("ArcGate")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .build_arc()
         .unwrap();
@@ -548,8 +590,14 @@ fn custom_gate_compose() {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     let h = CustomGateBuilder::new("H")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .build()
         .unwrap();
@@ -582,15 +630,27 @@ fn custom_gate_fidelity() {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     let h1 = CustomGateBuilder::new("H1")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .build()
         .unwrap();
     let h2 = CustomGateBuilder::new("H2")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .build()
         .unwrap();
@@ -702,8 +762,14 @@ fn gate_registry_register_get() {
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
     let h = CustomGateBuilder::new("H")
         .matrix_2x2([
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ])
         .build()
         .unwrap();
@@ -760,8 +826,14 @@ fn gate_registry_gates_for_qubits() {
     let mut registry = GateRegistry::new();
     let one_q = CustomGateBuilder::new("H")
         .matrix_2x2([
-            [Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0), Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0)],
-            [Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0), Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0)],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
         ])
         .build()
         .unwrap();
@@ -812,8 +884,10 @@ fn gate_registry_clear() {
 #[test]
 fn tensor_product_identity() {
     let i = vec![
-        Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
     ];
     let result = tensor_product(&i, &i);
     assert_eq!(result.len(), 16);
@@ -825,8 +899,10 @@ fn tensor_product_identity() {
 #[test]
 fn matrix_multiply_identity() {
     let i = vec![
-        Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
     ];
     let result = matrix_multiply(&i, &i);
     for idx in 0..2 {
@@ -837,8 +913,10 @@ fn matrix_multiply_identity() {
 #[test]
 fn matrix_adjoint_test() {
     let m = vec![
-        Complex64::new(1.0, 2.0), Complex64::new(3.0, 4.0),
-        Complex64::new(5.0, 6.0), Complex64::new(7.0, 8.0),
+        Complex64::new(1.0, 2.0),
+        Complex64::new(3.0, 4.0),
+        Complex64::new(5.0, 6.0),
+        Complex64::new(7.0, 8.0),
     ];
     let adj = matrix_adjoint(&m);
     assert!((adj[0] - Complex64::new(1.0, -2.0)).norm() < EPSILON);
@@ -850,8 +928,10 @@ fn matrix_adjoint_test() {
 #[test]
 fn matrix_trace_test() {
     let m = vec![
-        Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(3.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(3.0, 0.0),
     ];
     let tr = matrix_trace(&m);
     assert!((tr - Complex64::new(4.0, 0.0)).norm() < EPSILON);
@@ -863,8 +943,10 @@ fn is_unitary_check() {
     assert!(is_unitary(&h_flat, 1e-8));
 
     let non_unitary = vec![
-        Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0),
+        Complex64::new(2.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
     ];
     assert!(!is_unitary(&non_unitary, 1e-8));
 }
@@ -880,8 +962,10 @@ fn is_hermitian_check() {
 
 #[test]
 fn matrix_to_vec_roundtrip() {
-    let m = [[Complex64::new(1.0, 0.0), Complex64::new(2.0, 0.0)],
-             [Complex64::new(3.0, 0.0), Complex64::new(4.0, 0.0)]];
+    let m = [
+        [Complex64::new(1.0, 0.0), Complex64::new(2.0, 0.0)],
+        [Complex64::new(3.0, 0.0), Complex64::new(4.0, 0.0)],
+    ];
     let flat = matrix_to_vec(&m);
     assert_eq!(flat.len(), 4);
     let back = vec_to_matrix_2x2(&flat);
@@ -962,8 +1046,10 @@ fn enhanced_cache_matches_direct_computation() {
     let direct = RotationX::new(theta).matrix_uncached();
     for i in 0..2 {
         for j in 0..2 {
-            assert!((cached[i][j] - direct[i][j]).norm() < 1e-2,
-                "Cached RX should be close to direct computation (nearest-neighbor lookup)");
+            assert!(
+                (cached[i][j] - direct[i][j]).norm() < 1e-2,
+                "Cached RX should be close to direct computation (nearest-neighbor lookup)"
+            );
         }
     }
     assert!(is_unitary_2x2(&cached), "Cached matrix must be unitary");
@@ -1011,8 +1097,10 @@ fn lookup_table_rx_accuracy() {
     let direct = RotationX::new(theta).matrix_uncached();
     for i in 0..2 {
         for j in 0..2 {
-            assert!((from_table[i][j] - direct[i][j]).norm() < 1e-4,
-                "Lookup table RX should be close to direct computation");
+            assert!(
+                (from_table[i][j] - direct[i][j]).norm() < 1e-4,
+                "Lookup table RX should be close to direct computation"
+            );
         }
     }
 }
@@ -1033,8 +1121,10 @@ fn optimized_rotation_gates() {
     let direct = RotationX::new(0.5).matrix_uncached();
     for i in 0..2 {
         for j in 0..2 {
-            assert!((m[i][j] - direct[i][j]).norm() < 1e-3,
-                "Optimized RX should approximate direct computation");
+            assert!(
+                (m[i][j] - direct[i][j]).norm() < 1e-3,
+                "Optimized RX should approximate direct computation"
+            );
         }
     }
 
@@ -1069,8 +1159,12 @@ fn optimized_compact_vs_high_precision() {
     let from_hq = OptimizedRotationX::new(theta, &hq).compute_matrix();
     let direct = RotationX::new(theta).matrix_uncached();
 
-    let err_compact: f64 = (0..2).flat_map(|i| (0..2).map(move |j| (from_compact[i][j] - direct[i][j]).norm())).sum();
-    let err_hq: f64 = (0..2).flat_map(|i| (0..2).map(move |j| (from_hq[i][j] - direct[i][j]).norm())).sum();
+    let err_compact: f64 = (0..2)
+        .flat_map(|i| (0..2).map(move |j| (from_compact[i][j] - direct[i][j]).norm()))
+        .sum();
+    let err_hq: f64 = (0..2)
+        .flat_map(|i| (0..2).map(move |j| (from_hq[i][j] - direct[i][j]).norm()))
+        .sum();
 
     assert!(err_hq <= err_compact + EPSILON, "High precision should be at least as accurate");
 }
@@ -1084,7 +1178,9 @@ fn circuit_matrix_single_gate() {
     use simq_core::{Circuit, QubitId};
 
     let mut circuit = Circuit::new(1);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
     let full = circuit_matrix(&circuit).unwrap();
     assert_eq!(full.len(), 4);
     assert!(is_unitary(&full, 1e-8));
@@ -1095,12 +1191,20 @@ fn circuit_matrix_two_gate_sequence() {
     use simq_core::{Circuit, QubitId};
 
     let mut circuit = Circuit::new(1);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
     let full = circuit_matrix(&circuit).unwrap();
     for i in 0..2 {
         for j in 0..2 {
-            let expected = if i == j { Complex64::new(1.0, 0.0) } else { Complex64::new(0.0, 0.0) };
+            let expected = if i == j {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
             assert!((full[i * 2 + j] - expected).norm() < EPSILON, "H*H should be identity");
         }
     }
@@ -1111,8 +1215,12 @@ fn circuit_matrix_multi_qubit() {
     use simq_core::{Circuit, QubitId};
 
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
     let full = circuit_matrix(&circuit).unwrap();
     assert_eq!(full.len(), 16);
     assert!(is_unitary(&full, 1e-8));
@@ -1128,13 +1236,25 @@ fn stress_many_rotation_angles() {
         let theta = (i as f64) * PI / 50.0;
         let rx = RotationX::new(theta);
         assert!(is_unitary_2x2(&rx.matrix()), "RX({}) cached should be unitary", theta);
-        assert!(is_unitary_2x2(&rx.matrix_uncached()), "RX({}) uncached should be unitary", theta);
+        assert!(
+            is_unitary_2x2(&rx.matrix_uncached()),
+            "RX({}) uncached should be unitary",
+            theta
+        );
         let ry = RotationY::new(theta);
         assert!(is_unitary_2x2(&ry.matrix()), "RY({}) cached should be unitary", theta);
-        assert!(is_unitary_2x2(&ry.matrix_uncached()), "RY({}) uncached should be unitary", theta);
+        assert!(
+            is_unitary_2x2(&ry.matrix_uncached()),
+            "RY({}) uncached should be unitary",
+            theta
+        );
         let rz = RotationZ::new(theta);
         assert!(is_unitary_2x2(&rz.matrix()), "RZ({}) cached should be unitary", theta);
-        assert!(is_unitary_2x2(&rz.matrix_uncached()), "RZ({}) uncached should be unitary", theta);
+        assert!(
+            is_unitary_2x2(&rz.matrix_uncached()),
+            "RZ({}) uncached should be unitary",
+            theta
+        );
     }
 }
 

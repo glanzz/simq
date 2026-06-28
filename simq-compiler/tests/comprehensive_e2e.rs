@@ -45,7 +45,8 @@ fn build_multi_gate_circuit() -> Circuit {
     c.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
     c.add_gate(Arc::new(PauliX), &[q(1)]).unwrap();
     c.add_gate(Arc::new(CNot), &[q(0), q(1)]).unwrap();
-    c.add_gate(Arc::new(RotationZ::new(std::f64::consts::PI / 4.0)), &[q(2)]).unwrap();
+    c.add_gate(Arc::new(RotationZ::new(std::f64::consts::PI / 4.0)), &[q(2)])
+        .unwrap();
     c.add_gate(Arc::new(Hadamard), &[q(2)]).unwrap();
     c.add_gate(Arc::new(CNot), &[q(1), q(2)]).unwrap();
     c
@@ -141,7 +142,12 @@ fn hh_cancellation() {
     let mut circuit = build_hh_circuit();
     let before = circuit.len();
     let _ = pass.apply(&mut circuit);
-    assert!(circuit.len() <= before, "H·H should simplify: before={}, after={}", before, circuit.len());
+    assert!(
+        circuit.len() <= before,
+        "H·H should simplify: before={}, after={}",
+        before,
+        circuit.len()
+    );
 }
 
 // ============================================================================
@@ -820,7 +826,9 @@ fn stress_large_circuit() {
         circuit.add_gate(Arc::new(CNot), &[q(i), q(i + 1)]).unwrap();
     }
     for i in 0..10 {
-        circuit.add_gate(Arc::new(RotationZ::new(0.1 * i as f64)), &[q(i)]).unwrap();
+        circuit
+            .add_gate(Arc::new(RotationZ::new(0.1 * i as f64)), &[q(i)])
+            .unwrap();
     }
     let compiler = create_compiler(OptimizationLevel::O2);
     let result = compiler.compile(&mut circuit);

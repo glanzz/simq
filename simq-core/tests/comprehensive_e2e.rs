@@ -88,8 +88,12 @@ fn apply_two_qubit_gates() {
 fn apply_three_qubit_gates() {
     let mut builder = CircuitBuilder::<3>::new();
     let [q0, q1, q2] = builder.qubits();
-    builder.apply_gate(Arc::new(Toffoli), &[q0, q1, q2]).unwrap();
-    builder.apply_gate(Arc::new(Fredkin), &[q0, q1, q2]).unwrap();
+    builder
+        .apply_gate(Arc::new(Toffoli), &[q0, q1, q2])
+        .unwrap();
+    builder
+        .apply_gate(Arc::new(Fredkin), &[q0, q1, q2])
+        .unwrap();
     let circuit = builder.build();
     assert_eq!(circuit.len(), 2);
     assert!(circuit.validate().is_ok());
@@ -99,12 +103,25 @@ fn apply_three_qubit_gates() {
 fn apply_rotation_gates() {
     let mut builder = CircuitBuilder::<1>::new();
     let [q0] = builder.qubits();
-    let angles = [0.0, std::f64::consts::FRAC_PI_4, std::f64::consts::PI, std::f64::consts::TAU];
+    let angles = [
+        0.0,
+        std::f64::consts::FRAC_PI_4,
+        std::f64::consts::PI,
+        std::f64::consts::TAU,
+    ];
     for &theta in &angles {
-        builder.apply_gate(Arc::new(RotationX::new(theta)), &[q0]).unwrap();
-        builder.apply_gate(Arc::new(RotationY::new(theta)), &[q0]).unwrap();
-        builder.apply_gate(Arc::new(RotationZ::new(theta)), &[q0]).unwrap();
-        builder.apply_gate(Arc::new(Phase::new(theta)), &[q0]).unwrap();
+        builder
+            .apply_gate(Arc::new(RotationX::new(theta)), &[q0])
+            .unwrap();
+        builder
+            .apply_gate(Arc::new(RotationY::new(theta)), &[q0])
+            .unwrap();
+        builder
+            .apply_gate(Arc::new(RotationZ::new(theta)), &[q0])
+            .unwrap();
+        builder
+            .apply_gate(Arc::new(Phase::new(theta)), &[q0])
+            .unwrap();
     }
     let circuit = builder.build();
     assert_eq!(circuit.len(), angles.len() * 4);
@@ -198,18 +215,27 @@ fn dynamic_qubit_out_of_range() {
 fn dynamic_matches_static() {
     let mut static_builder = CircuitBuilder::<3>::new();
     let [q0, q1, _q2] = static_builder.qubits();
-    static_builder.apply_gate(Arc::new(Hadamard), &[q0]).unwrap();
-    static_builder.apply_gate(Arc::new(CNot), &[q0, q1]).unwrap();
+    static_builder
+        .apply_gate(Arc::new(Hadamard), &[q0])
+        .unwrap();
+    static_builder
+        .apply_gate(Arc::new(CNot), &[q0, q1])
+        .unwrap();
     let static_circuit = static_builder.build();
 
     let mut dynamic_builder = DynamicCircuitBuilder::new(3);
-    dynamic_builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
+    dynamic_builder
+        .apply_gate(Arc::new(Hadamard), &[0])
+        .unwrap();
     dynamic_builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
     let dynamic_circuit = dynamic_builder.build();
 
     assert_eq!(static_circuit.num_qubits(), dynamic_circuit.num_qubits());
     assert_eq!(static_circuit.len(), dynamic_circuit.len());
-    for (s_op, d_op) in static_circuit.operations().zip(dynamic_circuit.operations()) {
+    for (s_op, d_op) in static_circuit
+        .operations()
+        .zip(dynamic_circuit.operations())
+    {
         assert_eq!(s_op.gate().name(), d_op.gate().name());
         assert_eq!(s_op.qubits(), d_op.qubits());
     }
@@ -266,7 +292,9 @@ fn bind_parameter_value() {
 
 #[test]
 fn parameter_bounds() {
-    let param = Parameter::new(0.5).with_bounds(0.0, std::f64::consts::TAU).unwrap();
+    let param = Parameter::new(0.5)
+        .with_bounds(0.0, std::f64::consts::TAU)
+        .unwrap();
     let bounds = param.bounds();
     assert!(bounds.is_some());
     let (lo, hi) = bounds.unwrap();
@@ -387,7 +415,9 @@ fn latex_render_all_gate_types() {
     builder.apply_gate(Arc::new(PauliX), &[1]).unwrap();
     builder.apply_gate(Arc::new(PauliZ), &[2]).unwrap();
     builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
-    builder.apply_gate(Arc::new(RotationX::new(1.0)), &[0]).unwrap();
+    builder
+        .apply_gate(Arc::new(RotationX::new(1.0)), &[0])
+        .unwrap();
     let circuit = builder.build();
     let latex = circuit.to_latex();
     assert!(!latex.is_empty());
@@ -412,19 +442,28 @@ fn bloch_sphere_known_states() {
     assert!((bv.z + 1.0).abs() < 1e-10);
 
     // |+⟩ → (1, 0, 0)
-    let plus = [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)];
+    let plus = [
+        Complex64::new(inv_sqrt2, 0.0),
+        Complex64::new(inv_sqrt2, 0.0),
+    ];
     let bv = BlochVector::from_state(&plus);
     assert!((bv.x - 1.0).abs() < 1e-10);
     assert!(bv.y.abs() < 1e-10);
     assert!(bv.z.abs() < 1e-10);
 
     // |−⟩ → (-1, 0, 0)
-    let minus = [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)];
+    let minus = [
+        Complex64::new(inv_sqrt2, 0.0),
+        Complex64::new(-inv_sqrt2, 0.0),
+    ];
     let bv = BlochVector::from_state(&minus);
     assert!((bv.x + 1.0).abs() < 1e-10);
 
     // |i⟩ = (|0⟩ + i|1⟩)/√2 → (0, 1, 0)
-    let i_state = [Complex64::new(inv_sqrt2, 0.0), Complex64::new(0.0, inv_sqrt2)];
+    let i_state = [
+        Complex64::new(inv_sqrt2, 0.0),
+        Complex64::new(0.0, inv_sqrt2),
+    ];
     let bv = BlochVector::from_state(&i_state);
     assert!(bv.x.abs() < 1e-10);
     assert!((bv.y - 1.0).abs() < 1e-10);
@@ -841,8 +880,12 @@ fn circuit_append_mismatch() {
 #[test]
 fn circuit_remove_operation() {
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+        .unwrap();
     let removed = circuit.remove_operation(0);
     assert!(removed.is_some());
     assert_eq!(removed.unwrap().gate().name(), "H");
@@ -852,8 +895,12 @@ fn circuit_remove_operation() {
 #[test]
 fn circuit_insert_operation() {
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(PauliZ), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliZ), &[QubitId::new(0)])
+        .unwrap();
     let x_op = GateOp::new(Arc::new(PauliX), &[QubitId::new(0)]).unwrap();
     circuit.insert_operation(1, x_op).unwrap();
     assert_eq!(circuit.len(), 3);
@@ -863,9 +910,13 @@ fn circuit_insert_operation() {
 #[test]
 fn circuit_clone_independence() {
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
     let mut clone = circuit.clone();
-    clone.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
+    clone
+        .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+        .unwrap();
     assert_eq!(circuit.len(), 1);
     assert_eq!(clone.len(), 2);
 }
@@ -873,8 +924,12 @@ fn circuit_clone_independence() {
 #[test]
 fn circuit_clear() {
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+        .unwrap();
     circuit.clear();
     assert!(circuit.is_empty());
 }
@@ -882,7 +937,9 @@ fn circuit_clear() {
 #[test]
 fn circuit_display() {
     let mut circuit = Circuit::new(3);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
     let display = format!("{}", circuit);
     assert!(display.contains("3 qubits"));
     assert!(display.contains("1 operations"));
@@ -1002,7 +1059,10 @@ fn stateful_debugger_snapshots() {
     let snapshot = StateSnapshot {
         step: 0,
         num_qubits: 1,
-        amplitudes: vec![num_complex::Complex64::new(1.0, 0.0), num_complex::Complex64::new(0.0, 0.0)],
+        amplitudes: vec![
+            num_complex::Complex64::new(1.0, 0.0),
+            num_complex::Complex64::new(0.0, 0.0),
+        ],
         gate_applied: None,
     };
     assert_eq!(snapshot.num_qubits, 1);
@@ -1023,7 +1083,10 @@ fn stateful_debugger_most_likely() {
 
 #[test]
 fn stateful_debugger_purity() {
-    let amplitudes = vec![num_complex::Complex64::new(1.0, 0.0), num_complex::Complex64::new(0.0, 0.0)];
+    let amplitudes = vec![
+        num_complex::Complex64::new(1.0, 0.0),
+        num_complex::Complex64::new(0.0, 0.0),
+    ];
     let purity = StatefulDebugger::purity(&amplitudes);
     assert!((purity - 1.0).abs() < 1e-10);
 }
@@ -1031,7 +1094,10 @@ fn stateful_debugger_purity() {
 #[test]
 fn stateful_debugger_format_state_vector() {
     let config = VisualizationConfig::default();
-    let amplitudes = vec![num_complex::Complex64::new(1.0, 0.0), num_complex::Complex64::new(0.0, 0.0)];
+    let amplitudes = vec![
+        num_complex::Complex64::new(1.0, 0.0),
+        num_complex::Complex64::new(0.0, 0.0),
+    ];
     let formatted = StatefulDebugger::format_state_vector(&amplitudes, 1, &config);
     assert!(!formatted.is_empty());
 }
@@ -1273,7 +1339,10 @@ fn ascii_render_with_config() {
     builder.apply_gate(Arc::new(Hadamard), &[0]).unwrap();
     builder.apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
     let circuit = builder.build();
-    let config = AsciiConfig { max_width: 60, ..Default::default() };
+    let config = AsciiConfig {
+        max_width: 60,
+        ..Default::default()
+    };
     let ascii = circuit.to_ascii_with_config(&config);
     assert!(!ascii.is_empty());
 }
@@ -1331,10 +1400,16 @@ fn error_display_messages() {
     let e4 = QuantumError::ValidationError("test".to_string());
     assert!(format!("{}", e4).contains("test"));
 
-    let e5 = QuantumError::CycleDetected { operations: vec![0, 1] };
+    let e5 = QuantumError::CycleDetected {
+        operations: vec![0, 1],
+    };
     assert!(format!("{}", e5).contains("cycle"));
 
-    let e6 = QuantumError::InvalidDependency { from: 0, to: 1, qubit: 0 };
+    let e6 = QuantumError::InvalidDependency {
+        from: 0,
+        to: 1,
+        qubit: 0,
+    };
     assert!(format!("{}", e6).contains("dependency"));
 
     let e7 = QuantumError::SerializationError("ser".to_string());
@@ -1346,7 +1421,10 @@ fn error_display_messages() {
     let e9 = QuantumError::UnknownGateType("FooGate".to_string());
     assert!(format!("{}", e9).contains("FooGate"));
 
-    let e10 = QuantumError::VersionMismatch { expected: 1, actual: 2 };
+    let e10 = QuantumError::VersionMismatch {
+        expected: 1,
+        actual: 2,
+    };
     assert!(format!("{}", e10).contains("1"));
 
     let e11 = QuantumError::CacheError("cache".to_string());
@@ -1361,7 +1439,10 @@ fn error_display_messages() {
 fn bloch_angles_roundtrip() {
     use num_complex::Complex64;
     let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
-    let state = [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)];
+    let state = [
+        Complex64::new(inv_sqrt2, 0.0),
+        Complex64::new(inv_sqrt2, 0.0),
+    ];
     let bv = BlochVector::from_state(&state);
     let angles = bv.to_angles();
     let bv2 = angles.to_vector();
@@ -1389,11 +1470,16 @@ fn builder_method_chaining() {
     let mut builder = CircuitBuilder::<3>::new();
     let [q0, q1, q2] = builder.qubits();
     builder
-        .apply_gate(Arc::new(Hadamard), &[q0]).unwrap()
-        .apply_gate(Arc::new(Hadamard), &[q1]).unwrap()
-        .apply_gate(Arc::new(Hadamard), &[q2]).unwrap()
-        .apply_gate(Arc::new(CNot), &[q0, q1]).unwrap()
-        .apply_gate(Arc::new(CNot), &[q1, q2]).unwrap();
+        .apply_gate(Arc::new(Hadamard), &[q0])
+        .unwrap()
+        .apply_gate(Arc::new(Hadamard), &[q1])
+        .unwrap()
+        .apply_gate(Arc::new(Hadamard), &[q2])
+        .unwrap()
+        .apply_gate(Arc::new(CNot), &[q0, q1])
+        .unwrap()
+        .apply_gate(Arc::new(CNot), &[q1, q2])
+        .unwrap();
     assert_eq!(builder.build().len(), 5);
 }
 
@@ -1401,9 +1487,12 @@ fn builder_method_chaining() {
 fn dynamic_builder_method_chaining() {
     let mut builder = DynamicCircuitBuilder::new(3);
     builder
-        .apply_gate(Arc::new(Hadamard), &[0]).unwrap()
-        .apply_gate(Arc::new(Hadamard), &[1]).unwrap()
-        .apply_gate(Arc::new(CNot), &[0, 1]).unwrap();
+        .apply_gate(Arc::new(Hadamard), &[0])
+        .unwrap()
+        .apply_gate(Arc::new(Hadamard), &[1])
+        .unwrap()
+        .apply_gate(Arc::new(CNot), &[0, 1])
+        .unwrap();
     assert_eq!(builder.build().len(), 3);
 }
 
@@ -1448,8 +1537,12 @@ fn all_qubit_gate_categories() {
 #[test]
 fn circuit_operations_mut() {
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+        .unwrap();
     let ops = circuit.operations_mut();
     assert_eq!(ops.len(), 2);
     ops.clear();
@@ -1459,9 +1552,15 @@ fn circuit_operations_mut() {
 #[test]
 fn circuit_two_qubit_operations_iter() {
     let mut circuit = Circuit::new(3);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-    circuit.add_gate(Arc::new(CZ), &[QubitId::new(1), QubitId::new(2)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(CZ), &[QubitId::new(1), QubitId::new(2)])
+        .unwrap();
     let two_q: Vec<_> = circuit.two_qubit_operations().collect();
     assert_eq!(two_q.len(), 2);
 }
@@ -1469,9 +1568,15 @@ fn circuit_two_qubit_operations_iter() {
 #[test]
 fn circuit_single_qubit_operations_iter() {
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
-    circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
     let single_q: Vec<_> = circuit.single_qubit_operations().collect();
     assert_eq!(single_q.len(), 2);
 }
@@ -1487,7 +1592,9 @@ mod serialization_tests {
     #[test]
     fn json_roundtrip_simple() {
         let mut circuit = Circuit::new(2);
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
         let json = circuit.to_json().unwrap();
         let deserialized = Circuit::from_json(&json).unwrap();
         assert_eq!(deserialized.num_qubits(), 2);
@@ -1497,9 +1604,15 @@ mod serialization_tests {
     #[test]
     fn json_roundtrip_multi_gate() {
         let mut circuit = Circuit::new(3);
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-        circuit.add_gate(Arc::new(PauliX), &[QubitId::new(2)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(2)])
+            .unwrap();
         let json = circuit.to_json_pretty().unwrap();
         assert!(json.contains("H"));
         let deserialized = Circuit::from_json(&json).unwrap();
@@ -1509,7 +1622,9 @@ mod serialization_tests {
     #[test]
     fn binary_roundtrip() {
         let mut circuit = Circuit::new(2);
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
         let bytes = circuit.to_bytes().unwrap();
         assert!(!bytes.is_empty());
         let deserialized = Circuit::from_bytes(&bytes).unwrap();

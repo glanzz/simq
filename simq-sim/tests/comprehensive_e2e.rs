@@ -173,9 +173,7 @@ fn simulator_without_optimization() {
 #[test]
 fn simulator_optimization_levels() {
     for level in 0..=3u8 {
-        let sim = Simulator::new(
-            SimulatorConfig::default().with_optimization_level(level),
-        );
+        let sim = Simulator::new(SimulatorConfig::default().with_optimization_level(level));
         let circuit = bell_circuit();
         let result = sim.run(&circuit);
         assert!(result.is_ok(), "Level {} should succeed", level);
@@ -490,9 +488,15 @@ fn simulate_ghz_5() {
 fn simulate_rotation_gates() {
     let sim = Simulator::default();
     let mut circuit = Circuit::new(2);
-    circuit.add_gate(Arc::new(RotationX::new(1.0)), &[q(0)]).unwrap();
-    circuit.add_gate(Arc::new(RotationY::new(0.5)), &[q(1)]).unwrap();
-    circuit.add_gate(Arc::new(RotationZ::new(0.3)), &[q(0)]).unwrap();
+    circuit
+        .add_gate(Arc::new(RotationX::new(1.0)), &[q(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(RotationY::new(0.5)), &[q(1)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(RotationZ::new(0.3)), &[q(0)])
+        .unwrap();
     circuit.add_gate(Arc::new(CNot), &[q(0), q(1)]).unwrap();
     let result = sim.run(&circuit);
     assert!(result.is_ok());
@@ -526,9 +530,7 @@ fn simulate_s_t_gates() {
 
 #[test]
 fn memory_limit_too_small() {
-    let sim = Simulator::new(
-        SimulatorConfig::default().with_memory_limit(16),
-    );
+    let sim = Simulator::new(SimulatorConfig::default().with_memory_limit(16));
     let circuit = bell_circuit();
     let result = sim.run(&circuit);
     assert!(result.is_err(), "Should fail with tiny memory limit");
@@ -536,9 +538,7 @@ fn memory_limit_too_small() {
 
 #[test]
 fn memory_limit_sufficient() {
-    let sim = Simulator::new(
-        SimulatorConfig::default().with_memory_limit(1024 * 1024),
-    );
+    let sim = Simulator::new(SimulatorConfig::default().with_memory_limit(1024 * 1024));
     let circuit = bell_circuit();
     let result = sim.run(&circuit);
     assert!(result.is_ok());
@@ -585,8 +585,12 @@ fn optimization_reduces_gates() {
     let s_opt = r_opt.statistics.unwrap();
     let s_no = r_no.statistics.unwrap();
 
-    assert!(s_opt.optimized_gates < s_no.optimized_gates,
-        "Optimization should reduce gates: opt={}, no_opt={}", s_opt.optimized_gates, s_no.optimized_gates);
+    assert!(
+        s_opt.optimized_gates < s_no.optimized_gates,
+        "Optimization should reduce gates: opt={}, no_opt={}",
+        s_opt.optimized_gates,
+        s_no.optimized_gates
+    );
 }
 
 // ============================================================================

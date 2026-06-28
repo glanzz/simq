@@ -138,7 +138,7 @@ impl StandardGateRegistry {
                     "Unknown gate type: '{}'",
                     name
                 )));
-            }
+            },
         };
 
         Ok(Arc::new(DeserializedGate {

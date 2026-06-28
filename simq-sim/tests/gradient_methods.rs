@@ -2,7 +2,9 @@ use simq_core::circuit::Circuit;
 use simq_core::QubitId;
 use simq_gates::standard::*;
 use simq_sim::gradient::autodiff::{gradient_forward, Dual, HybridAD};
-use simq_sim::gradient::batch::{evaluate_batch_expectation, evaluate_multi_observable, grid_search};
+use simq_sim::gradient::batch::{
+    evaluate_batch_expectation, evaluate_multi_observable, grid_search,
+};
 use simq_sim::gradient::batch_advanced::{
     latin_hypercube_sampling, line_search, verify_gradients, AdaptiveBatchEvaluator, BatchConfig,
     ImportanceSampler,
@@ -210,8 +212,7 @@ fn ps_empty_params() {
         c.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
         c
     };
-    let result =
-        compute_gradient_parameter_shift(&sim, cb, &z_observable(), &[], &config).unwrap();
+    let result = compute_gradient_parameter_shift(&sim, cb, &z_observable(), &[], &config).unwrap();
     assert!(result.is_empty());
 }
 
@@ -252,8 +253,7 @@ fn batch_parameter_shift_multiple_observables() {
     let obs1 = z_observable();
     let obs2 = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 2.0);
     let observables = vec![obs1, obs2];
-    let results =
-        batch_parameter_shift(&sim, ry_circuit, &observables, &[0.5], &config).unwrap();
+    let results = batch_parameter_shift(&sim, ry_circuit, &observables, &[0.5], &config).unwrap();
     assert_eq!(results.len(), 2);
     // Second observable has 2x coefficient
     assert!((results[1].gradients[0] - 2.0 * results[0].gradients[0]).abs() < 1e-6);
@@ -270,8 +270,7 @@ fn compute_gradient_parameter_shift_method() {
         method: GradientMethod::ParameterShift,
         ..Default::default()
     };
-    let result =
-        compute_gradient(&sim, ry_circuit, &z_observable(), &[0.5], &config).unwrap();
+    let result = compute_gradient(&sim, ry_circuit, &z_observable(), &[0.5], &config).unwrap();
     assert_eq!(result.method_used, GradientMethod::ParameterShift);
 }
 
@@ -282,16 +281,14 @@ fn compute_gradient_fd_method() {
         method: GradientMethod::FiniteDifference,
         ..Default::default()
     };
-    let result =
-        compute_gradient(&sim, ry_circuit, &z_observable(), &[0.5], &config).unwrap();
+    let result = compute_gradient(&sim, ry_circuit, &z_observable(), &[0.5], &config).unwrap();
     assert_eq!(result.method_used, GradientMethod::FiniteDifference);
 }
 
 #[test]
 fn compute_gradient_auto_method() {
     let sim = make_sim();
-    let result =
-        compute_gradient_auto(&sim, ry_circuit, &z_observable(), &[0.5]).unwrap();
+    let result = compute_gradient_auto(&sim, ry_circuit, &z_observable(), &[0.5]).unwrap();
     assert!(!result.is_empty());
     assert!(result.norm() > 0.0);
 }
@@ -318,8 +315,7 @@ fn gradient_result_methods() {
 fn batch_expectation_basic() {
     let sim = make_sim();
     let params = vec![vec![0.0], vec![std::f64::consts::PI]];
-    let result =
-        evaluate_batch_expectation(&sim, ry_circuit, &z_observable(), &params).unwrap();
+    let result = evaluate_batch_expectation(&sim, ry_circuit, &z_observable(), &params).unwrap();
     assert_eq!(result.values.len(), 2);
     assert_eq!(result.num_evaluations, 2);
     // RY(0)|0⟩ = |0⟩ → ⟨Z⟩ = 1
@@ -333,10 +329,7 @@ fn multi_observable_evaluation() {
     let sim = make_sim();
     let obs_z = z_observable();
     let mut obs_x = PauliObservable::new();
-    obs_x.add_term(
-        PauliString::from_paulis(vec![Pauli::X]),
-        1.0,
-    );
+    obs_x.add_term(PauliString::from_paulis(vec![Pauli::X]), 1.0);
     let observables = vec![obs_z, obs_x];
 
     let cb = |params: &[f64]| {
@@ -356,14 +349,9 @@ fn multi_observable_evaluation() {
 #[test]
 fn grid_search_finds_minimum() {
     let sim = make_sim();
-    let result = grid_search(
-        &sim,
-        ry_circuit,
-        &z_observable(),
-        &[(0.0, std::f64::consts::TAU)],
-        10,
-    )
-    .unwrap();
+    let result =
+        grid_search(&sim, ry_circuit, &z_observable(), &[(0.0, std::f64::consts::TAU)], 10)
+            .unwrap();
     assert_eq!(result.param_grid.len(), 10);
     assert_eq!(result.values.len(), 10);
     // Minimum of cos(theta) is at theta=pi
@@ -682,10 +670,7 @@ fn convergence_monitor_full_convergence() {
 
     assert!(monitor.should_stop());
     assert!(monitor.is_converged());
-    assert_eq!(
-        monitor.stopping_criterion(),
-        StoppingCriterion::FullConvergence
-    );
+    assert_eq!(monitor.stopping_criterion(), StoppingCriterion::FullConvergence);
 }
 
 #[test]
@@ -699,10 +684,7 @@ fn convergence_monitor_energy_tolerance() {
     monitor.record(1, 1.0005, &[0.5], &[0.1]);
 
     assert!(monitor.should_stop());
-    assert_eq!(
-        monitor.stopping_criterion(),
-        StoppingCriterion::EnergyTolerance
-    );
+    assert_eq!(monitor.stopping_criterion(), StoppingCriterion::EnergyTolerance);
 }
 
 #[test]
@@ -716,10 +698,7 @@ fn convergence_monitor_gradient_tolerance() {
     monitor.record(1, 0.5, &[1e-4], &[0.2]);
 
     assert!(monitor.should_stop());
-    assert_eq!(
-        monitor.stopping_criterion(),
-        StoppingCriterion::GradientTolerance
-    );
+    assert_eq!(monitor.stopping_criterion(), StoppingCriterion::GradientTolerance);
 }
 
 #[test]
@@ -752,10 +731,7 @@ fn convergence_monitor_max_iterations() {
     monitor.record(2, 0.3, &[0.2], &[0.3]);
 
     assert!(monitor.should_stop());
-    assert_eq!(
-        monitor.stopping_criterion(),
-        StoppingCriterion::MaxIterations
-    );
+    assert_eq!(monitor.stopping_criterion(), StoppingCriterion::MaxIterations);
 }
 
 #[test]
@@ -774,10 +750,7 @@ fn convergence_monitor_energy_increase_stop() {
     monitor.record(4, 0.8, &[0.3], &[0.5]);
 
     assert!(monitor.should_stop());
-    assert_eq!(
-        monitor.stopping_criterion(),
-        StoppingCriterion::EnergyIncrease
-    );
+    assert_eq!(monitor.stopping_criterion(), StoppingCriterion::EnergyIncrease);
 }
 
 #[test]
@@ -989,7 +962,9 @@ fn stopping_criterion_warning_variants() {
 #[test]
 fn stopping_criterion_descriptions() {
     assert!(!StoppingCriterion::EnergyTolerance.description().is_empty());
-    assert!(!StoppingCriterion::GradientTolerance.description().is_empty());
+    assert!(!StoppingCriterion::GradientTolerance
+        .description()
+        .is_empty());
     assert!(!StoppingCriterion::FullConvergence.description().is_empty());
     assert!(!StoppingCriterion::Patience.description().is_empty());
     assert!(!StoppingCriterion::MaxIterations.description().is_empty());

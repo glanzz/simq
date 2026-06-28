@@ -346,8 +346,7 @@ impl VQEAngles {
         let x8 = x4 * x4;
         let x10 = x8 * x2;
         let x12 = x8 * x4;
-        1.0 - x2 / 2.0 + x4 / 24.0 - x6 / 720.0
-            + x8 / 40320.0 - x10 / 3628800.0 + x12 / 479001600.0
+        1.0 - x2 / 2.0 + x4 / 24.0 - x6 / 720.0 + x8 / 40320.0 - x10 / 3628800.0 + x12 / 479001600.0
     }
 
     /// Const-compatible sine approximation (Taylor series, 7 terms)
@@ -359,8 +358,8 @@ impl VQEAngles {
         let x9 = x7 * x2;
         let x11 = x9 * x2;
         let x13 = x11 * x2;
-        x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0
-            + x9 / 362880.0 - x11 / 39916800.0 + x13 / 6227020800.0
+        x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0 + x9 / 362880.0 - x11 / 39916800.0
+            + x13 / 6227020800.0
     }
 
     /// Lookup RX matrix, using cache only for exact angle matches

@@ -163,7 +163,7 @@ mod error_edge_cases {
         match backend_err {
             BackendError::SerializationError(msg) => {
                 assert!(!msg.is_empty());
-            }
+            },
             _ => panic!("expected SerializationError"),
         }
     }
@@ -175,15 +175,14 @@ mod error_edge_cases {
         match backend_err {
             BackendError::Other(msg) => {
                 assert!(msg.contains("Core error"));
-            }
+            },
             _ => panic!("expected Other"),
         }
     }
 
     #[test]
     fn error_is_std_error() {
-        let err: Box<dyn std::error::Error> =
-            Box::new(BackendError::Other("test".into()));
+        let err: Box<dyn std::error::Error> = Box::new(BackendError::Other("test".into()));
         assert!(!err.to_string().is_empty());
     }
 }
@@ -220,8 +219,7 @@ mod metadata_edge_cases {
 
     #[test]
     fn metadata_success() {
-        let meta =
-            ExecutionMetadata::success("sim".to_string(), Duration::from_millis(100));
+        let meta = ExecutionMetadata::success("sim".to_string(), Duration::from_millis(100));
         assert!(meta.is_success());
         assert!(!meta.is_failed());
         assert_eq!(meta.status, JobStatus::Completed);
@@ -400,7 +398,7 @@ mod router_edge_cases {
             Err(BackendError::CapabilityExceeded(msg)) => {
                 assert!(msg.contains("5"));
                 assert!(msg.contains("3"));
-            }
+            },
             Err(other) => panic!("expected CapabilityExceeded, got {:?}", other),
             Ok(_) => panic!("expected error"),
         }
@@ -525,7 +523,7 @@ mod transpiler_edge_cases {
             BackendError::CapabilityExceeded(msg) => {
                 assert!(msg.contains("10"));
                 assert!(msg.contains("5"));
-            }
+            },
             _ => panic!("expected CapabilityExceeded"),
         }
     }
@@ -761,7 +759,7 @@ mod gate_decomposer_edge_cases {
         match err {
             BackendError::TranspilationFailed(msg) => {
                 assert!(msg.contains("CSWAP"));
-            }
+            },
             _ => panic!("expected TranspilationFailed"),
         }
     }

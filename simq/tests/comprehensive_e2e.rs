@@ -110,15 +110,11 @@ fn optimization_preserves_bell_state() {
     let backend = LocalSimulatorBackend::new();
 
     // No optimization
-    let sim_no_opt = Simulator::new(
-        SimulatorConfig::default().with_optimization(false),
-    );
+    let sim_no_opt = Simulator::new(SimulatorConfig::default().with_optimization(false));
     let r_no_opt = sim_no_opt.run(&c).unwrap();
 
     // With O3 optimization
-    let sim_opt = Simulator::new(
-        SimulatorConfig::default().with_optimization_level(3),
-    );
+    let sim_opt = Simulator::new(SimulatorConfig::default().with_optimization_level(3));
     let r_opt = sim_opt.run(&c).unwrap();
 
     // Both should produce Bell state
@@ -156,7 +152,12 @@ fn all_optimization_levels_produce_correct_results() {
 
     let backend = LocalSimulatorBackend::new();
 
-    for level in [OptimizationLevel::O0, OptimizationLevel::O1, OptimizationLevel::O2, OptimizationLevel::O3] {
+    for level in [
+        OptimizationLevel::O0,
+        OptimizationLevel::O1,
+        OptimizationLevel::O2,
+        OptimizationLevel::O3,
+    ] {
         let compiler = create_compiler(level);
         let mut compiled = c.clone();
         compiler.compile(&mut compiled).unwrap();
@@ -379,9 +380,7 @@ fn expectation_value_z_on_x_gate() {
     let result = backend.execute(&c, 1000).unwrap();
 
     // ⟨Z⟩ for |1⟩ = -1
-    let z_exp = result.expectation_value(|bs| {
-        if bs == "0" { 1.0 } else { -1.0 }
-    });
+    let z_exp = result.expectation_value(|bs| if bs == "0" { 1.0 } else { -1.0 });
     assert!((z_exp - (-1.0)).abs() < 1e-10);
 }
 
@@ -514,8 +513,7 @@ fn multi_hadamard_uniform_superposition() {
     let probs = result.probabilities();
     assert_eq!(probs.len(), 8);
     for (_, prob) in &probs {
-        assert!((*prob - 0.125).abs() < 0.03,
-            "Probability {} too far from 0.125", prob);
+        assert!((*prob - 0.125).abs() < 0.03, "Probability {} too far from 0.125", prob);
     }
 }
 

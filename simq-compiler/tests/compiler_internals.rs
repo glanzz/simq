@@ -7,17 +7,19 @@ use simq_compiler::{
     cache::{CacheStatistics, CircuitFingerprint, CompilationCache, SharedCompilationCache},
     circuit_analysis_pass::{CircuitCharacteristics, CircuitSize},
     execution_plan::{ExecutionLayer, ExecutionPlan, ExecutionPlanner},
-    hardware_aware::{CostModel, GoogleHardware, HardwareModel, HardwareType, IBMHardware, IonQHardware},
-    matrix_computation::{
-        adjoint_2x2, controlled_gate_2x2, decompose_zyz, determinant_2x2, doubly_controlled_gate_2x2,
-        gate_fidelity_2x2, hadamard_matrix, identity_2x2, is_hermitian_2x2, is_unitary_2x2,
-        is_unitary_4x4, matrices_equal_2x2, matrix_exp_hermitian_2x2, multiply_2x2, multiply_4x4,
-        pauli_x_matrix, pauli_y_matrix, pauli_z_matrix, tensor_product_2x2, trace_2x2, trace_4x4,
-        Matrix2,
+    hardware_aware::{
+        CostModel, GoogleHardware, HardwareModel, HardwareType, IBMHardware, IonQHardware,
     },
-    AdaptiveCompiler, CompilerBuilder, MultiLevelOptimizer,
-    passes::{DeadCodeElimination, GateFusion, AdvancedTemplateMatching, GateCommutation},
+    matrix_computation::{
+        adjoint_2x2, controlled_gate_2x2, decompose_zyz, determinant_2x2,
+        doubly_controlled_gate_2x2, gate_fidelity_2x2, hadamard_matrix, identity_2x2,
+        is_hermitian_2x2, is_unitary_2x2, is_unitary_4x4, matrices_equal_2x2,
+        matrix_exp_hermitian_2x2, multiply_2x2, multiply_4x4, pauli_x_matrix, pauli_y_matrix,
+        pauli_z_matrix, tensor_product_2x2, trace_2x2, trace_4x4, Matrix2,
+    },
+    passes::{AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion},
     pipeline::{create_compiler, OptimizationLevel},
+    AdaptiveCompiler, CompilerBuilder, MultiLevelOptimizer,
 };
 use simq_core::{gate::Gate, Circuit, QubitId};
 use std::sync::Arc;
@@ -299,10 +301,7 @@ fn test_characteristics_single_qubit_circuit() {
 
 #[test]
 fn test_characteristics_size_categories() {
-    let categories = vec![
-        (10, CircuitSize::Small),
-        (49, CircuitSize::Small),
-    ];
+    let categories = vec![(10, CircuitSize::Small), (49, CircuitSize::Small)];
     for (count, expected_size) in categories {
         let mut circuit = Circuit::new(2);
         let x = mg("X");
@@ -475,10 +474,7 @@ fn test_fingerprint_identical_circuits_match() {
     c1.add_gate(gate.clone(), &[q(0)]).unwrap();
     c2.add_gate(gate.clone(), &[q(0)]).unwrap();
 
-    assert_eq!(
-        CircuitFingerprint::compute(&c1),
-        CircuitFingerprint::compute(&c2)
-    );
+    assert_eq!(CircuitFingerprint::compute(&c1), CircuitFingerprint::compute(&c2));
 }
 
 #[test]
@@ -488,10 +484,7 @@ fn test_fingerprint_different_circuits_differ() {
     c1.add_gate(mg("H"), &[q(0)]).unwrap();
     c2.add_gate(mg("X"), &[q(0)]).unwrap();
 
-    assert_ne!(
-        CircuitFingerprint::compute(&c1),
-        CircuitFingerprint::compute(&c2)
-    );
+    assert_ne!(CircuitFingerprint::compute(&c1), CircuitFingerprint::compute(&c2));
 }
 
 #[test]
@@ -750,12 +743,8 @@ fn test_cost_model_non_native_penalty() {
     let mut native_circuit = Circuit::new(2);
     let mut nonnative_circuit = Circuit::new(2);
 
-    native_circuit
-        .add_gate(mg("X"), &[q(0)])
-        .unwrap();
-    nonnative_circuit
-        .add_gate(mg("CZ"), &[q(0)])
-        .unwrap();
+    native_circuit.add_gate(mg("X"), &[q(0)]).unwrap();
+    nonnative_circuit.add_gate(mg("CZ"), &[q(0)]).unwrap();
 
     // Note: CZ is not native on IBM, so it gets decomposition penalty
     // But the mock gate has n_qubits=1 for mg("CZ"), so the comparison

@@ -123,12 +123,10 @@ mod serialization_edge_cases {
     #[test]
     fn cache_key_differs_for_different_circuits() {
         let mut c1 = Circuit::new(2);
-        c1.add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
-            .unwrap();
+        c1.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
 
         let mut c2 = Circuit::new(2);
-        c2.add_gate(Arc::new(PauliX), &[QubitId::new(0)])
-            .unwrap();
+        c2.add_gate(Arc::new(PauliX), &[QubitId::new(0)]).unwrap();
 
         assert_ne!(c1.cache_key(), c2.cache_key());
     }
@@ -137,8 +135,7 @@ mod serialization_edge_cases {
     fn cache_key_same_for_identical_circuits() {
         let build = || {
             let mut c = Circuit::new(2);
-            c.add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
-                .unwrap();
+            c.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
             c
         };
         assert_eq!(build().cache_key(), build().cache_key());
@@ -344,10 +341,7 @@ mod validation_edge_cases {
             .add_gate(MockGate::single("H"), &[QubitId::new(0)])
             .unwrap();
         circuit
-            .add_gate(
-                MockGate::two("CNOT"),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(MockGate::two("CNOT"), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
         circuit
             .add_gate(MockGate::single("X"), &[QubitId::new(1)])
@@ -375,16 +369,10 @@ mod validation_edge_cases {
                 .unwrap();
         }
         circuit
-            .add_gate(
-                MockGate::two("CX"),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(MockGate::two("CX"), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
         circuit
-            .add_gate(
-                MockGate::two("CX"),
-                &[QubitId::new(2), QubitId::new(3)],
-            )
+            .add_gate(MockGate::two("CX"), &[QubitId::new(2), QubitId::new(3)])
             .unwrap();
 
         let report = circuit.validate_dag().unwrap();
@@ -722,10 +710,7 @@ mod circuit_ops_edge_cases {
         let gate = MockGate::two("CNOT");
         let result = GateOp::new(gate, &[QubitId::new(0), QubitId::new(0)]);
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            QuantumError::DuplicateQubit(_)
-        ));
+        assert!(matches!(result.unwrap_err(), QuantumError::DuplicateQubit(_)));
     }
 
     #[test]

@@ -17,7 +17,7 @@ fn expectation(sim: &Simulator, circuit: &simq_core::Circuit, obs: &PauliObserva
         AdaptiveState::Sparse { state: s, .. } => {
             let d = simq_state::DenseState::from_sparse(s).unwrap();
             obs.expectation_value(&d).unwrap()
-        }
+        },
     }
 }
 
@@ -152,7 +152,9 @@ fn problem_type_num_qubits_custom() {
 #[test]
 fn problem_type_descriptions() {
     let g = Graph::from_edges(3, &[(0, 1, 1.0)]);
-    assert!(ProblemType::MaxCut(g.clone()).description().contains("MaxCut"));
+    assert!(ProblemType::MaxCut(g.clone())
+        .description()
+        .contains("MaxCut"));
     assert!(ProblemType::MinVertexCover(g.clone())
         .description()
         .contains("Vertex Cover"));
@@ -165,41 +167,33 @@ fn problem_type_descriptions() {
     assert!(ProblemType::GraphColoring(g.clone(), 3)
         .description()
         .contains("Coloring"));
-    assert!(
-        (ProblemType::MaxKSat {
-            num_variables: 3,
-            clauses: vec![]
-        })
-        .description()
-        .contains("SAT")
-    );
-    assert!(
-        (ProblemType::TSP {
-            num_cities: 3,
-            distances: vec![]
-        })
-        .description()
-        .contains("TSP")
-    );
-    assert!(
-        (ProblemType::Portfolio {
-            assets: 3,
-            expected_returns: vec![],
-            covariances: vec![],
-            risk_factor: 0.5,
-            budget: 1
-        })
-        .description()
-        .contains("Portfolio")
-    );
-    assert!(
-        (ProblemType::Custom {
-            num_qubits: 2,
-            terms: vec![]
-        })
-        .description()
-        .contains("Custom")
-    );
+    assert!((ProblemType::MaxKSat {
+        num_variables: 3,
+        clauses: vec![]
+    })
+    .description()
+    .contains("SAT"));
+    assert!((ProblemType::TSP {
+        num_cities: 3,
+        distances: vec![]
+    })
+    .description()
+    .contains("TSP"));
+    assert!((ProblemType::Portfolio {
+        assets: 3,
+        expected_returns: vec![],
+        covariances: vec![],
+        risk_factor: 0.5,
+        budget: 1
+    })
+    .description()
+    .contains("Portfolio"));
+    assert!((ProblemType::Custom {
+        num_qubits: 2,
+        terms: vec![]
+    })
+    .description()
+    .contains("Custom"));
 }
 
 // ============================================================================
@@ -489,12 +483,10 @@ fn builder_zero_initial_state() {
     let result = sim.run(&circuit).unwrap();
     let amps = match &result.state {
         AdaptiveState::Dense(d) => d.amplitudes().to_vec(),
-        AdaptiveState::Sparse { state: s, .. } => {
-            simq_state::DenseState::from_sparse(s)
-                .unwrap()
-                .amplitudes()
-                .to_vec()
-        }
+        AdaptiveState::Sparse { state: s, .. } => simq_state::DenseState::from_sparse(s)
+            .unwrap()
+            .amplitudes()
+            .to_vec(),
     };
     assert!((amps[0].norm() - 1.0).abs() < 1e-10);
 }
@@ -639,7 +631,10 @@ fn qaoa_maxcut_expectation_varies_with_params() {
         initial_state: InitialState::UniformSuperposition,
         final_mixer: true,
     };
-    let b = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)])), cfg);
+    let b = QAOACircuitBuilder::with_config(
+        ProblemType::MaxCut(Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)])),
+        cfg,
+    );
 
     let e1 = expectation(&sim, &b.build(&[0.1, 0.1]), &obs);
     let e2 = expectation(&sim, &b.build(&[1.0, 1.0]), &obs);

@@ -9,9 +9,7 @@ use simq_compiler::decomposition::{
     two_qubit::{EntanglementGate, TwoQubitDecomposer},
     Decomposer, DecompositionConfig, UniversalDecomposer,
 };
-use simq_compiler::matrix_computation::{
-    hadamard_matrix, identity_2x2, pauli_x_matrix, Matrix2,
-};
+use simq_compiler::matrix_computation::{hadamard_matrix, identity_2x2, pauli_x_matrix, Matrix2};
 use simq_core::gate::Gate;
 use std::f64::consts::PI;
 use std::sync::Arc;
@@ -297,10 +295,22 @@ fn test_two_qubit_decomposer_trait_gate_check() {
     assert!(!decomposer.can_decompose(&two_gate_no_matrix));
 
     let cz_matrix: Vec<Complex64> = vec![
-        Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(1.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+        Complex64::new(-1.0, 0.0),
     ];
     let two_gate_with_matrix = MockGate {
         name: "CZ".to_string(),
@@ -476,7 +486,8 @@ fn test_clifford_t_optimize_t_count() {
     ];
     let optimized = decomposer.optimize_t_count(&gates);
     assert!(
-        CliffordTDecomposer::count_t_gates(&optimized) <= CliffordTDecomposer::count_t_gates(&gates),
+        CliffordTDecomposer::count_t_gates(&optimized)
+            <= CliffordTDecomposer::count_t_gates(&gates),
         "Optimization should not increase T count"
     );
 }

@@ -350,9 +350,7 @@ fn result_expectation_value() {
     counts.insert("1".to_string(), 200);
     let result = BackendResult::new(counts, 1000);
     // Z operator: |0⟩ → +1, |1⟩ → -1
-    let z_expectation = result.expectation_value(|bs| {
-        if bs == "0" { 1.0 } else { -1.0 }
-    });
+    let z_expectation = result.expectation_value(|bs| if bs == "0" { 1.0 } else { -1.0 });
     assert!((z_expectation - 0.6).abs() < 1e-10);
 }
 
@@ -416,13 +414,17 @@ fn error_capability_exceeded() {
 
 #[test]
 fn error_job_not_found() {
-    let e = BackendError::JobNotFound { job_id: "abc123".to_string() };
+    let e = BackendError::JobNotFound {
+        job_id: "abc123".to_string(),
+    };
     assert!(format!("{}", e).contains("abc123"));
 }
 
 #[test]
 fn error_job_timeout() {
-    let e = BackendError::JobTimeout { timeout_seconds: 30 };
+    let e = BackendError::JobTimeout {
+        timeout_seconds: 30,
+    };
     assert!(format!("{}", e).contains("30"));
 }
 
@@ -431,7 +433,7 @@ fn error_from_serde() {
     let json_err = serde_json::from_str::<i32>("not json").unwrap_err();
     let be: BackendError = json_err.into();
     match be {
-        BackendError::SerializationError(_) => {}
+        BackendError::SerializationError(_) => {},
         _ => panic!("Expected SerializationError"),
     }
 }
@@ -1040,9 +1042,7 @@ mod selector_tests {
     #[test]
     fn selector_select_by_name() {
         let mut selector = BackendSelector::new();
-        let backend = Arc::new(
-            LocalSimulatorBackend::new().with_name("test-sim".to_string()),
-        );
+        let backend = Arc::new(LocalSimulatorBackend::new().with_name("test-sim".to_string()));
         selector.register(backend);
         let found = selector.select_by_name("test-sim");
         assert!(found.is_ok());
