@@ -363,62 +363,70 @@ impl VQEAngles {
             + x9 / 362880.0 - x11 / 39916800.0 + x13 / 6227020800.0
     }
 
-    /// Lookup RX matrix with nearest neighbor
+    /// Lookup RX matrix, using cache only for exact angle matches
     #[inline]
     pub fn rx_cached(theta: f64) -> [[Complex64; 2]; 2] {
         let abs_theta = theta.abs();
 
         if abs_theta <= Self::MAX_ANGLE {
-            let index = (abs_theta / Self::STEP).round() as usize;
+            let float_index = abs_theta / Self::STEP;
+            let index = float_index.round() as usize;
             let index = index.min(Self::NUM_ENTRIES - 1);
-            let mut m = Self::RX_CACHE[index];
-            if theta < 0.0 {
-                m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
-                m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
+            let cached_theta = index as f64 * Self::STEP;
+            if (abs_theta - cached_theta).abs() < 1e-12 {
+                let mut m = Self::RX_CACHE[index];
+                if theta < 0.0 {
+                    m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
+                    m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
+                }
+                return m;
             }
-            m
-        } else {
-            // Fallback to runtime computation
-            crate::matrices::rotation_x(theta)
         }
+        crate::matrices::rotation_x(theta)
     }
 
-    /// Lookup RY matrix with nearest neighbor
+    /// Lookup RY matrix, using cache only for exact angle matches
     #[inline]
     pub fn ry_cached(theta: f64) -> [[Complex64; 2]; 2] {
         let abs_theta = theta.abs();
 
         if abs_theta <= Self::MAX_ANGLE {
-            let index = (abs_theta / Self::STEP).round() as usize;
+            let float_index = abs_theta / Self::STEP;
+            let index = float_index.round() as usize;
             let index = index.min(Self::NUM_ENTRIES - 1);
-            let mut m = Self::RY_CACHE[index];
-            if theta < 0.0 {
-                m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
-                m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
+            let cached_theta = index as f64 * Self::STEP;
+            if (abs_theta - cached_theta).abs() < 1e-12 {
+                let mut m = Self::RY_CACHE[index];
+                if theta < 0.0 {
+                    m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
+                    m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
+                }
+                return m;
             }
-            m
-        } else {
-            crate::matrices::rotation_y(theta)
         }
+        crate::matrices::rotation_y(theta)
     }
 
-    /// Lookup RZ matrix with nearest neighbor
+    /// Lookup RZ matrix, using cache only for exact angle matches
     #[inline]
     pub fn rz_cached(theta: f64) -> [[Complex64; 2]; 2] {
         let abs_theta = theta.abs();
 
         if abs_theta <= Self::MAX_ANGLE {
-            let index = (abs_theta / Self::STEP).round() as usize;
+            let float_index = abs_theta / Self::STEP;
+            let index = float_index.round() as usize;
             let index = index.min(Self::NUM_ENTRIES - 1);
-            let mut m = Self::RZ_CACHE[index];
-            if theta < 0.0 {
-                m[0][0] = Complex64::new(m[0][0].re, -m[0][0].im);
-                m[1][1] = Complex64::new(m[1][1].re, -m[1][1].im);
+            let cached_theta = index as f64 * Self::STEP;
+            if (abs_theta - cached_theta).abs() < 1e-12 {
+                let mut m = Self::RZ_CACHE[index];
+                if theta < 0.0 {
+                    m[0][0] = Complex64::new(m[0][0].re, -m[0][0].im);
+                    m[1][1] = Complex64::new(m[1][1].re, -m[1][1].im);
+                }
+                return m;
             }
-            m
-        } else {
-            crate::matrices::rotation_z(theta)
         }
+        crate::matrices::rotation_z(theta)
     }
 
     /// Get cache memory usage in bytes
