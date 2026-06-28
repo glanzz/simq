@@ -601,7 +601,7 @@ fn test_dce_then_fusion_pipeline() {
 #[test]
 fn test_template_then_dce_pipeline() {
     let template = AdvancedTemplateMatching::new();
-    let dce = DeadCodeElimination::new();
+    let _dce = DeadCodeElimination::new();
     let mut circuit = Circuit::new(1);
 
     // H-Z-H -> X, then X on same qubit -> X-X pair (for DCE)

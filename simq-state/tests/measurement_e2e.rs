@@ -105,8 +105,6 @@ fn test_measurement_breaks_bell_entanglement() {
     // After measuring qubit 0, the state should be a product state
     let rho = state.partial_trace(&[0]).unwrap();
     // Should be pure (purity = 1) since entanglement is broken
-    let purity =
-        rho[0].re * rho[0].re + rho[1].norm_sqr() + rho[2].norm_sqr() + rho[3].re * rho[3].re;
     // Actually trace(rho^2) for 2x2
     let purity_correct =
         (rho[0] * rho[0] + rho[1] * rho[2]).re + (rho[2] * rho[1] + rho[3] * rho[3]).re;

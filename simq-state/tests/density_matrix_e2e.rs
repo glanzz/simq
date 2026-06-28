@@ -213,7 +213,7 @@ fn test_dm_measurement_preserves_validity() {
     let mut dm = DensityMatrix::from_state_vector(1, &amps).unwrap();
 
     let outcome = dm.measure(0, 0.3).unwrap();
-    assert!(outcome == false || outcome == true);
+    let _ = outcome;
     assert!(dm.is_valid(1e-8));
     assert_relative_eq!(dm.purity(), 1.0, epsilon = 1e-8);
 }

@@ -186,7 +186,6 @@ fn test_dense_12_qubit_basic_operations() {
     state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
     state.apply_cnot(0, 11).unwrap();
 
-    let h = FRAC_1_SQRT_2;
     assert_relative_eq!(state.get_probability(0).unwrap(), 0.5, epsilon = 1e-10);
     let idx_both_one = 1 | (1 << 11);
     assert_relative_eq!(state.get_probability(idx_both_one).unwrap(), 0.5, epsilon = 1e-10);

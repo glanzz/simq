@@ -6,7 +6,7 @@ use num_complex::Complex64;
 use simq_compiler::{
     cache::{CacheStatistics, CircuitFingerprint, CompilationCache, SharedCompilationCache},
     circuit_analysis_pass::{CircuitCharacteristics, CircuitSize},
-    execution_plan::{ExecutionLayer, ExecutionPlan, ExecutionPlanner},
+    execution_plan::{ExecutionLayer, ExecutionPlanner},
     hardware_aware::{
         CostModel, GoogleHardware, HardwareModel, HardwareType, IBMHardware, IonQHardware,
     },
@@ -15,9 +15,9 @@ use simq_compiler::{
         doubly_controlled_gate_2x2, gate_fidelity_2x2, hadamard_matrix, identity_2x2,
         is_hermitian_2x2, is_unitary_2x2, is_unitary_4x4, matrices_equal_2x2,
         matrix_exp_hermitian_2x2, multiply_2x2, multiply_4x4, pauli_x_matrix, pauli_y_matrix,
-        pauli_z_matrix, tensor_product_2x2, trace_2x2, trace_4x4, Matrix2,
+        pauli_z_matrix, tensor_product_2x2, trace_2x2, trace_4x4,
     },
-    passes::{AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion},
+    passes::{DeadCodeElimination, GateFusion},
     pipeline::{create_compiler, OptimizationLevel},
     AdaptiveCompiler, CompilerBuilder, MultiLevelOptimizer,
 };
@@ -150,6 +150,7 @@ fn test_determinant_pauli_x() {
 }
 
 #[test]
+#[allow(clippy::needless_range_loop)]
 fn test_tensor_product_identity_identity() {
     let id = identity_2x2();
     let result = tensor_product_2x2(&id, &id);
@@ -192,6 +193,7 @@ fn test_controlled_gate_produces_cnot() {
 }
 
 #[test]
+#[allow(clippy::needless_range_loop)]
 fn test_controlled_gate_identity_is_identity_4x4() {
     let id = identity_2x2();
     let cid = controlled_gate_2x2(&id);

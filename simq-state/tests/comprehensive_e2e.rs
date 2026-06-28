@@ -37,7 +37,7 @@ fn pauli_x_flat() -> [Complex64; 4] {
     [ZERO, ONE, ONE, ZERO]
 }
 
-fn pauli_z_matrix() -> [[Complex64; 2]; 2] {
+fn _pauli_z_matrix() -> [[Complex64; 2]; 2] {
     [[ONE, ZERO], [ZERO, Complex64::new(-1.0, 0.0)]]
 }
 
@@ -68,8 +68,8 @@ fn state_vector_new() {
     assert!(sv.is_simd_aligned());
     let amps = sv.amplitudes();
     assert!((amps[0] - ONE).norm() < EPSILON);
-    for i in 1..8 {
-        assert!(amps[i].norm() < EPSILON);
+    for amp in &amps[1..8] {
+        assert!(amp.norm() < EPSILON);
     }
 }
 
@@ -403,7 +403,7 @@ fn sparse_state_normalize() {
 
 #[test]
 fn sparse_state_measure() {
-    let mut state = SparseState::new(2).unwrap();
+    let state = SparseState::new(2).unwrap();
     let (p0, p1) = state.measure_probability(0).unwrap();
     assert!((p0 - 1.0).abs() < EPSILON);
     assert!(p1.abs() < EPSILON);
@@ -669,7 +669,7 @@ fn density_matrix_apply_unitary() {
 fn density_matrix_measurement() {
     let mut dm = DensityMatrix::new(1).unwrap();
     let outcome = dm.measure(0, 0.5).unwrap();
-    assert!(!outcome || outcome);
+    let _ = outcome;
     assert!((dm.trace() - 1.0).abs() < EPSILON);
 }
 
@@ -717,7 +717,7 @@ fn density_matrix_simulator_measurement() {
     let config = DensityMatrixConfig::new().with_seed(42).with_shots(100);
     let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
     let outcome = sim.measure_qubit(0).unwrap();
-    assert!(!outcome || outcome);
+    let _ = outcome;
 }
 
 #[test]

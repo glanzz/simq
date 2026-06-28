@@ -409,15 +409,16 @@ pub fn apply_gate_optimized(
         return;
     }
 
-    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
-    {
-        unsafe {
-            apply_gate_sse2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "avx2")
+    ))]
+    unsafe {
+        apply_gate_sse2(state, matrix, qubit, num_qubits);
     }
 
-    // Fallback to scalar
+    #[cfg(not(target_arch = "x86_64"))]
     apply_gate_scalar(state, matrix, qubit, num_qubits);
 }
 

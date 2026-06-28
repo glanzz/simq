@@ -236,8 +236,10 @@ mod metadata_edge_cases {
 
     #[test]
     fn metadata_cancelled_is_failed() {
-        let mut meta = ExecutionMetadata::default();
-        meta.status = JobStatus::Cancelled;
+        let meta = ExecutionMetadata {
+            status: JobStatus::Cancelled,
+            ..Default::default()
+        };
         assert!(meta.is_failed());
     }
 }

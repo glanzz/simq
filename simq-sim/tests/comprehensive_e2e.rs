@@ -362,7 +362,7 @@ fn qaoa_circuit_basic() {
     let params = vec![0.5, 0.3];
     let circuit = simq_sim::qaoa_circuit(2, &cost_h, &mixer, 1, &params);
     assert_eq!(circuit.num_qubits(), 2);
-    assert!(circuit.len() > 0);
+    assert!(!circuit.is_empty());
 }
 
 #[test]
@@ -391,7 +391,7 @@ fn vqe_ansatz_basic() {
     let params = vec![0.1, 0.2, 0.3];
     let circuit = simq_sim::vqe_hardware_efficient_ansatz(3, &params);
     assert_eq!(circuit.num_qubits(), 3);
-    assert!(circuit.len() > 0);
+    assert!(!circuit.is_empty());
 }
 
 #[test]

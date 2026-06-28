@@ -512,7 +512,7 @@ fn multi_hadamard_uniform_superposition() {
     // Should have 2^3 = 8 outcomes, each with ~1/8 probability
     let probs = result.probabilities();
     assert_eq!(probs.len(), 8);
-    for (_, prob) in &probs {
+    for prob in probs.values() {
         assert!((*prob - 0.125).abs() < 0.03, "Probability {} too far from 0.125", prob);
     }
 }

@@ -552,7 +552,7 @@ fn execution_engine_telemetry_access() {
     engine.execute(&circuit, &mut state).unwrap();
 
     let telemetry = engine.get_telemetry();
-    assert!(telemetry.per_gate_times.len() >= 1);
+    assert!(!telemetry.per_gate_times.is_empty());
 }
 
 #[test]

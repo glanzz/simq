@@ -25,14 +25,14 @@ fn mult_2x2(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2]) -> [[Complex64; 2]
 }
 
 fn is_identity_2x2(m: &[[Complex64; 2]; 2]) -> bool {
-    for i in 0..2 {
-        for j in 0..2 {
+    for (i, row) in m.iter().enumerate() {
+        for (j, val) in row.iter().enumerate() {
             let expected = if i == j {
                 Complex64::new(1.0, 0.0)
             } else {
                 Complex64::new(0.0, 0.0)
             };
-            if (m[i][j] - expected).norm() > EPSILON {
+            if (val - expected).norm() > EPSILON {
                 return false;
             }
         }
@@ -367,14 +367,14 @@ fn rotation_additivity() {
 fn rotation_2pi_is_minus_identity() {
     let rx = RotationX::new(2.0 * PI);
     let m = rx.matrix();
-    for i in 0..2 {
-        for j in 0..2 {
+    for (i, row) in m.iter().enumerate() {
+        for (j, val) in row.iter().enumerate() {
             let expected = if i == j {
                 Complex64::new(-1.0, 0.0)
             } else {
                 Complex64::new(0.0, 0.0)
             };
-            assert!((m[i][j] - expected).norm() < EPSILON);
+            assert!((val - expected).norm() < EPSILON);
         }
     }
 }
@@ -579,7 +579,7 @@ fn custom_gate_adjoint() {
     assert_eq!(adj.name(), "S_custom†");
     let m = gate.matrix_vec();
     let ma = adj.matrix_vec();
-    let flat_orig = vec![m[0], m[2], m[1], m[3]];
+    let flat_orig = [m[0], m[2], m[1], m[3]];
     for i in 0..4 {
         assert!((flat_orig[i].conj() - ma[i]).norm() < EPSILON);
     }

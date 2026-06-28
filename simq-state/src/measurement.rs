@@ -102,7 +102,7 @@ impl SamplingResult {
     /// Get all outcomes sorted by count (descending)
     pub fn sorted_outcomes(&self) -> Vec<(u64, usize)> {
         let mut outcomes: Vec<_> = self.counts.iter().map(|(&k, &v)| (k, v)).collect();
-        outcomes.sort_by(|a, b| b.1.cmp(&a.1));
+        outcomes.sort_by_key(|b| std::cmp::Reverse(b.1));
         outcomes
     }
 

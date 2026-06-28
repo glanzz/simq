@@ -42,6 +42,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn is_unitary(m: &[[Complex64; 2]; 2]) -> bool {
         let identity = [
             [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
@@ -421,7 +422,7 @@ mod tests {
         for angle in [0.0, 0.3, 0.7, 1.2, std::f64::consts::FRAC_PI_2, 3.0, -1.0] {
             let range_result = rx_range::RXRangeCache::lookup(angle);
             let reference = rotation_x(angle);
-            if angle < 0.0 || angle > std::f64::consts::FRAC_PI_2 {
+            if !(0.0..=std::f64::consts::FRAC_PI_2).contains(&angle) {
                 assert_matrix_close(&range_result, &reference, TOLERANCE);
             }
         }

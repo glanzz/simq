@@ -2,7 +2,7 @@
 
 use num_complex::Complex64;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
 use std::arch::x86_64::*;
 
 /// Cache-friendly two-qubit gate application (scalar implementation)

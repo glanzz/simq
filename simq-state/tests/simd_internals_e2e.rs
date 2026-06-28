@@ -1,7 +1,7 @@
 use approx::assert_relative_eq;
 use num_complex::Complex64;
 use simq_state::simd;
-use simq_state::DenseState;
+
 use std::f64::consts::{FRAC_1_SQRT_2, PI};
 
 fn hadamard() -> [[Complex64; 2]; 2] {
@@ -509,7 +509,7 @@ fn test_simd_cnot_chain_ghz_5_qubits() {
     let h = FRAC_1_SQRT_2;
     assert_relative_eq!(state[0].re, h, epsilon = 1e-10);
     assert_relative_eq!(state[(1 << num_qubits) - 1].re, h, epsilon = 1e-10);
-    for i in 1..((1 << num_qubits) - 1) {
-        assert_relative_eq!(state[i].norm(), 0.0, epsilon = 1e-10);
+    for s in &state[1..((1 << num_qubits) - 1)] {
+        assert_relative_eq!(s.norm(), 0.0, epsilon = 1e-10);
     }
 }

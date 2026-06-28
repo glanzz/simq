@@ -179,11 +179,15 @@ pub fn cached_rotations(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         use num_complex::Complex64;
 
-        #(#const_declarations)*
+        #(
+            #[allow(clippy::approx_constant)]
+            #const_declarations
+        )*
 
         /// Compile-time generated cache for rotation matrices
         pub struct #cache_struct_name;
 
+        #[allow(clippy::approx_constant)]
         impl #cache_struct_name {
             /// Cached angles
             const ANGLES: &'static [f64] = &[#(#angle_array),*];
@@ -372,6 +376,7 @@ pub fn cache_rotation_range(input: TokenStream) -> TokenStream {
         /// Compile-time generated range cache for rotation matrices
         pub struct #cache_struct_name;
 
+        #[allow(clippy::approx_constant)]
         impl #cache_struct_name {
             /// Cached angles (evenly spaced)
             const ANGLES: [f64; #steps] = [#(#angle_array),*];
@@ -392,7 +397,7 @@ pub fn cache_rotation_range(input: TokenStream) -> TokenStream {
             /// For angles outside the range, computes on-demand.
             #[inline]
             pub fn lookup(theta: f64) -> [[Complex64; 2]; 2] {
-                if theta < Self::START || theta > Self::END {
+                if !(Self::START..=Self::END).contains(&theta) {
                     return Self::compute_matrix(theta);
                 }
 
@@ -409,7 +414,7 @@ pub fn cache_rotation_range(input: TokenStream) -> TokenStream {
             /// Note: Matrix interpolation is approximate and may not preserve unitarity perfectly.
             #[inline]
             pub fn lookup_interpolated(theta: f64) -> [[Complex64; 2]; 2] {
-                if theta < Self::START || theta > Self::END {
+                if !(Self::START..=Self::END).contains(&theta) {
                     return Self::compute_matrix(theta);
                 }
 

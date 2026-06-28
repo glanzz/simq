@@ -609,8 +609,8 @@ fn random_params_in_range() {
     for i in 0..5 {
         let gamma = params[2 * i];
         let beta = params[2 * i + 1];
-        assert!(gamma >= 0.0 && gamma <= std::f64::consts::PI);
-        assert!(beta >= 0.0 && beta <= std::f64::consts::FRAC_PI_2);
+        assert!((0.0..=std::f64::consts::PI).contains(&gamma));
+        assert!((0.0..=std::f64::consts::FRAC_PI_2).contains(&beta));
     }
 }
 

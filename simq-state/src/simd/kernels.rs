@@ -6,6 +6,9 @@ use num_complex::Complex64;
 use std::arch::x86_64::*;
 
 /// Compute norm using SSE2
+///
+/// # Safety
+/// Requires SSE2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
 pub unsafe fn norm_sse2(vec: &[Complex64]) -> f64 {
@@ -14,7 +17,7 @@ pub unsafe fn norm_sse2(vec: &[Complex64]) -> f64 {
     let ptr = vec.as_ptr() as *const f64;
 
     let mut i = 0;
-    while i + 1 <= len {
+    while i < len {
         // Load complex number [re, im]
         let z = _mm_loadu_pd(ptr.add(i * 2));
 
@@ -35,6 +38,9 @@ pub unsafe fn norm_sse2(vec: &[Complex64]) -> f64 {
 }
 
 /// Compute norm using AVX2
+///
+/// # Safety
+/// Requires AVX2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 pub unsafe fn norm_avx2(vec: &[Complex64]) -> f64 {
@@ -72,6 +78,9 @@ pub unsafe fn norm_avx2(vec: &[Complex64]) -> f64 {
 }
 
 /// Scale vector by scalar using AVX2
+///
+/// # Safety
+/// Requires AVX2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 pub unsafe fn scale_avx2(vec: &mut [Complex64], scalar: f64) {
@@ -145,6 +154,9 @@ pub unsafe fn compute_probabilities_avx2(amplitudes: &[Complex64], output: &mut 
 }
 
 /// Compute probability distribution using SSE2 (fallback for older CPUs)
+///
+/// # Safety
+/// Requires SSE2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
 pub unsafe fn compute_probabilities_sse2(amplitudes: &[Complex64], output: &mut [f64]) {

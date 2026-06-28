@@ -14,8 +14,6 @@ use simq_core::gate::Gate;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-const EPSILON: f64 = 1e-8;
-
 // Helper: MockGate with matrix
 #[derive(Debug)]
 struct MockGate {

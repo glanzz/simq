@@ -54,6 +54,9 @@ pub fn apply_diagonal_gate_scalar(
 ///
 /// Processes 2 complex numbers (4 f64s) at once.
 /// This is optimal for small stride values where cache locality is critical.
+///
+/// # Safety
+/// Requires SSE2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
 #[inline]
@@ -68,8 +71,8 @@ pub unsafe fn apply_diagonal_gate_sse2(
 
     // Load diagonal elements into SIMD registers
     // Each diagonal element gets duplicated for complex multiplication
-    let diag0 = _mm_set_pd(diagonal[0].im, diagonal[0].re);
-    let diag1 = _mm_set_pd(diagonal[1].im, diagonal[1].re);
+    let _diag0 = _mm_set_pd(diagonal[0].im, diagonal[0].re);
+    let _diag1 = _mm_set_pd(diagonal[1].im, diagonal[1].re);
 
     let state_ptr = state.as_mut_ptr() as *mut f64;
 
@@ -130,6 +133,9 @@ pub unsafe fn apply_diagonal_gate_sse2(
 ///
 /// Processes 4 complex numbers (8 f64s) at once.
 /// Optimal for large stride values where SIMD throughput is more important than cache.
+///
+/// # Safety
+/// Requires AVX2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[inline]

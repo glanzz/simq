@@ -1,8 +1,6 @@
 use ahash::AHashMap;
 use num_complex::Complex64;
-use simq_sim::execution_engine::kernels::controlled::{
-    apply_controlled_gate, apply_multi_controlled,
-};
+use simq_sim::execution_engine::kernels::controlled::apply_controlled_gate;
 use simq_sim::execution_engine::kernels::diagonal::{apply_diagonal_gate, apply_phase_gate};
 use simq_sim::execution_engine::kernels::matrix::{common, GateMatrix, GateMatrixData};
 use simq_sim::execution_engine::kernels::single_qubit::{
@@ -14,7 +12,7 @@ use simq_sim::execution_engine::kernels::sparse::{
 use simq_sim::execution_engine::kernels::two_qubit::{
     apply_cnot, apply_cz, apply_swap, apply_two_qubit_dense,
 };
-use simq_sim::execution_engine::kernels::{Matrix2x2, Matrix4x4};
+use simq_sim::execution_engine::kernels::Matrix4x4;
 
 fn c(re: f64, im: f64) -> Complex64 {
     Complex64::new(re, im)
@@ -158,8 +156,8 @@ fn cnot_ket00_unchanged() {
     let mut state = state_ket0(2);
     apply_cnot(0, 1, &mut state, false, 1024).unwrap();
     assert_close(state[0], one(), 1e-12);
-    for i in 1..4 {
-        assert_close(state[i], zero(), 1e-12);
+    for s in &state[1..4] {
+        assert_close(*s, zero(), 1e-12);
     }
 }
 
