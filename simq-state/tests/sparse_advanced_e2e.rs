@@ -147,16 +147,8 @@ fn test_sparse_dense_sparse_with_gate_application() {
     let sparse2 = dense.to_sparse().unwrap();
 
     assert_eq!(sparse2.num_amplitudes(), 2);
-    assert_relative_eq!(
-        sparse2.get_amplitude(0).re,
-        FRAC_1_SQRT_2,
-        epsilon = 1e-10
-    );
-    assert_relative_eq!(
-        sparse2.get_amplitude(1).re,
-        FRAC_1_SQRT_2,
-        epsilon = 1e-10
-    );
+    assert_relative_eq!(sparse2.get_amplitude(0).re, FRAC_1_SQRT_2, epsilon = 1e-10);
+    assert_relative_eq!(sparse2.get_amplitude(1).re, FRAC_1_SQRT_2, epsilon = 1e-10);
 }
 
 // ============================================================
@@ -177,22 +169,13 @@ fn test_sparse_two_qubit_cnot_bell_state() {
     let zero = Complex64::new(0.0, 0.0);
     let one = Complex64::new(1.0, 0.0);
     let cnot = [
-        one, zero, zero, zero, zero, one, zero, zero, zero, zero, zero, one, zero, zero, one,
-        zero,
+        one, zero, zero, zero, zero, one, zero, zero, zero, zero, zero, one, zero, zero, one, zero,
     ];
     state.apply_two_qubit_gate(&cnot, 0, 1).unwrap();
 
     assert_eq!(state.num_amplitudes(), 2);
-    assert_relative_eq!(
-        state.get_amplitude(0).norm_sqr(),
-        0.5,
-        epsilon = 1e-10
-    );
-    assert_relative_eq!(
-        state.get_amplitude(3).norm_sqr(),
-        0.5,
-        epsilon = 1e-10
-    );
+    assert_relative_eq!(state.get_amplitude(0).norm_sqr(), 0.5, epsilon = 1e-10);
+    assert_relative_eq!(state.get_amplitude(3).norm_sqr(), 0.5, epsilon = 1e-10);
 }
 
 #[test]

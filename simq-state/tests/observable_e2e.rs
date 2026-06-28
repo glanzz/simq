@@ -139,10 +139,7 @@ fn test_observable_scalar_multiplication_via_coeffs() {
     let state = DenseState::new(1).unwrap();
 
     // 3.0 * Z on |0⟩ -> 3.0
-    let obs = PauliObservable::from_pauli_string(
-        PauliString::from_str("Z").unwrap(),
-        3.0,
-    );
+    let obs = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 3.0);
     let ev = obs.expectation_value(&state).unwrap();
     assert_relative_eq!(ev, 3.0, epsilon = 1e-10);
 }
@@ -194,9 +191,7 @@ fn test_observable_empty_gives_zero() {
 #[test]
 fn test_pauli_string_from_paulis_matches_from_str() {
     let from_str = PauliString::from_str("XYZIZ").unwrap();
-    let from_vec = PauliString::from_paulis(vec![
-        Pauli::X, Pauli::Y, Pauli::Z, Pauli::I, Pauli::Z,
-    ]);
+    let from_vec = PauliString::from_paulis(vec![Pauli::X, Pauli::Y, Pauli::Z, Pauli::I, Pauli::Z]);
 
     let state = DenseState::new(5).unwrap();
     let ev1 = from_str.expectation_value(&state).unwrap();

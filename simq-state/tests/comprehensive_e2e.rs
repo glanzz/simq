@@ -22,16 +22,15 @@ fn hadamard_matrix() -> [[Complex64; 2]; 2] {
 fn hadamard_flat() -> [Complex64; 4] {
     let h = FRAC_1_SQRT_2;
     [
-        Complex64::new(h, 0.0), Complex64::new(h, 0.0),
-        Complex64::new(h, 0.0), Complex64::new(-h, 0.0),
+        Complex64::new(h, 0.0),
+        Complex64::new(h, 0.0),
+        Complex64::new(h, 0.0),
+        Complex64::new(-h, 0.0),
     ]
 }
 
 fn pauli_x_matrix() -> [[Complex64; 2]; 2] {
-    [
-        [ZERO, ONE],
-        [ONE, ZERO],
-    ]
+    [[ZERO, ONE], [ONE, ZERO]]
 }
 
 fn pauli_x_flat() -> [Complex64; 4] {
@@ -39,10 +38,7 @@ fn pauli_x_flat() -> [Complex64; 4] {
 }
 
 fn pauli_z_matrix() -> [[Complex64; 2]; 2] {
-    [
-        [ONE, ZERO],
-        [ZERO, Complex64::new(-1.0, 0.0)],
-    ]
+    [[ONE, ZERO], [ZERO, Complex64::new(-1.0, 0.0)]]
 }
 
 fn cnot_matrix() -> [[Complex64; 4]; 4] {
@@ -56,10 +52,7 @@ fn cnot_matrix() -> [[Complex64; 4]; 4] {
 
 fn cnot_flat() -> [Complex64; 16] {
     [
-        ONE, ZERO, ZERO, ZERO,
-        ZERO, ONE, ZERO, ZERO,
-        ZERO, ZERO, ZERO, ONE,
-        ZERO, ZERO, ONE, ZERO,
+        ONE, ZERO, ZERO, ZERO, ZERO, ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ZERO, ZERO, ONE, ZERO,
     ]
 }
 
@@ -93,10 +86,7 @@ fn state_vector_from_amplitudes() {
 
 #[test]
 fn state_vector_norm_and_normalize() {
-    let amps = vec![
-        Complex64::new(1.0, 0.0),
-        Complex64::new(1.0, 0.0),
-    ];
+    let amps = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
     let mut sv = StateVector::from_amplitudes(1, &amps).unwrap();
     assert!((sv.norm() - 2.0_f64.sqrt()).abs() < EPSILON);
     sv.normalize();
@@ -105,10 +95,7 @@ fn state_vector_norm_and_normalize() {
 
 #[test]
 fn state_vector_reset() {
-    let amps = vec![
-        Complex64::new(0.0, 0.0),
-        Complex64::new(1.0, 0.0),
-    ];
+    let amps = vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)];
     let mut sv = StateVector::from_amplitudes(1, &amps).unwrap();
     sv.reset();
     assert!((sv.amplitudes()[0] - ONE).norm() < EPSILON);
@@ -137,7 +124,9 @@ fn state_vector_too_many_qubits() {
 #[test]
 fn dense_state_hadamard() {
     let mut state = DenseState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let amps = state.amplitudes();
     let h = FRAC_1_SQRT_2;
     assert!((amps[0] - Complex64::new(h, 0.0)).norm() < EPSILON);
@@ -165,8 +154,12 @@ fn dense_state_double_x_is_identity() {
 #[test]
 fn dense_state_h_squared_is_identity() {
     let mut state = DenseState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     assert!((state.amplitudes()[0] - ONE).norm() < EPSILON);
     assert!(state.amplitudes()[1].norm() < EPSILON);
 }
@@ -178,7 +171,9 @@ fn dense_state_cnot() {
     assert!((state.amplitudes()[0] - ONE).norm() < EPSILON, "CNOT|00⟩ = |00⟩");
 
     let mut state2 = DenseState::new(2).unwrap();
-    state2.apply_single_qubit_gate(&pauli_x_matrix(), 0).unwrap();
+    state2
+        .apply_single_qubit_gate(&pauli_x_matrix(), 0)
+        .unwrap();
     state2.apply_cnot(0, 1).unwrap();
     assert!((state2.amplitudes()[3] - ONE).norm() < EPSILON, "CNOT|10⟩ = |11⟩");
 }
@@ -195,7 +190,9 @@ fn dense_state_cz() {
 #[test]
 fn dense_state_diagonal_gate() {
     let mut state = DenseState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let z_diag = [ONE, Complex64::new(-1.0, 0.0)];
     state.apply_diagonal_gate(z_diag, 0).unwrap();
     let amps = state.amplitudes();
@@ -215,7 +212,9 @@ fn dense_state_two_qubit_gate() {
 #[test]
 fn dense_state_bell_state() {
     let mut state = DenseState::new(2).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     state.apply_cnot(0, 1).unwrap();
     let h = FRAC_1_SQRT_2;
     assert!((state.amplitudes()[0] - Complex64::new(h, 0.0)).norm() < EPSILON);
@@ -227,7 +226,9 @@ fn dense_state_bell_state() {
 #[test]
 fn dense_state_probabilities() {
     let mut state = DenseState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let p0 = state.get_probability(0).unwrap();
     let p1 = state.get_probability(1).unwrap();
     assert!((p0 - 0.5).abs() < EPSILON);
@@ -275,7 +276,9 @@ fn dense_state_fidelity() {
     assert!((f - 1.0).abs() < EPSILON);
 
     let mut state3 = DenseState::new(1).unwrap();
-    state3.apply_single_qubit_gate(&pauli_x_matrix(), 0).unwrap();
+    state3
+        .apply_single_qubit_gate(&pauli_x_matrix(), 0)
+        .unwrap();
     let f2 = state1.fidelity(&state3).unwrap();
     assert!(f2.abs() < EPSILON);
 }
@@ -291,7 +294,9 @@ fn dense_state_expectation_value() {
 #[test]
 fn dense_state_invalid_qubit() {
     let mut state = DenseState::new(2).unwrap();
-    assert!(state.apply_single_qubit_gate(&hadamard_matrix(), 5).is_err());
+    assert!(state
+        .apply_single_qubit_gate(&hadamard_matrix(), 5)
+        .is_err());
 }
 
 #[test]
@@ -458,14 +463,18 @@ fn adaptive_state_with_threshold() {
 #[test]
 fn adaptive_state_gate_application() {
     let mut state = AdaptiveState::new(2).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     assert!(state.is_normalized(1e-6));
 }
 
 #[test]
 fn adaptive_state_two_qubit_gate() {
     let mut state = AdaptiveState::new(2).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     state.apply_two_qubit_gate(&cnot_matrix(), 0, 1).unwrap();
     assert!(state.is_normalized(1e-6));
 }
@@ -481,7 +490,9 @@ fn adaptive_state_force_dense() {
 #[test]
 fn adaptive_state_measurement() {
     let mut state = AdaptiveState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let p = state.get_probability(0).unwrap();
     assert!((p - 0.5).abs() < 1e-6);
 }
@@ -513,7 +524,9 @@ fn adaptive_state_reset() {
 #[test]
 fn adaptive_state_partial_trace() {
     let mut state = AdaptiveState::new(2).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let reduced = state.partial_trace(&[0]).unwrap();
     assert_eq!(reduced.len(), 4);
 }
@@ -551,7 +564,9 @@ fn cow_state_make_unique() {
 #[test]
 fn cow_state_gate_application() {
     let mut state = CowState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     assert!(state.is_normalized(1e-6));
     let h = FRAC_1_SQRT_2;
     assert!((state.amplitudes()[0] - Complex64::new(h, 0.0)).norm() < 1e-6);
@@ -561,7 +576,9 @@ fn cow_state_gate_application() {
 fn cow_state_copy_on_write_semantics() {
     let state = CowState::new(1).unwrap();
     let mut branch = state.branch();
-    branch.apply_single_qubit_gate(&pauli_x_matrix(), 0).unwrap();
+    branch
+        .apply_single_qubit_gate(&pauli_x_matrix(), 0)
+        .unwrap();
     assert!((state.amplitudes()[0] - ONE).norm() < EPSILON);
     assert!((branch.amplitudes()[1] - ONE).norm() < 1e-6);
 }
@@ -584,7 +601,9 @@ fn cow_state_memory_stats() {
 #[test]
 fn cow_state_probabilities() {
     let mut state = CowState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let p0 = state.get_probability(0).unwrap();
     assert!((p0 - 0.5).abs() < 1e-6);
     let probs = state.get_all_probabilities();
@@ -630,17 +649,17 @@ fn density_matrix_von_neumann_entropy() {
 
     let dm_mixed = DensityMatrix::maximally_mixed(1).unwrap();
     let mixed_entropy = dm_mixed.von_neumann_entropy();
-    assert!(mixed_entropy > 0.0, "Mixed state should have positive entropy: {}", mixed_entropy);
+    assert!(
+        mixed_entropy > 0.0,
+        "Mixed state should have positive entropy: {}",
+        mixed_entropy
+    );
 }
 
 #[test]
 fn density_matrix_apply_unitary() {
     let mut dm = DensityMatrix::new(1).unwrap();
-    let h_flat: Vec<Complex64> = hadamard_matrix()
-        .iter()
-        .flatten()
-        .copied()
-        .collect();
+    let h_flat: Vec<Complex64> = hadamard_matrix().iter().flatten().copied().collect();
     dm.apply_unitary(&h_flat, &[0]).unwrap();
     assert!((dm.purity() - 1.0).abs() < EPSILON);
     assert!((dm.trace() - 1.0).abs() < EPSILON);
@@ -672,14 +691,8 @@ fn density_matrix_partial_trace() {
 fn density_matrix_kraus_channel() {
     let mut dm = DensityMatrix::new(1).unwrap();
     let p: f64 = 0.1;
-    let k0 = vec![
-        ONE, ZERO,
-        ZERO, Complex64::new((1.0 - p).sqrt(), 0.0),
-    ];
-    let k1 = vec![
-        ZERO, Complex64::new(p.sqrt(), 0.0),
-        ZERO, ZERO,
-    ];
+    let k0 = vec![ONE, ZERO, ZERO, Complex64::new((1.0 - p).sqrt(), 0.0)];
+    let k1 = vec![ZERO, Complex64::new(p.sqrt(), 0.0), ZERO, ZERO];
     dm.apply_kraus_channel(&[(k0, 2), (k1, 2)], &[0]).unwrap();
     assert!((dm.trace() - 1.0).abs() < EPSILON);
     assert!(dm.purity() <= 1.0 + EPSILON);
@@ -835,7 +848,9 @@ fn sampling_result_bitstring_counts() {
 #[test]
 fn mid_circuit_measurement() {
     let mut state = DenseState::new(2).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let mcm = MidCircuitMeasurement::new(vec![0]);
     let mut rng_val = 0.3;
     let result = mcm.measure(&mut state, &mut || {
@@ -949,7 +964,9 @@ fn sparse_to_dense_roundtrip() {
 #[test]
 fn dense_sparse_conversion() {
     let mut dense = DenseState::new(2).unwrap();
-    dense.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    dense
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     dense.apply_cnot(0, 1).unwrap();
     let sparse = dense.to_sparse().unwrap();
     let dense2 = DenseState::from_sparse(&sparse).unwrap();
@@ -960,8 +977,10 @@ fn dense_sparse_conversion() {
 #[test]
 fn adaptive_from_amplitudes() {
     let amps = vec![
-        Complex64::new(FRAC_1_SQRT_2, 0.0), ZERO,
-        ZERO, Complex64::new(FRAC_1_SQRT_2, 0.0),
+        Complex64::new(FRAC_1_SQRT_2, 0.0),
+        ZERO,
+        ZERO,
+        Complex64::new(FRAC_1_SQRT_2, 0.0),
     ];
     let state = AdaptiveState::from_amplitudes(2, &amps).unwrap();
     assert!(state.is_normalized(1e-6));
@@ -974,7 +993,9 @@ fn adaptive_from_amplitudes() {
 #[test]
 fn ghz_state_3_qubits() {
     let mut state = DenseState::new(3).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     state.apply_cnot(0, 1).unwrap();
     state.apply_cnot(1, 2).unwrap();
     let h = FRAC_1_SQRT_2;
@@ -988,7 +1009,9 @@ fn ghz_state_3_qubits() {
 #[test]
 fn entanglement_detection_via_partial_trace() {
     let mut state = DenseState::new(2).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     state.apply_cnot(0, 1).unwrap();
     let reduced = state.partial_trace(&[0]).unwrap();
     let mut trace = Complex64::new(0.0, 0.0);
@@ -1014,7 +1037,9 @@ fn product_state_measurement_statistics() {
     let n_trials = 1000;
     for trial in 0..n_trials {
         let mut state = DenseState::new(2).unwrap();
-        state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+        state
+            .apply_single_qubit_gate(&hadamard_matrix(), 0)
+            .unwrap();
         let random = (trial as f64) / (n_trials as f64);
         let outcome = state.measure_all(random).unwrap();
         counts[outcome] += 1;
@@ -1068,7 +1093,9 @@ fn cow_state_multiple_branches() {
 fn stress_many_gates() {
     let mut state = DenseState::new(4).unwrap();
     for i in 0..4 {
-        state.apply_single_qubit_gate(&hadamard_matrix(), i).unwrap();
+        state
+            .apply_single_qubit_gate(&hadamard_matrix(), i)
+            .unwrap();
     }
     assert!(state.is_normalized(EPSILON));
     let probs = state.get_all_probabilities();
@@ -1081,7 +1108,9 @@ fn stress_many_gates() {
 #[test]
 fn stress_repeated_measurement() {
     let mut state = DenseState::new(1).unwrap();
-    state.apply_single_qubit_gate(&hadamard_matrix(), 0).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
     let outcome = state.measure_qubit(0, 0.3).unwrap();
     assert!(state.is_normalized(EPSILON));
     let p = state.get_probability(outcome as usize).unwrap();
@@ -1092,7 +1121,9 @@ fn stress_repeated_measurement() {
 fn stress_adaptive_many_gates() {
     let mut state = AdaptiveState::new(4).unwrap();
     for i in 0..4 {
-        state.apply_single_qubit_gate(&hadamard_matrix(), i).unwrap();
+        state
+            .apply_single_qubit_gate(&hadamard_matrix(), i)
+            .unwrap();
     }
     assert!(state.is_normalized(1e-6));
 }
@@ -1104,7 +1135,9 @@ fn stress_cow_branching() {
     assert_eq!(state.ref_count(), 11);
     for (i, branch) in branches.iter_mut().enumerate() {
         if i % 2 == 0 {
-            branch.apply_single_qubit_gate(&pauli_x_matrix(), 0).unwrap();
+            branch
+                .apply_single_qubit_gate(&pauli_x_matrix(), 0)
+                .unwrap();
         }
     }
 }

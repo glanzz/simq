@@ -68,25 +68,18 @@ fn test_measurement_deterministic_one_state() {
 
 #[test]
 fn test_measurement_conditional_on_rng_value() {
-    let amplitudes = vec![
-        Complex64::new(0.6, 0.0),
-        Complex64::new(0.8, 0.0),
-    ];
+    let amplitudes = vec![Complex64::new(0.6, 0.0), Complex64::new(0.8, 0.0)];
     let mut state0 = DenseState::from_amplitudes(1, &amplitudes).unwrap();
     let mut state1 = DenseState::from_amplitudes(1, &amplitudes).unwrap();
 
     let measurement = ComputationalBasis::new();
 
     // rng < 0.36 -> outcome 0
-    let result0 = measurement
-        .measure_once(&mut state0, &mut || 0.1)
-        .unwrap();
+    let result0 = measurement.measure_once(&mut state0, &mut || 0.1).unwrap();
     assert_eq!(result0.outcome, 0);
 
     // rng > 0.36 -> outcome 1
-    let result1 = measurement
-        .measure_once(&mut state1, &mut || 0.5)
-        .unwrap();
+    let result1 = measurement.measure_once(&mut state1, &mut || 0.5).unwrap();
     assert_eq!(result1.outcome, 1);
 }
 
@@ -112,9 +105,11 @@ fn test_measurement_breaks_bell_entanglement() {
     // After measuring qubit 0, the state should be a product state
     let rho = state.partial_trace(&[0]).unwrap();
     // Should be pure (purity = 1) since entanglement is broken
-    let purity = rho[0].re * rho[0].re + rho[1].norm_sqr() + rho[2].norm_sqr() + rho[3].re * rho[3].re;
+    let purity =
+        rho[0].re * rho[0].re + rho[1].norm_sqr() + rho[2].norm_sqr() + rho[3].re * rho[3].re;
     // Actually trace(rho^2) for 2x2
-    let purity_correct = (rho[0] * rho[0] + rho[1] * rho[2]).re + (rho[2] * rho[1] + rho[3] * rho[3]).re;
+    let purity_correct =
+        (rho[0] * rho[0] + rho[1] * rho[2]).re + (rho[2] * rho[1] + rho[3] * rho[3]).re;
     assert_relative_eq!(purity_correct, 1.0, epsilon = 1e-8);
 
     if measured == 0 {
@@ -259,9 +254,7 @@ fn test_mid_circuit_measure_with_state_returns_clone() {
     state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
 
     let mid = MidCircuitMeasurement::new(vec![0]);
-    let (outcomes, final_state) = mid
-        .measure_with_state(&mut state, &mut || 0.3)
-        .unwrap();
+    let (outcomes, final_state) = mid.measure_with_state(&mut state, &mut || 0.3).unwrap();
 
     assert_eq!(outcomes.len(), 1);
     assert!(final_state.is_normalized(1e-10));

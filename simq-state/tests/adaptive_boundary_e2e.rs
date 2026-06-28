@@ -27,15 +27,11 @@ fn test_adaptive_threshold_exact_boundary() {
     let mut state = AdaptiveState::with_threshold(3, 0.25).unwrap();
     assert!(state.is_sparse());
 
-    state
-        .apply_single_qubit_gate(&hadamard(), 0)
-        .unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
     // 2/8 = 0.25, not exceeding threshold
     assert!(state.is_sparse() || state.is_dense());
 
-    state
-        .apply_single_qubit_gate(&hadamard(), 1)
-        .unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 1).unwrap();
     // 4/8 = 0.5 > 0.25, should convert
     assert!(state.is_dense());
 }
@@ -45,9 +41,7 @@ fn test_adaptive_tiny_threshold_converts_immediately() {
     let mut state = AdaptiveState::with_threshold(4, 0.01).unwrap();
     assert!(state.is_sparse());
 
-    state
-        .apply_single_qubit_gate(&hadamard(), 0)
-        .unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
     // 2/16 = 0.125 > 0.01
     assert!(state.is_dense());
 }
@@ -55,12 +49,8 @@ fn test_adaptive_tiny_threshold_converts_immediately() {
 #[test]
 fn test_adaptive_high_threshold_stays_sparse() {
     let mut state = AdaptiveState::with_threshold(3, 0.99).unwrap();
-    state
-        .apply_single_qubit_gate(&hadamard(), 0)
-        .unwrap();
-    state
-        .apply_single_qubit_gate(&hadamard(), 1)
-        .unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 1).unwrap();
     // Even at 4/8 = 50% density, threshold is 99%
     assert!(state.is_sparse());
 }
@@ -97,9 +87,7 @@ fn test_adaptive_multiple_force_to_dense_idempotent() {
 #[test]
 fn test_adaptive_conversion_preserves_state() {
     let mut state = AdaptiveState::new(3).unwrap();
-    state
-        .apply_single_qubit_gate(&x_gate(), 0)
-        .unwrap();
+    state.apply_single_qubit_gate(&x_gate(), 0).unwrap();
 
     let amps_before = state.to_dense_vec();
     state.force_to_dense().unwrap();
@@ -123,9 +111,7 @@ fn test_adaptive_hadamard_on_zero_triggers_conversion() {
 
     // Apply H to all qubits -> density goes to 1.0
     for q in 0..3 {
-        state
-            .apply_single_qubit_gate(&hadamard(), q)
-            .unwrap();
+        state.apply_single_qubit_gate(&hadamard(), q).unwrap();
     }
 
     assert!(state.is_dense());
@@ -135,9 +121,7 @@ fn test_adaptive_hadamard_on_zero_triggers_conversion() {
 #[test]
 fn test_adaptive_single_hadamard_may_not_convert() {
     let mut state = AdaptiveState::with_threshold(1, 0.5).unwrap();
-    state
-        .apply_single_qubit_gate(&hadamard(), 0)
-        .unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
     // 2/4 = 0.5, exactly at threshold -> should NOT convert (only converts when >)
     // The state could be either sparse or dense depending on implementation
     assert!(state.is_normalized(1e-10));
@@ -152,22 +136,14 @@ fn test_adaptive_gates_correct_after_sparse_to_dense() {
     let mut state = AdaptiveState::new(3).unwrap();
 
     // Apply gates until conversion happens
-    state
-        .apply_single_qubit_gate(&hadamard(), 0)
-        .unwrap();
-    state
-        .apply_single_qubit_gate(&hadamard(), 1)
-        .unwrap();
-    state
-        .apply_single_qubit_gate(&hadamard(), 2)
-        .unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 0).unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 1).unwrap();
+    state.apply_single_qubit_gate(&hadamard(), 2).unwrap();
 
     assert!(state.is_dense());
 
     // Continue applying gates after conversion
-    state
-        .apply_single_qubit_gate(&x_gate(), 0)
-        .unwrap();
+    state.apply_single_qubit_gate(&x_gate(), 0).unwrap();
 
     assert!(state.is_normalized(1e-10));
 
@@ -182,18 +158,14 @@ fn test_adaptive_gates_correct_after_sparse_to_dense() {
 fn test_adaptive_measurement_works_in_both_representations() {
     // Sparse measurement
     let mut sparse_state = AdaptiveState::new(2).unwrap();
-    sparse_state
-        .apply_single_qubit_gate(&x_gate(), 0)
-        .unwrap();
+    sparse_state.apply_single_qubit_gate(&x_gate(), 0).unwrap();
     let outcome = sparse_state.measure_qubit(0, 0.5).unwrap();
     assert_eq!(outcome, 1);
 
     // Dense measurement
     let mut dense_state = AdaptiveState::new(2).unwrap();
     dense_state.force_to_dense().unwrap();
-    dense_state
-        .apply_single_qubit_gate(&x_gate(), 0)
-        .unwrap();
+    dense_state.apply_single_qubit_gate(&x_gate(), 0).unwrap();
     let outcome = dense_state.measure_qubit(0, 0.5).unwrap();
     assert_eq!(outcome, 1);
 }
