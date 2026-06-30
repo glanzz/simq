@@ -665,6 +665,48 @@ mod tests {
 
     const TOL: f64 = 1e-10;
 
+    fn hadamard() -> Vec<Complex64> {
+        let s = 1.0 / 2.0_f64.sqrt();
+        vec![
+            Complex64::new(s, 0.0),
+            Complex64::new(s, 0.0),
+            Complex64::new(s, 0.0),
+            Complex64::new(-s, 0.0),
+        ]
+    }
+
+    fn pauli_x() -> Vec<Complex64> {
+        vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ]
+    }
+
+    /// Identity gate as flat Vec<Complex64> (4 elements for single qubit)
+    fn identity_1q() -> Vec<Complex64> {
+        vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ]
+    }
+
+    /// 4×4 CNOT gate (16 elements, flattened row-major)
+    fn cnot_2q() -> Vec<Complex64> {
+        // |00⟩→|00⟩, |01⟩→|01⟩, |10⟩→|11⟩, |11⟩→|10⟩
+        let z = Complex64::new(0.0, 0.0);
+        let o = Complex64::new(1.0, 0.0);
+        vec![
+            o, z, z, z,
+            z, o, z, z,
+            z, z, z, o,
+            z, z, o, z,
+        ]
+    }
+
     #[test]
     fn test_new_density_matrix() {
         let dm = DensityMatrix::new(2).unwrap();
@@ -690,6 +732,18 @@ mod tests {
     }
 
     #[test]
+    fn test_from_state_vector_dimension_mismatch() {
+        // Provide wrong number of amplitudes for 2 qubits (need 4, give 3)
+        let amplitudes = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let result = DensityMatrix::from_state_vector(2, &amplitudes);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_maximally_mixed() {
         let dm = DensityMatrix::maximally_mixed(2).unwrap();
         assert!((dm.trace() - 1.0).abs() < TOL);
@@ -700,14 +754,59 @@ mod tests {
     }
 
     #[test]
+    fn test_maximally_mixed_1qubit() {
+        let dm = DensityMatrix::maximally_mixed(1).unwrap();
+        assert!((dm.trace() - 1.0).abs() < TOL);
+        assert!((dm.purity() - 0.5).abs() < TOL);
+        assert!((dm.get(0, 0).re - 0.5).abs() < TOL);
+        assert!((dm.get(1, 1).re - 0.5).abs() < TOL);
+    }
+
+    #[test]
+    fn test_get_set() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        // Initial: (0,0)=1, (0,1)=0, (1,0)=0, (1,1)=0
+        assert!((dm.get(0, 0).re - 1.0).abs() < TOL);
+        assert!(dm.get(0, 1).norm() < TOL);
+
+        // Set element
+        dm.set(0, 1, Complex64::new(0.5, 0.1));
+        let v = dm.get(0, 1);
+        assert!((v.re - 0.5).abs() < TOL);
+        assert!((v.im - 0.1).abs() < TOL);
+    }
+
+    #[test]
+    fn test_matrix_accessor() {
+        let dm = DensityMatrix::new(1).unwrap();
+        let mat = dm.matrix();
+        // For 1-qubit |0⟩: matrix is [1, 0, 0, 0]
+        assert_eq!(mat.len(), 4);
+        assert!((mat[0].re - 1.0).abs() < TOL);
+        assert!(mat[1].norm() < TOL);
+    }
+
+    #[test]
+    fn test_matrix_mut_accessor() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        {
+            let mat_mut = dm.matrix_mut();
+            mat_mut[3] = Complex64::new(0.5, 0.0);
+        }
+        assert!((dm.get(1, 1).re - 0.5).abs() < TOL);
+    }
+
+    #[test]
+    fn test_dimension_accessor() {
+        let dm = DensityMatrix::new(3).unwrap();
+        assert_eq!(dm.num_qubits(), 3);
+        assert_eq!(dm.dimension(), 8);
+    }
+
+    #[test]
     fn test_apply_single_qubit_unitary() {
         // Hadamard gate
-        let h = vec![
-            Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
-            Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
-            Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
-            Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
-        ];
+        let h = hadamard();
 
         let mut dm = DensityMatrix::new(1).unwrap();
         dm.apply_single_qubit_unitary(&h, 0).unwrap();
@@ -716,6 +815,132 @@ mod tests {
         assert!((dm.purity() - 1.0).abs() < TOL);
         assert!((dm.get(0, 0).re - 0.5).abs() < TOL);
         assert!((dm.get(1, 1).re - 0.5).abs() < TOL);
+    }
+
+    #[test]
+    fn test_apply_single_qubit_unitary_invalid_qubit() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        let result = dm.apply_single_qubit_unitary(&identity_1q(), 5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_unitary_single_qubit_dispatch() {
+        // Apply Hadamard via the general apply_unitary dispatcher
+        let h = hadamard();
+        let mut dm = DensityMatrix::new(1).unwrap();
+        dm.apply_unitary(&h, &[0]).unwrap();
+        assert!((dm.purity() - 1.0).abs() < TOL);
+        assert!((dm.get(0, 0).re - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_apply_unitary_two_qubit_dispatch() {
+        // Apply CNOT to |10⟩ state → should become |11⟩
+        // |10⟩ in 2-qubit: qubit0=0, qubit1=1, so binary index = 0b10 = 2
+        let amplitudes = vec![
+            Complex64::new(0.0, 0.0), // |00⟩
+            Complex64::new(0.0, 0.0), // |01⟩
+            Complex64::new(1.0, 0.0), // |10⟩
+            Complex64::new(0.0, 0.0), // |11⟩
+        ];
+        let mut dm = DensityMatrix::from_state_vector(2, &amplitudes).unwrap();
+        let cnot = cnot_2q();
+        // Apply CNOT with qubit0=control, qubit1=target
+        dm.apply_unitary(&cnot, &[0, 1]).unwrap();
+        // Should remain a pure state
+        assert!((dm.purity() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_apply_unitary_two_qubit_invalid_qubit() {
+        let mut dm = DensityMatrix::new(2).unwrap();
+        let cnot = cnot_2q();
+        // qubit index 5 is out of bounds for 2-qubit system
+        let result = dm.apply_unitary(&cnot, &[0, 5]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_unitary_general_returns_error() {
+        // General n-qubit (>2) unitary should return an error
+        let mut dm = DensityMatrix::new(3).unwrap();
+        // 8×8 identity (just a placeholder, function returns error immediately)
+        let identity_3q = vec![Complex64::new(1.0, 0.0); 64];
+        let result = dm.apply_unitary(&identity_3q, &[0, 1, 2]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_kraus_channel_bit_flip() {
+        // Bit-flip channel with probability p: K0 = sqrt(1-p)*I, K1 = sqrt(p)*X
+        let p = 0.1_f64;
+        let k0: Vec<Complex64> = vec![
+            Complex64::new((1.0 - p).sqrt(), 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new((1.0 - p).sqrt(), 0.0),
+        ];
+        let k1: Vec<Complex64> = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(p.sqrt(), 0.0),
+            Complex64::new(p.sqrt(), 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+
+        let mut dm = DensityMatrix::new(1).unwrap(); // |0⟩
+        let kraus_ops = vec![(k0, 2usize), (k1, 2usize)];
+        dm.apply_kraus_channel(&kraus_ops, &[0]).unwrap();
+
+        // Trace should still be 1
+        assert!((dm.trace() - 1.0).abs() < 1e-9);
+        // State is now mixed: |0⟩ with prob (1-p), |1⟩ with prob p
+        assert!((dm.get(0, 0).re - (1.0 - p)).abs() < 1e-9);
+        assert!((dm.get(1, 1).re - p).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_apply_kraus_channel_general_error() {
+        // Applying a 2-qubit Kraus op with kraus_dim != 2 should fail
+        let kraus_op = vec![Complex64::new(1.0, 0.0); 16]; // 4×4 matrix
+        let mut dm = DensityMatrix::new(2).unwrap();
+        let kraus_ops = vec![(kraus_op, 4usize)]; // kraus_dim=4, not 2
+        let result = dm.apply_kraus_channel(&kraus_ops, &[0, 1]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_purity_pure_state() {
+        let dm = DensityMatrix::new(2).unwrap();
+        assert!((dm.purity() - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_purity_mixed_state() {
+        let dm = DensityMatrix::maximally_mixed(2).unwrap();
+        assert!((dm.purity() - 0.25).abs() < TOL);
+    }
+
+    #[test]
+    fn test_trace_valid_state() {
+        let dm = DensityMatrix::new(2).unwrap();
+        assert!((dm.trace() - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_von_neumann_entropy_pure_state() {
+        let dm = DensityMatrix::new(1).unwrap();
+        // Pure state → entropy = 0
+        let entropy = dm.von_neumann_entropy();
+        assert!((entropy - 0.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_von_neumann_entropy_mixed_state() {
+        let dm = DensityMatrix::maximally_mixed(1).unwrap();
+        // purity = 0.5, so entropy = -0.5 * log2(0.5) = 0.5
+        let entropy = dm.von_neumann_entropy();
+        assert!(entropy > 0.0); // Mixed state has positive entropy
     }
 
     #[test]
@@ -731,11 +956,154 @@ mod tests {
     }
 
     #[test]
+    fn test_measure_outcome_one() {
+        // Set up |1⟩ state
+        let mut dm = DensityMatrix::new(1).unwrap();
+        dm.set(0, 0, Complex64::new(0.0, 0.0));
+        dm.set(1, 1, Complex64::new(1.0, 0.0));
+
+        // P(0) = 0, so random_value=0.0 >= prob_0=0.0 → outcome = true (1)
+        let outcome = dm.measure(0, 0.0).unwrap();
+        assert!(outcome);
+        assert!((dm.get(1, 1).re - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_measure_invalid_qubit() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        let result = dm.measure(5, 0.5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_measure_superposition() {
+        // Apply Hadamard to get |+⟩ state: P(0) = P(1) = 0.5
+        let h = hadamard();
+        let mut dm = DensityMatrix::new(1).unwrap();
+        dm.apply_unitary(&h, &[0]).unwrap();
+
+        // random_value < prob_0=0.5 → outcome = false (0)
+        let outcome = dm.measure(0, 0.3).unwrap();
+        assert!(!outcome);
+
+        // random_value >= prob_0=0.5 → outcome = true (1) — but prob_0 is now 0 or 1 after measurement
+        // Re-create |+⟩ for second measurement
+        let mut dm2 = DensityMatrix::new(1).unwrap();
+        dm2.apply_unitary(&h, &[0]).unwrap();
+        let outcome2 = dm2.measure(0, 0.7).unwrap();
+        assert!(outcome2); // 0.7 >= 0.5 → outcome 1
+    }
+
+    #[test]
     fn test_is_valid() {
         let dm = DensityMatrix::new(2).unwrap();
         assert!(dm.is_valid(TOL));
 
         let mixed = DensityMatrix::maximally_mixed(2).unwrap();
         assert!(mixed.is_valid(TOL));
+    }
+
+    #[test]
+    fn test_is_valid_invalid_trace() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        // Set trace to 2 (invalid)
+        dm.set(0, 0, Complex64::new(2.0, 0.0));
+        dm.set(1, 1, Complex64::new(0.0, 0.0));
+        assert!(!dm.is_valid(TOL));
+    }
+
+    #[test]
+    fn test_is_valid_non_hermitian() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        // Set off-diagonal to be non-Hermitian: (0,1) != conj((1,0))
+        dm.set(0, 1, Complex64::new(0.3, 0.1));
+        dm.set(1, 0, Complex64::new(0.3, 0.5)); // conj would be (0.3, -0.1)
+        assert!(!dm.is_valid(TOL));
+    }
+
+    #[test]
+    fn test_is_valid_negative_diagonal() {
+        let mut dm = DensityMatrix::new(1).unwrap();
+        // Set a diagonal element negative
+        dm.set(1, 1, Complex64::new(-0.5, 0.0));
+        assert!(!dm.is_valid(TOL));
+    }
+
+    #[test]
+    fn test_partial_trace_2qubit() {
+        // Create Bell state density matrix
+        let s = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(s, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(s, 0.0),
+        ];
+        let dm = DensityMatrix::from_state_vector(2, &amplitudes).unwrap();
+
+        // Trace out qubit 0 → reduced density matrix of qubit 1
+        let reduced = dm.partial_trace(&[0]).unwrap();
+        assert_eq!(reduced.num_qubits(), 1);
+        assert_eq!(reduced.dimension(), 2);
+        // Reduced state should be maximally mixed (I/2)
+        assert!((reduced.trace() - 1.0).abs() < 1e-9);
+        assert!((reduced.purity() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_partial_trace_empty_qubits_error() {
+        let dm = DensityMatrix::new(2).unwrap();
+        let result = dm.partial_trace(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_partial_trace_invalid_qubit_error() {
+        let dm = DensityMatrix::new(2).unwrap();
+        let result = dm.partial_trace(&[5]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_partial_trace_product_state() {
+        // |00⟩ is a product state; trace out qubit 0 → |0⟩ with purity 1
+        let dm = DensityMatrix::new(2).unwrap(); // |00⟩
+        let reduced = dm.partial_trace(&[0]).unwrap();
+        assert!((reduced.purity() - 1.0).abs() < 1e-9);
+        assert!((reduced.trace() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_apply_pauli_x_on_qubit0() {
+        // Apply X gate to |0⟩: should give |1⟩
+        let x = pauli_x();
+        let mut dm = DensityMatrix::new(1).unwrap();
+        dm.apply_unitary(&x, &[0]).unwrap();
+        // Now in |1⟩ state
+        assert!((dm.get(0, 0).re).abs() < TOL);
+        assert!((dm.get(1, 1).re - 1.0).abs() < TOL);
+        assert!((dm.purity() - 1.0).abs() < TOL);
+        assert!((dm.trace() - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_apply_hadamard_twice_returns_to_zero() {
+        // H² = I, so applying H twice returns to |0⟩
+        let h = hadamard();
+        let mut dm = DensityMatrix::new(1).unwrap();
+        dm.apply_unitary(&h, &[0]).unwrap();
+        dm.apply_unitary(&h, &[0]).unwrap();
+        assert!((dm.get(0, 0).re - 1.0).abs() < 1e-9);
+        assert!(dm.get(0, 1).norm() < 1e-9);
+        assert!((dm.purity() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let dm = DensityMatrix::new(2).unwrap();
+        let s = format!("{:?}", dm);
+        assert!(s.contains("DensityMatrix"));
+        assert!(s.contains("qubits: 2"));
+        assert!(s.contains("dim: 4"));
     }
 }

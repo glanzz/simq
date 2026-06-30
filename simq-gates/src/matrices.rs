@@ -548,4 +548,291 @@ mod tests {
             }
         }
     }
+
+    // =========================================================================
+    // Additional matrix constant tests
+    // =========================================================================
+
+    #[test]
+    fn test_hadamard_values() {
+        // H[0][0] = H[0][1] = H[1][0] = 1/√2, H[1][1] = -1/√2
+        let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
+        assert_relative_eq!(HADAMARD[0][0].re, inv_sqrt2, epsilon = 1e-12);
+        assert_relative_eq!(HADAMARD[0][1].re, inv_sqrt2, epsilon = 1e-12);
+        assert_relative_eq!(HADAMARD[1][0].re, inv_sqrt2, epsilon = 1e-12);
+        assert_relative_eq!(HADAMARD[1][1].re, -inv_sqrt2, epsilon = 1e-12);
+        // All imaginary parts are zero
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(HADAMARD[i][j].im, 0.0, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_pauli_matrices_values() {
+        // X = [[0,1],[1,0]]
+        assert_relative_eq!(PAULI_X[0][0].re, 0.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_X[0][1].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_X[1][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_X[1][1].re, 0.0, epsilon = 1e-12);
+
+        // Y = [[0,-i],[i,0]]
+        assert_relative_eq!(PAULI_Y[0][1].im, -1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_Y[1][0].im, 1.0, epsilon = 1e-12);
+
+        // Z = [[1,0],[0,-1]]
+        assert_relative_eq!(PAULI_Z[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_Z[1][1].re, -1.0, epsilon = 1e-12);
+
+        // Identity
+        assert_relative_eq!(IDENTITY[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(IDENTITY[1][1].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(IDENTITY[0][1].re, 0.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_phase_gate_values() {
+        use std::f64::consts::FRAC_1_SQRT_2;
+
+        // S = [[1,0],[0,i]]
+        assert_relative_eq!(S_GATE[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(S_GATE[1][1].im, 1.0, epsilon = 1e-12);
+
+        // S† = [[1,0],[0,-i]]
+        assert_relative_eq!(S_GATE_DAGGER[1][1].im, -1.0, epsilon = 1e-12);
+
+        // T = [[1,0],[0,e^(iπ/4)]]
+        assert_relative_eq!(T_GATE[1][1].re, FRAC_1_SQRT_2, epsilon = 1e-12);
+        assert_relative_eq!(T_GATE[1][1].im, FRAC_1_SQRT_2, epsilon = 1e-12);
+
+        // T† = [[1,0],[0,e^(-iπ/4)]]
+        assert_relative_eq!(T_GATE_DAGGER[1][1].re, FRAC_1_SQRT_2, epsilon = 1e-12);
+        assert_relative_eq!(T_GATE_DAGGER[1][1].im, -FRAC_1_SQRT_2, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_sx_gate_values() {
+        // SX = 1/2 * [[1+i, 1-i],[1-i, 1+i]]
+        assert_relative_eq!(SX_GATE[0][0].re, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE[0][0].im, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE[0][1].re, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE[0][1].im, -0.5, epsilon = 1e-12);
+
+        // SX† should be the adjoint of SX
+        assert_relative_eq!(SX_GATE_DAGGER[0][0].re, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE_DAGGER[0][0].im, -0.5, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_two_qubit_matrices_dimensions() {
+        // All two-qubit matrices are 4x4
+        assert_eq!(CNOT.len(), 4);
+        assert_eq!(CNOT[0].len(), 4);
+        assert_eq!(CZ.len(), 4);
+        assert_eq!(SWAP.len(), 4);
+        assert_eq!(ISWAP.len(), 4);
+        assert_eq!(CY.len(), 4);
+        assert_eq!(ECR.len(), 4);
+    }
+
+    #[test]
+    fn test_three_qubit_matrices_dimensions() {
+        // Both three-qubit matrices are 8x8
+        assert_eq!(TOFFOLI.len(), 8);
+        assert_eq!(TOFFOLI[0].len(), 8);
+        assert_eq!(FREDKIN.len(), 8);
+        assert_eq!(FREDKIN[0].len(), 8);
+    }
+
+    #[test]
+    fn test_toffoli_flips_target() {
+        // TOFFOLI|111⟩ = |110⟩ (flips target=qubit 2 when control1=control0=1)
+        // Ordering: |q0 q1 q2⟩ => index 7 = |111⟩, index 6 = |110⟩
+        // The TOFFOLI matrix swaps rows 6 and 7
+        assert_relative_eq!(TOFFOLI[6][7].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(TOFFOLI[7][6].re, 1.0, epsilon = 1e-12);
+        // Row 7 should map to row 6 (they're swapped)
+        // Everything else is identity
+        for i in 0..6 {
+            assert_relative_eq!(TOFFOLI[i][i].re, 1.0, epsilon = 1e-12);
+        }
+    }
+
+    #[test]
+    fn test_rotation_y_identity() {
+        // RY(0) = I
+        let ry_0 = rotation_y(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(ry_0[i][j].re, IDENTITY[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(ry_0[i][j].im, IDENTITY[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rotation_y_pi() {
+        // RY(π) = [[0, -1],[1, 0]]
+        use std::f64::consts::PI;
+        let ry_pi = rotation_y(PI);
+        assert_relative_eq!(ry_pi[0][0].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(ry_pi[0][1].re, -1.0, epsilon = 1e-10);
+        assert_relative_eq!(ry_pi[1][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(ry_pi[1][1].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_rotation_z_identity() {
+        // RZ(0) = I
+        let rz_0 = rotation_z(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(rz_0[i][j].re, IDENTITY[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rz_0[i][j].im, IDENTITY[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rotation_z_half_pi() {
+        // RZ(π/2): e^(-iπ/4) on [0][0], e^(iπ/4) on [1][1]
+        use std::f64::consts::{PI, FRAC_1_SQRT_2};
+        let rz = rotation_z(PI / 2.0);
+        assert_relative_eq!(rz[0][0].re, FRAC_1_SQRT_2, epsilon = 1e-10);
+        assert_relative_eq!(rz[0][0].im, -FRAC_1_SQRT_2, epsilon = 1e-10);
+        assert_relative_eq!(rz[1][1].re, FRAC_1_SQRT_2, epsilon = 1e-10);
+        assert_relative_eq!(rz[1][1].im, FRAC_1_SQRT_2, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_phase_function() {
+        // P(0) = I
+        let p0 = phase(0.0);
+        assert_relative_eq!(p0[0][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(p0[1][1].re, 1.0, epsilon = 1e-10);
+
+        // P(π) = [[1,0],[0,-1]] = diag(1,-1)
+        use std::f64::consts::PI;
+        let p_pi = phase(PI);
+        assert_relative_eq!(p_pi[1][1].re, -1.0, epsilon = 1e-10);
+        assert_relative_eq!(p_pi[0][0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_u1_equals_phase() {
+        use std::f64::consts::PI;
+        let lam = PI / 3.0;
+        let u1_m = u1(lam);
+        let p_m = phase(lam);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(u1_m[i][j].re, p_m[i][j].re, epsilon = 1e-12);
+                assert_relative_eq!(u1_m[i][j].im, p_m[i][j].im, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_u2_normalization() {
+        // U2 should be unitary: U·U† = I
+        use std::f64::consts::PI;
+        let u = u2(PI / 4.0, PI / 3.0);
+        let mut product = [[ZERO; 2]; 2];
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    product[i][j] += u[i][k] * u[j][k].conj();
+                }
+            }
+        }
+        assert_relative_eq!(product[0][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(product[1][1].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(product[0][1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(product[1][0].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_u3_normalization() {
+        use std::f64::consts::PI;
+        let u = u3(PI / 4.0, PI / 3.0, PI / 6.0);
+        let mut product = [[ZERO; 2]; 2];
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    product[i][j] += u[i][k] * u[j][k].conj();
+                }
+            }
+        }
+        assert_relative_eq!(product[0][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(product[1][1].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_controlled_phase_structure() {
+        use std::f64::consts::PI;
+        let cp = controlled_phase(PI / 2.0);
+        // CP is 4x4: identity on top-left 3x3, e^(iθ) at [3][3]
+        assert_relative_eq!(cp[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(cp[1][1].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(cp[2][2].re, 1.0, epsilon = 1e-12);
+        // cp[3][3] = e^(iπ/2) = i
+        assert_relative_eq!(cp[3][3].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(cp[3][3].im, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_rxx_unitarity() {
+        use std::f64::consts::PI;
+        let m = rxx(PI / 4.0);
+        // Check unitarity: M·M† = I
+        let mut product = [[ZERO; 4]; 4];
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..4 {
+                    product[i][j] += m[i][k] * m[j][k].conj();
+                }
+            }
+        }
+        for i in 0..4 {
+            assert_relative_eq!(product[i][i].re, 1.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_ryy_unitarity() {
+        use std::f64::consts::PI;
+        let m = ryy(PI / 4.0);
+        let mut product = [[ZERO; 4]; 4];
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..4 {
+                    product[i][j] += m[i][k] * m[j][k].conj();
+                }
+            }
+        }
+        for i in 0..4 {
+            assert_relative_eq!(product[i][i].re, 1.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_rzz_structure() {
+        // RZZ: diagonal matrix with e^(-iθ/2) and e^(iθ/2) alternating
+        use std::f64::consts::PI;
+        let m = rzz(PI / 2.0);
+        // Off-diagonals should all be zero
+        for i in 0..4 {
+            for j in 0..4 {
+                if i != j {
+                    assert_relative_eq!(m[i][j].re, 0.0, epsilon = 1e-12);
+                    assert_relative_eq!(m[i][j].im, 0.0, epsilon = 1e-12);
+                }
+            }
+        }
+        // Diagonal elements should have unit norm
+        for i in 0..4 {
+            assert_relative_eq!(m[i][i].norm_sqr(), 1.0, epsilon = 1e-10);
+        }
+    }
 }

@@ -447,4 +447,143 @@ mod tests {
         let result = apply_cnot(0, 0, &mut state, false, usize::MAX);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_cnot_parallel() {
+        // |10⟩ → |11⟩ with parallel execution enabled
+        let mut state = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_cnot(0, 1, &mut state, true, 0).unwrap(); // threshold=0 forces parallel
+        assert_abs_diff_eq!(state[3].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[2].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_cz_parallel() {
+        // |11⟩ → -|11⟩ with parallel execution
+        let mut state = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ];
+        apply_cz(0, 1, &mut state, true, 0).unwrap(); // threshold=0 forces parallel
+        assert_abs_diff_eq!(state[3].re, -1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_swap_parallel() {
+        // |10⟩ → |01⟩ with parallel execution
+        let mut state = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_swap(0, 1, &mut state, true, 0).unwrap();
+        assert_abs_diff_eq!(state[1].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[2].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_swap_same_qubit_is_identity() {
+        // SWAP(i, i) is identity
+        let mut state = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ];
+        apply_swap(0, 0, &mut state, false, usize::MAX).unwrap();
+        assert_abs_diff_eq!(state[1].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_dense_identity() {
+        // Identity 4x4 gate should leave state unchanged
+        let identity: Matrix4x4 = [
+            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+        ];
+        let mut state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_two_qubit_dense(&identity, 0, 1, &mut state, false, usize::MAX).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_dense_parallel() {
+        let identity: Matrix4x4 = [
+            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+        ];
+        let mut state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_two_qubit_dense(&identity, 0, 1, &mut state, true, 0).unwrap(); // threshold=0 forces parallel
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_dense_invalid_qubit() {
+        let identity: Matrix4x4 = [
+            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+        ];
+        let mut state = vec![Complex64::new(1.0, 0.0); 4];
+        // qubit1 out of bounds
+        assert!(apply_two_qubit_dense(&identity, 5, 1, &mut state, false, usize::MAX).is_err());
+        // qubit2 out of bounds
+        assert!(apply_two_qubit_dense(&identity, 0, 5, &mut state, false, usize::MAX).is_err());
+        // same qubit
+        assert!(apply_two_qubit_dense(&identity, 0, 0, &mut state, false, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn test_cz_invalid_qubits() {
+        let mut state = vec![Complex64::new(1.0, 0.0); 4];
+        assert!(apply_cz(5, 1, &mut state, false, usize::MAX).is_err());
+        assert!(apply_cz(0, 0, &mut state, false, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn test_swap_invalid_qubit() {
+        let mut state = vec![Complex64::new(1.0, 0.0); 4];
+        assert!(apply_swap(5, 1, &mut state, false, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn test_apply_two_qubit_qubit2_less_than_qubit1() {
+        // Apply with qubit2 < qubit1 to test (q_min, q_max) order
+        let identity: Matrix4x4 = [
+            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
+            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+        ];
+        let mut state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        // qubit2=0, qubit1=1 (reversed order)
+        apply_two_qubit_dense(&identity, 1, 0, &mut state, false, usize::MAX).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+    }
 }

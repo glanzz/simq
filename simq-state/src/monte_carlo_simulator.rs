@@ -414,4 +414,130 @@ mod tests {
         sim.reset_to_initial().unwrap();
         assert_eq!(sim.stats().gate_count, 0);
     }
+
+    // ---- New coverage tests ----
+
+    #[test]
+    fn test_config_without_seed() {
+        // MonteCarloConfig::new() without with_seed — constructs from entropy
+        let config = MonteCarloConfig::new();
+        assert!(config.seed.is_none());
+        assert_eq!(config.trajectories, 1000);
+        // Simulator creation should succeed
+        let sim = MonteCarloSimulator::new(2, config).unwrap();
+        assert_eq!(sim.num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_config_with_shots_per_trajectory() {
+        let config = MonteCarloConfig::new().with_shots_per_trajectory(5);
+        assert_eq!(config.shots_per_trajectory, 5);
+    }
+
+    #[test]
+    fn test_apply_gate_wrong_qubit_count_returns_error() {
+        // Passing a 2-element qubits array to apply_gate (which only supports 1) → Err
+        let config = MonteCarloConfig::new().with_seed(42);
+        let mut sim = MonteCarloSimulator::new(2, config).unwrap();
+
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+
+        let result = sim.apply_gate(&h, &[0, 1]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::InvalidDimension { dimension } => assert_eq!(dimension, 2),
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_noise_ops_increments_each_call() {
+        let config = MonteCarloConfig::new().with_seed(99);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        let noise = DepolarizingMC::from_probability(0.1).unwrap();
+        sim.apply_stochastic_noise(&noise, 0).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+        sim.apply_stochastic_noise(&noise, 0).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 2);
+    }
+
+    #[test]
+    fn test_measure_all_returns_num_qubits_results() {
+        // Hadamard-prepared state: measure_all length == num_qubits
+        let config = MonteCarloConfig::new().with_seed(42);
+        let mut sim = MonteCarloSimulator::new(3, config).unwrap();
+
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+        sim.apply_gate(&h, &[0]).unwrap();
+        let results = sim.measure_all().unwrap();
+        assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn test_stats_trajectory_count() {
+        let config = MonteCarloConfig::new().with_seed(42).with_trajectories(500);
+        let sim = MonteCarloSimulator::new(2, config).unwrap();
+        let stats = sim.stats();
+        assert_eq!(stats.total_trajectories, 500);
+        assert_eq!(stats.current_trajectory, 0);
+    }
+
+    #[test]
+    fn test_reset_preserves_initial_state() {
+        // reset_to_initial restores state across multiple calls
+        let config = MonteCarloConfig::new().with_seed(42);
+        let mut sim = MonteCarloSimulator::new(2, config).unwrap();
+
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+        sim.apply_gate(&h, &[0]).unwrap();
+        sim.apply_gate(&h, &[1]).unwrap();
+        assert_eq!(sim.stats().gate_count, 2);
+
+        sim.reset_to_initial().unwrap();
+        assert_eq!(sim.stats().gate_count, 0);
+        assert_eq!(sim.stats().noise_ops_applied, 0);
+
+        // Second reset after no changes — still OK
+        sim.reset_to_initial().unwrap();
+        assert_eq!(sim.stats().gate_count, 0);
+    }
+
+    #[test]
+    fn test_amplitude_damping_mc_noise_increments_counter() {
+        use simq_core::noise::AmplitudeDampingMC;
+        let config = MonteCarloConfig::new().with_seed(7);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        let noise = AmplitudeDampingMC::from_gamma(0.1).unwrap();
+        sim.apply_stochastic_noise(&noise, 0).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+    }
 }

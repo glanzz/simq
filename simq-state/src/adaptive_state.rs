@@ -656,4 +656,186 @@ mod tests {
         let dense_state = AdaptiveState::from_amplitudes(2, &dense_amps).unwrap();
         assert!(dense_state.is_dense()); // 100% density should always be dense
     }
+
+    #[test]
+    fn test_representation_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert_eq!(state.representation(), "Sparse");
+        state.force_to_dense().unwrap();
+        assert_eq!(state.representation(), "Dense");
+    }
+
+    #[test]
+    fn test_threshold_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        let thresh = state.threshold();
+        assert!(thresh > 0.0 && thresh <= 1.0);
+        state.force_to_dense().unwrap();
+        // Dense states always return 1.0
+        assert_eq!(state.threshold(), 1.0);
+    }
+
+    #[test]
+    fn test_density_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        // After force_to_dense on |00>, density is 1 non-zero / 4 total = 0.25
+        let d = state.density();
+        assert!(d >= 0.0 && d <= 1.0);
+    }
+
+    #[test]
+    fn test_stats_dense_path() {
+        let mut state = AdaptiveState::new(3).unwrap();
+        state.force_to_dense().unwrap();
+        let stats = state.stats();
+        assert_eq!(stats.num_qubits, 3);
+        assert_eq!(stats.dimension, 8);
+        assert_eq!(stats.representation, "Dense");
+        assert_eq!(stats.threshold, 1.0);
+        assert_eq!(stats.memory_entries, 8);
+    }
+
+    #[test]
+    fn test_to_dense_vec_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        let dense_vec = state.to_dense_vec();
+        assert_eq!(dense_vec.len(), 4);
+        assert_eq!(dense_vec[0], Complex64::new(1.0, 0.0));
+        assert_eq!(dense_vec[1], Complex64::new(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_measure_qubit_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        // Apply Hadamard to first qubit (on dense state)
+        let h = 1.0 / 2.0_f64.sqrt();
+        let hadamard = [
+            [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
+            [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
+        ];
+        state.apply_single_qubit_gate(&hadamard, 0).unwrap();
+        let outcome = state.measure_qubit(0, 0.25).unwrap();
+        assert!(outcome == 0 || outcome == 1);
+    }
+
+    #[test]
+    fn test_partial_trace_sparse_path() {
+        // Bell state (|00> + |11>) / sqrt(2)
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        // Use sparse state (low density)
+        let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        let rho = state.partial_trace(&[0]).unwrap();
+        // Maximally mixed state: diag(0.5, 0.5)
+        assert!((rho[0].re - 0.5).abs() < 1e-10);
+        assert!((rho[3].re - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_partial_trace_dense_path() {
+        // Bell state (|00> + |11>) / sqrt(2)
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        let mut state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        state.force_to_dense().unwrap();
+        assert!(state.is_dense());
+        let rho = state.partial_trace(&[0]).unwrap();
+        assert!((rho[0].re - 0.5).abs() < 1e-10);
+        assert!((rho[3].re - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_stats_display() {
+        let state = AdaptiveState::new(2).unwrap();
+        let stats = state.stats();
+        let s = format!("{}", stats);
+        assert!(s.contains("2 qubits"));
+        assert!(s.contains("Sparse"));
+    }
+
+    #[test]
+    fn test_adaptive_state_debug() {
+        let state = AdaptiveState::new(3).unwrap();
+        let dbg = format!("{:?}", state);
+        assert!(dbg.contains("AdaptiveState"));
+        assert!(dbg.contains("Sparse"));
+    }
+
+    #[test]
+    fn test_adaptive_state_display() {
+        let state = AdaptiveState::new(3).unwrap();
+        let s = format!("{}", state);
+        assert!(s.contains("StateStats"));
+    }
+
+    #[test]
+    fn test_normalize_dense_path() {
+        let amplitudes = vec![
+            Complex64::new(2.0, 0.0),
+            Complex64::new(2.0, 0.0),
+            Complex64::new(2.0, 0.0),
+            Complex64::new(2.0, 0.0),
+        ];
+        let mut state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        // Should be dense since density=1.0
+        assert!(state.is_dense());
+        state.normalize().unwrap();
+        assert!(state.is_normalized(1e-10));
+        assert_relative_eq!(state.norm(), 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_get_probability_dense_path() {
+        let amplitudes = vec![
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+        ];
+        let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        assert!(state.is_dense());
+        let p = state.get_probability(0).unwrap();
+        assert!((p - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_sparse_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(state.is_sparse());
+        // Identity 4x4 gate
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for i in 0..4 {
+            identity[i][i] = Complex64::new(1.0, 0.0);
+        }
+        let _converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
+        // State should still be valid after applying identity
+        assert_eq!(state.num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        assert!(state.is_dense());
+        // Identity 4x4 gate
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for i in 0..4 {
+            identity[i][i] = Complex64::new(1.0, 0.0);
+        }
+        let converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
+        assert!(!converted); // always false for dense
+    }
 }

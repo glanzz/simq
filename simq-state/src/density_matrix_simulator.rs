@@ -335,4 +335,195 @@ mod tests {
         assert_eq!(stats.gate_count, 1);
         assert_eq!(stats.noise_ops_applied, 0);
     }
+
+    // ---- New coverage tests ----
+
+    fn hadamard_flat() -> Vec<Complex64> {
+        let h = 1.0 / 2.0_f64.sqrt();
+        vec![
+            Complex64::new(h, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(-h, 0.0),
+        ]
+    }
+
+    #[test]
+    fn test_config_without_seed() {
+        // Constructor without seed — uses entropy
+        let config = DensityMatrixConfig::new();
+        assert!(config.seed.is_none());
+        let sim = DensityMatrixSimulator::new(2, config).unwrap();
+        assert_eq!(sim.num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_config_with_shots() {
+        let config = DensityMatrixConfig::new().with_shots(50);
+        assert_eq!(config.shots, 50);
+    }
+
+    #[test]
+    fn test_apply_kraus_channel_increments_noise_ops() {
+        let config = DensityMatrixConfig::new().with_seed(42);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+
+        // Depolarizing Kraus channel: identity Kraus op scaled by sqrt(1)
+        // Just use a single identity Kraus operator — trivial but valid channel
+        let identity_kraus: Vec<Complex64> = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ];
+        let kraus_ops = vec![(identity_kraus, 2usize)];
+        sim.apply_kraus_channel(&kraus_ops, &[0]).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+    }
+
+    #[test]
+    fn test_purity_decreases_after_depolarizing_kraus() {
+        // Depolarizing Kraus channel lowers purity below 1.0
+        let config = DensityMatrixConfig::new().with_seed(42);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+
+        // Apply Hadamard to get pure |+⟩ state (purity = 1.0)
+        sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
+        let purity_before = sim.purity();
+        assert!((purity_before - 1.0).abs() < 1e-10);
+
+        // Apply a depolarizing Kraus channel: { sqrt(1-p)*I, sqrt(p/3)*X, sqrt(p/3)*Y, sqrt(p/3)*Z }
+        let p = 0.3_f64;
+        let a = ((1.0 - p)).sqrt();
+        let b = (p / 3.0).sqrt();
+
+        let zero = Complex64::new(0.0, 0.0);
+        let k0: Vec<Complex64> = vec![
+            Complex64::new(a, 0.0), zero,
+            zero, Complex64::new(a, 0.0),
+        ];
+        let k1: Vec<Complex64> = vec![
+            zero, Complex64::new(b, 0.0),
+            Complex64::new(b, 0.0), zero,
+        ]; // b*X
+        let k2: Vec<Complex64> = vec![
+            zero, Complex64::new(0.0, -b),
+            Complex64::new(0.0, b), zero,
+        ]; // b*Y
+        let k3: Vec<Complex64> = vec![
+            Complex64::new(b, 0.0), zero,
+            zero, Complex64::new(-b, 0.0),
+        ]; // b*Z
+
+        let kraus_ops = vec![(k0, 2usize), (k1, 2usize), (k2, 2usize), (k3, 2usize)];
+        sim.apply_kraus_channel(&kraus_ops, &[0]).unwrap();
+
+        let purity_after = sim.purity();
+        assert!(purity_after < 1.0, "purity should decrease after noise, got {purity_after}");
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+    }
+
+    #[test]
+    fn test_entropy_positive_after_depolarizing_kraus() {
+        let config = DensityMatrixConfig::new().with_seed(42);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+        sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
+
+        let p = 0.3_f64;
+        let a = ((1.0 - p)).sqrt();
+        let b = (p / 3.0).sqrt();
+        let zero = Complex64::new(0.0, 0.0);
+
+        let k0: Vec<Complex64> = vec![
+            Complex64::new(a, 0.0), zero,
+            zero, Complex64::new(a, 0.0),
+        ];
+        let k1: Vec<Complex64> = vec![
+            zero, Complex64::new(b, 0.0),
+            Complex64::new(b, 0.0), zero,
+        ];
+        let k2: Vec<Complex64> = vec![
+            zero, Complex64::new(0.0, -b),
+            Complex64::new(0.0, b), zero,
+        ];
+        let k3: Vec<Complex64> = vec![
+            Complex64::new(b, 0.0), zero,
+            zero, Complex64::new(-b, 0.0),
+        ];
+
+        let kraus_ops = vec![(k0, 2usize), (k1, 2usize), (k2, 2usize), (k3, 2usize)];
+        sim.apply_kraus_channel(&kraus_ops, &[0]).unwrap();
+
+        let entropy = sim.entropy();
+        assert!(entropy > 0.0, "entropy should be positive for mixed state, got {entropy}");
+    }
+
+    #[test]
+    fn test_measure_all_2qubit() {
+        let config = DensityMatrixConfig::new().with_seed(42);
+        let mut sim = DensityMatrixSimulator::new(2, config).unwrap();
+
+        let results = sim.measure_all().unwrap();
+        assert_eq!(results.len(), 2);
+        // |00⟩ state → both outcomes must be false
+        assert!(!results[0]);
+        assert!(!results[1]);
+    }
+
+    #[test]
+    fn test_measure_all_shots_pure_zero_state() {
+        let config = DensityMatrixConfig::new().with_seed(42).with_shots(10);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+
+        let all_shots = sim.measure_all_shots().unwrap();
+        assert_eq!(all_shots.len(), 10);
+        for shot in &all_shots {
+            assert_eq!(shot.len(), 1);
+            // |0⟩ state always measures 0
+            assert!(!shot[0]);
+        }
+    }
+
+    #[test]
+    fn test_partial_trace_2qubit() {
+        // Apply H on qubit 0, then partial_trace out qubit 0 → 1-qubit reduced simulator
+        let config = DensityMatrixConfig::new().with_seed(42);
+        let mut sim = DensityMatrixSimulator::new(2, config).unwrap();
+        sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
+
+        let reduced = sim.partial_trace(&[0]).unwrap();
+        assert_eq!(reduced.num_qubits(), 1);
+    }
+
+    #[test]
+    fn test_reset_clears_counts() {
+        let config = DensityMatrixConfig::new().with_seed(42);
+        let mut sim = DensityMatrixSimulator::new(2, config).unwrap();
+
+        sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
+        let identity_kraus: Vec<Complex64> = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ];
+        sim.apply_kraus_channel(&vec![(identity_kraus, 2usize)], &[0]).unwrap();
+
+        assert_eq!(sim.stats().gate_count, 1);
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+
+        sim.reset().unwrap();
+        assert_eq!(sim.stats().gate_count, 0);
+        assert_eq!(sim.stats().noise_ops_applied, 0);
+        assert!((sim.purity() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_with_validation_valid_gate_succeeds() {
+        let config = DensityMatrixConfig::new().with_seed(42).with_validation(true);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+        // Valid Hadamard gate — should not trigger validation error
+        sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
+        assert!((sim.purity() - 1.0).abs() < 1e-10);
+    }
 }

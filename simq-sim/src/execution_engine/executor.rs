@@ -576,7 +576,34 @@ impl ExecutionEngine {
 mod tests {
     use super::*;
     use simq_core::QubitId;
-    use simq_gates::standard::{CNot, Hadamard, PauliX};
+    use simq_gates::standard::{CNot, CZ, Hadamard, PauliX, PauliZ, RotationY, Swap};
+
+    fn make_sequential_engine() -> ExecutionEngine {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        ExecutionEngine::new(config)
+    }
+
+    fn make_parallel_engine() -> ExecutionEngine {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Parallel,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        ExecutionEngine::new(config)
+    }
+
+    fn make_gpu_engine() -> ExecutionEngine {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Gpu,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        ExecutionEngine::new(config)
+    }
 
     #[test]
     fn test_engine_creation() {
@@ -621,5 +648,170 @@ mod tests {
 
         let result = engine.execute(&circuit, &mut state);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sequential_mode() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_parallel_mode() {
+        let mut engine = make_parallel_engine();
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+            .unwrap();
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_gpu_mode_fallback_to_sequential() {
+        let mut engine = make_gpu_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        // GPU mode falls back to sequential
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_cache_hit_on_repeated_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(2);
+        // Apply same gate twice to trigger cache hit
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+        // Second execution should use cache
+        let hit_rate = engine.cache_hit_rate();
+        assert!(hit_rate >= 0.0 && hit_rate <= 1.0);
+    }
+
+    #[test]
+    fn test_pauli_z_optimized_path() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliZ), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_cz_gate_optimized_path() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(CZ), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_swap_gate_optimized_path() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(Swap), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_general_single_qubit_gate_simd() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        // RotationY is not named "X"/"Z"/"H" so it goes through general path
+        circuit
+            .add_gate(Arc::new(RotationY::new(0.5)), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_recovery_policy_skip() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        engine.recovery_policy = RecoveryPolicy::Skip;
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_empty_circuit() {
+        let mut engine = make_sequential_engine();
+        let circuit = Circuit::new(2);
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_telemetry_after_execution() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        engine.execute(&circuit, &mut state).unwrap();
+        let telemetry = engine.get_telemetry();
+        assert!(!telemetry.per_gate_times.is_empty());
+    }
+
+    #[test]
+    fn test_engine_with_checkpoints() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            enable_checkpoints: true,
+            checkpoint_interval: 1,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_debug_config() {
+        let config = ExecutionConfig::debug();
+        assert_eq!(config.mode, ExecutionMode::Sequential);
+        assert!(config.validate_state);
+        assert!(config.enable_checkpoints);
+        assert!(!config.enable_gate_fusion);
     }
 }

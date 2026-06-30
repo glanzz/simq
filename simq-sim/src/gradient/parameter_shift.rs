@@ -366,4 +366,123 @@ mod tests {
         assert_eq!(result.len(), 0);
         assert_eq!(result.num_evaluations, 0);
     }
+
+    #[test]
+    fn test_sequential_parameter_shift() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let params = vec![0.5];
+        let config = ParameterShiftConfig { parallel: false, ..Default::default() };
+        let result = compute_gradient_parameter_shift(
+            &simulator, circuit_builder, &observable, &params, &config,
+        ).unwrap();
+        assert_eq!(result.gradients.len(), 1);
+        assert!(result.gradients[0].is_finite());
+    }
+
+    #[test]
+    fn test_parameter_shift_general_shift() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        // Use non-pi/2 shift to test general formula
+        let config = ParameterShiftConfig {
+            shift: 0.3, // non-pi/2 shift
+            parallel: true,
+            batch_size: 0,
+        };
+        let params = vec![0.5];
+        let result = compute_gradient_parameter_shift(
+            &simulator, circuit_builder, &observable, &params, &config,
+        ).unwrap();
+        assert_eq!(result.gradients.len(), 1);
+        assert!(result.gradients[0].is_finite());
+    }
+
+    #[test]
+    fn test_batch_parameter_shift_parallel() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observables = vec![
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0),
+        ];
+        let params = vec![0.5];
+        let config = ParameterShiftConfig::default();
+        let results = batch_parameter_shift(
+            &simulator, circuit_builder, &observables, &params, &config,
+        ).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].gradients.len(), 1);
+    }
+
+    #[test]
+    fn test_batch_parameter_shift_sequential() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observables = vec![
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0),
+        ];
+        let params = vec![0.5];
+        let config = ParameterShiftConfig { parallel: false, ..Default::default() };
+        let results = batch_parameter_shift(
+            &simulator, circuit_builder, &observables, &params, &config,
+        ).unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_parameter_shift_general_function() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let params = vec![0.5];
+        let config = ParameterShiftConfig::default();
+        let result = parameter_shift_general(
+            &simulator, circuit_builder, &observable, &params, 1.0, &config,
+        ).unwrap();
+        assert_eq!(result.gradients.len(), 1);
+        assert!(result.gradients[0].is_finite());
+    }
+
+    #[test]
+    fn test_parameter_shift_config_default() {
+        let config = ParameterShiftConfig::default();
+        assert!((config.shift - std::f64::consts::FRAC_PI_2).abs() < 1e-10);
+        assert!(config.parallel);
+        assert_eq!(config.batch_size, 0);
+    }
 }

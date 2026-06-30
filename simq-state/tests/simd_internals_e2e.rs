@@ -513,3 +513,192 @@ fn test_simd_cnot_chain_ghz_5_qubits() {
         assert_relative_eq!(s.norm(), 0.0, epsilon = 1e-10);
     }
 }
+
+// ============================================================
+// New coverage tests for simd.rs public API
+// ============================================================
+
+#[test]
+fn test_apply_single_qubit_gate_hadamard_2qubit() {
+    // Apply Hadamard on qubit 0 of 2-qubit |00⟩ state
+    // In the simq convention, qubit 0 is the LSB of the index.
+    // H on qubit 0 maps |00⟩ → (|00⟩ + |01⟩)/√2 — indices 0 and 1 get amplitude FRAC_1_SQRT_2
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits); // |00⟩
+    simd::apply_single_qubit_gate(&mut state, &hadamard(), 0, num_qubits);
+
+    assert_relative_eq!(state[0].re, FRAC_1_SQRT_2, epsilon = 1e-12);
+    assert_relative_eq!(state[1].re, FRAC_1_SQRT_2, epsilon = 1e-12);
+    assert_relative_eq!(state[2].norm(), 0.0, epsilon = 1e-12);
+    assert_relative_eq!(state[3].norm(), 0.0, epsilon = 1e-12);
+}
+
+#[test]
+fn test_apply_two_qubit_gate_identity_unchanged() {
+    // Apply 4×4 identity on qubits 0,1 of 2-qubit state — state unchanged
+    let num_qubits = 2;
+    let zero = Complex64::new(0.0, 0.0);
+    let one = Complex64::new(1.0, 0.0);
+    let identity4: [[Complex64; 4]; 4] = [
+        [one, zero, zero, zero],
+        [zero, one, zero, zero],
+        [zero, zero, one, zero],
+        [zero, zero, zero, one],
+    ];
+
+    let original = make_plus_state(num_qubits);
+    let mut state = original.clone();
+    simd::apply_two_qubit_gate(&mut state, &identity4, 0, 1, num_qubits);
+
+    for i in 0..state.len() {
+        assert_relative_eq!(state[i].re, original[i].re, epsilon = 1e-12);
+        assert_relative_eq!(state[i].im, original[i].im, epsilon = 1e-12);
+    }
+}
+
+#[test]
+fn test_norm_simd_known_vector() {
+    // Known normalized vector — norm should be ≈ 1.0
+    let state = make_plus_state(2); // [0.5, 0.5, 0.5, 0.5]
+    let norm = simd::norm_simd(&state);
+    assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
+}
+
+#[test]
+fn test_normalize_simd_makes_unit_norm() {
+    // Start with non-unit vector, normalize, check norm = 1
+    let mut state = vec![
+        Complex64::new(3.0, 0.0),
+        Complex64::new(4.0, 0.0),
+    ];
+    simd::normalize_simd(&mut state);
+    let norm = state.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
+    assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
+}
+
+#[test]
+fn test_normalize_simd_zero_vector_left_unchanged() {
+    // Zero vector (norm < 1e-10) — normalize_simd should leave it unchanged
+    let mut state = vec![
+        Complex64::new(0.0, 0.0),
+        Complex64::new(0.0, 0.0),
+    ];
+    simd::normalize_simd(&mut state);
+    assert_relative_eq!(state[0].norm(), 0.0, epsilon = 1e-12);
+    assert_relative_eq!(state[1].norm(), 0.0, epsilon = 1e-12);
+}
+
+#[test]
+fn test_apply_cnot_10_becomes_11() {
+    // CNOT(control=0, target=1) on |10⟩ (index 2 in 2-qubit basis) → |11⟩ (index 3)
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits);
+    // Build |10⟩: qubit 0 is LSB, qubit 1 is next bit
+    // Index 2 = binary 10 → qubit1=1, qubit0=0
+    // We want control=0 (qubit0) to be |1⟩ → use index where bit0=1 → index 1 or 3
+    // Let's use the standard: apply X on qubit 0 to get |10⟩ in the qubit-ordering sense
+    // In simq convention: index bit k = (index >> k) & 1
+    // |10⟩ means qubit1=1, qubit0=0 → index = 2
+    // CNOT(control=1, target=0): flip qubit0 when qubit1=1
+    state[0] = Complex64::new(0.0, 0.0);
+    state[2] = Complex64::new(1.0, 0.0); // |10⟩
+    simd::apply_cnot(&mut state, 1, 0, num_qubits);
+    // After CNOT(ctrl=1,tgt=0) on |10⟩ → |11⟩ (index 3)
+    assert_relative_eq!(state[3].re, 1.0, epsilon = 1e-12);
+    assert_relative_eq!(state[2].norm(), 0.0, epsilon = 1e-12);
+}
+
+#[test]
+fn test_apply_cz_negates_11_amplitude() {
+    // CZ(0,1) on equal superposition: |11⟩ component (index 3) gets phase -1
+    let num_qubits = 2;
+    let mut state = make_plus_state(num_qubits);
+    let amp_before_3 = state[3]; // |11⟩ amplitude = 0.5
+    let amp_before_0 = state[0]; // |00⟩ amplitude = 0.5
+    simd::apply_cz(&mut state, 0, 1, num_qubits);
+    // |11⟩ (index 3) amplitude should be negated
+    assert_relative_eq!(state[3].re, -amp_before_3.re, epsilon = 1e-12);
+    // Other amplitudes unchanged
+    assert_relative_eq!(state[0].re, amp_before_0.re, epsilon = 1e-12);
+    assert_relative_eq!(state[1].re, state[1].re, epsilon = 1e-12);
+    assert_relative_eq!(state[2].re, state[2].re, epsilon = 1e-12);
+}
+
+#[test]
+fn test_apply_controlled_u_x_on_10() {
+    // Controlled-X (X gate as u_matrix), control=1, target=0, state=|10⟩
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits);
+    state[0] = Complex64::new(0.0, 0.0);
+    state[2] = Complex64::new(1.0, 0.0); // |10⟩
+    simd::apply_controlled_u(&mut state, 1, 0, &x_gate(), num_qubits);
+    // Control qubit 1 is |1⟩, so X is applied to qubit 0 → |10⟩ becomes |11⟩ (index 3)
+    assert_relative_eq!(state[3].re, 1.0, epsilon = 1e-12);
+    assert_relative_eq!(state[2].norm(), 0.0, epsilon = 1e-12);
+}
+
+#[test]
+fn test_apply_crx_pi_on_10_flips_target() {
+    // CRX(π) on |10⟩ (2 qubits): control=1, target=0
+    // When control=1, RX(π) ≈ -iX flips the target qubit
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits);
+    state[0] = Complex64::new(0.0, 0.0);
+    state[2] = Complex64::new(1.0, 0.0); // |10⟩
+    simd::apply_crx(&mut state, 1, 0, PI, num_qubits);
+    // After CRX(π): target qubit 0 gets flipped → |10⟩ → |11⟩ (index 3) with phase
+    // The norm must be preserved
+    let norm: f64 = state.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
+    assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
+    // The |10⟩ amplitude should be gone (flipped)
+    assert_relative_eq!(state[2].norm(), 0.0, epsilon = 1e-10);
+    assert_relative_eq!(state[3].norm(), 1.0, epsilon = 1e-10);
+}
+
+#[test]
+fn test_apply_cry_pi_on_10() {
+    // CRY(π) on |10⟩ (2 qubits): control=1, target=0
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits);
+    state[0] = Complex64::new(0.0, 0.0);
+    state[2] = Complex64::new(1.0, 0.0); // |10⟩
+    simd::apply_cry(&mut state, 1, 0, PI, num_qubits);
+    let norm: f64 = state.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
+    assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
+    // RY(π)|0⟩ = |1⟩, so qubit0 gets flipped: |10⟩ → |11⟩
+    assert_relative_eq!(state[2].norm(), 0.0, epsilon = 1e-10);
+    assert_relative_eq!(state[3].norm(), 1.0, epsilon = 1e-10);
+}
+
+#[test]
+fn test_apply_crz_pi_on_10() {
+    // CRZ(π) on |10⟩ (2 qubits): control=1, target=0
+    // RZ(π) applies phase to |1⟩ component — but here target is |0⟩ so no flip
+    // Let's put state in |11⟩ so that control=1 and target is in |1⟩
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits);
+    state[0] = Complex64::new(0.0, 0.0);
+    state[3] = Complex64::new(1.0, 0.0); // |11⟩
+    simd::apply_crz(&mut state, 1, 0, PI, num_qubits);
+    let norm: f64 = state.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
+    assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
+    // CRZ(π) on |11⟩: control qubit1=1 so RZ(π) applied to qubit0 which is |1⟩
+    // RZ(π) = diag(e^{-iπ/2}, e^{iπ/2}) so |11⟩ gets phase e^{iπ/2} = i
+    assert_relative_eq!(state[3].norm(), 1.0, epsilon = 1e-10);
+    assert_relative_eq!(state[0].norm(), 0.0, epsilon = 1e-10);
+}
+
+#[test]
+fn test_apply_diagonal_gate_z_on_plus0() {
+    // Apply Z diagonal [1, -1] on qubit 0 of |+0⟩ = (|00⟩ + |10⟩)/√2
+    let num_qubits = 2;
+    let mut state = make_state(num_qubits);
+    // Create |+0⟩ by applying H on qubit 1
+    simd::apply_single_qubit_gate(&mut state, &hadamard(), 1, num_qubits);
+    // Now apply Z diagonal on qubit 0
+    let z_diag = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+    simd::apply_diagonal_gate(&mut state, z_diag, 0, num_qubits);
+    // Norm must be preserved
+    let norm: f64 = state.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
+    assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
+}

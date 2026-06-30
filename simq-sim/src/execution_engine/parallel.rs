@@ -120,10 +120,78 @@ impl ParallelExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use simq_core::QubitId;
+    use simq_gates::standard::{Hadamard, PauliX};
+    use std::sync::Arc;
+
+    fn make_circuit() -> Circuit {
+        let mut c = Circuit::new(2);
+        c.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+        c.add_gate(Arc::new(PauliX), &[QubitId::new(1)]).unwrap();
+        c
+    }
+
+    fn no_op_gate_fn(
+        _gate_op: &simq_core::GateOp,
+        _state: &mut AdaptiveState,
+    ) -> Result<()> {
+        Ok(())
+    }
 
     #[test]
     fn test_parallel_executor_creation() {
         let executor = ParallelExecutor::new(ParallelStrategy::LayerBased);
         assert_eq!(executor.strategy, ParallelStrategy::LayerBased);
+    }
+
+    #[test]
+    fn test_data_parallel_strategy() {
+        let executor = ParallelExecutor::new(ParallelStrategy::DataParallel);
+        let circuit = make_circuit();
+        let mut state = AdaptiveState::new(2).unwrap();
+        let result = executor.execute(&circuit, &mut state, no_op_gate_fn);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_hybrid_strategy() {
+        let executor = ParallelExecutor::new(ParallelStrategy::Hybrid);
+        let circuit = make_circuit();
+        let mut state = AdaptiveState::new(2).unwrap();
+        let result = executor.execute(&circuit, &mut state, no_op_gate_fn);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_task_based_strategy() {
+        let executor = ParallelExecutor::new(ParallelStrategy::TaskBased);
+        let circuit = make_circuit();
+        let mut state = AdaptiveState::new(2).unwrap();
+        let result = executor.execute(&circuit, &mut state, no_op_gate_fn);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_layer_based_strategy() {
+        let executor = ParallelExecutor::new(ParallelStrategy::LayerBased);
+        let circuit = make_circuit();
+        let mut state = AdaptiveState::new(2).unwrap();
+        let result = executor.execute(&circuit, &mut state, no_op_gate_fn);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_empty_circuit_all_strategies() {
+        let circuit = Circuit::new(1);
+        let mut state = AdaptiveState::new(1).unwrap();
+        for strategy in &[
+            ParallelStrategy::LayerBased,
+            ParallelStrategy::DataParallel,
+            ParallelStrategy::Hybrid,
+            ParallelStrategy::TaskBased,
+        ] {
+            let executor = ParallelExecutor::new(*strategy);
+            assert!(executor.execute(&circuit, &mut state, no_op_gate_fn).is_ok());
+        }
     }
 }
