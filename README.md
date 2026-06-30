@@ -1,6 +1,6 @@
 # SimQ - High-Performance Quantum Computing SDK
 
-[![codecov](https://codecov.io/gh/yourusername/simq/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/simq)
+[![Coverage Status](https://coveralls.io/repos/github/glanzz/simq/badge.svg?branch=main)](https://coveralls.io/github/glanzz/simq?branch=main)
 [![Crates.io](https://img.shields.io/crates/v/simq.svg)](https://crates.io/crates/simq)
 [![Documentation](https://docs.rs/simq/badge.svg)](https://docs.rs/simq)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
