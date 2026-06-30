@@ -654,4 +654,344 @@ mod tests {
         assert!(output.contains("|0⟩"));
         assert!(output.contains("|1⟩"));
     }
+
+    // ---- New tests for uncovered branches ----
+
+    #[test]
+    fn test_with_config_constructor() {
+        let circuit = Circuit::new(1);
+        let config = VisualizationConfig {
+            hide_zeros: false,
+            zero_threshold: 1e-5,
+            max_display: 20,
+            show_probabilities: false,
+            show_phase: true,
+            precision: 6,
+        };
+        let debugger = StatefulDebugger::with_config(&circuit, config).unwrap();
+        assert_eq!(debugger.step_number(), 0);
+        assert_eq!(debugger.total_gates(), 0);
+        assert!(!debugger.has_next());
+    }
+
+    #[test]
+    fn test_visualization_config_default_values() {
+        let config = VisualizationConfig::default();
+        assert!(config.hide_zeros);
+        assert_eq!(config.zero_threshold, 1e-10);
+        assert_eq!(config.max_display, 10);
+        assert!(config.show_probabilities);
+        assert!(!config.show_phase);
+        assert_eq!(config.precision, 4);
+    }
+
+    #[test]
+    fn test_step_multiple_gates_and_history() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate("H")), &[crate::QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate("X")), &[crate::QubitId::new(0)])
+            .unwrap();
+
+        let mut debugger = StatefulDebugger::new(&circuit).unwrap();
+        assert_eq!(debugger.history().len(), 0);
+
+        debugger.step().unwrap();
+        assert_eq!(debugger.history().len(), 1);
+        assert_eq!(debugger.history()[0].1, "H");
+
+        debugger.step().unwrap();
+        assert_eq!(debugger.history().len(), 2);
+        assert_eq!(debugger.history()[1].1, "X");
+
+        // Step past end returns false
+        assert!(!debugger.step().unwrap());
+    }
+
+    #[test]
+    fn test_reset_clears_history_and_step() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate("H")), &[crate::QubitId::new(0)])
+            .unwrap();
+
+        let mut debugger = StatefulDebugger::new(&circuit).unwrap();
+        debugger.step().unwrap();
+        assert_eq!(debugger.step_number(), 1);
+        assert_eq!(debugger.history().len(), 1);
+
+        debugger.reset();
+        assert_eq!(debugger.step_number(), 0);
+        assert_eq!(debugger.history().len(), 0);
+        assert!(debugger.has_next());
+    }
+
+    #[test]
+    fn test_current_gate_description_during_circuit() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate("H")), &[crate::QubitId::new(0)])
+            .unwrap();
+
+        let mut debugger = StatefulDebugger::new(&circuit).unwrap();
+        // Before stepping, should describe the first gate
+        let desc = debugger.current_gate_description();
+        assert!(desc.contains("H") || !desc.is_empty());
+
+        // After all gates done, returns "(end of circuit)"
+        debugger.step().unwrap();
+        let end_desc = debugger.current_gate_description();
+        assert_eq!(end_desc, "(end of circuit)");
+    }
+
+    #[test]
+    fn test_set_config() {
+        let circuit = Circuit::new(1);
+        let mut debugger = StatefulDebugger::new(&circuit).unwrap();
+        assert!(debugger.config().hide_zeros);
+
+        let new_config = VisualizationConfig {
+            hide_zeros: false,
+            ..Default::default()
+        };
+        debugger.set_config(new_config);
+        assert!(!debugger.config().hide_zeros);
+    }
+
+    #[test]
+    fn test_capture_state() {
+        let amplitudes = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let snapshot = StatefulDebugger::capture_state(&amplitudes, 1, 3, Some("H".to_string()));
+        assert_eq!(snapshot.step, 3);
+        assert_eq!(snapshot.num_qubits, 1);
+        assert_eq!(snapshot.amplitudes.len(), 2);
+        assert_eq!(snapshot.gate_applied, Some("H".to_string()));
+    }
+
+    #[test]
+    fn test_capture_state_no_gate() {
+        let amplitudes = vec![Complex64::new(1.0, 0.0)];
+        let snapshot = StatefulDebugger::capture_state(&amplitudes, 1, 0, None);
+        assert!(snapshot.gate_applied.is_none());
+    }
+
+    #[test]
+    fn test_print_state_summary_does_not_panic() {
+        let circuit = Circuit::new(1);
+        let debugger = StatefulDebugger::new(&circuit).unwrap();
+        // Should not panic
+        debugger.print_state_summary();
+    }
+
+    #[test]
+    fn test_fidelity_different_lengths() {
+        let amp1 = vec![Complex64::new(1.0, 0.0)];
+        let amp2 = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        // Different lengths should return 0.0
+        let fid = StatefulDebugger::fidelity(&amp1, &amp2);
+        assert_eq!(fid, 0.0);
+    }
+
+    #[test]
+    fn test_extract_single_qubit_state_single_qubit() {
+        // 1-qubit system: just returns amplitudes directly
+        let amps = vec![
+            Complex64::new(0.6, 0.0),
+            Complex64::new(0.8, 0.0),
+        ];
+        let result = StatefulDebugger::extract_single_qubit_state(&amps, 1, 0);
+        assert!((result[0].re - 0.6).abs() < 1e-10);
+        assert!((result[1].re - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_extract_single_qubit_state_out_of_range() {
+        // target_qubit >= num_qubits: returns default [1, 0]
+        let amps = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let result = StatefulDebugger::extract_single_qubit_state(&amps, 1, 5);
+        assert!((result[0].re - 1.0).abs() < 1e-10);
+        assert!(result[1].re.abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_extract_single_qubit_state_wrong_length() {
+        // amplitudes.len() != 2^num_qubits: returns default [1, 0]
+        let amps = vec![Complex64::new(1.0, 0.0)]; // length 1, but num_qubits=2 expects 4
+        let result = StatefulDebugger::extract_single_qubit_state(&amps, 2, 0);
+        assert!((result[0].re - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_extract_single_qubit_state_multi_qubit() {
+        // 2-qubit state |00> (qubit 0 is in |0>)
+        let amps = vec![
+            Complex64::new(1.0, 0.0), // |00>
+            Complex64::new(0.0, 0.0), // |01>
+            Complex64::new(0.0, 0.0), // |10>
+            Complex64::new(0.0, 0.0), // |11>
+        ];
+        let result = StatefulDebugger::extract_single_qubit_state(&amps, 2, 0);
+        // Qubit 0 is fully in |0>
+        assert!((result[0].re - 1.0).abs() < 1e-10);
+        assert!(result[1].re.abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_format_complex_purely_imaginary() {
+        // im != 0, re == 0 => "{im}i"
+        let c = Complex64::new(0.0, 2.0);
+        let s = format_complex(c, 2);
+        assert!(s.contains("2.00i"));
+        assert!(!s.contains("+"));
+    }
+
+    #[test]
+    fn test_format_complex_negative_imaginary() {
+        let c = Complex64::new(1.0, -0.5);
+        let s = format_complex(c, 2);
+        assert!(s.contains("1.00"));
+        assert!(s.contains("-0.50i"));
+    }
+
+    #[test]
+    fn test_format_complex_polar_pure_real() {
+        let c = Complex64::new(1.0, 0.0);
+        let s = format_complex_polar(c, 4);
+        // phase is ~0, so should be formatted as magnitude only
+        assert!(s.contains("1.0000"));
+        assert!(!s.contains("e^"));
+    }
+
+    #[test]
+    fn test_format_complex_polar_with_phase() {
+        let c = Complex64::new(0.0, 1.0);
+        let s = format_complex_polar(c, 4);
+        // phase = π/2, magnitude = 1
+        assert!(s.contains("e^"));
+        assert!(s.contains("i"));
+    }
+
+    #[test]
+    fn test_amplitude_entry_display() {
+        let entry = AmplitudeEntry {
+            index: 0,
+            basis: "|00⟩".to_string(),
+            amplitude: Complex64::new(0.5, 0.0),
+            probability: 0.25,
+        };
+        let s = format!("{}", entry);
+        assert!(s.contains("|00⟩"));
+        assert!(s.contains("0.25"));
+    }
+
+    #[test]
+    fn test_state_snapshot_measurement_probabilities() {
+        let snapshot = StateSnapshot {
+            step: 0,
+            num_qubits: 1,
+            amplitudes: vec![
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            gate_applied: None,
+        };
+        let probs = snapshot.measurement_probabilities();
+        assert_eq!(probs.len(), 2);
+        assert_eq!(probs[0].0, "|0⟩");
+        assert!((probs[0].1 - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_format_state_all_zeros() {
+        let snapshot = StateSnapshot {
+            step: 0,
+            num_qubits: 1,
+            amplitudes: vec![Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)],
+            gate_applied: None,
+        };
+        let config = VisualizationConfig::default(); // hide_zeros=true
+        let s = snapshot.format_state(&config);
+        assert!(s.contains("all zeros"));
+    }
+
+    #[test]
+    fn test_format_state_with_show_phase() {
+        let snapshot = StateSnapshot {
+            step: 1,
+            num_qubits: 1,
+            amplitudes: vec![
+                Complex64::new(0.0, 1.0), // purely imaginary
+                Complex64::new(0.0, 0.0),
+            ],
+            gate_applied: None,
+        };
+        let config = VisualizationConfig {
+            show_phase: true,
+            ..Default::default()
+        };
+        let s = snapshot.format_state(&config);
+        assert!(s.contains("State at step 1"));
+    }
+
+    #[test]
+    fn test_format_state_without_probabilities() {
+        let snapshot = StateSnapshot {
+            step: 0,
+            num_qubits: 1,
+            amplitudes: vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            gate_applied: None,
+        };
+        let config = VisualizationConfig {
+            show_probabilities: false,
+            ..Default::default()
+        };
+        let s = snapshot.format_state(&config);
+        // Without probabilities, the (p=...) part should be absent
+        assert!(!s.contains("p="));
+    }
+
+    #[test]
+    fn test_significant_amplitudes_hide_zeros_false() {
+        let snapshot = StateSnapshot {
+            step: 0,
+            num_qubits: 1,
+            amplitudes: vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            gate_applied: None,
+        };
+        let config = VisualizationConfig {
+            hide_zeros: false,
+            ..Default::default()
+        };
+        let entries = snapshot.significant_amplitudes(&config);
+        // Should include zero amplitude too
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn test_significant_amplitudes_max_display_truncation() {
+        let snapshot = StateSnapshot {
+            step: 0,
+            num_qubits: 3,
+            amplitudes: (0..8)
+                .map(|_| Complex64::new(1.0 / (8.0_f64.sqrt()), 0.0))
+                .collect(),
+            gate_applied: None,
+        };
+        let config = VisualizationConfig {
+            max_display: 3,
+            hide_zeros: true,
+            ..Default::default()
+        };
+        let entries = snapshot.significant_amplitudes(&config);
+        // Should be truncated to max_display=3
+        assert!(entries.len() <= 3);
+    }
 }

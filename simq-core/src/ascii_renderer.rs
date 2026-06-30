@@ -1210,4 +1210,497 @@ mod tests {
         assert!(result.starts_with("──"));
         assert!(result.ends_with("──"));
     }
+
+    // ========================================================================
+    // Additional coverage tests
+    // ========================================================================
+
+    #[test]
+    fn test_render_style_variants() {
+        assert_eq!(RenderStyle::default(), RenderStyle::Unicode);
+        assert_ne!(RenderStyle::Ascii, RenderStyle::Unicode);
+        assert_ne!(RenderStyle::Compact, RenderStyle::Unicode);
+        let debug_str = format!("{:?}", RenderStyle::Compact);
+        assert!(!debug_str.is_empty());
+    }
+
+    #[test]
+    fn test_wire_style_variants() {
+        assert_eq!(WireStyle::default(), WireStyle::Single);
+        assert_ne!(WireStyle::Double, WireStyle::Single);
+        assert_ne!(WireStyle::Dashed, WireStyle::Single);
+        let debug_str = format!("{:?}", WireStyle::Dashed);
+        assert!(!debug_str.is_empty());
+    }
+
+    #[test]
+    fn test_ascii_config_default() {
+        let config = AsciiConfig::default();
+        assert_eq!(config.max_width, 0);
+        assert_eq!(config.min_gate_width, 3);
+        assert!(config.show_labels);
+        assert!(!config.compact);
+        assert_eq!(config.style, RenderStyle::Unicode);
+        assert_eq!(config.wire_style, WireStyle::Single);
+        assert!(config.show_measurements);
+        assert_eq!(config.float_precision, 4);
+        assert_eq!(config.max_param_length, 20);
+        assert_eq!(config.vertical_spacing, 1);
+        assert!(!config.show_depth);
+        assert!(config.label_format.is_none());
+    }
+
+    #[test]
+    fn test_ascii_config_compact_preset() {
+        let config = AsciiConfig::compact();
+        assert!(config.compact);
+        assert_eq!(config.max_param_length, 8);
+        assert_eq!(config.min_gate_width, 3);
+    }
+
+    #[test]
+    fn test_ascii_config_ascii_only_preset() {
+        let config = AsciiConfig::ascii_only();
+        assert_eq!(config.style, RenderStyle::Ascii);
+    }
+
+    #[test]
+    fn test_ascii_config_builder_all_methods() {
+        let config = AsciiConfig::builder()
+            .max_width(120)
+            .min_gate_width(5)
+            .show_labels(false)
+            .compact(true)
+            .style(RenderStyle::Compact)
+            .wire_style(WireStyle::Double)
+            .float_precision(2)
+            .max_param_length(10)
+            .show_depth(true)
+            .label_format("{n}: ")
+            .build();
+
+        assert_eq!(config.max_width, 120);
+        assert_eq!(config.min_gate_width, 5);
+        assert!(!config.show_labels);
+        assert!(config.compact);
+        assert_eq!(config.style, RenderStyle::Compact);
+        assert_eq!(config.wire_style, WireStyle::Double);
+        assert_eq!(config.float_precision, 2);
+        assert_eq!(config.max_param_length, 10);
+        assert!(config.show_depth);
+        assert_eq!(config.label_format, Some("{n}: ".to_string()));
+    }
+
+    #[test]
+    fn test_wire_char_unicode_single() {
+        let config = AsciiConfig {
+            style: RenderStyle::Unicode,
+            wire_style: WireStyle::Single,
+            ..Default::default()
+        };
+        assert_eq!(config.wire_char(), '─');
+    }
+
+    #[test]
+    fn test_wire_char_unicode_double() {
+        let config = AsciiConfig {
+            style: RenderStyle::Unicode,
+            wire_style: WireStyle::Double,
+            ..Default::default()
+        };
+        assert_eq!(config.wire_char(), '═');
+    }
+
+    #[test]
+    fn test_wire_char_unicode_dashed() {
+        let config = AsciiConfig {
+            style: RenderStyle::Unicode,
+            wire_style: WireStyle::Dashed,
+            ..Default::default()
+        };
+        assert_eq!(config.wire_char(), '╌');
+    }
+
+    #[test]
+    fn test_wire_char_ascii_overrides_wire_style() {
+        // ASCII style always returns '-' regardless of wire_style
+        for ws in [WireStyle::Single, WireStyle::Double, WireStyle::Dashed] {
+            let config = AsciiConfig {
+                style: RenderStyle::Ascii,
+                wire_style: ws,
+                ..Default::default()
+            };
+            assert_eq!(config.wire_char(), '-');
+        }
+    }
+
+    #[test]
+    fn test_render_with_show_depth() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("H", 1)), &[QubitId::new(0)])
+            .unwrap();
+
+        let config = AsciiConfig {
+            show_depth: true,
+            max_width: 80,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(ascii.contains("Depth:"));
+    }
+
+    #[test]
+    fn test_render_no_labels() {
+        let circuit = Circuit::new(2);
+        let config = AsciiConfig {
+            show_labels: false,
+            max_width: 80,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(!ascii.contains("q0:"));
+        assert!(!ascii.contains("q1:"));
+    }
+
+    #[test]
+    fn test_render_with_custom_label_format() {
+        let circuit = Circuit::new(2);
+        let config = AsciiConfig {
+            show_labels: true,
+            label_format: Some("qubit{n}: ".to_string()),
+            max_width: 80,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(ascii.contains("qubit"));
+    }
+
+    #[test]
+    fn test_render_ascii_style_no_unicode() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let config = AsciiConfig::ascii_only();
+        let ascii = render_with_config(&circuit, &config);
+        // Should use ASCII-only characters
+        assert!(!ascii.contains('●'));
+        assert!(!ascii.contains('⊕'));
+    }
+
+    #[test]
+    fn test_render_double_wire() {
+        let circuit = Circuit::new(1);
+        let config = AsciiConfig {
+            wire_style: WireStyle::Double,
+            max_width: 80,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(ascii.contains('═'));
+    }
+
+    #[test]
+    fn test_render_dashed_wire() {
+        let circuit = Circuit::new(1);
+        let config = AsciiConfig {
+            wire_style: WireStyle::Dashed,
+            max_width: 80,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(ascii.contains('╌'));
+    }
+
+    #[test]
+    fn test_rendered_circuit_display() {
+        let circuit = Circuit::new(1);
+        let rendered = render_detailed(&circuit, &AsciiConfig::default());
+        let display_str = format!("{}", rendered);
+        // Display should just show the ascii art
+        assert!(!display_str.is_empty());
+        assert_eq!(rendered.qubits, 1);
+    }
+
+    #[test]
+    fn test_render_cz_gate() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CZ", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let ascii = render(&circuit);
+        // CZ renders control on both
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_cy_gate() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CY", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_iswap_gate() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("ISWAP", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(ascii.contains("×") || ascii.contains("x"));
+    }
+
+    #[test]
+    fn test_render_cswap_gate() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("CSWAP", 3)),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_fredkin_gate() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("FREDKIN", 3)),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_toffoli_gate() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("CCNOT", 3)),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(!ascii.is_empty());
+        assert!(ascii.contains("●") || ascii.contains("@")); // control
+        assert!(ascii.contains("⊕") || ascii.contains("(+)")); // target
+    }
+
+    #[test]
+    fn test_render_rxx_gate() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("RXX", 2, "RXX(0.785)")),
+                &[QubitId::new(0), QubitId::new(1)],
+            )
+            .unwrap();
+
+        let ascii = render(&circuit);
+        // RXX is symmetric so should show [RXX] on both qubits
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_rzz_gate() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("RZZ", 2)),
+                &[QubitId::new(0), QubitId::new(1)],
+            )
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_multiple_gates_sequential() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("H", 1)), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate::new("X", 1)), &[QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let ascii = render(&circuit);
+        assert!(ascii.contains("[H]"));
+        assert!(ascii.contains("[X]"));
+    }
+
+    #[test]
+    fn test_render_with_narrow_width() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("LongGate", 1, "VeryLongGateName(1.2345)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+
+        // Very narrow width forces compression
+        let config = AsciiConfig {
+            max_width: 20,
+            min_gate_width: 3,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(!ascii.is_empty());
+    }
+
+    #[test]
+    fn test_render_compact_custom_desc_truncation() {
+        // A long custom description that isn't parametric triggers format_custom_desc truncation
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description(
+                    "Oracle",
+                    1,
+                    "SuperLongCustomDescriptionThatNeedsTruncation",
+                )),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+
+        let config = AsciiConfig {
+            compact: true,
+            max_param_length: 10,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(ascii.contains("..."));
+    }
+
+    #[test]
+    fn test_render_parametric_gate_compact() {
+        // parametric gate in compact mode - triggers format_parametric truncation
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description(
+                    "U",
+                    1,
+                    "U(1.23456789, 3.14159265, 2.71828182)",
+                )),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+
+        let config = AsciiConfig {
+            compact: true,
+            max_param_length: 8,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        // Should contain "U(.." truncation
+        assert!(ascii.contains(".."));
+    }
+
+    #[test]
+    fn test_render_detailed_empty_circuit() {
+        // Circuit requires at least 1 qubit; test with 1 qubit and no gates
+        let circuit = Circuit::new(1);
+        let result = render_detailed(&circuit, &AsciiConfig::default());
+        assert_eq!(result.qubits, 1);
+        assert_eq!(result.columns, 0);
+    }
+
+    #[test]
+    fn test_center_with_wire_exact_fit() {
+        // String that exactly fills the width (no padding needed)
+        let s = "[H]";
+        let result = center_with_wire(s, 3, '─');
+        assert_eq!(result, "[H]");
+    }
+
+    #[test]
+    fn test_center_with_wire_smaller() {
+        // String larger than width returns string as-is
+        let s = "[VeryLong]";
+        let result = center_with_wire(s, 3, '─');
+        assert_eq!(result, s);
+    }
+
+    #[test]
+    fn test_digit_count_large() {
+        assert_eq!(digit_count(999), 3);
+        assert_eq!(digit_count(1000), 4);
+        assert_eq!(digit_count(9999), 4);
+        assert_eq!(digit_count(10000), 5);
+    }
+
+    #[test]
+    fn test_render_empty_no_gates() {
+        // Circuit with 1 qubit but no gates renders a wire line
+        let circuit = Circuit::new(1);
+        let ascii = render(&circuit);
+        // Should contain the qubit label
+        assert!(ascii.contains("q0:"));
+    }
+
+    #[test]
+    fn test_render_circuit_with_depth_annotation() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("H", 1)), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate::new("X", 1)), &[QubitId::new(0)])
+            .unwrap();
+
+        let config = AsciiConfig {
+            show_depth: true,
+            max_width: 80,
+            ..Default::default()
+        };
+        let ascii = render_with_config(&circuit, &config);
+        assert!(ascii.contains("Depth: 2"));
+    }
+
+    #[test]
+    fn test_gate_symbols_unicode_vs_ascii() {
+        let unicode = GateSymbols::unicode();
+        let ascii = GateSymbols::ascii();
+
+        assert_eq!(unicode.control, "●");
+        assert_eq!(ascii.control, "@");
+        assert_eq!(unicode.target_x, "⊕");
+        assert_eq!(ascii.target_x, "(+)");
+        assert_eq!(unicode.swap, "×");
+        assert_eq!(ascii.swap, "x");
+    }
+
+    #[test]
+    fn test_gate_symbols_from_style() {
+        let unicode = GateSymbols::from_style(RenderStyle::Unicode);
+        let ascii = GateSymbols::from_style(RenderStyle::Ascii);
+        let compact = GateSymbols::from_style(RenderStyle::Compact);
+
+        assert_eq!(unicode.control, "●");
+        assert_eq!(ascii.control, "@");
+        // Compact uses unicode
+        assert_eq!(compact.control, "●");
+    }
 }

@@ -737,4 +737,548 @@ mod tests {
         let latex = render(&circuit);
         assert!(latex.contains("\\gate[2]"));
     }
+
+    // ---- New tests for uncovered branches ----
+
+    #[test]
+    fn test_config_default_values() {
+        let config = LatexConfig::default();
+        assert!(!config.standalone);
+        assert!(config.show_labels);
+        assert!(config.ket_labels);
+        assert_eq!(config.scale, 1.0);
+        assert_eq!(config.row_sep, 0.5);
+        assert_eq!(config.col_sep, 0.5);
+        assert_eq!(config.float_precision, 4);
+        assert!(!config.thin_lines);
+        assert!(!config.show_slices);
+        assert!(config.gate_styles.is_empty());
+    }
+
+    #[test]
+    fn test_config_standalone_constructor() {
+        let config = LatexConfig::standalone();
+        assert!(config.standalone);
+        assert!(config.show_labels);
+    }
+
+    #[test]
+    fn test_config_with_standalone_builder() {
+        let config = LatexConfig::default().with_standalone(true);
+        assert!(config.standalone);
+        let config2 = LatexConfig::default().with_standalone(false);
+        assert!(!config2.standalone);
+    }
+
+    #[test]
+    fn test_config_with_scale_builder() {
+        let config = LatexConfig::default().with_scale(2.0);
+        assert_eq!(config.scale, 2.0);
+    }
+
+    #[test]
+    fn test_config_with_ket_labels_false() {
+        let circuit = Circuit::new(2);
+        let config = LatexConfig::default().with_ket_labels(false);
+        let latex = render_with_config(&circuit, &config);
+        // Should use q_0 style (not ket notation)
+        assert!(latex.contains("\\lstick{q_0}"));
+        assert!(!latex.contains("\\ket{q_0}"));
+    }
+
+    #[test]
+    fn test_config_with_ket_labels_true() {
+        let circuit = Circuit::new(1);
+        let config = LatexConfig::default().with_ket_labels(true);
+        let latex = render_with_config(&circuit, &config);
+        assert!(latex.contains("\\ket{q_0}"));
+    }
+
+    #[test]
+    fn test_config_with_gate_style() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("MY_GATE", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let config = LatexConfig::default().with_gate_style("MY_GATE", "\\gate{Custom}");
+        let latex = render_with_config(&circuit, &config);
+        assert!(latex.contains("\\gate{Custom}"));
+    }
+
+    #[test]
+    fn test_scale_not_one_includes_scale_in_quantikz() {
+        let circuit = Circuit::new(1);
+        let config = LatexConfig::default().with_scale(1.5);
+        let latex = render_with_config(&circuit, &config);
+        assert!(latex.contains("scale=1.50"));
+    }
+
+    #[test]
+    fn test_show_slices() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("H", 1)), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate::new("X", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let config = LatexConfig {
+            show_slices: true,
+            ..Default::default()
+        };
+        let latex = render_with_config(&circuit, &config);
+        assert!(latex.contains("\\slice{}"));
+    }
+
+    #[test]
+    fn test_x_y_z_s_t_gates() {
+        let mut circuit = Circuit::new(1);
+        for name in &["X", "Y", "Z", "S", "T"] {
+            circuit
+                .add_gate(Arc::new(MockGate::new(name, 1)), &[QubitId::new(0)])
+                .unwrap();
+        }
+        let latex = render(&circuit);
+        assert!(latex.contains("\\gate{X}"));
+        assert!(latex.contains("\\gate{Y}"));
+        assert!(latex.contains("\\gate{Z}"));
+        assert!(latex.contains("\\gate{S}"));
+        assert!(latex.contains("\\gate{T}"));
+    }
+
+    #[test]
+    fn test_sdagger_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("SDG", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("S^\\dagger"));
+    }
+
+    #[test]
+    fn test_tdagger_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("TDG", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("T^\\dagger"));
+    }
+
+    #[test]
+    fn test_identity_gate_renders_as_wire() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("I", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        // Identity should render as \\qw
+        assert!(latex.contains("\\qw"));
+    }
+
+    #[test]
+    fn test_sx_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("SX", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\sqrt{X}"));
+    }
+
+    #[test]
+    fn test_sxdg_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("SXDG", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\sqrt{X}^\\dagger"));
+    }
+
+    #[test]
+    fn test_cx_gate_target_is_targ() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CX", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\targ{}"));
+        assert!(latex.contains("\\ctrl{1}"));
+    }
+
+    #[test]
+    fn test_ccx_toffoli_gate() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("CCNOT", 3)),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\targ{}"));
+        // Two control qubits
+        assert!(latex.contains("\\ctrl{"));
+    }
+
+    #[test]
+    fn test_cz_gate_target_shows_ctrl_back() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CZ", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let latex = render(&circuit);
+        // CZ shows ctrl on both qubits
+        assert!(latex.contains("\\ctrl{1}"));
+        assert!(latex.contains("\\ctrl{-1}"));
+    }
+
+    #[test]
+    fn test_cy_gate_target_shows_y() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CY", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\gate{Y}"));
+    }
+
+    #[test]
+    fn test_generic_controlled_gate_shows_base() {
+        // A gate starting with C but not a specific known one - shows base gate name
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("CPHASE", 2)),
+                &[QubitId::new(0), QubitId::new(1)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        // Target qubit should show the base gate name (PHASE)
+        assert!(latex.contains("\\gate{PHASE}"));
+    }
+
+    #[test]
+    fn test_cswap_fredkin_gate() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("CSWAP", 3)),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        // Control qubit
+        assert!(latex.contains("\\ctrl{"));
+        // Swap qubits
+        assert!(latex.contains("\\swap{"));
+        assert!(latex.contains("\\targX{}"));
+    }
+
+    #[test]
+    fn test_iswap_gate() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("ISWAP", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\swap{1}"));
+        assert!(latex.contains("\\targX{}"));
+    }
+
+    #[test]
+    fn test_parametric_ry_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description(
+                    "RY",
+                    1,
+                    &format!("RY({})", std::f64::consts::PI),
+                )),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("R_y"));
+        assert!(latex.contains("\\pi"));
+    }
+
+    #[test]
+    fn test_parametric_rz_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description(
+                    "RZ",
+                    1,
+                    &format!("RZ({})", std::f64::consts::PI / 4.0),
+                )),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("R_z"));
+        assert!(latex.contains("\\pi/4"));
+    }
+
+    #[test]
+    fn test_parametric_phase_gate() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description(
+                    "PHASE",
+                    1,
+                    &format!("PHASE({})", std::f64::consts::PI / 2.0),
+                )),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("P("));
+    }
+
+    #[test]
+    fn test_parametric_u1_u2_u3_gates() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("U1", 1, "U1(0.5)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("U2", 1, "U2(0.5, 1.0)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("U3", 1, "U3(0.5, 1.0, 1.5)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("U_1"));
+        assert!(latex.contains("U_2"));
+        assert!(latex.contains("U_3"));
+    }
+
+    #[test]
+    fn test_parametric_rxx_ryy_rzz_gates() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("RXX", 2, "RXX(0.5)")),
+                &[QubitId::new(0), QubitId::new(1)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("R_{xx}"));
+
+        let mut circuit2 = Circuit::new(2);
+        circuit2
+            .add_gate(
+                Arc::new(MockGate::with_description("RYY", 2, "RYY(0.5)")),
+                &[QubitId::new(0), QubitId::new(1)],
+            )
+            .unwrap();
+        let latex2 = render(&circuit2);
+        assert!(latex2.contains("R_{yy}"));
+
+        let mut circuit3 = Circuit::new(2);
+        circuit3
+            .add_gate(
+                Arc::new(MockGate::with_description("RZZ", 2, "RZZ(0.5)")),
+                &[QubitId::new(0), QubitId::new(1)],
+            )
+            .unwrap();
+        let latex3 = render(&circuit3);
+        assert!(latex3.contains("R_{zz}"));
+    }
+
+    #[test]
+    fn test_parametric_common_angles() {
+        // Test all the common angle fractions
+        let angles = [
+            (std::f64::consts::PI, "\\pi"),
+            (std::f64::consts::PI / 2.0, "\\pi/2"),
+            (std::f64::consts::PI / 4.0, "\\pi/4"),
+            (std::f64::consts::PI / 3.0, "\\pi/3"),
+            (std::f64::consts::PI / 6.0, "\\pi/6"),
+            (std::f64::consts::PI / 8.0, "\\pi/8"),
+            (2.0 * std::f64::consts::PI, "2\\pi"),
+            (3.0 * std::f64::consts::PI / 2.0, "3\\pi/2"),
+            (-std::f64::consts::PI, "-\\pi"),
+            (-std::f64::consts::PI / 2.0, "-\\pi/2"),
+            (-std::f64::consts::PI / 4.0, "-\\pi/4"),
+        ];
+        for (angle, expected_latex) in &angles {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(
+                    Arc::new(MockGate::with_description("RX", 1, &format!("RX({})", angle))),
+                    &[QubitId::new(0)],
+                )
+                .unwrap();
+            let latex = render(&circuit);
+            assert!(
+                latex.contains(expected_latex),
+                "Expected {} for angle {}, got:\n{}",
+                expected_latex,
+                angle,
+                latex
+            );
+        }
+    }
+
+    #[test]
+    fn test_parametric_non_standard_angle() {
+        // A non-standard angle should be formatted with float_precision digits
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("RX", 1, "RX(1.23456789)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        // Should contain a decimal representation (not a pi fraction)
+        assert!(latex.contains("R_x"));
+        assert!(latex.contains("1.2346")); // default float_precision=4
+    }
+
+    #[test]
+    fn test_custom_description_gate() {
+        // Gate with a custom description (not matching default "N-qubit gate 'name'" pattern)
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("MGATE", 1, "My Custom Gate")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("My Custom Gate"));
+    }
+
+    #[test]
+    fn test_escape_latex_all_chars() {
+        // Backslash gets replaced with \textbackslash{}, but then the {} get escaped too
+        // So a\b -> a\textbackslash{}b -> a\textbackslash\{\}b
+        assert!(escape_latex("a\\b").contains("textbackslash"));
+        // Curly braces are escaped
+        assert_eq!(escape_latex("a{b}"), "a\\{b\\}");
+        assert_eq!(escape_latex("a&b"), "a\\&b");
+        assert_eq!(escape_latex("a#b"), "a\\#b");
+        assert_eq!(escape_latex("a~b"), "a\\~{}b");
+        assert_eq!(escape_latex("a$b"), "a\\$b");
+    }
+
+    #[test]
+    fn test_sequential_gates_same_qubit() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("H", 1)), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate::new("X", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\gate{H}"));
+        assert!(latex.contains("\\gate{X}"));
+    }
+
+    #[test]
+    fn test_multi_qubit_gate_ghost_entry() {
+        // A 3-qubit multi gate: position 0 gets gate[3], positions 1 and 2 get ghost
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("BIGGATE", 3, "BigGate(0.5)")),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\gate[3]"));
+        assert!(latex.contains("\\ghost{}"));
+    }
+
+    #[test]
+    fn test_row_sep_col_sep_in_output() {
+        let circuit = Circuit::new(1);
+        let config = LatexConfig {
+            row_sep: 0.75,
+            col_sep: 0.25,
+            ..Default::default()
+        };
+        let latex = render_with_config(&circuit, &config);
+        assert!(latex.contains("row sep={0.75cm}"));
+        assert!(latex.contains("column sep={0.25cm}"));
+    }
+
+    #[test]
+    fn test_cnot_upper_case_variations() {
+        // Test CCX and TOFFOLI also produce \\targ{}
+        for name in &["CCX", "TOFFOLI"] {
+            let mut circuit = Circuit::new(3);
+            circuit
+                .add_gate(
+                    Arc::new(MockGate::new(name, 3)),
+                    &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+                )
+                .unwrap();
+            let latex = render(&circuit);
+            assert!(latex.contains("\\targ{}"), "Expected \\targ{{}} for {}", name);
+        }
+    }
+
+    #[test]
+    fn test_fredkin_cswap_variant() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::new("FREDKIN", 3)),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\ctrl{"));
+        assert!(latex.contains("\\swap{"));
+        assert!(latex.contains("\\targX{}"));
+    }
+
+    #[test]
+    fn test_two_qubit_circuit_parallel_gates() {
+        // Gates on different qubits can appear in same column
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("H", 1)), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockGate::new("X", 1)), &[QubitId::new(1)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\gate{H}"));
+        assert!(latex.contains("\\gate{X}"));
+    }
+
+    #[test]
+    fn test_format_parametric_gate_unknown_base() {
+        // A gate with params but unknown base name gets escaped
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("MYROT", 1, "MYROT(0.5)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        // Should still have the gate rendered (escaped base name)
+        assert!(latex.contains("MYROT"));
+    }
 }
