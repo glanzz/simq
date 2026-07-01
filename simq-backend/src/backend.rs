@@ -386,6 +386,7 @@ mod tests {
             }
         }
 
+        #[async_trait::async_trait]
         impl AsyncQuantumBackend for ScriptedBackend {
             async fn execute_async(
                 &self,
