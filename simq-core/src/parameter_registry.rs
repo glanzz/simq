@@ -595,4 +595,50 @@ mod tests {
         assert_eq!(registry.len(), 0);
         assert!(registry.is_empty());
     }
+
+    #[test]
+    fn test_get_mut_invalid_id() {
+        let mut registry = ParameterRegistry::new();
+        registry.add_named("theta", 0.5);
+
+        let bad_id = ParameterId::new(42);
+        let result = registry.get_mut(bad_id);
+        assert!(result.is_err());
+        if let Err(QuantumError::ValidationError(msg)) = result {
+            assert!(msg.contains("param_42"));
+        } else {
+            panic!("Expected ValidationError");
+        }
+    }
+
+    #[test]
+    fn test_get_mut_valid_id_modifies_value() {
+        let mut registry = ParameterRegistry::new();
+        let id = registry.add(Parameter::new(1.0));
+
+        registry.get_mut(id).unwrap().set_value(9.0).unwrap();
+        assert_eq!(registry.get(id).unwrap().value(), 9.0);
+    }
+
+    #[test]
+    fn test_set_all_values_mismatch() {
+        let mut registry = ParameterRegistry::new();
+        registry.add_many(&[1.0, 2.0, 3.0]);
+
+        let result = registry.set_all_values(&[1.0, 2.0]);
+        assert!(result.is_err());
+        if let Err(QuantumError::ValidationError(msg)) = result {
+            assert!(msg.contains("expected 3"));
+            assert!(msg.contains("got 2"));
+        } else {
+            panic!("Expected ValidationError");
+        }
+    }
+
+    #[test]
+    fn test_default_impl() {
+        let registry: ParameterRegistry = Default::default();
+        assert_eq!(registry.len(), 0);
+        assert!(registry.is_empty());
+    }
 }

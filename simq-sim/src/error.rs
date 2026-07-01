@@ -218,4 +218,28 @@ mod tests {
         let dbg = format!("{:?}", e);
         assert!(dbg.contains("TooManyQubits"));
     }
+
+    #[test]
+    fn test_from_quantum_error() {
+        let qe = simq_core::QuantumError::EmptyCircuit;
+        let e: SimulatorError = qe.into();
+        match e {
+            SimulatorError::InvalidCircuit(msg) => {
+                assert!(msg.contains("at least one qubit"));
+            },
+            other => panic!("expected InvalidCircuit, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_state_error() {
+        let se = simq_state::error::StateError::InvalidDimension { dimension: 3 };
+        let e: SimulatorError = se.into();
+        match e {
+            SimulatorError::StateInitializationFailed(msg) => {
+                assert!(msg.contains("Invalid state dimension"));
+            },
+            other => panic!("expected StateInitializationFailed, got {:?}", other),
+        }
+    }
 }

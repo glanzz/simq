@@ -485,4 +485,141 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&tmp);
     }
+
+    #[test]
+    fn test_memory_cache_default_impl() {
+        // Covers `impl Default for MemoryCache` (delegates to `new()`).
+        let cache: MemoryCache = Default::default();
+        let circuit = Circuit::new(1);
+        let key = CircuitKey::from_circuit(&circuit);
+        assert!(cache.get(&key).is_none());
+    }
+
+    #[test]
+    fn test_file_cache_ttl_expired_entry_is_removed() {
+        // Covers the TTL-expiry branch in `FileCache::get`: when the file's
+        // age exceeds the configured TTL, it must be deleted and `None`
+        // returned.
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_ttl_expired_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        // A TTL of 0 means any elapsed time at all counts as expired.
+        let cache = FileCache::with_ttl(&tmp, Duration::from_millis(0)).unwrap();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        cache.put(key.clone(), circuit).unwrap();
+        // Give the filesystem a moment so `elapsed` is strictly > 0.
+        std::thread::sleep(Duration::from_millis(5));
+
+        // Should be treated as expired and removed.
+        assert!(cache.get(&key).is_none());
+        // Confirm the underlying file was actually deleted.
+        let file_path = cache.key_to_path(&key);
+        assert!(!file_path.exists());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_new_create_dir_error() {
+        // Covers the `create_dir_all` error-mapping branch in `FileCache::new`:
+        // if the target path is actually an existing file, directory
+        // creation must fail and be wrapped as a `CacheError`.
+        let tmp_parent = std::env::temp_dir().join(format!(
+            "simq_cache_new_err_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&tmp_parent).unwrap();
+        let blocked_path = tmp_parent.join("blocked_by_file");
+        std::fs::write(&blocked_path, b"not a directory").unwrap();
+
+        // `blocked_path` exists as a plain file, so treating it as a
+        // directory to create should fail.
+        let result = FileCache::new(&blocked_path);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(QuantumError::CacheError(_))));
+
+        let _ = std::fs::remove_dir_all(&tmp_parent);
+    }
+
+    #[test]
+    fn test_file_cache_put_create_dir_error() {
+        // Covers the `create_dir_all` error-mapping branch in `FileCache::put`
+        // for the per-key subdirectory: if a plain file already occupies the
+        // subdirectory path, `create_dir_all` must fail there too.
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_put_err_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        // Pre-create a plain file at the subdirectory path that `put` will
+        // try to `create_dir_all` for the given key.
+        let file_path = cache.key_to_path(&key);
+        let parent = file_path.parent().unwrap();
+        std::fs::write(parent, b"blocking file").unwrap();
+
+        let result = cache.put(key, circuit);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(QuantumError::CacheError(_))));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_clear_removes_top_level_bin_file() {
+        // Covers the top-level `path.is_file() && extension == "bin"` branch
+        // in `clear()`, which requires a `.bin` file directly inside the
+        // cache root (not nested in the hash subdirectory).
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_clear_toplevel_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+        let loose_file = tmp.join("loose.bin");
+        std::fs::write(&loose_file, b"data").unwrap();
+        assert!(loose_file.exists());
+
+        cache.clear();
+        assert!(!loose_file.exists());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_stats_counts_top_level_bin_file() {
+        // Covers the top-level `size += 1` branch in `stats()` for a `.bin`
+        // file sitting directly in the cache root.
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_stats_toplevel_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+        let loose_file = tmp.join("loose.bin");
+        std::fs::write(&loose_file, b"data").unwrap();
+
+        let stats = cache.stats();
+        assert_eq!(stats.size, 1);
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 }

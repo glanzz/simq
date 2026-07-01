@@ -340,4 +340,79 @@ mod tests {
         let stats = cached.cache_statistics();
         assert_eq!(stats.hits, 1);
     }
+
+    #[test]
+    fn test_cached_compiler_with_compiler_default_size() {
+        let compiler = create_compiler(OptimizationLevel::O1);
+        let cached = CachedCompiler::with_compiler(compiler);
+
+        // Default cache size should be 100.
+        assert_eq!(cached.cache().max_size(), 100);
+        assert!(cached.is_enabled());
+    }
+
+    #[test]
+    fn test_cached_compiler_cache_mut_and_compiler_accessors() {
+        let compiler = create_compiler(OptimizationLevel::O1);
+        let mut cached = CachedCompiler::new(compiler, 10);
+
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
+
+        let result = cached.compile(&mut circuit).unwrap();
+        assert!(!result.is_cached());
+
+        // `result()` should expose the inner optimization result.
+        let _ = result.result();
+
+        // `cache_mut()` should allow mutating the underlying cache directly.
+        assert_eq!(cached.cache_mut().len(), 1);
+        cached.cache_mut().clear();
+        assert_eq!(cached.cache().len(), 0);
+
+        // `compiler()` should return the underlying compiler.
+        let _ = cached.compiler();
+    }
+
+    #[test]
+    fn test_shared_cached_compiler_with_compiler_default_size() {
+        let compiler = create_compiler(OptimizationLevel::O1);
+        let cached = SharedCachedCompiler::with_compiler(compiler);
+
+        assert_eq!(cached.cache_statistics().max_size, 100);
+        assert!(cached.is_enabled());
+    }
+
+    #[test]
+    fn test_shared_cached_compiler_disabled_and_clear() {
+        let compiler = create_compiler(OptimizationLevel::O1);
+        let mut cached = SharedCachedCompiler::new(compiler, 10);
+        cached.set_enabled(false);
+        assert!(!cached.is_enabled());
+
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
+
+        // Caching disabled: repeated compiles should never be cached.
+        let result1 = cached.compile(&mut circuit).unwrap();
+        assert!(!result1.is_cached());
+        let result2 = cached.compile(&mut circuit).unwrap();
+        assert!(!result2.is_cached());
+
+        // Cache should still be empty since caching was disabled throughout.
+        assert_eq!(cached.cache_statistics().current_size, 0);
+
+        // Re-enable, compile & cache, then clear.
+        cached.set_enabled(true);
+        cached.compile(&mut circuit).unwrap();
+        assert_eq!(cached.cache_statistics().current_size, 1);
+        cached.clear_cache();
+        assert_eq!(cached.cache_statistics().current_size, 0);
+    }
 }

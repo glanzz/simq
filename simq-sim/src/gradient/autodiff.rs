@@ -337,6 +337,26 @@ impl ReverseTape {
         index
     }
 
+    /// Cosine of a tape variable
+    pub fn cos(&mut self, arg: usize) -> usize {
+        let index = self.values.len();
+        let value = self.values[arg].cos();
+        self.values.push(value);
+        self.adjoints.push(0.0);
+        self.operations.push(Operation::Cos { arg });
+        index
+    }
+
+    /// Exponential of a tape variable
+    pub fn exp(&mut self, arg: usize) -> usize {
+        let index = self.values.len();
+        let value = self.values[arg].exp();
+        self.values.push(value);
+        self.adjoints.push(0.0);
+        self.operations.push(Operation::Exp { arg });
+        index
+    }
+
     /// Compute gradients using reverse-mode AD
     ///
     /// # Arguments
@@ -666,6 +686,21 @@ mod tests {
     fn test_reverse_tape_default() {
         let tape = ReverseTape::default();
         let _ = tape;
+    }
+
+    #[test]
+    fn test_reverse_tape_gradient_cos_and_exp() {
+        // f(x) = cos(x) + exp(x)
+        let mut tape = ReverseTape::new();
+        let x = tape.input(0.5);
+        let cos_x = tape.cos(x);
+        let exp_x = tape.exp(x);
+        let output = tape.add(cos_x, exp_x);
+        let grad = tape.gradient(output, 1);
+
+        // df/dx = -sin(x) + exp(x)
+        let expected = -(0.5f64).sin() + (0.5f64).exp();
+        assert!((grad[0] - expected).abs() < 1e-10);
     }
 
     #[test]

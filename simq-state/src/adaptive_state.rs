@@ -838,4 +838,56 @@ mod tests {
         let converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
         assert!(!converted); // always false for dense
     }
+
+    #[test]
+    fn test_from_amplitudes_stays_sparse_low_density() {
+        // 5 qubits => dimension 32; only 1 nonzero amplitude => density = 1/32 = 0.03125,
+        // well below the default 0.1 threshold, so the state should remain sparse
+        // (exercises the `Ok(Self::Sparse { .. })` branch of `from_amplitudes`).
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 32];
+        amplitudes[0] = Complex64::new(1.0, 0.0);
+        let state = AdaptiveState::from_amplitudes(5, &amplitudes).unwrap();
+        assert!(state.is_sparse());
+        assert_eq!(state.num_qubits(), 5);
+    }
+
+    #[test]
+    fn test_dimension_sparse_and_dense() {
+        let sparse_state = AdaptiveState::new(4).unwrap();
+        assert!(sparse_state.is_sparse());
+        assert_eq!(sparse_state.dimension(), 16);
+
+        let mut dense_state = AdaptiveState::new(4).unwrap();
+        dense_state.force_to_dense().unwrap();
+        assert_eq!(dense_state.dimension(), 16);
+    }
+
+    #[test]
+    fn test_norm_sparse_path() {
+        // Stays sparse: single nonzero amplitude out of 32.
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 32];
+        amplitudes[0] = Complex64::new(2.0, 0.0);
+        let state = AdaptiveState::from_amplitudes(5, &amplitudes).unwrap();
+        assert!(state.is_sparse());
+        assert_relative_eq!(state.norm(), 2.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_sparse_path() {
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 32];
+        amplitudes[0] = Complex64::new(3.0, 0.0);
+        let mut state = AdaptiveState::from_amplitudes(5, &amplitudes).unwrap();
+        assert!(state.is_sparse());
+        state.normalize().unwrap();
+        assert!(state.is_normalized(1e-10));
+        assert_relative_eq!(state.norm(), 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_is_normalized_sparse_path() {
+        let state = AdaptiveState::new(5).unwrap();
+        assert!(state.is_sparse());
+        // Freshly created |0...0> state is normalized.
+        assert!(state.is_normalized(1e-10));
+    }
 }

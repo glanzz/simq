@@ -487,4 +487,85 @@ mod tests {
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.hit_rate(), 50.0);
     }
+
+    #[test]
+    fn test_fingerprint_value() {
+        let circuit = Circuit::new(2);
+        let fp = CircuitFingerprint::compute(&circuit);
+
+        // `value()` should expose the raw hash and be stable across calls.
+        assert_eq!(fp.value(), fp.value());
+
+        let circuit2 = Circuit::new(3);
+        let fp2 = CircuitFingerprint::compute(&circuit2);
+        assert_ne!(fp.value(), fp2.value());
+    }
+
+    #[test]
+    fn test_hit_rate_zero_total() {
+        // No hits or misses recorded yet: hit_rate should hit the `total == 0`
+        // branch and return 0.0 rather than dividing by zero.
+        let stats = CacheStatistics::default();
+        assert_eq!(stats.hits + stats.misses, 0);
+        assert_eq!(stats.hit_rate(), 0.0);
+        assert_eq!(stats.miss_rate(), 100.0);
+    }
+
+    #[test]
+    fn test_cache_insert_update_existing_entry() {
+        // Inserting the same fingerprint twice should hit the `Occupied` arm
+        // in `insert`, replacing the value and moving it to the back of the
+        // LRU queue instead of growing the cache.
+        let mut cache = CompilationCache::new(10);
+
+        let circuit_a = Circuit::new(2);
+        let circuit_b = Circuit::new(2);
+        let fp = CircuitFingerprint::compute(&circuit_a);
+        assert_eq!(fp, CircuitFingerprint::compute(&circuit_b));
+
+        cache.insert(fp, circuit_a);
+        assert_eq!(cache.len(), 1);
+
+        // Re-insert under the same fingerprint: should update, not add a new entry.
+        cache.insert(fp, circuit_b);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get(fp).is_some());
+    }
+
+    #[test]
+    fn test_cache_max_size_getter() {
+        let cache = CompilationCache::new(42);
+        assert_eq!(cache.max_size(), 42);
+    }
+
+    #[test]
+    fn test_compilation_cache_default() {
+        let cache = CompilationCache::default();
+        assert_eq!(cache.max_size(), 100);
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn test_shared_cache_set_max_size() {
+        let cache = SharedCompilationCache::new(5);
+
+        for i in 0..5 {
+            let circuit = Circuit::new(i + 1);
+            let fp = CircuitFingerprint::compute(&circuit);
+            cache.insert(fp, circuit);
+        }
+        assert_eq!(cache.len(), 5);
+
+        cache.set_max_size(2);
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.statistics().max_size, 2);
+        assert_eq!(cache.statistics().evictions, 3);
+    }
+
+    #[test]
+    fn test_shared_cache_default() {
+        let cache = SharedCompilationCache::default();
+        assert!(cache.is_empty());
+        assert_eq!(cache.statistics().max_size, 100);
+    }
 }

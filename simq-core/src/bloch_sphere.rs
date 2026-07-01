@@ -506,4 +506,127 @@ mod tests {
         assert!(output.contains("Bloch Sphere"));
         assert!(output.contains("|0⟩"));
     }
+
+    #[test]
+    fn test_to_angles_near_zero_vector() {
+        // A vector very close to the origin (fully mixed state) should hit the
+        // near-zero guard branch in `to_angles` and return theta=phi=0.0 rather
+        // than dividing by a ~zero magnitude.
+        let vector = BlochVector::new(1e-12, -1e-12, 1e-13);
+        let angles = vector.to_angles();
+
+        assert_eq!(angles.theta, 0.0);
+        assert_eq!(angles.phi, 0.0);
+    }
+
+    #[test]
+    fn test_describe_north_pole() {
+        let vector = BlochVector::new(0.0, 0.0, 1.0);
+        let desc = vector.describe();
+
+        assert!(desc.contains("Bloch Vector:"));
+        assert!(desc.contains("Magnitude:"));
+        assert!(desc.contains("Angles:"));
+        assert!(desc.contains("|0⟩ (north pole)"));
+    }
+
+    #[test]
+    fn test_describe_south_pole() {
+        let vector = BlochVector::new(0.0, 0.0, -1.0);
+        let desc = vector.describe();
+        assert!(desc.contains("|1⟩ (south pole)"));
+    }
+
+    #[test]
+    fn test_describe_east_pole() {
+        let vector = BlochVector::new(1.0, 0.0, 0.0);
+        let desc = vector.describe();
+        assert!(desc.contains("|+⟩ (east pole)"));
+    }
+
+    #[test]
+    fn test_describe_west_pole() {
+        let vector = BlochVector::new(-1.0, 0.0, 0.0);
+        let desc = vector.describe();
+        assert!(desc.contains("|−⟩ (west pole)"));
+    }
+
+    #[test]
+    fn test_describe_front_pole() {
+        let vector = BlochVector::new(0.0, 1.0, 0.0);
+        let desc = vector.describe();
+        assert!(desc.contains("|+i⟩ (front pole)"));
+    }
+
+    #[test]
+    fn test_describe_back_pole() {
+        let vector = BlochVector::new(0.0, -1.0, 0.0);
+        let desc = vector.describe();
+        assert!(desc.contains("|−i⟩ (back pole)"));
+    }
+
+    #[test]
+    fn test_describe_mixed_state() {
+        // Magnitude well below the pure-state threshold (0.9) and not close to
+        // any of the special poles, so it should fall into the "mixed state"
+        // branch of `describe`.
+        let vector = BlochVector::new(0.1, 0.1, 0.1);
+        assert!(vector.magnitude() < 0.9);
+        let desc = vector.describe();
+        assert!(desc.contains("Mixed state (inside sphere)"));
+    }
+
+    #[test]
+    fn test_describe_generic_state_no_special_label() {
+        // A pure-ish state that isn't near any pole and isn't "mixed" (magnitude
+        // >= 0.9) should produce a description without any special state line.
+        let vector = BlochVector::new(0.6, 0.6, 0.4472135955);
+        assert!(vector.magnitude() >= 0.9);
+        let desc = vector.describe();
+        assert!(desc.contains("Bloch Vector:"));
+        assert!(!desc.contains("north pole"));
+        assert!(!desc.contains("south pole"));
+        assert!(!desc.contains("east pole"));
+        assert!(!desc.contains("west pole"));
+        assert!(!desc.contains("front pole"));
+        assert!(!desc.contains("back pole"));
+        assert!(!desc.contains("Mixed state"));
+    }
+
+    #[test]
+    fn test_bloch_vector_display() {
+        let vector = BlochVector::new(0.5, -0.25, 0.75);
+        let displayed = format!("{}", vector);
+        assert_eq!(displayed, "BlochVector(0.5000, -0.2500, 0.7500)");
+    }
+
+    #[test]
+    fn test_bloch_angles_to_state() {
+        // theta = PI/2, phi = PI/2 should give alpha = cos(PI/4), beta = i*sin(PI/4)
+        let angles = BlochAngles {
+            theta: PI / 2.0,
+            phi: PI / 2.0,
+        };
+        let state = angles.to_state();
+
+        let expected_alpha = (PI / 4.0).cos();
+        let expected_beta_im = (PI / 4.0).sin();
+
+        assert!((state[0].re - expected_alpha).abs() < 1e-10);
+        assert!(state[0].im.abs() < 1e-10);
+        assert!(state[1].re.abs() < 1e-10);
+        assert!((state[1].im - expected_beta_im).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_bloch_angles_to_state_zero_theta() {
+        // theta = 0 should reproduce the |0> state: alpha = 1, beta = 0
+        let angles = BlochAngles { theta: 0.0, phi: 0.0 };
+        let state = angles.to_state();
+
+        assert!((state[0].re - 1.0).abs() < 1e-10);
+        assert!(state[0].im.abs() < 1e-10);
+        assert!(state[1].re.abs() < 1e-10);
+        assert!(state[1].im.abs() < 1e-10);
+    }
 }

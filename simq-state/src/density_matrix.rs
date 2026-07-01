@@ -1101,4 +1101,49 @@ mod tests {
         assert!(s.contains("qubits: 2"));
         assert!(s.contains("dim: 4"));
     }
+
+    #[test]
+    fn test_apply_two_qubit_unitary_with_spectator_qubit_zero_block() {
+        // 3-qubit system; apply a 2-qubit gate (CNOT) to qubits 0,1 while
+        // qubit 2 is a spectator. This exercises the "no match" (zero)
+        // branch of get_two_qubit_element, since row/col pairs that differ
+        // only in the spectator qubit's bit must produce a zero contribution.
+        // Start in |100⟩ (qubit0=0, qubit1=0, qubit2=1 => index 4) in
+        // superposition with |000⟩ so the density matrix has off-diagonal
+        // elements spanning the spectator qubit.
+        let s = 1.0 / 2.0_f64.sqrt();
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 8];
+        amplitudes[0] = Complex64::new(s, 0.0); // |000>
+        amplitudes[4] = Complex64::new(s, 0.0); // |100> (qubit2 = 1)
+
+        let mut dm = DensityMatrix::from_state_vector(3, &amplitudes).unwrap();
+        let cnot = cnot_2q();
+        // Apply CNOT to qubits 0 and 1; qubit 2 remains a spectator, forcing
+        // get_two_qubit_element to hit both the matching and non-matching
+        // (zero) mask branches across the full 8x8 matrix.
+        dm.apply_unitary(&cnot, &[0, 1]).unwrap();
+
+        // CNOT with control=qubit0=0, target=qubit1=0 leaves |000> and |100>
+        // unchanged (control bit is 0 in both), so state should remain the
+        // same superposition and stay pure.
+        assert!((dm.purity() - 1.0).abs() < 1e-9);
+        assert!((dm.trace() - 1.0).abs() < 1e-9);
+        assert!((dm.get(0, 4).re - 0.5).abs() < 1e-9);
+        assert!((dm.get(4, 0).re - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_is_valid_negative_diagonal_with_trace_preserved() {
+        // Regression-style test: a negative diagonal element must be
+        // detected even when the trace is still exactly 1 (compensated by
+        // another diagonal element), ensuring the code actually reaches the
+        // positive-semi-definiteness check rather than failing earlier on
+        // the trace check.
+        let mut dm = DensityMatrix::new(1).unwrap();
+        // Start: (0,0)=1, (1,1)=0. Make (0,0)=1.5 and (1,1)=-0.5 so trace=1.
+        dm.set(0, 0, Complex64::new(1.5, 0.0));
+        dm.set(1, 1, Complex64::new(-0.5, 0.0));
+        assert!((dm.trace() - 1.0).abs() < TOL);
+        assert!(!dm.is_valid(TOL));
+    }
 }

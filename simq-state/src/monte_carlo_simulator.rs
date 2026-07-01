@@ -540,4 +540,116 @@ mod tests {
         sim.apply_stochastic_noise(&noise, 0).unwrap();
         assert_eq!(sim.stats().noise_ops_applied, 1);
     }
+
+    // ---- Deterministic branch coverage for apply_pauli_operation and
+    // amplitude-damping helpers. We call the private methods directly
+    // (accessible via `use super::*` in the same crate) to avoid relying on
+    // RNG draws landing in a specific sampler range. ----
+
+    #[test]
+    fn test_apply_pauli_operation_y_directly() {
+        // Forces PauliOperation::Y branch (lines applying the Y gate).
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        sim.apply_pauli_operation(PauliOperation::Y, 0).unwrap();
+
+        // Y|0> = i|1>, so amplitude at index 1 should have norm ~1 and index 0 ~0.
+        let amps = sim.state().amplitudes();
+        assert!(amps[0].norm() < 1e-10);
+        assert!((amps[1].norm() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_pauli_operation_z_directly() {
+        // Forces PauliOperation::Z branch (lines applying the Z gate).
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        // Put qubit in |1> first so Z has an observable effect on phase.
+        sim.apply_pauli_operation(PauliOperation::X, 0).unwrap();
+        sim.apply_pauli_operation(PauliOperation::Z, 0).unwrap();
+
+        let amps = sim.state().amplitudes();
+        // Z|1> = -|1>, so amplitude at index 1 should be -1 (real part).
+        assert!((amps[1].re - (-1.0)).abs() < 1e-10);
+        assert!(amps[0].norm() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_pauli_operation_nojump_directly() {
+        // Forces PauliOperation::NoJump branch, dispatching into
+        // apply_amplitude_damping_no_jump.
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        // Put the qubit into an equal superposition so both the |0> and |1>
+        // components are non-zero, exercising the scaling branch and the
+        // renormalization branch inside apply_amplitude_damping_no_jump.
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+        sim.apply_gate(&h, &[0]).unwrap();
+
+        let factor = 0.5_f64;
+        sim.apply_pauli_operation(PauliOperation::NoJump { sqrt_1_minus_gamma: factor }, 0)
+            .unwrap();
+
+        let amps = sim.state().amplitudes();
+        // After scaling |1> by 0.5 and renormalizing, |1> component should
+        // shrink relative to |0>, and the state should remain normalized.
+        let norm_sq: f64 = amps.iter().map(|a| a.norm_sqr()).sum();
+        assert!((norm_sq - 1.0).abs() < 1e-9);
+        assert!(amps[1].norm() < amps[0].norm());
+    }
+
+    #[test]
+    fn test_apply_amplitude_damping_no_jump_zero_norm_skips_renormalization() {
+        // If the resulting state has ~zero norm (e.g. factor=0 applied to a
+        // pure |1> state, and no |0> component exists), the norm_sq <= 1e-15
+        // branch must be taken, skipping renormalization without panicking
+        // (e.g. divide by zero).
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        // Prepare |1> state via X gate.
+        sim.apply_pauli_operation(PauliOperation::X, 0).unwrap();
+
+        // factor = 0.0 zeroes out the only (|1>) component entirely, leaving
+        // norm_sq == 0, which must not trigger a division by zero.
+        sim.apply_amplitude_damping_no_jump(0, 0.0).unwrap();
+
+        let amps = sim.state().amplitudes();
+        assert!(amps[0].norm() < 1e-10);
+        assert!(amps[1].norm() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_stochastic_noise_depolarizing_y_branch_via_full_range() {
+        // Exercise the full apply_stochastic_noise -> apply_pauli_operation
+        // dispatch path (not just the direct helper call) for the Y branch,
+        // using error_prob=1.0 so Identity is never sampled, and scanning a
+        // few seeds to find one landing in the Y third of the range.
+        let noise = DepolarizingMC::from_probability(1.0).unwrap();
+        let mut found_y = false;
+        for seed in 0..50u64 {
+            let config = MonteCarloConfig::new().with_seed(seed);
+            let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+            sim.apply_stochastic_noise(&noise, 0).unwrap();
+            let amps = sim.state().amplitudes();
+            // Y|0> = i|1>: amplitude at index 1 is purely imaginary with norm 1.
+            if amps[1].norm() > 1e-9 && amps[1].re.abs() < 1e-9 && amps[1].im.abs() > 1e-9 {
+                found_y = true;
+                break;
+            }
+        }
+        assert!(found_y, "expected at least one seed to sample the Y branch");
+    }
 }

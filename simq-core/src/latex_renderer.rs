@@ -1275,4 +1275,96 @@ mod tests {
         // Should still have the gate rendered (escaped base name)
         assert!(latex.contains("MYROT"));
     }
+
+    // ---- Additional coverage tests for private helpers / edge branches ----
+
+    #[test]
+    fn test_is_wire_through_true_for_intermediate_qubit() {
+        // Covers is_wire_through returning true (lines 316-321): a qubit strictly
+        // between the min and max of a multi-qubit gate's indices, and not itself
+        // one of the gate's qubits, counts as a "wire passing through".
+        let circuit = Circuit::new(4);
+        let config = LatexConfig::default();
+        let renderer = LatexRenderer::new(&circuit, &config);
+
+        let op = GateOp::new(
+            Arc::new(MockGate::new("CNOT", 2)),
+            &[QubitId::new(0), QubitId::new(3)],
+        )
+        .unwrap();
+        let col: Vec<(usize, &GateOp)> = vec![(0, &op)];
+
+        assert!(renderer.is_wire_through(&col, 1));
+        assert!(renderer.is_wire_through(&col, 2));
+    }
+
+    #[test]
+    fn test_is_wire_through_false_when_not_intermediate() {
+        // Covers is_wire_through returning false (line 325): either the qubit is
+        // one of the gate's own qubits, or it's outside the [min, max] span, or
+        // the column has no gates at all.
+        let circuit = Circuit::new(4);
+        let config = LatexConfig::default();
+        let renderer = LatexRenderer::new(&circuit, &config);
+
+        let op = GateOp::new(
+            Arc::new(MockGate::new("CNOT", 2)),
+            &[QubitId::new(0), QubitId::new(3)],
+        )
+        .unwrap();
+        let col: Vec<(usize, &GateOp)> = vec![(0, &op)];
+
+        // qubit 0 and 3 are the gate's own qubits, not "passing through"
+        assert!(!renderer.is_wire_through(&col, 0));
+        assert!(!renderer.is_wire_through(&col, 3));
+
+        // empty column: loop body never executes, falls through to `false`
+        let empty_col: Vec<(usize, &GateOp)> = Vec::new();
+        assert!(!renderer.is_wire_through(&empty_col, 1));
+    }
+
+    #[test]
+    fn test_format_gate_text_falls_back_to_escaped_name() {
+        // Covers the final `else` branch of format_gate_text (line 468):
+        // a single-qubit gate whose description matches the auto-generated
+        // default description (no parens, and desc == default_desc), and whose
+        // name isn't one of the specially-handled cases in write_single_gate,
+        // so write_single_gate's `_` arm calls format_gate_text -> escape_latex(name).
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(MockGate::new("ORACLE", 1)), &[QubitId::new(0)])
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("\\gate{ORACLE}"));
+    }
+
+    #[test]
+    fn test_format_parametric_gate_no_paren_directly() {
+        // Covers the `else` branch of format_parametric_gate (line 499): reached
+        // only when the description has no '(' at all. format_gate_text itself
+        // only calls format_parametric_gate when desc contains both '(' and ')',
+        // so this branch is unreachable via the public rendering path; we call
+        // the private helper directly to exercise it.
+        let circuit = Circuit::new(1);
+        let config = LatexConfig::default();
+        let renderer = LatexRenderer::new(&circuit, &config);
+
+        let result = renderer.format_parametric_gate("NoParensHere");
+        assert_eq!(result, escape_latex("NoParensHere"));
+    }
+
+    #[test]
+    fn test_format_single_param_non_numeric_is_escaped() {
+        // Covers the `else` branch of format_single_param (line 546): a
+        // parameter that fails to parse as f64 gets passed through escape_latex.
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(
+                Arc::new(MockGate::with_description("RX", 1, "RX(theta)")),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        let latex = render(&circuit);
+        assert!(latex.contains("theta"));
+    }
 }

@@ -234,4 +234,240 @@ mod tests {
         assert_eq!(format!("{}", BackendType::Simulator), "Simulator");
         assert_eq!(format!("{}", BackendType::Hardware), "Hardware");
     }
+
+    #[test]
+    fn test_backend_type_display_all_variants() {
+        assert_eq!(format!("{}", BackendType::CloudSimulator), "Cloud Simulator");
+        assert_eq!(format!("{}", BackendType::HybridSimulator), "Hybrid Simulator");
+        assert_eq!(format!("{}", BackendType::Emulator), "Emulator");
+    }
+
+    #[test]
+    fn test_default_get_result_not_supported() {
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: BackendCapabilities::simulator(),
+        };
+
+        let err = backend.get_result("some-job-id").unwrap_err();
+        match err {
+            crate::BackendError::Other(msg) => {
+                assert_eq!(msg, "Async job retrieval not supported");
+            },
+            other => panic!("expected BackendError::Other, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_default_cancel_job_is_ok() {
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: BackendCapabilities::simulator(),
+        };
+
+        assert!(backend.cancel_job("some-job-id").is_ok());
+    }
+
+    #[test]
+    fn test_default_job_status_is_completed() {
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: BackendCapabilities::simulator(),
+        };
+
+        assert_eq!(backend.job_status("some-job-id").unwrap(), crate::JobStatus::Completed);
+    }
+
+    #[test]
+    fn test_estimate_cost_with_cost_per_shot() {
+        let mut caps = BackendCapabilities::simulator();
+        caps.cost_per_shot = Some(0.5);
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: caps,
+        };
+        let circuit = Circuit::new(1);
+
+        assert_eq!(backend.estimate_cost(&circuit, 100), Some(50.0));
+    }
+
+    #[test]
+    fn test_estimate_cost_without_cost_per_shot() {
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: BackendCapabilities::simulator(),
+        };
+        let circuit = Circuit::new(1);
+
+        assert_eq!(backend.estimate_cost(&circuit, 100), None);
+    }
+
+    #[test]
+    fn test_submit_job_and_description() {
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: BackendCapabilities::simulator(),
+        };
+        let circuit = Circuit::new(1);
+
+        let job_id = backend.submit_job(&circuit, 10).unwrap();
+        assert!(job_id.starts_with("sync-"));
+
+        let desc = backend.description();
+        assert!(desc.contains("test_backend"));
+        assert!(desc.contains("Simulator"));
+    }
+
+    #[test]
+    fn test_validate_circuit_ok_and_exceeded() {
+        let backend = MockBackend {
+            name: "test_backend".to_string(),
+            capabilities: BackendCapabilities::simulator(),
+        };
+        let small_circuit = Circuit::new(1);
+        assert!(backend.validate_circuit(&small_circuit).is_ok());
+
+        let mut small_caps = BackendCapabilities::simulator();
+        small_caps.max_qubits = 1;
+        let limited_backend = MockBackend {
+            name: "limited".to_string(),
+            capabilities: small_caps,
+        };
+        let big_circuit = Circuit::new(5);
+        let err = limited_backend.validate_circuit(&big_circuit).unwrap_err();
+        match err {
+            crate::BackendError::CapabilityExceeded(msg) => {
+                assert!(msg.contains("5 qubits"));
+            },
+            other => panic!("expected CapabilityExceeded, got {:?}", other),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    mod async_tests {
+        use super::*;
+
+        // A backend whose job lifecycle can be scripted for execute_and_wait tests.
+        struct ScriptedBackend {
+            capabilities: BackendCapabilities,
+            statuses: std::sync::Mutex<std::collections::VecDeque<crate::JobStatus>>,
+            cancelled: std::sync::atomic::AtomicBool,
+        }
+
+        impl QuantumBackend for ScriptedBackend {
+            fn name(&self) -> &str {
+                "scripted"
+            }
+
+            fn backend_type(&self) -> BackendType {
+                BackendType::Simulator
+            }
+
+            fn execute(&self, _circuit: &Circuit, _shots: usize) -> Result<BackendResult> {
+                use std::collections::HashMap;
+                let mut counts = HashMap::new();
+                counts.insert("0".to_string(), 1);
+                Ok(BackendResult::new(counts, 1))
+            }
+
+            fn capabilities(&self) -> &BackendCapabilities {
+                &self.capabilities
+            }
+
+            fn job_status(&self, _job_id: &str) -> Result<crate::JobStatus> {
+                let mut statuses = self.statuses.lock().unwrap();
+                Ok(statuses.pop_front().unwrap_or(crate::JobStatus::Running))
+            }
+
+            fn cancel_job(&self, _job_id: &str) -> Result<()> {
+                self.cancelled.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            }
+        }
+
+        impl AsyncQuantumBackend for ScriptedBackend {
+            async fn execute_async(&self, circuit: &Circuit, shots: usize) -> Result<BackendResult> {
+                self.execute(circuit, shots)
+            }
+        }
+
+        #[tokio::test]
+        async fn test_execute_and_wait_completes() {
+            let backend = ScriptedBackend {
+                capabilities: BackendCapabilities::simulator(),
+                statuses: std::sync::Mutex::new(std::collections::VecDeque::from(vec![
+                    crate::JobStatus::Completed,
+                ])),
+                cancelled: std::sync::atomic::AtomicBool::new(false),
+            };
+            let circuit = Circuit::new(1);
+
+            let result = backend.execute_and_wait(&circuit, 10, None).await.unwrap();
+            assert_eq!(result.shots, 1);
+        }
+
+        #[tokio::test]
+        async fn test_execute_and_wait_failed_job() {
+            let backend = ScriptedBackend {
+                capabilities: BackendCapabilities::simulator(),
+                statuses: std::sync::Mutex::new(std::collections::VecDeque::from(vec![
+                    crate::JobStatus::Failed,
+                ])),
+                cancelled: std::sync::atomic::AtomicBool::new(false),
+            };
+            let circuit = Circuit::new(1);
+
+            let err = backend.execute_and_wait(&circuit, 10, None).await.unwrap_err();
+            match err {
+                crate::BackendError::JobExecutionFailed(msg) => {
+                    assert!(msg.contains("Failed"));
+                },
+                other => panic!("expected JobExecutionFailed, got {:?}", other),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_execute_and_wait_cancelled_job() {
+            let backend = ScriptedBackend {
+                capabilities: BackendCapabilities::simulator(),
+                statuses: std::sync::Mutex::new(std::collections::VecDeque::from(vec![
+                    crate::JobStatus::Cancelled,
+                ])),
+                cancelled: std::sync::atomic::AtomicBool::new(false),
+            };
+            let circuit = Circuit::new(1);
+
+            let err = backend.execute_and_wait(&circuit, 10, None).await.unwrap_err();
+            match err {
+                crate::BackendError::JobExecutionFailed(msg) => {
+                    assert!(msg.contains("Cancelled"));
+                },
+                other => panic!("expected JobExecutionFailed, got {:?}", other),
+            }
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn test_execute_and_wait_timeout() {
+            let backend = ScriptedBackend {
+                capabilities: BackendCapabilities::simulator(),
+                // Never report completion; every poll returns Running so the
+                // timeout branch is what ends the loop.
+                statuses: std::sync::Mutex::new(std::collections::VecDeque::new()),
+                cancelled: std::sync::atomic::AtomicBool::new(false),
+            };
+            let circuit = Circuit::new(1);
+
+            let err = backend
+                .execute_and_wait(&circuit, 10, Some(0))
+                .await
+                .unwrap_err();
+            match err {
+                crate::BackendError::JobTimeout { timeout_seconds } => {
+                    assert_eq!(timeout_seconds, 0);
+                },
+                other => panic!("expected JobTimeout, got {:?}", other),
+            }
+            assert!(backend.cancelled.load(std::sync::atomic::Ordering::SeqCst));
+        }
+    }
 }

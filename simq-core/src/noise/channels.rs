@@ -582,6 +582,22 @@ mod tests {
     }
 
     #[test]
+    fn test_phase_damping_from_t2_invalid_t2() {
+        assert!(PhaseDamping::from_t2(0.0, 0.1).is_err());
+        assert!(PhaseDamping::from_t2(-1.0, 0.1).is_err());
+    }
+
+    #[test]
+    fn test_phase_damping_from_t2_negative_gate_time() {
+        let result = PhaseDamping::from_t2(100.0, -0.1);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            let msg = e.to_string();
+            assert!(msg.contains("Gate time must be non-negative"));
+        }
+    }
+
+    #[test]
     fn test_readout_error_channel() {
         let channel = ReadoutError::new(0.02, 0.03).unwrap();
         assert_eq!(channel.p01(), 0.02);
@@ -617,5 +633,25 @@ mod tests {
     fn test_readout_error_invalid_probabilities() {
         assert!(ReadoutError::new(-0.1, 0.1).is_err());
         assert!(ReadoutError::new(0.1, 1.1).is_err());
+    }
+
+    #[test]
+    fn test_readout_error_kraus_operators() {
+        let channel = ReadoutError::new(0.02, 0.03).unwrap();
+        let ops = channel.kraus_operators();
+
+        // Readout error returns a single identity-like Kraus operator
+        // since the actual error is applied classically to measurement bits.
+        assert_eq!(ops.len(), 1);
+        let op = &ops[0];
+        assert_eq!(op.dimension, 2);
+        assert_eq!(op.get(0, 0), Complex64::new(1.0, 0.0));
+        assert_eq!(op.get(0, 1), Complex64::new(0.0, 0.0));
+        assert_eq!(op.get(1, 0), Complex64::new(0.0, 0.0));
+        assert_eq!(op.get(1, 1), Complex64::new(1.0, 0.0));
+
+        // Since it's an identity operator, completeness should trivially hold
+        // (single identity Kraus operator satisfies K†K = I).
+        assert!(channel.verify_completeness(TOLERANCE));
     }
 }

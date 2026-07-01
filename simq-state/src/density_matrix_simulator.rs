@@ -505,4 +505,87 @@ mod tests {
         sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
         assert!((sim.purity() - 1.0).abs() < 1e-10);
     }
+
+    #[test]
+    fn test_state_accessor() {
+        // Covers the `state()` reference accessor.
+        let sim = DensityMatrixSimulator::new(2, DensityMatrixConfig::default()).unwrap();
+        let state_ref = sim.state();
+        assert_eq!(state_ref.num_qubits(), 2);
+        assert!((state_ref.trace() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_gate_with_validation_detects_invalid_state() {
+        // A non-unitary "gate" (projector onto |0>) breaks trace=1, so with
+        // validate_state=true, apply_gate must return a NotNormalized error.
+        let config = DensityMatrixConfig::new()
+            .with_seed(42)
+            .with_validation(true);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+
+        // Non-unitary projector: [[1,0],[0,0]] — not unitary, breaks trace
+        // preservation when applied as U rho U^dagger is still trace-1 for a
+        // projector on |0><0| applied to |0><0|... use a matrix guaranteed to
+        // break Hermiticity/trace instead: a pure scaling (non-unitary) gate.
+        let non_unitary = vec![
+            Complex64::new(2.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(2.0, 0.0),
+        ];
+
+        let result = sim.apply_gate(&non_unitary, &[0]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::NotNormalized { norm } => {
+                // Trace should now be 4x the original (scaled by 2 twice: U rho U^dagger)
+                assert!((norm - 4.0).abs() < 1e-9, "unexpected norm: {norm}");
+            },
+            other => panic!("expected NotNormalized error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_apply_kraus_channel_with_validation_detects_invalid_state() {
+        // A Kraus "channel" made of a single non-trace-preserving operator
+        // breaks trace=1, so with validate_state=true, apply_kraus_channel
+        // must return a NotNormalized error.
+        let config = DensityMatrixConfig::new()
+            .with_seed(42)
+            .with_validation(true);
+        let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
+
+        // Single Kraus operator that is a pure scaling (not trace-preserving
+        // on its own): K = 2*I. Sum K^dagger K != I, so channel is invalid.
+        let scaled_identity: Vec<Complex64> = vec![
+            Complex64::new(2.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(2.0, 0.0),
+        ];
+        let kraus_ops = vec![(scaled_identity, 2usize)];
+
+        let result = sim.apply_kraus_channel(&kraus_ops, &[0]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::NotNormalized { norm } => {
+                assert!((norm - 4.0).abs() < 1e-9, "unexpected norm: {norm}");
+            },
+            other => panic!("expected NotNormalized error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_partial_trace_without_seed_uses_entropy_rng() {
+        // Covers the `StdRng::from_entropy()` branch inside partial_trace
+        // when the simulator's config has no seed set.
+        let config = DensityMatrixConfig::new(); // no seed
+        let mut sim = DensityMatrixSimulator::new(2, config).unwrap();
+        sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
+
+        let reduced = sim.partial_trace(&[0]).unwrap();
+        assert_eq!(reduced.num_qubits(), 1);
+        assert_eq!(reduced.stats().gate_count, 0);
+    }
 }

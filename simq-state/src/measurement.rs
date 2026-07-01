@@ -513,6 +513,108 @@ mod tests {
         assert_eq!(bitstring_counts.get("10"), Some(&1));
         assert_eq!(bitstring_counts.get("11"), Some(&1));
     }
+
+    #[test]
+    fn test_measurement_result_with_collapsed_state() {
+        let state = DenseState::new(2).unwrap();
+        let result = MeasurementResult::with_collapsed_state(3, 0.5, state);
+        assert_eq!(result.outcome, 3);
+        assert_relative_eq!(result.probability, 0.5);
+        assert!(result.collapsed_state.is_some());
+        assert_eq!(result.collapsed_state.unwrap().num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_of_qubits_constructor() {
+        // Exercise the `of_qubits` constructor (specific qubit subset).
+        let measurement = ComputationalBasis::of_qubits(vec![0, 1]);
+        let mut state = DenseState::new(2).unwrap();
+        let mut rng = TestRng::new(7);
+
+        let result = measurement
+            .measure_once(&mut state, &mut || rng.next())
+            .unwrap();
+
+        // |00⟩ always measures to 0 regardless of which qubits are tracked.
+        assert_eq!(result.outcome, 0);
+    }
+
+    #[test]
+    fn test_sample_zero_shots() {
+        // shots == 0 should short-circuit and return an empty result without
+        // touching the RNG or building an alias table from real data.
+        let state = DenseState::new(2).unwrap();
+        let measurement = ComputationalBasis::new();
+        let mut rng = TestRng::new(1);
+
+        let result = measurement.sample(&state, 0, &mut || rng.next()).unwrap();
+        assert_eq!(result.shots, 0);
+        assert_eq!(result.counts.len(), 0);
+    }
+
+    #[test]
+    fn test_measure_once_without_collapse() {
+        // With collapse disabled, `collapsed_state` must be `None` and the
+        // original state must remain untouched.
+        let amplitudes = vec![
+            Complex64::new(1.0 / 2_f64.sqrt(), 0.0),
+            Complex64::new(1.0 / 2_f64.sqrt(), 0.0),
+        ];
+        let mut state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
+
+        let measurement = ComputationalBasis::new().with_collapse(false);
+        let mut rng = || 0.1; // deterministic outcome 0
+
+        let result = measurement.measure_once(&mut state, &mut rng).unwrap();
+        assert_eq!(result.outcome, 0);
+        assert!(result.collapsed_state.is_none());
+
+        // State amplitudes should be unmodified since collapse was skipped.
+        let amps = state.amplitudes();
+        assert_relative_eq!(amps[0].re, 1.0 / 2_f64.sqrt(), epsilon = 1e-10);
+        assert_relative_eq!(amps[1].re, 1.0 / 2_f64.sqrt(), epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_computational_basis_default() {
+        // Default::default() should behave identically to `new()`.
+        let measurement = ComputationalBasis::default();
+        let mut state = DenseState::new(1).unwrap();
+        let mut rng = || 0.1;
+        let result = measurement.measure_once(&mut state, &mut rng).unwrap();
+        assert_eq!(result.outcome, 0);
+        assert_relative_eq!(result.probability, 1.0);
+    }
+
+    #[test]
+    fn test_measurement_trait_impl() {
+        // Exercise the `Measurement` trait's `measure` method, which simply
+        // delegates to `measure_once`.
+        fn measure_via_trait(
+            m: &dyn Measurement,
+            state: &mut DenseState,
+            rng: &mut dyn FnMut() -> f64,
+        ) -> MeasurementResult {
+            m.measure(state, rng).unwrap()
+        }
+
+        let mut state = DenseState::new(1).unwrap();
+        let measurement = ComputationalBasis::new();
+        let mut rng = || 0.1;
+        let result = measure_via_trait(&measurement, &mut state, &mut rng);
+        assert_eq!(result.outcome, 0);
+    }
+
+    #[test]
+    fn test_alias_table_empty_probabilities_errors() {
+        // AliasTable::new must reject an empty probability distribution.
+        // (AliasTable doesn't implement Debug, so we can't use unwrap_err(); match instead.)
+        let is_expected_err = matches!(
+            AliasTable::new(&[]),
+            Err(StateError::InvalidDimension { dimension: 0 })
+        );
+        assert!(is_expected_err);
+    }
 }
 
 /// Mid-circuit measurement with partial collapse
@@ -786,5 +888,57 @@ mod mid_circuit_tests {
 
         // Both should have same value due to GHZ entanglement
         assert_eq!(outcomes[0].1, outcomes[1].1);
+    }
+
+    #[test]
+    fn test_mid_circuit_invalid_qubit_index() {
+        // Measuring a qubit index that is out of range must return
+        // StateError::InvalidQubitIndex rather than panicking.
+        let mut state = DenseState::new(2).unwrap();
+        let measurement = MidCircuitMeasurement::new(vec![5]);
+        let mut rng = || 0.5;
+
+        let err = measurement.measure(&mut state, &mut rng).unwrap_err();
+        assert_eq!(
+            err,
+            StateError::InvalidQubitIndex {
+                index: 5,
+                num_qubits: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn test_mid_circuit_zero_probability_outcome_errors() {
+        // Qubit 0 is deterministically |0> (prob_zero = 1.0). Forcing the RNG
+        // to return a value >= 1.0 selects the |1> branch, whose amplitude
+        // mass is exactly zero, so normalization must fail with
+        // StateError::NotNormalized instead of dividing by (near) zero.
+        let mut state = DenseState::new(1).unwrap();
+        let measurement = MidCircuitMeasurement::new(vec![0]);
+        let mut rng = || 1.0; // not < prob_zero (1.0), so outcome = 1
+
+        let err = measurement.measure(&mut state, &mut rng).unwrap_err();
+        match err {
+            StateError::NotNormalized { norm } => {
+                assert_relative_eq!(norm, 0.0, epsilon = 1e-10);
+            },
+            other => panic!("expected NotNormalized error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mid_circuit_measure_with_state() {
+        // Cover `measure_with_state`, which returns both outcomes and a
+        // cloned copy of the post-measurement state.
+        let mut state = DenseState::new(2).unwrap();
+        let measurement = MidCircuitMeasurement::new(vec![0]);
+        let mut rng = || 0.1;
+
+        let (outcomes, final_state) = measurement.measure_with_state(&mut state, &mut rng).unwrap();
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0], (0, 0));
+        assert_eq!(final_state.num_qubits(), 2);
+        assert_relative_eq!(final_state.amplitudes()[0].norm(), 1.0, epsilon = 1e-10);
     }
 }

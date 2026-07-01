@@ -1700,4 +1700,216 @@ mod tests {
         // Compact uses unicode
         assert_eq!(compact.control, "●");
     }
+
+    #[test]
+    fn test_vertical_wire_char() {
+        // Covers AsciiConfig::vertical_wire for both styles (lines 163-166)
+        let ascii_cfg = AsciiConfig {
+            style: RenderStyle::Ascii,
+            ..Default::default()
+        };
+        assert_eq!(ascii_cfg.vertical_wire(), '|');
+
+        let unicode_cfg = AsciiConfig {
+            style: RenderStyle::Unicode,
+            ..Default::default()
+        };
+        assert_eq!(unicode_cfg.vertical_wire(), '│');
+
+        let compact_cfg = AsciiConfig {
+            style: RenderStyle::Compact,
+            ..Default::default()
+        };
+        assert_eq!(compact_cfg.vertical_wire(), '│');
+    }
+
+    #[test]
+    fn test_terminal_width_from_columns_env() {
+        // Covers the COLUMNS env var success path (lines 312-316)
+        // Safe: no other test in this binary reads/writes COLUMNS.
+        let prev = std::env::var("COLUMNS").ok();
+        std::env::set_var("COLUMNS", "123");
+        let w = terminal_width();
+        assert_eq!(w, Some(123));
+        match prev {
+            Some(v) => std::env::set_var("COLUMNS", v),
+            None => std::env::remove_var("COLUMNS"),
+        }
+    }
+
+    #[test]
+    fn test_terminal_width_invalid_columns_falls_through() {
+        // Covers the case where COLUMNS is set but invalid (parse fails) or zero,
+        // so terminal_width() falls through to platform detection / None (lines 317-331).
+        let prev = std::env::var("COLUMNS").ok();
+        std::env::set_var("COLUMNS", "not_a_number");
+        let _ = terminal_width(); // Should not panic; result depends on platform tools.
+        std::env::set_var("COLUMNS", "0");
+        let _ = terminal_width(); // w > 0 is false, falls through as well.
+        match prev {
+            Some(v) => std::env::set_var("COLUMNS", v),
+            None => std::env::remove_var("COLUMNS"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_get_terminal_size_tput_and_stty_real() {
+        // Directly exercises the tput/stty helper functions (lines 326-327, 334-376)
+        // against whatever real `tput`/`stty` binaries are present in this environment.
+        let tput_result = get_terminal_size_tput();
+        if let Some(w) = tput_result {
+            assert!(w > 0);
+        }
+        let stty_result = get_terminal_size_stty();
+        if let Some(w) = stty_result {
+            assert!(w > 0);
+        }
+    }
+
+    #[cfg(unix)]
+    /// Create an executable fake binary at `dir/name` containing `body` as its shell script.
+    fn write_fake_bin(dir: &std::path::Path, name: &str, body: &str) {
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = dir.join(name);
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            writeln!(f, "#!/bin/sh").unwrap();
+            writeln!(f, "{}", body).unwrap();
+        }
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&path, perms).unwrap();
+    }
+
+    #[cfg(unix)]
+    /// Run `f` with PATH temporarily pointing only at `dir`, then restore PATH.
+    fn with_fake_path<T>(dir: &std::path::Path, f: impl FnOnce() -> T) -> T {
+        let prev_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", dir);
+        let result = f();
+        match prev_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+        result
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_get_terminal_size_tput_success() {
+        // Covers the success parse path of get_terminal_size_tput (lines 343-346).
+        let dir = std::env::temp_dir().join(format!("simq_fake_tput_ok_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        write_fake_bin(&dir, "tput", "echo 99");
+
+        let result = with_fake_path(&dir, get_terminal_size_tput);
+        assert_eq!(result, Some(99));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_get_terminal_size_tput_failure() {
+        // Covers the failure branch of get_terminal_size_tput (line 348): non-zero exit.
+        let dir = std::env::temp_dir().join(format!("simq_fake_tput_fail_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        write_fake_bin(&dir, "tput", "exit 1");
+
+        let result = with_fake_path(&dir, get_terminal_size_tput);
+        assert_eq!(result, None);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_get_terminal_size_stty_success() {
+        // Covers the success parse path of get_terminal_size_stty (lines 362-368):
+        // "rows cols" output with at least 2 whitespace-separated parts.
+        let dir = std::env::temp_dir().join(format!("simq_fake_stty_ok_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        write_fake_bin(&dir, "stty", "echo '24 100'");
+
+        let result = with_fake_path(&dir, get_terminal_size_stty);
+        assert_eq!(result, Some(100));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_get_terminal_size_stty_too_few_parts() {
+        // Covers the `parts.len() < 2` branch of get_terminal_size_stty (line 369).
+        let dir = std::env::temp_dir().join(format!("simq_fake_stty_short_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        write_fake_bin(&dir, "stty", "echo 'onlyoneword'");
+
+        let result = with_fake_path(&dir, get_terminal_size_stty);
+        assert_eq!(result, None);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_get_terminal_size_stty_failure() {
+        // Covers the failure branch of get_terminal_size_stty (line 373): non-zero exit.
+        let dir = std::env::temp_dir().join(format!("simq_fake_stty_fail_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        write_fake_bin(&dir, "stty", "exit 1");
+
+        let result = with_fake_path(&dir, get_terminal_size_stty);
+        assert_eq!(result, None);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_calculate_column_widths_empty_columns() {
+        // Covers the early-return branch when columns is empty (line 582)
+        let circuit = Circuit::new(1);
+        let config = AsciiConfig::default();
+        let renderer = AsciiRenderer::new(&circuit, &config);
+        let widths = renderer.calculate_column_widths(&[]);
+        assert!(widths.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_column_widths_zero_total_natural() {
+        // Covers the `total_natural == 0` branch (line 610), which requires:
+        // - at least one column so we don't hit the empty-columns early return
+        // - every column's natural width computed as 0 via `min_gate_width: 0`
+        //   (an empty column list means `.max()` is None, falling back to min_gate_width)
+        // - the circuit's effective width forced small enough to trigger compression
+        let circuit = Circuit::new(1);
+        let config = AsciiConfig {
+            max_width: 3,
+            min_gate_width: 0,
+            show_labels: false,
+            ..Default::default()
+        };
+        let renderer = AsciiRenderer::new(&circuit, &config);
+        // Two empty columns: natural width per column = min_gate_width = 0.
+        let columns: Vec<Vec<(usize, &GateOp)>> = vec![Vec::new(), Vec::new()];
+        let widths = renderer.calculate_column_widths(&columns);
+        assert_eq!(widths, vec![0, 0]);
+    }
+
+    #[test]
+    fn test_get_target_symbol_generic_controlled_gate() {
+        // Covers the default arm of get_target_symbol (lines 861, 864-865):
+        // a controlled gate name that isn't one of the specifically-matched cases.
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(MockGate::new("CPHASE", 2)), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let ascii = render(&circuit);
+        // Target qubit should show base name "PHASE" boxed.
+        assert!(ascii.contains("[PHASE]"));
+    }
 }

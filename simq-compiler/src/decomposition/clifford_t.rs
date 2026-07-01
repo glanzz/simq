@@ -526,4 +526,253 @@ mod tests {
         assert!(!CliffordTGate::H.is_t_gate());
         assert!(!CliffordTGate::S.is_t_gate());
     }
+
+    #[derive(Debug)]
+    struct MockGate {
+        name: String,
+        n_qubits: usize,
+        matrix: Option<Vec<Complex64>>,
+    }
+
+    impl Gate for MockGate {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn num_qubits(&self) -> usize {
+            self.n_qubits
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            self.matrix.clone()
+        }
+    }
+
+    fn matrix2_to_flat(m: &Matrix2) -> Vec<Complex64> {
+        vec![m[0][0], m[0][1], m[1][0], m[1][1]]
+    }
+
+    fn identity_matrix2() -> Matrix2 {
+        [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ]
+    }
+
+    fn hadamard_matrix2() -> Matrix2 {
+        let f = std::f64::consts::FRAC_1_SQRT_2;
+        [
+            [Complex64::new(f, 0.0), Complex64::new(f, 0.0)],
+            [Complex64::new(f, 0.0), Complex64::new(-f, 0.0)],
+        ]
+    }
+
+    #[test]
+    fn test_exact_rz_pi_over_4_all_residues() {
+        let decomposer = CliffordTDecomposer::new();
+
+        // k=0 => identity (empty vec)
+        assert_eq!(decomposer.exact_rz_pi_over_4(0), vec![]);
+        // k=1 => T
+        assert_eq!(decomposer.exact_rz_pi_over_4(1), vec![CliffordTGate::T]);
+        // k=2 => S
+        assert_eq!(decomposer.exact_rz_pi_over_4(2), vec![CliffordTGate::S]);
+        // k=3 => T, S
+        assert_eq!(
+            decomposer.exact_rz_pi_over_4(3),
+            vec![CliffordTGate::T, CliffordTGate::S]
+        );
+        // k=4 => Z
+        assert_eq!(decomposer.exact_rz_pi_over_4(4), vec![CliffordTGate::Z]);
+        // k=5 => TDagger
+        assert_eq!(decomposer.exact_rz_pi_over_4(5), vec![CliffordTGate::TDagger]);
+        // k=6 => SDagger
+        assert_eq!(decomposer.exact_rz_pi_over_4(6), vec![CliffordTGate::SDagger]);
+        // k=7 => TDagger, SDagger
+        assert_eq!(
+            decomposer.exact_rz_pi_over_4(7),
+            vec![CliffordTGate::TDagger, CliffordTGate::SDagger]
+        );
+
+        // Negative k wraps around via rem_euclid: -1 -> 7
+        assert_eq!(
+            decomposer.exact_rz_pi_over_4(-1),
+            vec![CliffordTGate::TDagger, CliffordTGate::SDagger]
+        );
+
+        // k=8 wraps to 0
+        assert_eq!(decomposer.exact_rz_pi_over_4(8), vec![]);
+    }
+
+    #[test]
+    fn test_approximate_rz_arbitrary_angle() {
+        let decomposer = CliffordTDecomposer::new();
+        // An angle that is not close to any k*pi/4 multiple within epsilon,
+        // forcing decompose_rz to fall through to approximate_rz.
+        let angle = PI / 4.0 + 0.2;
+        let gates = decomposer.decompose_rz(angle);
+        // approximate_rz rounds to nearest pi/4 multiple, so should match exact_rz_pi_over_4
+        let k = (angle / (PI / 4.0)).round() as i32;
+        assert_eq!(gates, decomposer.exact_rz_pi_over_4(k));
+    }
+
+    #[test]
+    fn test_decompose_single_qubit_identity_gamma_near_zero() {
+        // Identity matrix triggers the gamma.abs() < EPSILON branch inside decompose_single_qubit
+        let decomposer = CliffordTDecomposer::new();
+        let id = identity_matrix2();
+        let result = decomposer.decompose_single_qubit(&id);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_decompose_single_qubit_non_unitary_errors() {
+        let decomposer = CliffordTDecomposer::new();
+        let not_unitary: Matrix2 = [
+            [Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let result = decomposer.decompose_single_qubit(&not_unitary);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_solovay_kitaev_base_case_and_recursive_fallback() {
+        let decomposer = CliffordTDecomposer::new();
+        let h = hadamard_matrix2();
+
+        // depth == 0 -> base case (direct decomposition)
+        let base = decomposer.solovay_kitaev(&h, 0).unwrap();
+        assert!(!base.is_empty());
+
+        // depth > 0 -> recursive case, currently falls back to direct decomposition
+        let recursive = decomposer.solovay_kitaev(&h, 3).unwrap();
+        assert!(!recursive.is_empty());
+    }
+
+    #[test]
+    fn test_optimize_t_count_s_dagger_s_and_ss_cancellation() {
+        let decomposer = CliffordTDecomposer::new();
+
+        // S† S should cancel (and its symmetric S S† case)
+        let gates = vec![CliffordTGate::SDagger, CliffordTGate::S];
+        assert!(decomposer.optimize_t_count(&gates).is_empty());
+
+        let gates2 = vec![CliffordTGate::S, CliffordTGate::SDagger];
+        assert!(decomposer.optimize_t_count(&gates2).is_empty());
+
+        // S S should become Z
+        let gates3 = vec![CliffordTGate::S, CliffordTGate::S];
+        assert_eq!(decomposer.optimize_t_count(&gates3), vec![CliffordTGate::Z]);
+
+        // A gate with no matching optimization rule (default arm) should just be appended
+        let gates4 = vec![CliffordTGate::X, CliffordTGate::Y];
+        assert_eq!(
+            decomposer.optimize_t_count(&gates4),
+            vec![CliffordTGate::X, CliffordTGate::Y]
+        );
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_non_single_qubit_gate() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig::default();
+        let two_qubit_gate = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+            matrix: None,
+        };
+        let result = decomposer.decompose(&two_qubit_gate, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_gate_without_matrix() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig::default();
+        let gate_no_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        };
+        let result = decomposer.decompose(&gate_no_matrix, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_invalid_matrix_size() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig::default();
+        let gate_bad_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(vec![Complex64::new(1.0, 0.0)]),
+        };
+        let result = decomposer.decompose(&gate_bad_matrix, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_succeeds_and_optimizes() {
+        let decomposer = CliffordTDecomposer::new();
+        let mut config = DecompositionConfig::default();
+        config.optimization_level = 1;
+
+        let gate = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(matrix2_to_flat(&hadamard_matrix2())),
+        };
+        let result = decomposer.decompose(&gate, &config).unwrap();
+        assert!(result.metadata.optimized);
+        assert!(result.metadata.strategy.contains("Clifford+T"));
+        assert_eq!(result.two_qubit_count, 0);
+    }
+
+    #[test]
+    fn test_decomposer_trait_can_decompose_name_and_estimate_cost() {
+        let decomposer = CliffordTDecomposer::new();
+        assert_eq!(decomposer.name(), "CliffordT");
+
+        let single_with_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(matrix2_to_flat(&hadamard_matrix2())),
+        };
+        assert!(decomposer.can_decompose(&single_with_matrix));
+        assert_eq!(decomposer.estimate_cost(&single_with_matrix), Some(7));
+
+        let single_without_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        };
+        assert!(!decomposer.can_decompose(&single_without_matrix));
+
+        let two_qubit = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+            matrix: None,
+        };
+        assert!(!decomposer.can_decompose(&two_qubit));
+        assert_eq!(decomposer.estimate_cost(&two_qubit), None);
+    }
+
+    #[test]
+    fn test_clifford_t_gate_name_all_variants() {
+        let expected = [
+            (CliffordTGate::H, "H"),
+            (CliffordTGate::S, "S"),
+            (CliffordTGate::SDagger, "S†"),
+            (CliffordTGate::T, "T"),
+            (CliffordTGate::TDagger, "T†"),
+            (CliffordTGate::X, "X"),
+            (CliffordTGate::Y, "Y"),
+            (CliffordTGate::Z, "Z"),
+            (CliffordTGate::I, "I"),
+            (CliffordTGate::CNOT, "CNOT"),
+        ];
+
+        for (gate, name) in expected {
+            assert_eq!(gate.name(), name, "unexpected name for {:?}", gate);
+        }
+    }
 }
