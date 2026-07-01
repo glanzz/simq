@@ -1786,7 +1786,12 @@ mod tests {
 
     #[cfg(unix)]
     /// Run `f` with PATH temporarily pointing only at `dir`, then restore PATH.
+    /// A process-wide mutex serializes all callers so parallel test threads
+    /// can't clobber each other's PATH manipulation.
     fn with_fake_path<T>(dir: &std::path::Path, f: impl FnOnce() -> T) -> T {
+        use std::sync::Mutex;
+        static PATH_LOCK: Mutex<()> = Mutex::new(());
+        let _guard = PATH_LOCK.lock().unwrap();
         let prev_path = std::env::var("PATH").ok();
         std::env::set_var("PATH", dir);
         let result = f();
