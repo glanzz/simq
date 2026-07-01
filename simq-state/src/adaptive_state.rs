@@ -681,7 +681,7 @@ mod tests {
         state.force_to_dense().unwrap();
         // After force_to_dense on |00>, density is 1 non-zero / 4 total = 0.25
         let d = state.density();
-        assert!(d >= 0.0 && d <= 1.0);
+        assert!((0.0..=1.0).contains(&d));
     }
 
     #[test]
@@ -817,8 +817,8 @@ mod tests {
         assert!(state.is_sparse());
         // Identity 4x4 gate
         let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
-        for i in 0..4 {
-            identity[i][i] = Complex64::new(1.0, 0.0);
+        for (i, row) in identity.iter_mut().enumerate() {
+            row[i] = Complex64::new(1.0, 0.0);
         }
         let _converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
         // State should still be valid after applying identity
@@ -832,8 +832,8 @@ mod tests {
         assert!(state.is_dense());
         // Identity 4x4 gate
         let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
-        for i in 0..4 {
-            identity[i][i] = Complex64::new(1.0, 0.0);
+        for (i, row) in identity.iter_mut().enumerate() {
+            row[i] = Complex64::new(1.0, 0.0);
         }
         let converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
         assert!(!converted); // always false for dense

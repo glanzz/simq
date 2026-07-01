@@ -279,7 +279,7 @@ fn test_convergence_status_variants() {
     // Test Clone and Copy
     let s = ConvergenceStatus::EnergyConverged;
     let s2 = s; // Copy
-    let s3 = s.clone(); // Clone
+    let s3 = s; // Copy again
     assert_eq!(s, s2);
     assert_eq!(s, s3);
 
@@ -507,7 +507,6 @@ fn test_vqe_energy_convergence_via_tight_tolerance() {
     let sim = make_sim();
     let obs = z_observable();
     // Use a very loose gradient tolerance but tight energy tolerance
-    use simq_sim::gradient::GradientConfig;
     let config = VQEConfig {
         max_iterations: 100,
         energy_tolerance: 1.0, // Very loose - will trigger after tiny energy change

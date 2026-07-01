@@ -647,7 +647,7 @@ fn test_single_qubit_decompose_with_optimization_level() {
     let result = decomposer.decompose(&gate, &config);
     assert!(result.is_ok());
     let dr = result.unwrap();
-    assert_eq!(dr.metadata.optimized, true);
+    assert!(dr.metadata.optimized);
     assert_eq!(dr.metadata.optimization_passes, 2);
 }
 

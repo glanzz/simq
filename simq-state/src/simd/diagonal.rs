@@ -433,11 +433,11 @@ mod tests {
         apply_diagonal_gate_scalar(&mut state, diagonal, 2, 3);
 
         let norm = (8.0_f64).sqrt().recip();
-        for i in 0..4 {
-            assert!((state[i].re - norm).abs() < 1e-10, "index {i} should be +norm");
+        for (i, s) in state[..4].iter().enumerate() {
+            assert!((s.re - norm).abs() < 1e-10, "index {i} should be +norm");
         }
-        for i in 4..8 {
-            assert!((state[i].re + norm).abs() < 1e-10, "index {i} should be -norm");
+        for (i, s) in state[4..].iter().enumerate() {
+            assert!((s.re + norm).abs() < 1e-10, "index {} should be -norm", i + 4);
         }
     }
 

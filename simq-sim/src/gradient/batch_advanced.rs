@@ -417,7 +417,7 @@ mod tests {
     use super::*;
     use crate::{Simulator, SimulatorConfig};
     use simq_core::{circuit::Circuit, QubitId};
-    use simq_gates::standard::{Hadamard, RotationY};
+    use simq_gates::standard::RotationY;
     use simq_state::observable::{PauliObservable, PauliString};
     use std::sync::Arc;
 
@@ -437,12 +437,6 @@ mod tests {
         let mut c = Circuit::new(1);
         c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
             .unwrap();
-        c
-    }
-
-    fn h_circuit(_params: &[f64]) -> Circuit {
-        let mut c = Circuit::new(1);
-        c.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
         c
     }
 

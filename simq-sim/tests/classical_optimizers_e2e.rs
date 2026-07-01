@@ -238,7 +238,7 @@ fn test_lbfgs_more_iterations_triggers_lbfgs_direction() {
     let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
     assert!(result.energy.is_finite());
     // Should have at least 2 history entries to cover the L-BFGS direction path
-    assert!(optimizer.history().len() >= 1);
+    assert!(!optimizer.history().is_empty());
 }
 
 #[test]

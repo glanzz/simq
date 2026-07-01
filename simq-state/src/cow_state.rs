@@ -715,8 +715,8 @@ mod tests {
         let probs = state.get_all_probabilities();
         assert_eq!(probs.len(), 4);
         assert_relative_eq!(probs[0], 1.0, epsilon = 1e-12);
-        for i in 1..4 {
-            assert_relative_eq!(probs[i], 0.0, epsilon = 1e-12);
+        for val in &probs[1..] {
+            assert_relative_eq!(*val, 0.0, epsilon = 1e-12);
         }
     }
 

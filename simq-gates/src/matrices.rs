@@ -562,9 +562,9 @@ mod tests {
         assert_relative_eq!(HADAMARD[1][0].re, inv_sqrt2, epsilon = 1e-12);
         assert_relative_eq!(HADAMARD[1][1].re, -inv_sqrt2, epsilon = 1e-12);
         // All imaginary parts are zero
-        for i in 0..2 {
-            for j in 0..2 {
-                assert_relative_eq!(HADAMARD[i][j].im, 0.0, epsilon = 1e-12);
+        for row in HADAMARD.iter() {
+            for val in row.iter() {
+                assert_relative_eq!(val.im, 0.0, epsilon = 1e-12);
             }
         }
     }
@@ -654,8 +654,8 @@ mod tests {
         assert_relative_eq!(TOFFOLI[7][6].re, 1.0, epsilon = 1e-12);
         // Row 7 should map to row 6 (they're swapped)
         // Everything else is identity
-        for i in 0..6 {
-            assert_relative_eq!(TOFFOLI[i][i].re, 1.0, epsilon = 1e-12);
+        for (i, row) in TOFFOLI.iter().enumerate().take(6) {
+            assert_relative_eq!(row[i].re, 1.0, epsilon = 1e-12);
         }
     }
 
@@ -739,11 +739,9 @@ mod tests {
         use std::f64::consts::PI;
         let u = u2(PI / 4.0, PI / 3.0);
         let mut product = [[ZERO; 2]; 2];
-        for i in 0..2 {
-            for j in 0..2 {
-                for k in 0..2 {
-                    product[i][j] += u[i][k] * u[j][k].conj();
-                }
+        for (i, ui) in u.iter().enumerate() {
+            for (j, uj) in u.iter().enumerate() {
+                product[i][j] = ui.iter().zip(uj.iter()).map(|(&a, &b)| a * b.conj()).sum();
             }
         }
         assert_relative_eq!(product[0][0].re, 1.0, epsilon = 1e-10);
@@ -757,11 +755,9 @@ mod tests {
         use std::f64::consts::PI;
         let u = u3(PI / 4.0, PI / 3.0, PI / 6.0);
         let mut product = [[ZERO; 2]; 2];
-        for i in 0..2 {
-            for j in 0..2 {
-                for k in 0..2 {
-                    product[i][j] += u[i][k] * u[j][k].conj();
-                }
+        for (i, ui) in u.iter().enumerate() {
+            for (j, uj) in u.iter().enumerate() {
+                product[i][j] = ui.iter().zip(uj.iter()).map(|(&a, &b)| a * b.conj()).sum();
             }
         }
         assert_relative_eq!(product[0][0].re, 1.0, epsilon = 1e-10);
@@ -787,15 +783,13 @@ mod tests {
         let m = rxx(PI / 4.0);
         // Check unitarity: M·M† = I
         let mut product = [[ZERO; 4]; 4];
-        for i in 0..4 {
-            for j in 0..4 {
-                for k in 0..4 {
-                    product[i][j] += m[i][k] * m[j][k].conj();
-                }
+        for (i, mi) in m.iter().enumerate() {
+            for (j, mj) in m.iter().enumerate() {
+                product[i][j] = mi.iter().zip(mj.iter()).map(|(&a, &b)| a * b.conj()).sum();
             }
         }
-        for i in 0..4 {
-            assert_relative_eq!(product[i][i].re, 1.0, epsilon = 1e-10);
+        for (i, row) in product.iter().enumerate() {
+            assert_relative_eq!(row[i].re, 1.0, epsilon = 1e-10);
         }
     }
 
@@ -804,15 +798,13 @@ mod tests {
         use std::f64::consts::PI;
         let m = ryy(PI / 4.0);
         let mut product = [[ZERO; 4]; 4];
-        for i in 0..4 {
-            for j in 0..4 {
-                for k in 0..4 {
-                    product[i][j] += m[i][k] * m[j][k].conj();
-                }
+        for (i, mi) in m.iter().enumerate() {
+            for (j, mj) in m.iter().enumerate() {
+                product[i][j] = mi.iter().zip(mj.iter()).map(|(&a, &b)| a * b.conj()).sum();
             }
         }
-        for i in 0..4 {
-            assert_relative_eq!(product[i][i].re, 1.0, epsilon = 1e-10);
+        for (i, row) in product.iter().enumerate() {
+            assert_relative_eq!(row[i].re, 1.0, epsilon = 1e-10);
         }
     }
 
@@ -822,17 +814,17 @@ mod tests {
         use std::f64::consts::PI;
         let m = rzz(PI / 2.0);
         // Off-diagonals should all be zero
-        for i in 0..4 {
-            for j in 0..4 {
+        for (i, row) in m.iter().enumerate() {
+            for (j, val) in row.iter().enumerate() {
                 if i != j {
-                    assert_relative_eq!(m[i][j].re, 0.0, epsilon = 1e-12);
-                    assert_relative_eq!(m[i][j].im, 0.0, epsilon = 1e-12);
+                    assert_relative_eq!(val.re, 0.0, epsilon = 1e-12);
+                    assert_relative_eq!(val.im, 0.0, epsilon = 1e-12);
                 }
             }
         }
         // Diagonal elements should have unit norm
-        for i in 0..4 {
-            assert_relative_eq!(m[i][i].norm_sqr(), 1.0, epsilon = 1e-10);
+        for (i, row) in m.iter().enumerate() {
+            assert_relative_eq!(row[i].norm_sqr(), 1.0, epsilon = 1e-10);
         }
     }
 }

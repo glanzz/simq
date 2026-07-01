@@ -483,7 +483,7 @@ mod tests {
             Complex64::new(0.0, 0.0),
             Complex64::new(1.0, 0.0),
         ];
-        sim.apply_kraus_channel(&vec![(identity_kraus, 2usize)], &[0])
+        sim.apply_kraus_channel(&[(identity_kraus, 2usize)], &[0])
             .unwrap();
 
         assert_eq!(sim.stats().gate_count, 1);

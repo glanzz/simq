@@ -702,7 +702,7 @@ mod tests {
         assert!(engine.execute(&circuit, &mut state).is_ok());
         // Second execution should use cache
         let hit_rate = engine.cache_hit_rate();
-        assert!(hit_rate >= 0.0 && hit_rate <= 1.0);
+        assert!((0.0..=1.0).contains(&hit_rate));
     }
 
     #[test]
