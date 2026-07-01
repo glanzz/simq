@@ -384,6 +384,13 @@ mod tests {
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             }
+
+            fn get_result(&self, _job_id: &str) -> Result<BackendResult> {
+                use std::collections::HashMap;
+                let mut counts = HashMap::new();
+                counts.insert("0".to_string(), 1);
+                Ok(BackendResult::new(counts, 1))
+            }
         }
 
         #[async_trait::async_trait]
