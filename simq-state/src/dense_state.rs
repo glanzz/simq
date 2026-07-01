@@ -1815,4 +1815,33 @@ mod tests {
         let result = state.expectation_value(&observable);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_vector_accessor() {
+        let state = DenseState::new(3).unwrap();
+        let vector = state.vector();
+        assert_eq!(vector.amplitudes().len(), 8);
+        assert_eq!(vector.amplitudes()[0], Complex64::new(1.0, 0.0));
+    }
+
+    #[test]
+    fn test_measure_qubit_zero_probability_outcome_errors() {
+        // |0> has prob_zero == 1.0, so forcing outcome=1 (random_value >= 1.0)
+        // collapses onto a zero-amplitude branch, yielding a ~0 normalization
+        // factor and triggering the NotNormalized error branch.
+        let mut state = DenseState::new(1).unwrap();
+        let result = state.measure_qubit(0, 1.0);
+        assert!(matches!(result, Err(StateError::NotNormalized { .. })));
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let state = DenseState::new(2).unwrap();
+        let dbg = format!("{:?}", state);
+        assert!(dbg.contains("DenseState"));
+        assert!(dbg.contains("num_qubits"));
+        assert!(dbg.contains("dimension"));
+        assert!(dbg.contains("norm"));
+        assert!(dbg.contains("is_simd_aligned"));
+    }
 }

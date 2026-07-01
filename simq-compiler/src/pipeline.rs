@@ -268,7 +268,7 @@ mod tests {
     fn test_pipeline_builder_min_benefit_score() {
         // Exercises PipelineBuilder::min_benefit_score (lines 172-174), which
         // forwards to the inner CompilerBuilder.
-        let mut compiler = PipelineBuilder::new()
+        let compiler = PipelineBuilder::new()
             .with_dead_code_elimination()
             .min_benefit_score(0.95)
             .build();

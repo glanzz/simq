@@ -344,8 +344,8 @@ pub enum CircuitSize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use simq_core::Circuit;
     use simq_core::gate::Gate as GateTrait;
+    use simq_core::Circuit;
     use simq_gates::standard::{CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationZ};
     use std::sync::Arc;
 
@@ -434,10 +434,7 @@ mod tests {
             .add_gate(Arc::new(PauliZ) as Arc<dyn GateTrait>, &[QubitId::new(0)])
             .unwrap();
         circuit
-            .add_gate(
-                Arc::new(RotationZ::new(0.5)) as Arc<dyn GateTrait>,
-                &[QubitId::new(0)],
-            )
+            .add_gate(Arc::new(RotationZ::new(0.5)) as Arc<dyn GateTrait>, &[QubitId::new(0)])
             .unwrap();
 
         let chars = CircuitCharacteristics::analyze(&circuit);
@@ -450,16 +447,10 @@ mod tests {
     fn test_same_axis_rotations_commute() {
         let mut circuit = Circuit::new(1);
         circuit
-            .add_gate(
-                Arc::new(RotationX::new(0.3)) as Arc<dyn GateTrait>,
-                &[QubitId::new(0)],
-            )
+            .add_gate(Arc::new(RotationX::new(0.3)) as Arc<dyn GateTrait>, &[QubitId::new(0)])
             .unwrap();
         circuit
-            .add_gate(
-                Arc::new(RotationX::new(0.7)) as Arc<dyn GateTrait>,
-                &[QubitId::new(0)],
-            )
+            .add_gate(Arc::new(RotationX::new(0.7)) as Arc<dyn GateTrait>, &[QubitId::new(0)])
             .unwrap();
 
         let chars = CircuitCharacteristics::analyze(&circuit);
@@ -534,10 +525,7 @@ mod tests {
             .add_gate(Arc::new(Hadamard) as Arc<dyn GateTrait>, &[QubitId::new(0)])
             .unwrap();
         circuit
-            .add_gate(
-                Arc::new(CNot) as Arc<dyn GateTrait>,
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(CNot) as Arc<dyn GateTrait>, &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
 
         let chars = CircuitCharacteristics::analyze(&circuit);

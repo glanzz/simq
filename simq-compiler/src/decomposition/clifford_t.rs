@@ -576,10 +576,7 @@ mod tests {
         // k=2 => S
         assert_eq!(decomposer.exact_rz_pi_over_4(2), vec![CliffordTGate::S]);
         // k=3 => T, S
-        assert_eq!(
-            decomposer.exact_rz_pi_over_4(3),
-            vec![CliffordTGate::T, CliffordTGate::S]
-        );
+        assert_eq!(decomposer.exact_rz_pi_over_4(3), vec![CliffordTGate::T, CliffordTGate::S]);
         // k=4 => Z
         assert_eq!(decomposer.exact_rz_pi_over_4(4), vec![CliffordTGate::Z]);
         // k=5 => TDagger
@@ -665,10 +662,7 @@ mod tests {
 
         // A gate with no matching optimization rule (default arm) should just be appended
         let gates4 = vec![CliffordTGate::X, CliffordTGate::Y];
-        assert_eq!(
-            decomposer.optimize_t_count(&gates4),
-            vec![CliffordTGate::X, CliffordTGate::Y]
-        );
+        assert_eq!(decomposer.optimize_t_count(&gates4), vec![CliffordTGate::X, CliffordTGate::Y]);
     }
 
     #[test]
@@ -713,8 +707,10 @@ mod tests {
     #[test]
     fn test_decomposer_trait_succeeds_and_optimizes() {
         let decomposer = CliffordTDecomposer::new();
-        let mut config = DecompositionConfig::default();
-        config.optimization_level = 1;
+        let config = DecompositionConfig {
+            optimization_level: 1,
+            ..Default::default()
+        };
 
         let gate = MockGate {
             name: "H".to_string(),

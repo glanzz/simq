@@ -609,10 +609,8 @@ mod tests {
     fn test_alias_table_empty_probabilities_errors() {
         // AliasTable::new must reject an empty probability distribution.
         // (AliasTable doesn't implement Debug, so we can't use unwrap_err(); match instead.)
-        let is_expected_err = matches!(
-            AliasTable::new(&[]),
-            Err(StateError::InvalidDimension { dimension: 0 })
-        );
+        let is_expected_err =
+            matches!(AliasTable::new(&[]), Err(StateError::InvalidDimension { dimension: 0 }));
         assert!(is_expected_err);
     }
 }
@@ -935,7 +933,9 @@ mod mid_circuit_tests {
         let measurement = MidCircuitMeasurement::new(vec![0]);
         let mut rng = || 0.1;
 
-        let (outcomes, final_state) = measurement.measure_with_state(&mut state, &mut rng).unwrap();
+        let (outcomes, final_state) = measurement
+            .measure_with_state(&mut state, &mut rng)
+            .unwrap();
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0], (0, 0));
         assert_eq!(final_state.num_qubits(), 2);

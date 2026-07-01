@@ -189,14 +189,8 @@ mod tests {
         // to `Self::new()`.
         let default_pass = GateFusion::default();
         let new_pass = GateFusion::new();
-        assert_eq!(
-            default_pass.config.min_fusion_size,
-            new_pass.config.min_fusion_size
-        );
-        assert_eq!(
-            default_pass.config.max_fusion_size,
-            new_pass.config.max_fusion_size
-        );
+        assert_eq!(default_pass.config.min_fusion_size, new_pass.config.min_fusion_size);
+        assert_eq!(default_pass.config.max_fusion_size, new_pass.config.max_fusion_size);
     }
 
     #[test]

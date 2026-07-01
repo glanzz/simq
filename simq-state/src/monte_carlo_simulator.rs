@@ -599,8 +599,13 @@ mod tests {
         sim.apply_gate(&h, &[0]).unwrap();
 
         let factor = 0.5_f64;
-        sim.apply_pauli_operation(PauliOperation::NoJump { sqrt_1_minus_gamma: factor }, 0)
-            .unwrap();
+        sim.apply_pauli_operation(
+            PauliOperation::NoJump {
+                sqrt_1_minus_gamma: factor,
+            },
+            0,
+        )
+        .unwrap();
 
         let amps = sim.state().amplitudes();
         // After scaling |1> by 0.5 and renormalizing, |1> component should

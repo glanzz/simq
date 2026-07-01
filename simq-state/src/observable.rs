@@ -663,19 +663,21 @@ mod tests {
         // A mixed string like "ZX" is not diagonal, so expectation_value
         // routes through expectation_value_general, which in turn exercises
         // the Pauli::Z branch of apply_to_basis_state (phase flip on bit==1).
+        // Paulis are indexed left-to-right as qubit0, qubit1, ...: "ZX" means
+        // qubit0=Z, qubit1=X.
         let zx = PauliString::from_str("ZX").unwrap();
         assert!(!zx.is_diagonal());
 
-        // basis_state = 0b01 -> qubit0 (X) bit=1, qubit1 (Z) bit=0
+        // basis_state = 0b01 -> qubit0 (Z) bit=1 => phase -1, qubit1 (X) bit=0 => flips qubit1
         let (new_state, phase) = zx.apply_to_basis_state(0b01);
-        assert_eq!(new_state, 0b00); // X flips qubit 0
-        assert_relative_eq!(phase.re, 1.0, epsilon = 1e-10);
+        assert_eq!(new_state, 0b11); // X flips qubit 1 bit
+        assert_relative_eq!(phase.re, -1.0, epsilon = 1e-10);
         assert_relative_eq!(phase.im, 0.0, epsilon = 1e-10);
 
-        // basis_state = 0b10 -> qubit0 (X) bit=0, qubit1 (Z) bit=1 => phase -1
+        // basis_state = 0b10 -> qubit0 (Z) bit=0 => no phase, qubit1 (X) bit=1 => flips qubit1
         let (new_state, phase) = zx.apply_to_basis_state(0b10);
-        assert_eq!(new_state, 0b11); // X flips qubit 0 bit
-        assert_relative_eq!(phase.re, -1.0, epsilon = 1e-10);
+        assert_eq!(new_state, 0b00); // X flips qubit 1 bit back to 0
+        assert_relative_eq!(phase.re, 1.0, epsilon = 1e-10);
         assert_relative_eq!(phase.im, 0.0, epsilon = 1e-10);
 
         // Full expectation value computation on a basis state for a mixed

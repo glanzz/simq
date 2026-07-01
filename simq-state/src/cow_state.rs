@@ -792,4 +792,15 @@ mod tests {
         let stats = state.apply_single_qubit_gate(&hadamard, 0).unwrap();
         assert!(!stats.copied, "should NOT have copied since state was already unique");
     }
+
+    #[test]
+    fn test_memory_stats_display() {
+        let state = CowState::new(3).unwrap();
+        let stats = state.memory_stats();
+        let s = format!("{}", stats);
+        assert!(s.starts_with("MemoryStats("));
+        assert!(s.contains(&format!("shared: {} bytes", stats.shared_memory)));
+        assert!(s.contains(&format!("refs: {}", stats.total_refs)));
+        assert!(s.contains(&format!("overhead: {} bytes total", stats.total_overhead)));
+    }
 }

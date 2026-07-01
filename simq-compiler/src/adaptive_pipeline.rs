@@ -379,9 +379,7 @@ mod tests {
             name: "X".to_string(),
         });
         for i in 0..1000 {
-            circuit
-                .add_gate(x.clone(), &[QubitId::new(i % 4)])
-                .unwrap();
+            circuit.add_gate(x.clone(), &[QubitId::new(i % 4)]).unwrap();
         }
 
         let optimizer = MultiLevelOptimizer::new().with_verbose(true);

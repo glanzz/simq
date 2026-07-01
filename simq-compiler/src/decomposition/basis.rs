@@ -666,7 +666,10 @@ mod tests {
 
     #[test]
     fn test_gates_rigetti_braket_universal_rotation_pauli_all() {
-        assert_eq!(BasisGateSet::Rigetti.gates(), vec![BasisGate::RZ, BasisGate::RX, BasisGate::CZ]);
+        assert_eq!(
+            BasisGateSet::Rigetti.gates(),
+            vec![BasisGate::RZ, BasisGate::RX, BasisGate::CZ]
+        );
 
         assert_eq!(
             BasisGateSet::Braket.gates(),

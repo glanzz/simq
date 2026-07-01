@@ -588,4 +588,26 @@ mod tests {
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].im, inv_sqrt2, epsilon = 1e-10);
     }
+
+    #[test]
+    fn test_optimized_execution_triggers_parallel_branch() {
+        // num_qubits >= PARALLEL_THRESHOLD (16) must route apply_gate_optimized
+        // through the parallel-execution branch (not just the direct
+        // apply_gate_parallel call already exercised by test_parallel_hadamard).
+        let num_qubits = PARALLEL_THRESHOLD; // 16
+        let mut state_scalar = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_scalar[0] = Complex64::new(1.0, 0.0);
+
+        let mut state_optimized = state_scalar.clone();
+
+        let h = hadamard_matrix();
+
+        apply_gate_scalar(&mut state_scalar, &h, 0, num_qubits);
+        apply_gate_optimized(&mut state_optimized, &h, 0, num_qubits);
+
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_optimized[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_optimized[i].im, epsilon = 1e-10);
+        }
+    }
 }

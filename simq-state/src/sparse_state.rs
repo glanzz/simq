@@ -1236,4 +1236,48 @@ mod tests {
         state.set_amplitude(1, Complex64::new(1.0, 0.0));
         assert!(!state.is_normalized(1e-10));
     }
+
+    #[test]
+    fn test_measure_and_collapse_invalid_qubit_error() {
+        let mut state = SparseState::new(2).unwrap();
+        // qubit=5 >= num_qubits=2
+        let result = state.measure_and_collapse(5, 0);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::InvalidQubitIndex { index, num_qubits } => {
+                assert_eq!(index, 5);
+                assert_eq!(num_qubits, 2);
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_apply_single_qubit_gate_from_bit_one_basis_state() {
+        // Start from |01⟩ (qubit 0 = 1) so the gate application exercises the
+        // `bit == 1` branch (bottom row of the 2x2 matrix) inside
+        // apply_single_qubit_gate, not just the `bit == 0` branch.
+        let mut state = SparseState::from_basis_state(2, 1).unwrap();
+
+        // Hadamard: 1/sqrt(2) * [[1, 1], [1, -1]]
+        let h = std::f64::consts::FRAC_1_SQRT_2;
+        let h_gate = [
+            Complex64::new(h, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(-h, 0.0),
+        ];
+
+        state.apply_single_qubit_gate(&h_gate, 0).unwrap();
+
+        // H|1> = (|0> - |1>)/sqrt(2), so basis states 0b00 and 0b01 should
+        // each have amplitude magnitude 1/sqrt(2), and the |01> amplitude
+        // should be negative (bottom-right element applied to bit==1).
+        let amp0 = state.get_amplitude(0);
+        let amp1 = state.get_amplitude(1);
+        assert!((amp0.norm_sqr() - 0.5).abs() < 1e-6);
+        assert!((amp1.norm_sqr() - 0.5).abs() < 1e-6);
+        assert!(amp0.re > 0.0);
+        assert!(amp1.re < 0.0);
+    }
 }

@@ -183,10 +183,7 @@ mod tests {
         let new_result = OptimizationResult::new();
 
         assert_eq!(default_result.modified, new_result.modified);
-        assert_eq!(
-            default_result.pass_stats.len(),
-            new_result.pass_stats.len()
-        );
+        assert_eq!(default_result.pass_stats.len(), new_result.pass_stats.len());
         assert_eq!(default_result.total_time_us, new_result.total_time_us);
 
         assert!(!default_result.modified);

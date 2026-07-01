@@ -323,10 +323,7 @@ mod tests {
         let new_pass = DeadCodeElimination::new();
 
         // Both should behave identically: same settings enabled.
-        assert_eq!(
-            default_pass.remove_inverse_pairs,
-            new_pass.remove_inverse_pairs
-        );
+        assert_eq!(default_pass.remove_inverse_pairs, new_pass.remove_inverse_pairs);
         assert_eq!(default_pass.remove_identity, new_pass.remove_identity);
 
         let mut circuit = Circuit::new(1);
