@@ -83,7 +83,7 @@ jobs:
       - name: Generate coverage report and enforce threshold
         run: |
           cargo tarpaulin --verbose --all-features --workspace --timeout 120 \
-            --out Xml --output-dir coverage --fail-under 95
+            --engine llvm --out Xml --output-dir coverage --fail-under 95
 
   # benchmark:
   #   name: Benchmark

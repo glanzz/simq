@@ -492,10 +492,7 @@ mod tests {
     #[test]
     fn test_swap_same_qubit_is_identity() {
         // SWAP(i, i) is identity
-        let mut state = vec![
-            Complex64::new(0.0, 0.0),
-            Complex64::new(1.0, 0.0),
-        ];
+        let mut state = vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)];
         apply_swap(0, 0, &mut state, false, usize::MAX).unwrap();
         assert_abs_diff_eq!(state[1].re, 1.0, epsilon = 1e-10);
     }
@@ -504,10 +501,30 @@ mod tests {
     fn test_apply_two_qubit_dense_identity() {
         // Identity 4x4 gate should leave state unchanged
         let identity: Matrix4x4 = [
-            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+            [
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ],
         ];
         let mut state = vec![
             Complex64::new(1.0, 0.0),
@@ -522,10 +539,30 @@ mod tests {
     #[test]
     fn test_apply_two_qubit_dense_parallel() {
         let identity: Matrix4x4 = [
-            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+            [
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ],
         ];
         let mut state = vec![
             Complex64::new(1.0, 0.0),
@@ -540,10 +577,30 @@ mod tests {
     #[test]
     fn test_apply_two_qubit_dense_invalid_qubit() {
         let identity: Matrix4x4 = [
-            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+            [
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ],
         ];
         let mut state = vec![Complex64::new(1.0, 0.0); 4];
         // qubit1 out of bounds
@@ -571,10 +628,30 @@ mod tests {
     fn test_apply_two_qubit_qubit2_less_than_qubit1() {
         // Apply with qubit2 < qubit1 to test (q_min, q_max) order
         let identity: Matrix4x4 = [
-            [Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0), Complex64::new(0.0,0.0)],
-            [Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(0.0,0.0), Complex64::new(1.0,0.0)],
+            [
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ],
         ];
         let mut state = vec![
             Complex64::new(1.0, 0.0),

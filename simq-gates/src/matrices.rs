@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn test_rotation_z_half_pi() {
         // RZ(π/2): e^(-iπ/4) on [0][0], e^(iπ/4) on [1][1]
-        use std::f64::consts::{PI, FRAC_1_SQRT_2};
+        use std::f64::consts::{FRAC_1_SQRT_2, PI};
         let rz = rotation_z(PI / 2.0);
         assert_relative_eq!(rz[0][0].re, FRAC_1_SQRT_2, epsilon = 1e-10);
         assert_relative_eq!(rz[0][0].im, -FRAC_1_SQRT_2, epsilon = 1e-10);

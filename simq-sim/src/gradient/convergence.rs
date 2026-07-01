@@ -1071,7 +1071,9 @@ mod tests {
     #[test]
     fn test_stopping_criterion_descriptions() {
         assert!(!StoppingCriterion::EnergyTolerance.description().is_empty());
-        assert!(!StoppingCriterion::GradientTolerance.description().is_empty());
+        assert!(!StoppingCriterion::GradientTolerance
+            .description()
+            .is_empty());
         assert!(!StoppingCriterion::FullConvergence.description().is_empty());
         assert!(!StoppingCriterion::Patience.description().is_empty());
         assert!(!StoppingCriterion::EnergyIncrease.description().is_empty());
@@ -1292,12 +1294,21 @@ mod tests {
     fn test_target_energy_callback() {
         let cb = target_energy_callback(0.5);
         let above = StepMetrics {
-            iteration: 0, energy: 0.8, gradient: vec![0.1], gradient_norm: 0.1,
-            parameters: vec![0.5], energy_change: 0.0, relative_energy_change: 0.0,
-            parameter_change: 0.0, step_time: Duration::from_millis(1),
+            iteration: 0,
+            energy: 0.8,
+            gradient: vec![0.1],
+            gradient_norm: 0.1,
+            parameters: vec![0.5],
+            energy_change: 0.0,
+            relative_energy_change: 0.0,
+            parameter_change: 0.0,
+            step_time: Duration::from_millis(1),
             total_time: Duration::from_millis(1),
         };
-        let below = StepMetrics { energy: 0.3, ..above.clone() };
+        let below = StepMetrics {
+            energy: 0.3,
+            ..above.clone()
+        };
         assert!(cb(&above)); // above target -> continue
         assert!(!cb(&below)); // below target -> stop
     }

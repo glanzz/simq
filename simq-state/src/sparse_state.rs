@@ -1020,7 +1020,7 @@ mod tests {
         let result = SparseState::new(31);
         assert!(result.is_err());
         match result.unwrap_err() {
-            StateError::InvalidDimension { .. } => {}
+            StateError::InvalidDimension { .. } => {},
             other => panic!("unexpected error: {:?}", other),
         }
     }
@@ -1039,7 +1039,7 @@ mod tests {
             StateError::DimensionMismatch { expected, actual } => {
                 assert_eq!(expected, 4);
                 assert_eq!(actual, 3);
-            }
+            },
             other => panic!("unexpected error: {:?}", other),
         }
     }
@@ -1060,7 +1060,7 @@ mod tests {
             StateError::InvalidQubitIndex { index, num_qubits } => {
                 assert_eq!(index, 8);
                 assert_eq!(num_qubits, 3);
-            }
+            },
             other => panic!("unexpected error: {:?}", other),
         }
     }
@@ -1082,7 +1082,7 @@ mod tests {
         match result.unwrap_err() {
             StateError::NotNormalized { norm } => {
                 assert!(norm < 1e-14);
-            }
+            },
             other => panic!("unexpected error: {:?}", other),
         }
     }
@@ -1103,7 +1103,7 @@ mod tests {
         let mut state = SparseState::new(2).unwrap();
         // Set amplitude to a nearly-zero value (norm_sqr < 1e-14)
         state.set_amplitude(0, Complex64::new(1e-8, 0.0)); // norm_sqr = 1e-16 < 1e-14
-        // The entry should be removed
+                                                           // The entry should be removed
         assert_eq!(state.get_amplitude(0), Complex64::new(0.0, 0.0));
     }
 
@@ -1181,7 +1181,7 @@ mod tests {
         match result.unwrap_err() {
             StateError::NotNormalized { norm } => {
                 assert!(norm < 1e-14);
-            }
+            },
             other => panic!("unexpected error: {:?}", other),
         }
     }

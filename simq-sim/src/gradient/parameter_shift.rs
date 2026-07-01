@@ -380,10 +380,18 @@ mod tests {
         let observable =
             PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
-        let config = ParameterShiftConfig { parallel: false, ..Default::default() };
+        let config = ParameterShiftConfig {
+            parallel: false,
+            ..Default::default()
+        };
         let result = compute_gradient_parameter_shift(
-            &simulator, circuit_builder, &observable, &params, &config,
-        ).unwrap();
+            &simulator,
+            circuit_builder,
+            &observable,
+            &params,
+            &config,
+        )
+        .unwrap();
         assert_eq!(result.gradients.len(), 1);
         assert!(result.gradients[0].is_finite());
     }
@@ -408,8 +416,13 @@ mod tests {
         };
         let params = vec![0.5];
         let result = compute_gradient_parameter_shift(
-            &simulator, circuit_builder, &observable, &params, &config,
-        ).unwrap();
+            &simulator,
+            circuit_builder,
+            &observable,
+            &params,
+            &config,
+        )
+        .unwrap();
         assert_eq!(result.gradients.len(), 1);
         assert!(result.gradients[0].is_finite());
     }
@@ -424,14 +437,15 @@ mod tests {
                 .unwrap();
             circuit
         };
-        let observables = vec![
-            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0),
-        ];
+        let observables = vec![PauliObservable::from_pauli_string(
+            PauliString::from_str("Z").unwrap(),
+            1.0,
+        )];
         let params = vec![0.5];
         let config = ParameterShiftConfig::default();
-        let results = batch_parameter_shift(
-            &simulator, circuit_builder, &observables, &params, &config,
-        ).unwrap();
+        let results =
+            batch_parameter_shift(&simulator, circuit_builder, &observables, &params, &config)
+                .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].gradients.len(), 1);
     }
@@ -446,14 +460,18 @@ mod tests {
                 .unwrap();
             circuit
         };
-        let observables = vec![
-            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0),
-        ];
+        let observables = vec![PauliObservable::from_pauli_string(
+            PauliString::from_str("Z").unwrap(),
+            1.0,
+        )];
         let params = vec![0.5];
-        let config = ParameterShiftConfig { parallel: false, ..Default::default() };
-        let results = batch_parameter_shift(
-            &simulator, circuit_builder, &observables, &params, &config,
-        ).unwrap();
+        let config = ParameterShiftConfig {
+            parallel: false,
+            ..Default::default()
+        };
+        let results =
+            batch_parameter_shift(&simulator, circuit_builder, &observables, &params, &config)
+                .unwrap();
         assert_eq!(results.len(), 1);
     }
 
@@ -472,8 +490,14 @@ mod tests {
         let params = vec![0.5];
         let config = ParameterShiftConfig::default();
         let result = parameter_shift_general(
-            &simulator, circuit_builder, &observable, &params, 1.0, &config,
-        ).unwrap();
+            &simulator,
+            circuit_builder,
+            &observable,
+            &params,
+            1.0,
+            &config,
+        )
+        .unwrap();
         assert_eq!(result.gradients.len(), 1);
         assert!(result.gradients[0].is_finite());
     }

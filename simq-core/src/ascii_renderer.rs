@@ -1521,10 +1521,7 @@ mod tests {
     fn test_render_rzz_gate() {
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("RZZ", 2)),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(MockGate::new("RZZ", 2)), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
 
         let ascii = render(&circuit);

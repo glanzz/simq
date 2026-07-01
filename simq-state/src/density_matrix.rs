@@ -699,12 +699,7 @@ mod tests {
         // |00⟩→|00⟩, |01⟩→|01⟩, |10⟩→|11⟩, |11⟩→|10⟩
         let z = Complex64::new(0.0, 0.0);
         let o = Complex64::new(1.0, 0.0);
-        vec![
-            o, z, z, z,
-            z, o, z, z,
-            z, z, z, o,
-            z, z, o, z,
-        ]
+        vec![o, z, z, z, z, o, z, z, z, z, z, o, z, z, o, z]
     }
 
     #[test]

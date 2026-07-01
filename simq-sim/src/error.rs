@@ -120,7 +120,10 @@ mod tests {
 
     #[test]
     fn test_out_of_memory_display() {
-        let e = SimulatorError::OutOfMemory { requested: 1024, limit: 512 };
+        let e = SimulatorError::OutOfMemory {
+            requested: 1024,
+            limit: 512,
+        };
         let msg = e.to_string();
         assert!(msg.contains("Out of memory"));
         assert!(msg.contains("1024"));
@@ -129,7 +132,10 @@ mod tests {
 
     #[test]
     fn test_too_many_qubits_display() {
-        let e = SimulatorError::TooManyQubits { num_qubits: 100, max_qubits: 30 };
+        let e = SimulatorError::TooManyQubits {
+            num_qubits: 100,
+            max_qubits: 30,
+        };
         let msg = e.to_string();
         assert!(msg.contains("Too many qubits"));
         assert!(msg.contains("100"));
@@ -173,7 +179,10 @@ mod tests {
 
     #[test]
     fn test_invalid_qubit_display() {
-        let e = SimulatorError::InvalidQubit { qubit: 5, num_qubits: 3 };
+        let e = SimulatorError::InvalidQubit {
+            qubit: 5,
+            num_qubits: 3,
+        };
         let msg = e.to_string();
         assert!(msg.contains("Invalid qubit index 5"));
         assert!(msg.contains("3 qubits"));
@@ -202,7 +211,10 @@ mod tests {
 
     #[test]
     fn test_error_debug() {
-        let e = SimulatorError::TooManyQubits { num_qubits: 10, max_qubits: 5 };
+        let e = SimulatorError::TooManyQubits {
+            num_qubits: 10,
+            max_qubits: 5,
+        };
         let dbg = format!("{:?}", e);
         assert!(dbg.contains("TooManyQubits"));
     }

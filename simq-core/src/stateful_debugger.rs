@@ -762,10 +762,7 @@ mod tests {
 
     #[test]
     fn test_capture_state() {
-        let amplitudes = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let amplitudes = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
         let snapshot = StatefulDebugger::capture_state(&amplitudes, 1, 3, Some("H".to_string()));
         assert_eq!(snapshot.step, 3);
         assert_eq!(snapshot.num_qubits, 1);
@@ -800,10 +797,7 @@ mod tests {
     #[test]
     fn test_extract_single_qubit_state_single_qubit() {
         // 1-qubit system: just returns amplitudes directly
-        let amps = vec![
-            Complex64::new(0.6, 0.0),
-            Complex64::new(0.8, 0.0),
-        ];
+        let amps = vec![Complex64::new(0.6, 0.0), Complex64::new(0.8, 0.0)];
         let result = StatefulDebugger::extract_single_qubit_state(&amps, 1, 0);
         assert!((result[0].re - 0.6).abs() < 1e-10);
         assert!((result[1].re - 0.8).abs() < 1e-10);
@@ -812,10 +806,7 @@ mod tests {
     #[test]
     fn test_extract_single_qubit_state_out_of_range() {
         // target_qubit >= num_qubits: returns default [1, 0]
-        let amps = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(0.0, 0.0),
-        ];
+        let amps = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
         let result = StatefulDebugger::extract_single_qubit_state(&amps, 1, 5);
         assert!((result[0].re - 1.0).abs() < 1e-10);
         assert!(result[1].re.abs() < 1e-10);

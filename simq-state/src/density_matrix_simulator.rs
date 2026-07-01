@@ -394,26 +394,14 @@ mod tests {
 
         // Apply a depolarizing Kraus channel: { sqrt(1-p)*I, sqrt(p/3)*X, sqrt(p/3)*Y, sqrt(p/3)*Z }
         let p = 0.3_f64;
-        let a = ((1.0 - p)).sqrt();
+        let a = (1.0 - p).sqrt();
         let b = (p / 3.0).sqrt();
 
         let zero = Complex64::new(0.0, 0.0);
-        let k0: Vec<Complex64> = vec![
-            Complex64::new(a, 0.0), zero,
-            zero, Complex64::new(a, 0.0),
-        ];
-        let k1: Vec<Complex64> = vec![
-            zero, Complex64::new(b, 0.0),
-            Complex64::new(b, 0.0), zero,
-        ]; // b*X
-        let k2: Vec<Complex64> = vec![
-            zero, Complex64::new(0.0, -b),
-            Complex64::new(0.0, b), zero,
-        ]; // b*Y
-        let k3: Vec<Complex64> = vec![
-            Complex64::new(b, 0.0), zero,
-            zero, Complex64::new(-b, 0.0),
-        ]; // b*Z
+        let k0: Vec<Complex64> = vec![Complex64::new(a, 0.0), zero, zero, Complex64::new(a, 0.0)];
+        let k1: Vec<Complex64> = vec![zero, Complex64::new(b, 0.0), Complex64::new(b, 0.0), zero]; // b*X
+        let k2: Vec<Complex64> = vec![zero, Complex64::new(0.0, -b), Complex64::new(0.0, b), zero]; // b*Y
+        let k3: Vec<Complex64> = vec![Complex64::new(b, 0.0), zero, zero, Complex64::new(-b, 0.0)]; // b*Z
 
         let kraus_ops = vec![(k0, 2usize), (k1, 2usize), (k2, 2usize), (k3, 2usize)];
         sim.apply_kraus_channel(&kraus_ops, &[0]).unwrap();
@@ -430,26 +418,14 @@ mod tests {
         sim.apply_gate(&hadamard_flat(), &[0]).unwrap();
 
         let p = 0.3_f64;
-        let a = ((1.0 - p)).sqrt();
+        let a = (1.0 - p).sqrt();
         let b = (p / 3.0).sqrt();
         let zero = Complex64::new(0.0, 0.0);
 
-        let k0: Vec<Complex64> = vec![
-            Complex64::new(a, 0.0), zero,
-            zero, Complex64::new(a, 0.0),
-        ];
-        let k1: Vec<Complex64> = vec![
-            zero, Complex64::new(b, 0.0),
-            Complex64::new(b, 0.0), zero,
-        ];
-        let k2: Vec<Complex64> = vec![
-            zero, Complex64::new(0.0, -b),
-            Complex64::new(0.0, b), zero,
-        ];
-        let k3: Vec<Complex64> = vec![
-            Complex64::new(b, 0.0), zero,
-            zero, Complex64::new(-b, 0.0),
-        ];
+        let k0: Vec<Complex64> = vec![Complex64::new(a, 0.0), zero, zero, Complex64::new(a, 0.0)];
+        let k1: Vec<Complex64> = vec![zero, Complex64::new(b, 0.0), Complex64::new(b, 0.0), zero];
+        let k2: Vec<Complex64> = vec![zero, Complex64::new(0.0, -b), Complex64::new(0.0, b), zero];
+        let k3: Vec<Complex64> = vec![Complex64::new(b, 0.0), zero, zero, Complex64::new(-b, 0.0)];
 
         let kraus_ops = vec![(k0, 2usize), (k1, 2usize), (k2, 2usize), (k3, 2usize)];
         sim.apply_kraus_channel(&kraus_ops, &[0]).unwrap();
@@ -507,7 +483,8 @@ mod tests {
             Complex64::new(0.0, 0.0),
             Complex64::new(1.0, 0.0),
         ];
-        sim.apply_kraus_channel(&vec![(identity_kraus, 2usize)], &[0]).unwrap();
+        sim.apply_kraus_channel(&vec![(identity_kraus, 2usize)], &[0])
+            .unwrap();
 
         assert_eq!(sim.stats().gate_count, 1);
         assert_eq!(sim.stats().noise_ops_applied, 1);
@@ -520,7 +497,9 @@ mod tests {
 
     #[test]
     fn test_with_validation_valid_gate_succeeds() {
-        let config = DensityMatrixConfig::new().with_seed(42).with_validation(true);
+        let config = DensityMatrixConfig::new()
+            .with_seed(42)
+            .with_validation(true);
         let mut sim = DensityMatrixSimulator::new(1, config).unwrap();
         // Valid Hadamard gate — should not trigger validation error
         sim.apply_gate(&hadamard_flat(), &[0]).unwrap();

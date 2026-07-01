@@ -576,7 +576,7 @@ impl ExecutionEngine {
 mod tests {
     use super::*;
     use simq_core::QubitId;
-    use simq_gates::standard::{CNot, CZ, Hadamard, PauliX, PauliZ, RotationY, Swap};
+    use simq_gates::standard::{CNot, Hadamard, PauliX, PauliZ, RotationY, Swap, CZ};
 
     fn make_sequential_engine() -> ExecutionEngine {
         let config = ExecutionConfig {

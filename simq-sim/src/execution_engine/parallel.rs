@@ -131,10 +131,7 @@ mod tests {
         c
     }
 
-    fn no_op_gate_fn(
-        _gate_op: &simq_core::GateOp,
-        _state: &mut AdaptiveState,
-    ) -> Result<()> {
+    fn no_op_gate_fn(_gate_op: &simq_core::GateOp, _state: &mut AdaptiveState) -> Result<()> {
         Ok(())
     }
 
@@ -191,7 +188,9 @@ mod tests {
             ParallelStrategy::TaskBased,
         ] {
             let executor = ParallelExecutor::new(*strategy);
-            assert!(executor.execute(&circuit, &mut state, no_op_gate_fn).is_ok());
+            assert!(executor
+                .execute(&circuit, &mut state, no_op_gate_fn)
+                .is_ok());
         }
     }
 }

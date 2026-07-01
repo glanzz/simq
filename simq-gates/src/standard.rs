@@ -1211,8 +1211,8 @@ mod tests {
 
     #[test]
     fn test_single_qubit_gates_comprehensive() {
-        use std::f64::consts::PI;
         use simq_core::gate::Gate;
+        use std::f64::consts::PI;
 
         // Hadamard
         assert_eq!(Hadamard.name(), "H");
@@ -1391,8 +1391,8 @@ mod tests {
 
     #[test]
     fn test_parameterized_two_qubit_gates() {
-        use std::f64::consts::PI;
         use simq_core::gate::Gate;
+        use std::f64::consts::PI;
 
         // CPhase - struct method returns [[Complex64;4];4], Gate trait method returns Option<Vec>
         let cp = CPhase::new(PI / 4.0);
@@ -1429,8 +1429,8 @@ mod tests {
 
     #[test]
     fn test_diagonal_gates_diagonal_elements() {
-        use std::f64::consts::{PI, FRAC_1_SQRT_2};
         use simq_core::gate::DiagonalGate;
+        use std::f64::consts::{FRAC_1_SQRT_2, PI};
 
         // PauliZ diagonal: [1, -1]
         let z_diag = PauliZ.diagonal_elements();
@@ -1477,8 +1477,8 @@ mod tests {
 
     #[test]
     fn test_rotation_gate_angles_and_descriptions() {
-        use std::f64::consts::PI;
         use simq_core::gate::Gate;
+        use std::f64::consts::PI;
 
         let rx = RotationX::new(1.23);
         assert!((rx.angle() - 1.23).abs() < 1e-12);

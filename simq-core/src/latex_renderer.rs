@@ -950,10 +950,7 @@ mod tests {
         // A gate starting with C but not a specific known one - shows base gate name
         let mut circuit = Circuit::new(2);
         circuit
-            .add_gate(
-                Arc::new(MockGate::new("CPHASE", 2)),
-                &[QubitId::new(0), QubitId::new(1)],
-            )
+            .add_gate(Arc::new(MockGate::new("CPHASE", 2)), &[QubitId::new(0), QubitId::new(1)])
             .unwrap();
         let latex = render(&circuit);
         // Target qubit should show the base gate name (PHASE)
@@ -1045,10 +1042,7 @@ mod tests {
     fn test_parametric_u1_u2_u3_gates() {
         let mut circuit = Circuit::new(1);
         circuit
-            .add_gate(
-                Arc::new(MockGate::with_description("U1", 1, "U1(0.5)")),
-                &[QubitId::new(0)],
-            )
+            .add_gate(Arc::new(MockGate::with_description("U1", 1, "U1(0.5)")), &[QubitId::new(0)])
             .unwrap();
         circuit
             .add_gate(

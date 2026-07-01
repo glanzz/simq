@@ -24,7 +24,8 @@ fn z_observable() -> PauliObservable {
 
 fn ry_circuit(params: &[f64]) -> Circuit {
     let mut c = Circuit::new(1);
-    c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)]).unwrap();
+    c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+        .unwrap();
     c
 }
 
@@ -262,7 +263,7 @@ fn test_lbfgs_fully_converged() {
     let obs = z_observable();
     let config = LBFGSConfig {
         max_iterations: 100,
-        tolerance: 10.0,  // Both energy_change and gradient_norm < 10.0
+        tolerance: 10.0, // Both energy_change and gradient_norm < 10.0
         ..LBFGSConfig::default()
     };
     let mut optimizer = LBFGSOptimizer::new(ry_circuit, config);
@@ -326,8 +327,10 @@ fn test_lbfgs_two_params() {
 
     fn two_param_circuit(params: &[f64]) -> Circuit {
         let mut c = Circuit::new(1);
-        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)]).unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)])
+            .unwrap();
         c
     }
 
@@ -420,8 +423,10 @@ fn test_nelder_mead_two_params_more_iterations() {
 
     fn two_param_circuit(params: &[f64]) -> Circuit {
         let mut c = Circuit::new(1);
-        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)]).unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)])
+            .unwrap();
         c
     }
 

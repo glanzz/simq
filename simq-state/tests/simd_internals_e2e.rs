@@ -567,10 +567,7 @@ fn test_norm_simd_known_vector() {
 #[test]
 fn test_normalize_simd_makes_unit_norm() {
     // Start with non-unit vector, normalize, check norm = 1
-    let mut state = vec![
-        Complex64::new(3.0, 0.0),
-        Complex64::new(4.0, 0.0),
-    ];
+    let mut state = vec![Complex64::new(3.0, 0.0), Complex64::new(4.0, 0.0)];
     simd::normalize_simd(&mut state);
     let norm = state.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
     assert_relative_eq!(norm, 1.0, epsilon = 1e-12);
@@ -579,10 +576,7 @@ fn test_normalize_simd_makes_unit_norm() {
 #[test]
 fn test_normalize_simd_zero_vector_left_unchanged() {
     // Zero vector (norm < 1e-10) — normalize_simd should leave it unchanged
-    let mut state = vec![
-        Complex64::new(0.0, 0.0),
-        Complex64::new(0.0, 0.0),
-    ];
+    let mut state = vec![Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)];
     simd::normalize_simd(&mut state);
     assert_relative_eq!(state[0].norm(), 0.0, epsilon = 1e-12);
     assert_relative_eq!(state[1].norm(), 0.0, epsilon = 1e-12);

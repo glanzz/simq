@@ -4,9 +4,9 @@ use simq_core::circuit::Circuit;
 use simq_core::QubitId;
 use simq_gates::standard::*;
 use simq_sim::gradient::vqe_qaoa::{
-    AdamConfig, AdamOptimizer, ConvergenceStatus, MomentumConfig, MomentumOptimizer,
-    OptimizationResult, OptimizationStep, QAOAConfig, QAOAOptimizer, VQEConfig, VQEOptimizer,
-    gradient_descent,
+    gradient_descent, AdamConfig, AdamOptimizer, ConvergenceStatus, MomentumConfig,
+    MomentumOptimizer, OptimizationResult, OptimizationStep, QAOAConfig, QAOAOptimizer, VQEConfig,
+    VQEOptimizer,
 };
 use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::observable::{PauliObservable, PauliString};
@@ -27,14 +27,17 @@ fn z_observable() -> PauliObservable {
 
 fn ry_circuit(params: &[f64]) -> Circuit {
     let mut c = Circuit::new(1);
-    c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)]).unwrap();
+    c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+        .unwrap();
     c
 }
 
 fn qaoa_circuit(params: &[f64]) -> Circuit {
     let mut c = Circuit::new(1);
-    c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)]).unwrap();
-    c.add_gate(Arc::new(RotationX::new(params[1])), &[q(0)]).unwrap();
+    c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+        .unwrap();
+    c.add_gate(Arc::new(RotationX::new(params[1])), &[q(0)])
+        .unwrap();
     c
 }
 
@@ -275,7 +278,7 @@ fn test_convergence_status_variants() {
 
     // Test Clone and Copy
     let s = ConvergenceStatus::EnergyConverged;
-    let s2 = s;   // Copy
+    let s2 = s; // Copy
     let s3 = s.clone(); // Clone
     assert_eq!(s, s2);
     assert_eq!(s, s3);
@@ -507,13 +510,15 @@ fn test_vqe_energy_convergence_via_tight_tolerance() {
     use simq_sim::gradient::GradientConfig;
     let config = VQEConfig {
         max_iterations: 100,
-        energy_tolerance: 1.0,    // Very loose - will trigger after tiny energy change
+        energy_tolerance: 1.0, // Very loose - will trigger after tiny energy change
         gradient_tolerance: 1e-12, // Very tight gradient threshold
         adaptive_learning_rate: false,
         ..VQEConfig::default()
     };
     let mut optimizer = VQEOptimizer::new(ry_circuit, config);
-    let result = optimizer.optimize(&sim, &obs, &[std::f64::consts::PI]).unwrap();
+    let result = optimizer
+        .optimize(&sim, &obs, &[std::f64::consts::PI])
+        .unwrap();
     // Should converge by energy (energy_tolerance is very loose)
     assert!(result.energy.is_finite());
     // The status should have converged
@@ -528,8 +533,8 @@ fn test_vqe_gradient_convergence() {
     let obs = z_observable();
     let config = VQEConfig {
         max_iterations: 200,
-        energy_tolerance: 1e-12,  // Very tight - hard to trigger
-        gradient_tolerance: 2.0,  // Very loose - triggers on first step
+        energy_tolerance: 1e-12, // Very tight - hard to trigger
+        gradient_tolerance: 2.0, // Very loose - triggers on first step
         adaptive_learning_rate: false,
         learning_rate: 0.001,
         ..VQEConfig::default()
@@ -553,7 +558,7 @@ fn test_vqe_plateau_detection() {
     // Use a very large learning rate to make energy jump around
     let config = VQEConfig {
         max_iterations: 50,
-        energy_tolerance: 1e-15, // Essentially never converges on energy
+        energy_tolerance: 1e-15,   // Essentially never converges on energy
         gradient_tolerance: 1e-15, // Essentially never converges on gradient
         adaptive_learning_rate: false,
         learning_rate: 10.0, // Very large LR may cause plateau
@@ -599,7 +604,9 @@ fn test_vqe_adaptive_lr_decrease_path() {
     };
     let mut optimizer = VQEOptimizer::new(ry_circuit, config);
     // Near minimum means small gradient
-    let result = optimizer.optimize(&sim, &obs, &[std::f64::consts::PI]).unwrap();
+    let result = optimizer
+        .optimize(&sim, &obs, &[std::f64::consts::PI])
+        .unwrap();
     assert!(result.energy.is_finite());
 }
 
@@ -610,8 +617,8 @@ fn test_vqe_max_iterations_path() {
     let obs = z_observable();
     let config = VQEConfig {
         max_iterations: 2,
-        energy_tolerance: 0.0,    // Never triggers
-        gradient_tolerance: 0.0,  // Never triggers
+        energy_tolerance: 0.0,   // Never triggers
+        gradient_tolerance: 0.0, // Never triggers
         adaptive_learning_rate: false,
         learning_rate: 0.01,
         ..VQEConfig::default()
@@ -629,7 +636,7 @@ fn test_vqe_fully_converged() {
     let obs = z_observable();
     let config = VQEConfig {
         max_iterations: 200,
-        energy_tolerance: 10.0,  // Always triggers
+        energy_tolerance: 10.0,   // Always triggers
         gradient_tolerance: 10.0, // Always triggers
         adaptive_learning_rate: false,
         learning_rate: 0.001,
@@ -657,7 +664,7 @@ fn test_qaoa_all_layers_fully_converged() {
     let config = QAOAConfig {
         num_layers: 1,
         max_iterations: 200,
-        energy_tolerance: 10.0,  // Very loose
+        energy_tolerance: 10.0,   // Very loose
         gradient_tolerance: 10.0, // Very loose
         ..QAOAConfig::default()
     };
@@ -689,7 +696,7 @@ fn test_qaoa_gradient_converged() {
     let config = QAOAConfig {
         num_layers: 1,
         max_iterations: 200,
-        energy_tolerance: 1e-15, // Never triggers
+        energy_tolerance: 1e-15,  // Never triggers
         gradient_tolerance: 10.0, // Very loose
         ..QAOAConfig::default()
     };
@@ -721,10 +728,14 @@ fn test_qaoa_two_layers_all_layers_mode() {
 
     fn two_layer_circuit(params: &[f64]) -> Circuit {
         let mut c = Circuit::new(1);
-        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationX::new(params[3])), &[QubitId::new(0)]).unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationX::new(params[3])), &[QubitId::new(0)])
+            .unwrap();
         c
     }
 
@@ -735,7 +746,9 @@ fn test_qaoa_two_layers_all_layers_mode() {
         ..QAOAConfig::default()
     };
     let mut optimizer = QAOAOptimizer::new(two_layer_circuit, config);
-    let result = optimizer.optimize(&sim, &obs, &[0.1, 0.2, 0.3, 0.4]).unwrap();
+    let result = optimizer
+        .optimize(&sim, &obs, &[0.1, 0.2, 0.3, 0.4])
+        .unwrap();
     assert!(result.energy.is_finite());
 }
 
@@ -746,10 +759,14 @@ fn test_qaoa_layer_wise_two_layers() {
 
     fn two_layer_circuit(params: &[f64]) -> Circuit {
         let mut c = Circuit::new(1);
-        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)]).unwrap();
-        c.add_gate(Arc::new(RotationX::new(params[3])), &[QubitId::new(0)]).unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationX::new(params[1])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[2])), &[QubitId::new(0)])
+            .unwrap();
+        c.add_gate(Arc::new(RotationX::new(params[3])), &[QubitId::new(0)])
+            .unwrap();
         c
     }
 
@@ -760,7 +777,9 @@ fn test_qaoa_layer_wise_two_layers() {
         ..QAOAConfig::default()
     };
     let mut optimizer = QAOAOptimizer::new(two_layer_circuit, config);
-    let result = optimizer.optimize(&sim, &obs, &[0.1, 0.2, 0.3, 0.4]).unwrap();
+    let result = optimizer
+        .optimize(&sim, &obs, &[0.1, 0.2, 0.3, 0.4])
+        .unwrap();
     assert!(result.energy.is_finite());
     assert_eq!(result.status, ConvergenceStatus::FullyConverged);
 }

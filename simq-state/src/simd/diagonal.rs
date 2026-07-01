@@ -397,14 +397,8 @@ mod tests {
         }
 
         for i in 0..state_scalar.len() {
-            assert!(
-                (state_scalar[i].re - state_avx2[i].re).abs() < 1e-10,
-                "re mismatch at {i}"
-            );
-            assert!(
-                (state_scalar[i].im - state_avx2[i].im).abs() < 1e-10,
-                "im mismatch at {i}"
-            );
+            assert!((state_scalar[i].re - state_avx2[i].re).abs() < 1e-10, "re mismatch at {i}");
+            assert!((state_scalar[i].im - state_avx2[i].im).abs() < 1e-10, "im mismatch at {i}");
         }
     }
 
@@ -424,14 +418,8 @@ mod tests {
         }
 
         for i in 0..state_scalar.len() {
-            assert!(
-                (state_scalar[i].re - state_sse2[i].re).abs() < 1e-10,
-                "re mismatch at {i}"
-            );
-            assert!(
-                (state_scalar[i].im - state_sse2[i].im).abs() < 1e-10,
-                "im mismatch at {i}"
-            );
+            assert!((state_scalar[i].re - state_sse2[i].re).abs() < 1e-10, "re mismatch at {i}");
+            assert!((state_scalar[i].im - state_sse2[i].im).abs() < 1e-10, "im mismatch at {i}");
         }
     }
 

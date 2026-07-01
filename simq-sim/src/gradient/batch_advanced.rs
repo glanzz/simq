@@ -415,10 +415,10 @@ pub struct GradientVerification {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Simulator, SimulatorConfig};
     use simq_core::{circuit::Circuit, QubitId};
     use simq_gates::standard::{Hadamard, RotationY};
     use simq_state::observable::{PauliObservable, PauliString};
-    use crate::{Simulator, SimulatorConfig};
     use std::sync::Arc;
 
     fn q(i: usize) -> QubitId {
@@ -435,7 +435,8 @@ mod tests {
 
     fn ry_circuit(params: &[f64]) -> Circuit {
         let mut c = Circuit::new(1);
-        c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)]).unwrap();
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+            .unwrap();
         c
     }
 
@@ -498,7 +499,9 @@ mod tests {
         let config = BatchConfig::default();
         let mut evaluator = AdaptiveBatchEvaluator::new(config);
         let param_sets = vec![vec![0.5]];
-        let result = evaluator.evaluate(&sim, ry_circuit, &obs, &param_sets).unwrap();
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
         assert_eq!(result.num_evaluations, 1);
         assert_eq!(result.values.len(), 1);
         assert!(result.values[0].is_finite());
@@ -508,10 +511,15 @@ mod tests {
     fn test_adaptive_evaluator_multiple_params() {
         let sim = make_sim();
         let obs = z_observable();
-        let config = BatchConfig { adaptive_sizing: false, ..BatchConfig::default() };
+        let config = BatchConfig {
+            adaptive_sizing: false,
+            ..BatchConfig::default()
+        };
         let mut evaluator = AdaptiveBatchEvaluator::new(config);
         let param_sets = vec![vec![0.0], vec![0.5], vec![1.0]];
-        let result = evaluator.evaluate(&sim, ry_circuit, &obs, &param_sets).unwrap();
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
         assert_eq!(result.num_evaluations, 3);
         assert_eq!(result.values.len(), 3);
     }
@@ -520,13 +528,21 @@ mod tests {
     fn test_adaptive_evaluator_with_adaptive_sizing() {
         let sim = make_sim();
         let obs = z_observable();
-        let config = BatchConfig { adaptive_sizing: true, max_batch_size: 2, ..BatchConfig::default() };
+        let config = BatchConfig {
+            adaptive_sizing: true,
+            max_batch_size: 2,
+            ..BatchConfig::default()
+        };
         let mut evaluator = AdaptiveBatchEvaluator::new(config);
         let param_sets = vec![vec![0.0], vec![0.5], vec![1.0], vec![1.5]];
         // evaluate once to set avg_eval_time
-        evaluator.evaluate(&sim, ry_circuit, &obs, &param_sets[..1]).unwrap();
+        evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets[..1])
+            .unwrap();
         // Now evaluate again, adaptive sizing uses historical data
-        let result = evaluator.evaluate(&sim, ry_circuit, &obs, &param_sets).unwrap();
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
         assert_eq!(result.num_evaluations, 4);
     }
 
@@ -537,14 +553,8 @@ mod tests {
         let start = vec![0.0];
         let direction = vec![1.0];
         let step_sizes = vec![0.0, 0.5, 1.0];
-        let (best_step, best_value) = line_search(
-            &sim,
-            ry_circuit,
-            &obs,
-            &start,
-            &direction,
-            &step_sizes,
-        ).unwrap();
+        let (best_step, best_value) =
+            line_search(&sim, ry_circuit, &obs, &start, &direction, &step_sizes).unwrap();
         assert!(step_sizes.contains(&best_step));
         assert!(best_value.is_finite());
     }
