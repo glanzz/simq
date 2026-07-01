@@ -217,7 +217,9 @@ mod tests {
     fn test_standard_gate_registry_new() {
         // Covers `StandardGateRegistry::new()`, which delegates to `Default`.
         let registry = StandardGateRegistry::new();
-        let gate = registry.create_gate(&SerializedGate::StandardGate { name: "H".to_string() });
+        let gate = registry.create_gate(&SerializedGate::StandardGate {
+            name: "H".to_string(),
+        });
         assert!(gate.is_ok());
     }
 
@@ -305,13 +307,17 @@ mod tests {
         let registry = StandardGateRegistry::new();
         for name in ["CZ", "CY", "SWAP", "ISWAP", "ECR"] {
             let gate = registry
-                .create_gate(&SerializedGate::StandardGate { name: name.to_string() })
+                .create_gate(&SerializedGate::StandardGate {
+                    name: name.to_string(),
+                })
                 .unwrap();
             assert_eq!(gate.num_qubits(), 2, "{name} should be 2-qubit");
         }
         for name in ["TOFFOLI", "CCX", "CCNOT", "FREDKIN", "CSWAP"] {
             let gate = registry
-                .create_gate(&SerializedGate::StandardGate { name: name.to_string() })
+                .create_gate(&SerializedGate::StandardGate {
+                    name: name.to_string(),
+                })
                 .unwrap();
             assert_eq!(gate.num_qubits(), 3, "{name} should be 3-qubit");
         }
@@ -337,7 +343,9 @@ mod tests {
         // Covers the qubit-index validation error branch in `create_gate_op`.
         let registry = StandardGateRegistry::new();
         let serialized = SerializedGateOp {
-            gate: SerializedGate::StandardGate { name: "H".to_string() },
+            gate: SerializedGate::StandardGate {
+                name: "H".to_string(),
+            },
             qubits: vec![5],
         };
         let result = registry.create_gate_op(&serialized, 2);
@@ -349,7 +357,9 @@ mod tests {
     fn test_create_gate_op_valid() {
         let registry = StandardGateRegistry::new();
         let serialized = SerializedGateOp {
-            gate: SerializedGate::StandardGate { name: "CNOT".to_string() },
+            gate: SerializedGate::StandardGate {
+                name: "CNOT".to_string(),
+            },
             qubits: vec![0, 1],
         };
         let op = registry.create_gate_op(&serialized, 2).unwrap();
@@ -363,7 +373,9 @@ mod tests {
         // of `description()`.
         let registry = StandardGateRegistry::new();
         let gate = registry
-            .create_gate(&SerializedGate::StandardGate { name: "H".to_string() })
+            .create_gate(&SerializedGate::StandardGate {
+                name: "H".to_string(),
+            })
             .unwrap();
         assert_eq!(gate.name(), "H");
         assert_eq!(gate.description(), "1-qubit gate 'H'");

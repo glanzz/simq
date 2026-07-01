@@ -621,7 +621,10 @@ mod tests {
     #[test]
     fn test_bloch_angles_to_state_zero_theta() {
         // theta = 0 should reproduce the |0> state: alpha = 1, beta = 0
-        let angles = BlochAngles { theta: 0.0, phi: 0.0 };
+        let angles = BlochAngles {
+            theta: 0.0,
+            phi: 0.0,
+        };
         let state = angles.to_state();
 
         assert!((state[0].re - 1.0).abs() < 1e-10);

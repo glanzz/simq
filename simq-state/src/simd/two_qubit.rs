@@ -2,9 +2,6 @@
 
 use num_complex::Complex64;
 
-#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-use std::arch::x86_64::*;
-
 /// Cache-friendly two-qubit gate application (scalar implementation)
 ///
 /// This implementation iterates the state vector in a nested, stride-based

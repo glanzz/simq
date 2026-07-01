@@ -380,13 +380,18 @@ mod tests {
             }
 
             fn cancel_job(&self, _job_id: &str) -> Result<()> {
-                self.cancelled.store(true, std::sync::atomic::Ordering::SeqCst);
+                self.cancelled
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             }
         }
 
         impl AsyncQuantumBackend for ScriptedBackend {
-            async fn execute_async(&self, circuit: &Circuit, shots: usize) -> Result<BackendResult> {
+            async fn execute_async(
+                &self,
+                circuit: &Circuit,
+                shots: usize,
+            ) -> Result<BackendResult> {
                 self.execute(circuit, shots)
             }
         }
@@ -417,7 +422,10 @@ mod tests {
             };
             let circuit = Circuit::new(1);
 
-            let err = backend.execute_and_wait(&circuit, 10, None).await.unwrap_err();
+            let err = backend
+                .execute_and_wait(&circuit, 10, None)
+                .await
+                .unwrap_err();
             match err {
                 crate::BackendError::JobExecutionFailed(msg) => {
                     assert!(msg.contains("Failed"));
@@ -437,7 +445,10 @@ mod tests {
             };
             let circuit = Circuit::new(1);
 
-            let err = backend.execute_and_wait(&circuit, 10, None).await.unwrap_err();
+            let err = backend
+                .execute_and_wait(&circuit, 10, None)
+                .await
+                .unwrap_err();
             match err {
                 crate::BackendError::JobExecutionFailed(msg) => {
                     assert!(msg.contains("Cancelled"));

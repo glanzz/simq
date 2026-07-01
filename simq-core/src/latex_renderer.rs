@@ -1287,11 +1287,9 @@ mod tests {
         let config = LatexConfig::default();
         let renderer = LatexRenderer::new(&circuit, &config);
 
-        let op = GateOp::new(
-            Arc::new(MockGate::new("CNOT", 2)),
-            &[QubitId::new(0), QubitId::new(3)],
-        )
-        .unwrap();
+        let op =
+            GateOp::new(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(3)])
+                .unwrap();
         let col: Vec<(usize, &GateOp)> = vec![(0, &op)];
 
         assert!(renderer.is_wire_through(&col, 1));
@@ -1307,11 +1305,9 @@ mod tests {
         let config = LatexConfig::default();
         let renderer = LatexRenderer::new(&circuit, &config);
 
-        let op = GateOp::new(
-            Arc::new(MockGate::new("CNOT", 2)),
-            &[QubitId::new(0), QubitId::new(3)],
-        )
-        .unwrap();
+        let op =
+            GateOp::new(Arc::new(MockGate::new("CNOT", 2)), &[QubitId::new(0), QubitId::new(3)])
+                .unwrap();
         let col: Vec<(usize, &GateOp)> = vec![(0, &op)];
 
         // qubit 0 and 3 are the gate's own qubits, not "passing through"

@@ -419,7 +419,9 @@ mod tests {
         let result = ReadoutErrorMC::from_probabilities(-0.1, 0.1);
         assert!(result.is_err());
         if let Err(e) = result {
-            assert!(e.to_string().contains("Readout error probabilities must be in [0,1]"));
+            assert!(e
+                .to_string()
+                .contains("Readout error probabilities must be in [0,1]"));
         }
 
         assert!(ReadoutErrorMC::from_probabilities(0.1, 1.1).is_err());

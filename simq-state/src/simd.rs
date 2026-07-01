@@ -52,11 +52,8 @@ pub fn apply_single_qubit_gate(
     num_qubits: usize,
 ) {
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            single_qubit::apply_gate_avx2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    unsafe {
+        single_qubit::apply_gate_avx2(state, matrix, qubit, num_qubits);
     }
 
     #[cfg(all(
@@ -96,11 +93,8 @@ pub fn apply_two_qubit_gate(
     num_qubits: usize,
 ) {
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            two_qubit::apply_gate_avx2(state, matrix, qubit1, qubit2, num_qubits);
-        }
-        return;
+    unsafe {
+        two_qubit::apply_gate_avx2(state, matrix, qubit1, qubit2, num_qubits);
     }
 
     #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
@@ -119,10 +113,8 @@ pub fn apply_two_qubit_gate(
 #[inline]
 pub fn norm_simd(vec: &[Complex64]) -> f64 {
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            return kernels::norm_avx2(vec);
-        }
+    unsafe {
+        kernels::norm_avx2(vec)
     }
 
     #[cfg(all(
@@ -151,14 +143,11 @@ pub fn normalize_simd(vec: &mut [Complex64]) {
         let inv_norm = 1.0 / norm;
 
         #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-        {
-            unsafe {
-                kernels::scale_avx2(vec, inv_norm);
-            }
-            return;
+        unsafe {
+            kernels::scale_avx2(vec, inv_norm);
         }
 
-        // Scalar fallback
+        #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
         for z in vec.iter_mut() {
             *z *= inv_norm;
         }

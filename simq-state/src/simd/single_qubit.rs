@@ -402,11 +402,8 @@ pub fn apply_gate_optimized(
 
     // For smaller states, use sequential SIMD
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            apply_gate_avx2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    unsafe {
+        apply_gate_avx2(state, matrix, qubit, num_qubits);
     }
 
     #[cfg(all(
