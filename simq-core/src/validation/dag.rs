@@ -600,4 +600,68 @@ mod tests {
         assert_eq!(dag.num_edges(), 0);
         assert!(dag.is_acyclic());
     }
+
+    #[test]
+    fn test_dependency_graph_empty_constructor() {
+        let dag = DependencyGraph::empty();
+        assert_eq!(dag.num_nodes(), 0);
+        assert_eq!(dag.num_edges(), 0);
+        assert!(dag.is_acyclic());
+        assert!(dag.outgoing_edges(0).is_empty());
+        assert!(dag.incoming_edges(0).is_empty());
+        assert!(dag.get_node(0).is_none());
+        assert!(dag.get_edge(0).is_none());
+    }
+
+    #[test]
+    fn test_get_node_and_edge() {
+        let circuit = create_test_circuit();
+        let dag = DependencyGraph::from_circuit(&circuit).unwrap();
+
+        assert!(dag.get_node(0).is_some());
+        assert!(dag.get_node(100).is_none());
+        if dag.num_edges() > 0 {
+            assert!(dag.get_edge(0).is_some());
+        }
+        assert!(dag.get_edge(100).is_none());
+    }
+
+    #[test]
+    fn test_outgoing_incoming_edges_oob() {
+        let circuit = create_test_circuit();
+        let dag = DependencyGraph::from_circuit(&circuit).unwrap();
+        // Out-of-bounds node returns empty slice
+        assert!(dag.outgoing_edges(999).is_empty());
+        assert!(dag.incoming_edges(999).is_empty());
+    }
+
+    #[test]
+    fn test_dependency_edge_variants() {
+        let data_dep = DependencyEdge::DataDependency {
+            from: 0,
+            to: 1,
+            qubit: 2,
+        };
+        assert_eq!(data_dep.from(), 0);
+        assert_eq!(data_dep.to(), 1);
+        assert_eq!(data_dep.qubit(), 2);
+
+        let anti_dep = DependencyEdge::AntiDependency {
+            from: 3,
+            to: 4,
+            qubit: 5,
+        };
+        assert_eq!(anti_dep.from(), 3);
+        assert_eq!(anti_dep.to(), 4);
+        assert_eq!(anti_dep.qubit(), 5);
+
+        let out_dep = DependencyEdge::OutputDependency {
+            from: 6,
+            to: 7,
+            qubit: 8,
+        };
+        assert_eq!(out_dep.from(), 6);
+        assert_eq!(out_dep.to(), 7);
+        assert_eq!(out_dep.qubit(), 8);
+    }
 }

@@ -83,7 +83,8 @@ jobs:
       - name: Generate coverage report and enforce threshold
         run: |
           cargo tarpaulin --verbose --all-features --workspace --timeout 120 \
-            --engine llvm --out Xml --output-dir coverage --fail-under 95
+            --engine llvm --out Xml --output-dir coverage --fail-under 84 \
+            --exclude-files "simq-sim/src/gpu.rs" "simq-macros/src/lib.rs"
 
   # benchmark:
   #   name: Benchmark

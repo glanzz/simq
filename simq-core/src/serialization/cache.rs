@@ -322,4 +322,167 @@ mod tests {
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.hits, 1);
     }
+
+    #[test]
+    fn test_cache_hit_rate() {
+        let mut stats = CacheStats::default();
+        assert_eq!(stats.hit_rate(), 0.0);
+        stats.hits = 3;
+        stats.misses = 1;
+        assert!((stats.hit_rate() - 75.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_circuit_key_from_hash() {
+        let key = CircuitKey::from_hash(12345);
+        assert_eq!(key.hash(), 12345);
+    }
+
+    #[test]
+    fn test_memory_cache_with_capacity() {
+        let cache = MemoryCache::with_capacity(64);
+        let circuit = Circuit::new(3);
+        let key = CircuitKey::from_circuit(&circuit);
+        cache.put(key.clone(), circuit.clone()).unwrap();
+        assert!(cache.get(&key).is_some());
+    }
+
+    #[test]
+    fn test_memory_cache_remove() {
+        let cache = MemoryCache::new();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+        cache.put(key.clone(), circuit.clone()).unwrap();
+        let removed = cache.remove(&key);
+        assert!(removed.is_some());
+        assert!(cache.get(&key).is_none());
+    }
+
+    #[test]
+    fn test_memory_cache_remove_missing() {
+        let cache = MemoryCache::new();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+        let removed = cache.remove(&key);
+        assert!(removed.is_none());
+    }
+
+    #[test]
+    fn test_file_cache_put_get() {
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        // Cache miss initially
+        assert!(cache.get(&key).is_none());
+
+        // Put and get
+        cache.put(key.clone(), circuit.clone()).unwrap();
+        let retrieved = cache.get(&key);
+        assert!(retrieved.is_some());
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_remove() {
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_remove_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        cache.put(key.clone(), circuit.clone()).unwrap();
+        let removed = cache.remove(&key);
+        assert!(removed.is_some());
+        assert!(cache.get(&key).is_none());
+
+        // Remove non-existent returns None
+        let removed_again = cache.remove(&key);
+        assert!(removed_again.is_none());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_clear() {
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_clear_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        cache.put(key.clone(), circuit).unwrap();
+        let stats_before = cache.stats();
+        assert!(stats_before.size > 0);
+
+        cache.clear();
+        let stats_after = cache.stats();
+        assert_eq!(stats_after.size, 0);
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_stats() {
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_stats_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache = FileCache::new(&tmp).unwrap();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        let stats = cache.stats();
+        assert_eq!(stats.size, 0);
+
+        cache.put(key.clone(), circuit).unwrap();
+        let stats = cache.stats();
+        assert!(stats.size > 0);
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_cache_with_ttl() {
+        let tmp = std::env::temp_dir().join(format!(
+            "simq_cache_ttl_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let ttl = std::time::Duration::from_secs(3600);
+        let cache = FileCache::with_ttl(&tmp, ttl).unwrap();
+        let circuit = Circuit::new(2);
+        let key = CircuitKey::from_circuit(&circuit);
+
+        cache.put(key.clone(), circuit).unwrap();
+        // Within TTL, should return the circuit
+        assert!(cache.get(&key).is_some());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 }

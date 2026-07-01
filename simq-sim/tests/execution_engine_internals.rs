@@ -566,3 +566,220 @@ fn execution_engine_multi_qubit_circuit() {
     let mut state = AdaptiveState::new(3).unwrap();
     engine.execute(&circuit, &mut state).unwrap();
 }
+
+// ============================================================================
+// Dense state execution paths (apply_gate_dense)
+// ============================================================================
+
+fn make_seq_engine() -> ExecutionEngine {
+    let config = ExecutionConfig {
+        mode: ExecutionMode::Sequential,
+        validate_state: false,
+        ..ExecutionConfig::default()
+    };
+    ExecutionEngine::new(config)
+}
+
+#[test]
+fn dense_state_pauli_x() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(1);
+    circuit.add_gate(Arc::new(PauliX), &[q(0)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_pauli_z() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(1);
+    circuit.add_gate(Arc::new(PauliZ), &[q(0)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_hadamard() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(1);
+    circuit.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_general_single_qubit() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(1);
+    circuit
+        .add_gate(Arc::new(RotationY::new(0.5)), &[q(0)])
+        .unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_general_single_qubit_no_simd() {
+    let config = ExecutionConfig {
+        mode: ExecutionMode::Sequential,
+        validate_state: false,
+        use_simd: false,
+        ..ExecutionConfig::default()
+    };
+    let mut engine = ExecutionEngine::new(config);
+    let mut circuit = Circuit::new(1);
+    circuit
+        .add_gate(Arc::new(RotationY::new(0.5)), &[q(0)])
+        .unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_cnot() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(2);
+    circuit.add_gate(Arc::new(CNot), &[q(0), q(1)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(2).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_cz() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(2);
+    circuit.add_gate(Arc::new(CZ), &[q(0), q(1)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(2).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_swap() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(2);
+    circuit.add_gate(Arc::new(Swap), &[q(0), q(1)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(2).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_general_two_qubit_gate() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(2);
+    // ISwap is not CNOT/CZ/SWAP so goes through general two-qubit path
+    circuit.add_gate(Arc::new(ISwap), &[q(0), q(1)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(2).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_rxx_gate() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(2);
+    circuit
+        .add_gate(Arc::new(RXX::new(0.5)), &[q(0), q(1)])
+        .unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(2).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_with_validate_state() {
+    let config = ExecutionConfig {
+        mode: ExecutionMode::Sequential,
+        validate_state: true,
+        ..ExecutionConfig::default()
+    };
+    let mut engine = ExecutionEngine::new(config);
+    let mut circuit = Circuit::new(1);
+    circuit.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn dense_state_with_adaptive_state_config() {
+    let config = ExecutionConfig {
+        mode: ExecutionMode::Sequential,
+        validate_state: false,
+        adaptive_state: true,
+        ..ExecutionConfig::default()
+    };
+    let mut engine = ExecutionEngine::new(config);
+    let mut circuit = Circuit::new(2);
+    circuit.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
+    let mut state = AdaptiveState::Dense(DenseState::new(2).unwrap());
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn sparse_state_with_validate_state() {
+    let config = ExecutionConfig {
+        mode: ExecutionMode::Sequential,
+        validate_state: true,
+        ..ExecutionConfig::default()
+    };
+    let mut engine = ExecutionEngine::new(config);
+    let mut circuit = Circuit::new(1);
+    circuit.add_gate(Arc::new(PauliX), &[q(0)]).unwrap();
+    let mut state = AdaptiveState::new(1).unwrap();
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn sparse_state_two_qubit_general_gate() {
+    let mut engine = make_seq_engine();
+    let mut circuit = Circuit::new(2);
+    circuit.add_gate(Arc::new(ISwap), &[q(0), q(1)]).unwrap();
+    let mut state = AdaptiveState::new(2).unwrap();
+    assert!(engine.execute(&circuit, &mut state).is_ok());
+}
+
+#[test]
+fn recovery_policy_halt_is_default() {
+    let config = ExecutionConfig {
+        mode: ExecutionMode::Sequential,
+        validate_state: false,
+        ..ExecutionConfig::default()
+    };
+    let engine = ExecutionEngine::new(config);
+    assert_eq!(engine.recovery_policy, RecoveryPolicy::Halt);
+}
+
+#[test]
+fn recovery_policy_retry_once() {
+    let policy = RecoveryPolicy::RetryOnce;
+    assert!(policy.should_retry(1));
+    assert!(!policy.should_retry(2));
+    assert_eq!(policy.max_attempts(), 2);
+}
+
+#[test]
+fn recovery_policy_retry_with_backoff() {
+    let policy = RecoveryPolicy::RetryWithBackoff { max_attempts: 5 };
+    assert!(policy.should_retry(4));
+    assert!(!policy.should_retry(5));
+    assert_eq!(policy.max_attempts(), 5);
+}
+
+#[test]
+fn recovery_policy_fallback() {
+    let policy = RecoveryPolicy::Fallback;
+    assert!(policy.should_retry(1));
+    assert!(!policy.should_retry(2));
+    assert_eq!(policy.max_attempts(), 2);
+}
+
+#[test]
+fn recovery_policy_skip_max_attempts() {
+    let policy = RecoveryPolicy::Skip;
+    assert_eq!(policy.max_attempts(), 1);
+    assert!(!policy.should_retry(1));
+}
+
+#[test]
+fn recovery_policy_halt_max_attempts() {
+    let policy = RecoveryPolicy::Halt;
+    assert_eq!(policy.max_attempts(), 1);
+    assert!(!policy.should_retry(1));
+}
