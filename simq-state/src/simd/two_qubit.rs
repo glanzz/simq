@@ -132,6 +132,22 @@ mod tests {
     }
 
     #[test]
+    fn test_scalar_identity() {
+        // Identity on |00⟩ should leave state unchanged
+        let mut state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_gate_scalar(&mut state, &identity_matrix(), 0, 1, 2);
+        assert_relative_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
     fn test_scalar_cnot() {
         // CNOT on |10⟩ → |11⟩
         let mut state = vec![
