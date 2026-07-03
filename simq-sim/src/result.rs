@@ -241,4 +241,95 @@ mod tests {
         assert_eq!(counts.total_shots(), 100);
         assert_eq!(counts.num_outcomes(), 2);
     }
+
+    #[test]
+    fn test_simulation_result_with_measurements() {
+        use simq_state::AdaptiveState;
+        let state = AdaptiveState::new(2).unwrap();
+        let mut counts = MeasurementCounts::new(100);
+        counts.add("00".to_string(), 60);
+        counts.add("11".to_string(), 40);
+        let result = SimulationResult::new(state).with_measurements(counts);
+        assert!(result.measurements.is_some());
+        assert_eq!(result.total_shots(), Some(100));
+    }
+
+    #[test]
+    fn test_simulation_result_with_statistics() {
+        use crate::statistics::ExecutionStatistics;
+        use simq_state::AdaptiveState;
+        let state = AdaptiveState::new(2).unwrap();
+        let stats = ExecutionStatistics::default();
+        let result = SimulationResult::new(state).with_statistics(stats);
+        assert!(result.statistics.is_some());
+    }
+
+    #[test]
+    fn test_simulation_result_is_dense() {
+        use simq_state::AdaptiveState;
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        let result = SimulationResult::new(state);
+        assert!(result.is_dense());
+        assert!(!result.is_sparse());
+    }
+
+    #[test]
+    fn test_simulation_result_is_sparse() {
+        use simq_state::AdaptiveState;
+        let state = AdaptiveState::new(4).unwrap();
+        let result = SimulationResult::new(state);
+        assert!(result.is_sparse());
+        assert!(!result.is_dense());
+    }
+
+    #[test]
+    fn test_simulation_result_total_shots_none() {
+        use simq_state::AdaptiveState;
+        let state = AdaptiveState::new(2).unwrap();
+        let result = SimulationResult::new(state);
+        assert_eq!(result.total_shots(), None);
+    }
+
+    #[test]
+    fn test_measurement_counts_probability_zero_shots() {
+        let counts = MeasurementCounts::new(0);
+        assert_eq!(counts.probability("00"), 0.0);
+    }
+
+    #[test]
+    fn test_measurement_counts_bitstrings() {
+        let mut counts = MeasurementCounts::new(100);
+        counts.add("00".to_string(), 50);
+        counts.add("11".to_string(), 50);
+        let bitstrings: Vec<_> = counts.bitstrings().collect();
+        assert_eq!(bitstrings.len(), 2);
+    }
+
+    #[test]
+    fn test_measurement_counts_counts_accessor() {
+        let mut counts = MeasurementCounts::new(100);
+        counts.add("01".to_string(), 100);
+        let map = counts.counts();
+        assert_eq!(map.get("01"), Some(&100));
+    }
+
+    #[test]
+    fn test_measurement_counts_display_many_outcomes() {
+        let mut counts = MeasurementCounts::new(11);
+        for i in 0..11 {
+            counts.add(format!("{:04b}", i), 1);
+        }
+        let display = format!("{}", counts);
+        assert!(display.contains("and 1 more outcomes"));
+    }
+
+    #[test]
+    fn test_measurement_counts_to_probabilities() {
+        let mut counts = MeasurementCounts::new(100);
+        counts.add("00".to_string(), 50);
+        counts.add("11".to_string(), 50);
+        let probs = counts.to_probabilities();
+        assert!((probs["00"] - 0.5).abs() < 1e-10);
+    }
 }

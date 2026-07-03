@@ -675,7 +675,121 @@ impl Default for LazyExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use simq_gates::standard::{Hadamard, PauliX};
+    use simq_core::gate::Gate;
+    use simq_gates::standard::{CNot, Hadamard, PauliX};
+
+    // -----------------------------------------------------------------------
+    // Mock gate helpers for error-path testing
+    // -----------------------------------------------------------------------
+
+    /// A mock 2-qubit gate used to test calling matrix_1q() on a 2-qubit gate.
+    #[derive(Debug)]
+    struct MockTwoQubitGate;
+
+    impl Gate for MockTwoQubitGate {
+        fn name(&self) -> &str {
+            "Mock2Q"
+        }
+        fn num_qubits(&self) -> usize {
+            2
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            // Return a valid 16-element 4x4 matrix (CNOT-like)
+            Some(vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ])
+        }
+    }
+
+    /// A mock 1-qubit gate that returns no matrix (matrix() == None).
+    #[derive(Debug)]
+    struct MockNoMatrixGate;
+
+    impl Gate for MockNoMatrixGate {
+        fn name(&self) -> &str {
+            "MockNoMatrix"
+        }
+        fn num_qubits(&self) -> usize {
+            1
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            None
+        }
+    }
+
+    /// A mock 1-qubit gate whose matrix() returns wrong number of elements.
+    #[derive(Debug)]
+    struct MockBadMatrix1qGate;
+
+    impl Gate for MockBadMatrix1qGate {
+        fn name(&self) -> &str {
+            "MockBadMatrix1q"
+        }
+        fn num_qubits(&self) -> usize {
+            1
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            // Return only 2 elements instead of 4
+            Some(vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)])
+        }
+    }
+
+    /// A mock 2-qubit gate that returns no matrix.
+    #[derive(Debug)]
+    struct MockNoMatrix2qGate;
+
+    impl Gate for MockNoMatrix2qGate {
+        fn name(&self) -> &str {
+            "MockNoMatrix2q"
+        }
+        fn num_qubits(&self) -> usize {
+            2
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            None
+        }
+    }
+
+    /// A mock 2-qubit gate whose matrix() returns wrong number of elements.
+    #[derive(Debug)]
+    struct MockBadMatrix2qGate;
+
+    impl Gate for MockBadMatrix2qGate {
+        fn name(&self) -> &str {
+            "MockBadMatrix2q"
+        }
+        fn num_qubits(&self) -> usize {
+            2
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            // Return only 4 elements instead of 16
+            Some(vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ])
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Existing tests (unchanged)
+    // -----------------------------------------------------------------------
 
     #[test]
     fn test_lazy_gate_single_qubit() {
@@ -739,5 +853,382 @@ mod tests {
 
         // Cache should still have 2 entries
         assert_eq!(cache.stats().total_entries, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests to cover previously uncovered lines
+    // -----------------------------------------------------------------------
+
+    // --- LazyGate::gate() (lines 117-118) ---
+
+    #[test]
+    fn test_lazy_gate_gate_accessor() {
+        let gate = Arc::new(Hadamard) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate.clone());
+        // gate() should return a reference to the stored gate
+        assert_eq!(lazy.gate().name(), "H");
+    }
+
+    // --- LazyGate::matrix_1q() error: wrong num_qubits (line 124) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_1q_wrong_num_qubits() {
+        let gate = Arc::new(MockTwoQubitGate) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let result = lazy.matrix_1q();
+        assert!(result.is_err(), "Expected error for 2-qubit gate passed to matrix_1q");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("single-qubit"),
+            "Error should mention single-qubit: {}",
+            err_msg
+        );
+    }
+
+    // --- LazyGate::matrix_1q() error: gate returns None matrix (lines 134-138) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_1q_no_matrix() {
+        let gate = Arc::new(MockNoMatrixGate) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let result = lazy.matrix_1q();
+        assert!(result.is_err(), "Expected error when gate has no matrix");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("does not provide a matrix"), "Got: {}", err_msg);
+    }
+
+    // --- LazyGate::matrix_1q() error: wrong matrix size (lines 141-144) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_1q_bad_matrix_size() {
+        let gate = Arc::new(MockBadMatrix1qGate) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let result = lazy.matrix_1q();
+        assert!(result.is_err(), "Expected error when matrix has wrong size");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("2x2 matrix"), "Got: {}", err_msg);
+    }
+
+    // --- LazyGate::matrix_2q() happy path with caching (lines 160-202) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_2q_success_and_cache() {
+        let gate = Arc::new(CNot) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+
+        // matrix_2q should not be computed yet
+        assert!(lazy.matrix_2q.borrow().is_none());
+
+        // First call computes and caches
+        let m1 = lazy.matrix_2q().unwrap();
+        assert!(lazy.matrix_2q.borrow().is_some());
+
+        // Second call returns cached value
+        let m2 = lazy.matrix_2q().unwrap();
+        assert_eq!(m1, m2);
+    }
+
+    // --- LazyGate::matrix_2q() error: wrong num_qubits (line 162) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_2q_wrong_num_qubits() {
+        let gate = Arc::new(Hadamard) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let result = lazy.matrix_2q();
+        assert!(result.is_err(), "Expected error for 1-qubit gate passed to matrix_2q");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("two-qubit"), "Got: {}", err_msg);
+    }
+
+    // --- LazyGate::matrix_2q() error: gate returns None matrix (lines 171-176) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_2q_no_matrix() {
+        let gate = Arc::new(MockNoMatrix2qGate) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let result = lazy.matrix_2q();
+        assert!(result.is_err(), "Expected error when 2q gate has no matrix");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("does not provide a matrix"), "Got: {}", err_msg);
+    }
+
+    // --- LazyGate::matrix_2q() error: wrong matrix size (lines 178-183) ---
+
+    #[test]
+    fn test_lazy_gate_matrix_2q_bad_matrix_size() {
+        let gate = Arc::new(MockBadMatrix2qGate) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let result = lazy.matrix_2q();
+        assert!(result.is_err(), "Expected error when 2q matrix has wrong size");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("4x4 matrix"), "Got: {}", err_msg);
+    }
+
+    // --- LazyGate Debug impl (lines 205-213) ---
+
+    #[test]
+    fn test_lazy_gate_debug() {
+        let gate = Arc::new(Hadamard) as Arc<dyn Gate>;
+        let lazy = LazyGate::new(gate);
+        let debug_str = format!("{:?}", lazy);
+        assert!(debug_str.contains("LazyGate"), "Got: {}", debug_str);
+        assert!(debug_str.contains("matrix_1q_computed"), "Got: {}", debug_str);
+    }
+
+    // --- MatrixCacheKey via get_or_compute_2q (lines 215-250) ---
+
+    #[test]
+    fn test_matrix_cache_2q_hit_and_miss() {
+        let mut cache = MatrixCache::new(10);
+        let cnot_gate = Arc::new(CNot) as Arc<dyn Gate>;
+
+        // First access: miss → compute
+        let m1 = cache.get_or_compute_2q(&cnot_gate).unwrap();
+        assert_eq!(cache.stats().entries_2q, 1);
+
+        // Second access: hit → return cached
+        let m2 = cache.get_or_compute_2q(&cnot_gate).unwrap();
+        assert_eq!(m1, m2);
+    }
+
+    // --- MatrixCache::get_or_compute_1q error: gate returns no matrix ---
+
+    #[test]
+    fn test_matrix_cache_1q_no_matrix_error() {
+        let mut cache = MatrixCache::new(10);
+        let gate = Arc::new(MockNoMatrixGate) as Arc<dyn Gate>;
+        let result = cache.get_or_compute_1q(&gate);
+        assert!(result.is_err());
+    }
+
+    // --- MatrixCache::get_or_compute_1q error: wrong matrix size ---
+
+    #[test]
+    fn test_matrix_cache_1q_bad_matrix_size_error() {
+        let mut cache = MatrixCache::new(10);
+        let gate = Arc::new(MockBadMatrix1qGate) as Arc<dyn Gate>;
+        let result = cache.get_or_compute_1q(&gate);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("2x2 matrix"), "Got: {}", err_msg);
+    }
+
+    // --- MatrixCache::get_or_compute_2q error: gate returns no matrix ---
+
+    #[test]
+    fn test_matrix_cache_2q_no_matrix_error() {
+        let mut cache = MatrixCache::new(10);
+        let gate = Arc::new(MockNoMatrix2qGate) as Arc<dyn Gate>;
+        let result = cache.get_or_compute_2q(&gate);
+        assert!(result.is_err());
+    }
+
+    // --- MatrixCache::get_or_compute_2q error: wrong matrix size ---
+
+    #[test]
+    fn test_matrix_cache_2q_bad_matrix_size_error() {
+        let mut cache = MatrixCache::new(10);
+        let gate = Arc::new(MockBadMatrix2qGate) as Arc<dyn Gate>;
+        let result = cache.get_or_compute_2q(&gate);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("4x4 matrix"), "Got: {}", err_msg);
+    }
+
+    // --- MatrixCache LRU eviction for 2q cache ---
+
+    #[test]
+    fn test_matrix_cache_2q_lru_eviction() {
+        // max_size=1 so adding a second 2q entry triggers eviction
+        let mut cache = MatrixCache::new(1);
+        let cnot_gate = Arc::new(CNot) as Arc<dyn Gate>;
+        let mock_gate = Arc::new(MockTwoQubitGate) as Arc<dyn Gate>;
+
+        cache.get_or_compute_2q(&cnot_gate).unwrap();
+        assert_eq!(cache.stats().total_entries, 1);
+
+        // Adding second entry triggers eviction of first
+        cache.get_or_compute_2q(&mock_gate).unwrap();
+        assert_eq!(cache.stats().total_entries, 1);
+    }
+
+    // --- MatrixCache::clear ---
+
+    #[test]
+    fn test_matrix_cache_clear() {
+        let mut cache = MatrixCache::new(10);
+        let h_gate = Arc::new(Hadamard) as Arc<dyn Gate>;
+        let cnot_gate = Arc::new(CNot) as Arc<dyn Gate>;
+
+        cache.get_or_compute_1q(&h_gate).unwrap();
+        cache.get_or_compute_2q(&cnot_gate).unwrap();
+        assert_eq!(cache.stats().total_entries, 2);
+
+        cache.clear();
+        assert_eq!(cache.stats().total_entries, 0);
+    }
+
+    // --- CacheStats Display (lines 410-418) ---
+
+    #[test]
+    fn test_cache_stats_display() {
+        let mut cache = MatrixCache::new(10);
+        let h_gate = Arc::new(Hadamard) as Arc<dyn Gate>;
+        cache.get_or_compute_1q(&h_gate).unwrap();
+        let stats = cache.stats();
+        let display = format!("{}", stats);
+        assert!(display.contains("Cache:"), "Got: {}", display);
+    }
+
+    // --- ExecutorStats::cache_hit_rate zero-total branch ---
+
+    #[test]
+    fn test_executor_stats_zero_hit_rate() {
+        let stats = ExecutorStats::default();
+        assert_eq!(stats.cache_hit_rate(), 0.0);
+    }
+
+    // --- ExecutorStats Display ---
+
+    #[test]
+    fn test_executor_stats_display() {
+        let stats = ExecutorStats {
+            cache_hits: 3,
+            cache_misses: 1,
+            matrices_computed: 1,
+            gates_fused: 0,
+            batches_executed: 2,
+        };
+        let display = format!("{}", stats);
+        assert!(display.contains("Executor Stats:"), "Got: {}", display);
+    }
+
+    // --- LazyExecutor Debug impl ---
+
+    #[test]
+    fn test_lazy_executor_debug() {
+        let executor = LazyExecutor::default();
+        let debug_str = format!("{:?}", executor);
+        assert!(debug_str.contains("LazyExecutor"), "Got: {}", debug_str);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests to cover LazyExecutor::execute paths
+    // -----------------------------------------------------------------------
+
+    /// A mock 3-qubit gate for testing the unsupported gate error path.
+    #[derive(Debug)]
+    struct MockThreeQubitGate;
+
+    impl Gate for MockThreeQubitGate {
+        fn name(&self) -> &str {
+            "MockThreeQubit"
+        }
+
+        fn num_qubits(&self) -> usize {
+            3
+        }
+
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            Some(vec![Complex64::new(1.0, 0.0); 64])
+        }
+    }
+
+    /// Build an initial |0…0⟩ state vector for n qubits.
+    fn zero_state(n: usize) -> Vec<Complex64> {
+        let mut v = vec![Complex64::new(0.0, 0.0); 1 << n];
+        v[0] = Complex64::new(1.0, 0.0);
+        v
+    }
+
+    /// Lines 497-501: state size mismatch returns ValidationError.
+    #[test]
+    fn test_lazy_executor_state_size_mismatch() {
+        let mut executor = LazyExecutor::default();
+        let circuit = Circuit::new(2); // expects 4-element state
+                                       // Provide an 8-element state → mismatch
+        let mut state = zero_state(3);
+        let result = executor.execute(&circuit, &mut state);
+        assert!(result.is_err(), "Expected error on size mismatch");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("State size") || err.contains("state"), "Got: {}", err);
+    }
+
+    /// Line 600: cache hit on 2-qubit gate (second call to execute with same circuit).
+    #[test]
+    fn test_lazy_executor_2q_cache_hit() {
+        use simq_core::QubitId;
+        let config = LazyConfig {
+            enable_caching: true,
+            enable_fusion: false, // disable fusion to keep circuit unchanged
+            ..LazyConfig::default()
+        };
+        let mut executor = LazyExecutor::new(config);
+
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(CNot) as Arc<dyn Gate>, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        // First execution: cache miss
+        let mut state1 = zero_state(2);
+        executor.execute(&circuit, &mut state1).unwrap();
+        assert_eq!(executor.stats().cache_misses, 1);
+
+        // Second execution: cache hit (line 600)
+        let mut state2 = zero_state(2);
+        executor.execute(&circuit, &mut state2).unwrap();
+        assert!(
+            executor.stats().cache_hits >= 1,
+            "Expected at least one cache hit on second execution"
+        );
+    }
+
+    /// Lines 608-610: 2-qubit gate executed without caching.
+    #[test]
+    fn test_lazy_executor_2q_no_caching() {
+        use simq_core::QubitId;
+        let config = LazyConfig {
+            enable_caching: false,
+            enable_fusion: false,
+            ..LazyConfig::default()
+        };
+        let mut executor = LazyExecutor::new(config);
+
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(CNot) as Arc<dyn Gate>, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let mut state = zero_state(2);
+        let result = executor.execute(&circuit, &mut state);
+        assert!(result.is_ok());
+        // With no caching, matrices_computed should be 1 (computed directly each time)
+        assert_eq!(executor.stats().matrices_computed, 1);
+    }
+
+    /// Lines 622-625: 3-qubit gate triggers unsupported-gate error.
+    #[test]
+    fn test_lazy_executor_3q_gate_error() {
+        use simq_core::QubitId;
+        let config = LazyConfig {
+            enable_fusion: false,
+            ..LazyConfig::default()
+        };
+        let mut executor = LazyExecutor::new(config);
+
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(MockThreeQubitGate) as Arc<dyn Gate>,
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+
+        let mut state = zero_state(3);
+        let result = executor.execute(&circuit, &mut state);
+        assert!(result.is_err(), "Expected error for 3-qubit gate");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("3") || err.contains("qubit"), "Got: {}", err);
     }
 }

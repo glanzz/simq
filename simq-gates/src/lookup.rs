@@ -468,4 +468,58 @@ mod tests {
         assert_relative_eq!(stats.max_angle, PI / 4.0, epsilon = 1e-10);
         assert!(stats.memory_bytes > 0);
     }
+
+    // --- Additional coverage for lines 94-96, 257, 338 ---
+
+    #[test]
+    fn test_config_error_tolerance_setter() {
+        // Lines 94-96: LookupConfig::error_tolerance() builder method
+        let config = LookupConfig::new()
+            .max_angle(PI / 4.0)
+            .num_entries(100)
+            .error_tolerance(1e-8);
+        // Verify the config can be used to create a table without panicking
+        let _table = RotationLookupTable::new(config);
+    }
+
+    #[test]
+    fn test_ry_matrix_fallback_large_angle() {
+        // Line 257: ry_matrix falls back to direct computation for angles beyond table range
+        let config = LookupConfig::new().max_angle(PI / 4.0).num_entries(100);
+        let table = RotationLookupTable::new(config);
+
+        // Angle beyond table range → fallback path in ry_matrix
+        let theta = PI; // larger than PI/4
+        let matrix_lookup = table.ry_matrix(theta);
+        let matrix_direct = crate::matrices::rotation_y(theta);
+
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(
+                    matrix_lookup[i][j].re,
+                    matrix_direct[i][j].re,
+                    epsilon = 1e-10
+                );
+                assert_relative_eq!(
+                    matrix_lookup[i][j].im,
+                    matrix_direct[i][j].im,
+                    epsilon = 1e-10
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_lookup_stats_display_interpolation_disabled() {
+        // Line 338: "disabled" branch in LookupStats Display impl
+        let config = LookupConfig::new()
+            .max_angle(PI / 4.0)
+            .num_entries(100)
+            .interpolation_enabled(false);
+        let table = RotationLookupTable::new(config);
+        let stats = table.stats();
+        assert!(!stats.interpolation_enabled);
+        let display = format!("{}", stats);
+        assert!(display.contains("disabled"), "display was: {display}");
+    }
 }

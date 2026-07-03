@@ -278,4 +278,78 @@ mod tests {
         assert_eq!(grid[0], vec![0.0, -1.0]);
         assert_eq!(grid[8], vec![1.0, 1.0]);
     }
+
+    /// Lines 121-133: evaluate_multi_observable (Dense branch at lines 123-124)
+    #[test]
+    fn test_evaluate_multi_observable() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let obs1 = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let obs2 = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 0.5);
+        let observables = vec![obs1, obs2];
+        let params = vec![0.5];
+        let values =
+            evaluate_multi_observable(&simulator, circuit_builder, &observables, &params).unwrap();
+        assert_eq!(values.len(), 2);
+        // Second observable is 0.5 * first
+        assert!((values[1] - 0.5 * values[0]).abs() < 1e-10);
+    }
+
+    /// Lines 140-154: batch_gradient
+    #[test]
+    fn test_batch_gradient() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+
+        // A simple gradient function — returns a fixed-size gradient for testing
+        let gradient_fn = |_sim: &Simulator,
+                           _cb: &_,
+                           _obs: &PauliObservable,
+                           params: &[f64]|
+         -> Result<Vec<f64>> { Ok(vec![params[0].cos()]) };
+
+        let batch_params = vec![vec![0.0], vec![0.5], vec![1.0]];
+        let results =
+            batch_gradient(&simulator, circuit_builder, gradient_fn, &observable, &batch_params)
+                .unwrap();
+        assert_eq!(results.len(), 3);
+        for grad in &results {
+            assert_eq!(grad.len(), 1);
+            assert!(grad[0].is_finite());
+        }
+    }
+
+    /// grid_search test
+    #[test]
+    fn test_grid_search() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let ranges = vec![(0.0, std::f64::consts::PI)];
+        let result = grid_search(&simulator, circuit_builder, &observable, &ranges, 3).unwrap();
+        assert_eq!(result.values.len(), 3);
+        assert!(result.optimal_value.is_finite());
+        assert_eq!(result.param_grid.len(), 3);
+    }
 }

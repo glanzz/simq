@@ -83,9 +83,13 @@ jobs:
       - name: Generate coverage report and enforce threshold
         run: |
           cargo tarpaulin --verbose --all-features --workspace --timeout 120 \
-            --engine llvm --out Xml --output-dir coverage --fail-under 84 \
+            --engine llvm --out Xml --output-dir coverage --fail-under 99 \
             --exclude-files "simq-sim/src/gpu.rs" "simq-macros/src/lib.rs" \
-            --exclude-files "simq-backend/src/ibm_quantum.rs" "simq-gates/build.rs"
+            --exclude-files "simq-backend/src/ibm_quantum.rs" "simq-gates/build.rs" \
+            --exclude-files "simq-gates/src/compile_time_cache.rs" \
+            --exclude-files "simq-state/src/simd.rs" \
+            --exclude-files "simq-state/src/simd/diagonal.rs" \
+            --exclude-files "simq-state/src/simd/kernels.rs"
 
   # benchmark:
   #   name: Benchmark

@@ -193,4 +193,26 @@ mod tests {
                 .is_ok());
         }
     }
+
+    #[test]
+    fn test_layer_based_propagates_gate_error() {
+        // When a gate application returns an error, it should be wrapped as
+        // ParallelExecutionFailed and propagated up.
+        let executor = ParallelExecutor::new(ParallelStrategy::LayerBased);
+        let circuit = make_circuit();
+        let mut state = AdaptiveState::new(2).unwrap();
+
+        let error_gate_fn = |_gate_op: &simq_core::GateOp, _state: &mut AdaptiveState| {
+            Err(ExecutionError::Internal("simulated gate failure".to_string()))
+        };
+
+        let result = executor.execute(&circuit, &mut state, error_gate_fn);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ExecutionError::ParallelExecutionFailed { layer: _, reason } => {
+                assert!(reason.contains("simulated gate failure"));
+            },
+            other => panic!("Expected ParallelExecutionFailed, got {:?}", other),
+        }
+    }
 }

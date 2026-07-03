@@ -957,4 +957,118 @@ mod tests {
             assert!(params[2 * i + 1] >= 0.0 && params[2 * i + 1] <= std::f64::consts::FRAC_PI_2);
         }
     }
+
+    #[test]
+    fn test_graph_path_star_grid() {
+        let path = Graph::path(4);
+        assert_eq!(path.num_vertices, 4);
+        assert_eq!(path.num_edges(), 3);
+
+        let star = Graph::star(4);
+        assert_eq!(star.num_vertices, 4);
+        assert_eq!(star.num_edges(), 3);
+
+        let grid = Graph::grid(2, 3);
+        assert_eq!(grid.num_vertices, 6);
+        assert_eq!(grid.num_edges(), 7);
+    }
+
+    #[test]
+    fn test_graph_neighbors_empty() {
+        let graph = Graph::from_edges(3, &[(0, 1, 1.0)]);
+        // Vertex 2 has no neighbors
+        assert!(graph.neighbors(2).is_empty());
+    }
+
+    #[test]
+    fn test_problem_type_descriptions() {
+        let g = Graph::cycle(3);
+        assert!(ProblemType::MaxCut(g.clone())
+            .description()
+            .contains("MaxCut"));
+        assert!(ProblemType::MinVertexCover(g.clone())
+            .description()
+            .contains("Vertex Cover"));
+        assert!(ProblemType::MaxIndependentSet(g.clone())
+            .description()
+            .contains("Independent Set"));
+        assert!(ProblemType::NumberPartitioning(vec![1.0, 2.0])
+            .description()
+            .contains("Number Partitioning"));
+        assert!(ProblemType::GraphColoring(g.clone(), 3)
+            .description()
+            .contains("Coloring"));
+        assert!(ProblemType::MaxKSat {
+            num_variables: 3,
+            clauses: vec![(vec![0, 1], vec![false, true], 1.0)],
+        }
+        .description()
+        .contains("SAT"));
+        assert!(ProblemType::TSP {
+            num_cities: 3,
+            distances: vec![]
+        }
+        .description()
+        .contains("TSP"));
+        assert!(ProblemType::Portfolio {
+            assets: 2,
+            expected_returns: vec![],
+            covariances: vec![],
+            risk_factor: 0.5,
+            budget: 1,
+        }
+        .description()
+        .contains("Portfolio"));
+        assert!(ProblemType::Custom {
+            num_qubits: 2,
+            terms: vec![]
+        }
+        .description()
+        .contains("Custom"));
+    }
+
+    #[test]
+    fn test_problem_type_num_qubits() {
+        let g = Graph::cycle(3);
+        assert_eq!(ProblemType::MaxCut(g.clone()).num_qubits(), 3);
+        assert_eq!(ProblemType::MinVertexCover(g.clone()).num_qubits(), 3);
+        assert_eq!(ProblemType::MaxIndependentSet(g.clone()).num_qubits(), 3);
+        assert_eq!(ProblemType::NumberPartitioning(vec![1.0, 2.0, 3.0]).num_qubits(), 3);
+        assert_eq!(ProblemType::GraphColoring(g.clone(), 2).num_qubits(), 6);
+        assert_eq!(
+            ProblemType::MaxKSat {
+                num_variables: 4,
+                clauses: vec![]
+            }
+            .num_qubits(),
+            4
+        );
+        assert_eq!(
+            ProblemType::TSP {
+                num_cities: 2,
+                distances: vec![]
+            }
+            .num_qubits(),
+            4
+        );
+        assert_eq!(
+            ProblemType::Portfolio {
+                assets: 3,
+                expected_returns: vec![],
+                covariances: vec![],
+                risk_factor: 0.0,
+                budget: 1,
+            }
+            .num_qubits(),
+            3
+        );
+        assert_eq!(
+            ProblemType::Custom {
+                num_qubits: 5,
+                terms: vec![]
+            }
+            .num_qubits(),
+            5
+        );
+    }
 }

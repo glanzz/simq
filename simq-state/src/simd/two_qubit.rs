@@ -118,6 +118,19 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
 
+    fn identity_matrix() -> [[Complex64; 4]; 4] {
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        [[i, o, o, o], [o, i, o, o], [o, o, i, o], [o, o, o, i]]
+    }
+
+    fn cnot_matrix() -> [[Complex64; 4]; 4] {
+        // CNOT: |00⟩→|00⟩, |01⟩→|01⟩, |10⟩→|11⟩, |11⟩→|10⟩
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        [[i, o, o, o], [o, i, o, o], [o, o, o, i], [o, o, i, o]]
+    }
+
     #[test]
     fn test_scalar_cnot() {
         // Test identity on |00⟩
@@ -128,39 +141,61 @@ mod tests {
             Complex64::new(0.0, 0.0), // |11⟩
         ];
 
-        let identity_2q = [
-            [
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
-            [
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(0.0, 0.0),
-                Complex64::new(1.0, 0.0),
-            ],
-        ];
-
-        apply_gate_scalar(&mut state, &identity_2q, 0, 1, 2);
+        apply_gate_scalar(&mut state, &identity_matrix(), 0, 1, 2);
 
         // Identity should preserve state
         assert_relative_eq!(state[0].re, 1.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[2].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[3].re, 0.0, epsilon = 1e-10);
+    }
+
+    /// Covers apply_gate_avx2 (lines 105, 113) — on AVX2-capable CPUs this
+    /// exercises the function body which immediately delegates to scalar.
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_identity_matches_scalar() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        let mut state_scalar = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let mut state_avx2 = state_scalar.clone();
+
+        apply_gate_scalar(&mut state_scalar, &identity_matrix(), 0, 1, 2);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &identity_matrix(), 0, 1, 2);
+        }
+        for i in 0..4 {
+            assert_relative_eq!(state_scalar[i].re, state_avx2[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_avx2[i].im, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_cnot_matches_scalar() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // Apply CNOT starting from |10⟩ — should flip to |11⟩
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        let start = vec![o, o, i, o]; // |10⟩
+        let mut state_scalar = start.clone();
+        let mut state_avx2 = start.clone();
+
+        apply_gate_scalar(&mut state_scalar, &cnot_matrix(), 0, 1, 2);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &cnot_matrix(), 0, 1, 2);
+        }
+        for idx in 0..4 {
+            assert_relative_eq!(state_scalar[idx].re, state_avx2[idx].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[idx].im, state_avx2[idx].im, epsilon = 1e-10);
+        }
     }
 }

@@ -624,6 +624,52 @@ mod tests {
         assert!(apply_swap(5, 1, &mut state, false, usize::MAX).is_err());
     }
 
+    fn cnot_matrix() -> Matrix4x4 {
+        // CNOT: |00>→|00>, |01>→|01>, |10>→|11>, |11>→|10>
+        [
+            [
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+        ]
+    }
+
+    #[test]
+    fn test_apply_two_qubit_dense_parallel_with_non_trivial_gate() {
+        // Use a larger state (8 amplitudes = 3 qubits) so the parallel executor
+        // actually processes work across chunks. Apply CNOT-like gate on qubits 0,1.
+        // Start with |100> = index 4 (for 3-qubit big-endian: bit2=1, bit1=0, bit0=0)
+        let mut state = vec![Complex64::new(0.0, 0.0); 8];
+        state[4] = Complex64::new(1.0, 0.0); // |100>
+
+        let cnot = cnot_matrix();
+        apply_two_qubit_dense(&cnot, 0, 1, &mut state, true, 0).unwrap();
+
+        // State norm should be preserved
+        let norm: f64 = state.iter().map(|a| a.norm_sqr()).sum();
+        assert!((norm - 1.0).abs() < 1e-10);
+    }
+
     #[test]
     fn test_apply_two_qubit_qubit2_less_than_qubit1() {
         // Apply with qubit2 < qubit1 to test (q_min, q_max) order

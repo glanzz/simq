@@ -814,4 +814,362 @@ mod tests {
         assert!(config.enable_checkpoints);
         assert!(!config.enable_gate_fusion);
     }
+
+    /// A gate that has no matrix (returns None from matrix())
+    #[derive(Debug)]
+    struct NoMatrixGate;
+
+    impl simq_core::Gate for NoMatrixGate {
+        fn name(&self) -> &str {
+            "NoMatrixGate"
+        }
+        fn num_qubits(&self) -> usize {
+            1
+        }
+        fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+            None
+        }
+    }
+
+    /// A gate that returns a wrong-size matrix (triggers InvalidGateMatrix)
+    #[derive(Debug)]
+    struct BadMatrixGate;
+
+    impl simq_core::Gate for BadMatrixGate {
+        fn name(&self) -> &str {
+            "BadMatrixGate"
+        }
+        fn num_qubits(&self) -> usize {
+            1
+        }
+        fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+            // Wrong size: should be 4 for a 1-qubit gate
+            Some(vec![num_complex::Complex64::new(1.0, 0.0); 3])
+        }
+    }
+
+    /// A gate that claims to be 3-qubit (unsupported)
+    #[derive(Debug)]
+    struct ThreeQubitGate;
+
+    impl simq_core::Gate for ThreeQubitGate {
+        fn name(&self) -> &str {
+            "ThreeQubitGate"
+        }
+        fn num_qubits(&self) -> usize {
+            3
+        }
+        fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+            Some(vec![num_complex::Complex64::new(1.0, 0.0); 64])
+        }
+    }
+
+    #[test]
+    fn test_timeout_triggers_error() {
+        use std::time::Duration;
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            // Zero duration — will always time out on first gate
+            timeout: Some(Duration::from_nanos(0)),
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        let result = engine.execute(&circuit, &mut state);
+        // Should either timeout or succeed depending on timing; mostly we test it doesn't panic
+        // A zero-duration timeout should reliably fail
+        match result {
+            Err(crate::execution_engine::error::ExecutionError::ExecutionTimeout { .. }) => {},
+            Ok(()) => {}, // Timing edge case: completed before check
+            Err(e) => panic!("Unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_recovery_policy_halt_on_no_matrix_gate() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        engine.recovery_policy = RecoveryPolicy::Halt;
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        // Should fail because gate has no matrix
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_recovery_policy_skip_on_no_matrix_gate() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        engine.recovery_policy = RecoveryPolicy::Skip;
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        // Skip policy: error is suppressed, execution continues
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_recovery_policy_retry_exhausted() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        engine.recovery_policy = RecoveryPolicy::RetryOnce;
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        // RetryOnce: tries twice, then halts with ExecutionHalted
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::execution_engine::error::ExecutionError::ExecutionHalted { .. } => {},
+            e => panic!("Expected ExecutionHalted, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_no_matrix_gate_returns_error() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        // Halt policy (default), so should propagate InvalidGateMatrix
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bad_matrix_size_returns_error() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(BadMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_three_qubit_gate_unsupported() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(ThreeQubitGate),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        let mut state = AdaptiveState::new(3).unwrap();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_general_single_qubit_no_simd() {
+        // Use use_simd=false to go through the non-SIMD general path
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            use_simd: false,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(RotationY::new(0.5)), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    #[test]
+    fn test_cache_eviction_with_small_cache() {
+        // Cache size 1 forces eviction after first insertion
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            matrix_cache_size: 1,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        assert!(engine.execute(&circuit, &mut state).is_ok());
+    }
+
+    /// A 2-qubit gate that returns a wrong-size matrix (4 elements instead of 16)
+    #[derive(Debug)]
+    struct BadMatrix2qGate;
+
+    impl simq_core::Gate for BadMatrix2qGate {
+        fn name(&self) -> &str {
+            "BadMatrix2qGate"
+        }
+
+        fn num_qubits(&self) -> usize {
+            2
+        }
+
+        fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+            // Wrong size: should be 16 for a 2-qubit gate
+            Some(vec![num_complex::Complex64::new(1.0, 0.0); 4])
+        }
+    }
+
+    /// Create a Dense 1-qubit state (both amplitudes non-zero → density=1.0 > 10%).
+    fn make_dense_1q_state() -> AdaptiveState {
+        let sqrt2_inv = std::f64::consts::FRAC_1_SQRT_2;
+        let amplitudes = [
+            Complex64::new(sqrt2_inv, 0.0),
+            Complex64::new(sqrt2_inv, 0.0),
+        ];
+        let state = AdaptiveState::from_amplitudes(1, &amplitudes).unwrap();
+        assert!(state.is_dense(), "Expected Dense state for density=1.0");
+        state
+    }
+
+    /// Create a Dense 2-qubit state (all 4 amplitudes non-zero → density=1.0 > 10%).
+    fn make_dense_2q_state() -> AdaptiveState {
+        let amplitudes = [
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+        ];
+        let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        assert!(state.is_dense(), "Expected Dense state for density=1.0");
+        state
+    }
+
+    /// Create a Dense 3-qubit state (all 8 amplitudes non-zero → density=1.0 > 10%).
+    fn make_dense_3q_state() -> AdaptiveState {
+        let amp = 1.0 / (8.0_f64).sqrt();
+        let amplitudes = vec![Complex64::new(amp, 0.0); 8];
+        let state = AdaptiveState::from_amplitudes(3, &amplitudes).unwrap();
+        assert!(state.is_dense(), "Expected Dense state for density=1.0");
+        state
+    }
+
+    /// Cache hit in apply_gate_dense (lines 297-298):
+    /// Same gate applied twice on Dense state; second application hits cache.
+    #[test]
+    fn test_dense_state_cache_hit() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = make_dense_1q_state();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_ok());
+        // After two Hadamards the state returns to the original
+    }
+
+    /// gate.matrix() returns None on Dense state (lines 306-307).
+    #[test]
+    fn test_dense_state_no_matrix_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = make_dense_1q_state();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    /// 1-qubit gate with wrong matrix size on Dense state (lines 314-316).
+    #[test]
+    fn test_dense_state_bad_1q_matrix_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(BadMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = make_dense_1q_state();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    /// 2-qubit gate with wrong matrix size on Dense state (lines 327-329).
+    #[test]
+    fn test_dense_state_bad_2q_matrix_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(BadMatrix2qGate), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let mut state = make_dense_2q_state();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    /// 3-qubit gate on Dense state hits the `_` arm (lines 341-344).
+    #[test]
+    fn test_dense_state_three_qubit_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(ThreeQubitGate),
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        let mut state = make_dense_3q_state();
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    /// 2-qubit gate with wrong matrix size on SPARSE state (lines 515-517).
+    #[test]
+    fn test_sparse_state_bad_2q_matrix_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(BadMatrix2qGate), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(state.is_sparse(), "Expected Sparse state from AdaptiveState::new");
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
 }

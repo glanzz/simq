@@ -346,4 +346,111 @@ mod tests {
         let result = apply_single_qubit_dense(&gate, 10, &mut state, false, usize::MAX);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_pauli_x_parallel() {
+        // threshold=0 forces parallel path
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        apply_pauli_x(0, &mut state, true, 0).unwrap();
+        assert_abs_diff_eq!(state[0].re, 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_pauli_x_out_of_bounds() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let result = apply_pauli_x(5, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pauli_z_parallel() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
+        apply_pauli_z(0, &mut state, true, 0).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, -1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_pauli_z_out_of_bounds() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let result = apply_pauli_z(5, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hadamard_parallel() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        apply_hadamard(0, &mut state, true, 0).unwrap();
+        let sqrt_2_inv = std::f64::consts::FRAC_1_SQRT_2;
+        assert_abs_diff_eq!(state[0].re, sqrt_2_inv, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, sqrt_2_inv, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_hadamard_out_of_bounds() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let result = apply_hadamard(5, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_general_single_qubit_gate_parallel() {
+        let h_gate: Matrix2x2 = [
+            [
+                Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+                Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            ],
+            [
+                Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+                Complex64::new(-std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            ],
+        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        apply_single_qubit_dense(&h_gate, 0, &mut state, true, 0).unwrap();
+        let sqrt_2_inv = std::f64::consts::FRAC_1_SQRT_2;
+        assert_abs_diff_eq!(state[0].re, sqrt_2_inv, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, sqrt_2_inv, epsilon = 1e-10);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_validate_gate_matrix_not_unitary_a00() {
+        // Non-unitary gate: row norms don't equal 1
+        let bad_gate: Matrix2x2 = [
+            [Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let result = apply_single_qubit_dense(&bad_gate, 0, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_validate_gate_matrix_not_unitary_a11() {
+        // Gate where (0,0) passes but (1,1) fails
+        let bad_gate: Matrix2x2 = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(2.0, 0.0)],
+        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let result = apply_single_qubit_dense(&bad_gate, 0, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_validate_gate_matrix_not_unitary_a01() {
+        // Gate where diagonal norms are 1 but off-diag inner product fails
+        // Use: [[1/√2, 1/√2], [1/√2, 1/√2]] — not unitary (rows not orthogonal)
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let bad_gate: Matrix2x2 = [
+            [Complex64::new(s, 0.0), Complex64::new(s, 0.0)],
+            [Complex64::new(s, 0.0), Complex64::new(s, 0.0)],
+        ];
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let result = apply_single_qubit_dense(&bad_gate, 0, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
 }

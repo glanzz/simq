@@ -608,4 +608,121 @@ mod tests {
         let rule = rules.get_rule("CustomGate").unwrap();
         assert_eq!(rule.gate_count, 3);
     }
+
+    // Tests for previously uncovered lines
+
+    #[test]
+    fn test_transpile_too_many_qubits() {
+        // Covers lines 87-91: circuit exceeds backend qubit count
+        let transpiler = Transpiler::new(OptimizationLevel::None);
+        let mut caps = crate::BackendCapabilities::simulator();
+        caps.max_qubits = 3;
+
+        let circuit = simq_core::Circuit::new(5);
+        let result = transpiler.transpile(&circuit, &caps);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::BackendError::CapabilityExceeded(msg) => {
+                assert!(msg.contains("5 qubits"));
+            },
+            other => panic!("Expected CapabilityExceeded, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_transpile_with_connectivity() {
+        // Covers lines 158-161: map_and_route called when connectivity is set
+        use crate::ConnectivityGraph;
+
+        let transpiler = Transpiler::new(OptimizationLevel::None);
+        let mut caps = crate::BackendCapabilities::simulator();
+        caps.connectivity = Some(ConnectivityGraph::all_to_all(5));
+
+        let circuit = simq_core::Circuit::new(3);
+        let result = transpiler.transpile(&circuit, &caps);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transpile_map_route_qubit_mismatch() {
+        // map_and_route error when circuit needs more qubits than connectivity graph
+        use crate::ConnectivityGraph;
+
+        let transpiler = Transpiler::new(OptimizationLevel::None);
+        let mut caps = crate::BackendCapabilities::simulator();
+        // Connectivity graph has only 2 qubits, circuit has 3
+        caps.max_qubits = 10; // allow the first check to pass
+        caps.connectivity = Some(ConnectivityGraph::linear_chain(2));
+
+        let circuit = simq_core::Circuit::new(3);
+        let result = transpiler.transpile(&circuit, &caps);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_estimate_cost_on_valid_circuit() {
+        // Covers line 233: estimate_cost Ok branch
+        let transpiler = Transpiler::new(OptimizationLevel::Medium);
+        let caps = crate::BackendCapabilities::simulator();
+        let circuit = simq_core::Circuit::new(2);
+
+        let cost = transpiler.estimate_cost(&circuit, &caps);
+        // Circuit is empty so transpile succeeds
+        assert_eq!(cost.original_gates, 0);
+        assert_eq!(cost.original_depth, 0);
+    }
+
+    #[test]
+    fn test_transpile_heavy_optimization() {
+        // Covers OptimizationLevel::Heavy path
+        let transpiler = Transpiler::new(OptimizationLevel::Heavy);
+        let caps = crate::BackendCapabilities::simulator();
+        let circuit = simq_core::Circuit::new(2);
+
+        let result = transpiler.transpile(&circuit, &caps);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transpile_light_optimization() {
+        // Covers OptimizationLevel::Light path
+        let transpiler = Transpiler::new(OptimizationLevel::Light);
+        let caps = crate::BackendCapabilities::simulator();
+        let circuit = simq_core::Circuit::new(2);
+
+        let result = transpiler.transpile(&circuit, &caps);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transpilation_cost_zero_depth_overhead() {
+        // Covers depth_overhead with zero original_depth
+        let cost = TranspilationCost {
+            original_gates: 5,
+            transpiled_gates: 7,
+            original_depth: 0,
+            transpiled_depth: 0,
+            swap_gates: 0,
+        };
+        assert_eq!(cost.depth_overhead(), 0.0);
+    }
+
+    #[test]
+    fn test_transpilation_cost_zero_gate_overhead() {
+        // Covers gate_overhead with zero original_gates
+        let cost = TranspilationCost {
+            original_gates: 0,
+            transpiled_gates: 0,
+            original_depth: 0,
+            transpiled_depth: 0,
+            swap_gates: 0,
+        };
+        assert_eq!(cost.gate_overhead(), 0.0);
+    }
+
+    #[test]
+    fn test_with_approximations() {
+        let transpiler = Transpiler::new(OptimizationLevel::Medium).with_approximations(true);
+        assert!(transpiler.allow_approximations);
+    }
 }

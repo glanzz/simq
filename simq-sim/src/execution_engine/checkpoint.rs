@@ -72,3 +72,58 @@ impl Default for CheckpointManager {
         Self::new(10)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use simq_state::AdaptiveState;
+
+    #[test]
+    fn test_default_checkpoint_manager() {
+        let manager = CheckpointManager::default();
+        assert_eq!(manager.max_checkpoints, 10);
+        assert!(manager.latest_checkpoint().is_none());
+    }
+
+    #[test]
+    fn test_create_and_retrieve_checkpoint() {
+        let mut manager = CheckpointManager::new(5);
+        let state = AdaptiveState::new(2).unwrap();
+        manager.create_checkpoint(0, &state).unwrap();
+        assert!(manager.latest_checkpoint().is_some());
+        assert_eq!(manager.latest_checkpoint().unwrap().gate_index, 0);
+    }
+
+    #[test]
+    fn test_restore_checkpoint_not_implemented() {
+        let manager = CheckpointManager::new(5);
+        let result = manager.restore_checkpoint(0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_checkpoint_eviction() {
+        let mut manager = CheckpointManager::new(2);
+        let state = AdaptiveState::new(1).unwrap();
+        manager.create_checkpoint(0, &state).unwrap();
+        manager.create_checkpoint(1, &state).unwrap();
+        manager.create_checkpoint(2, &state).unwrap(); // should evict oldest
+        assert_eq!(manager.checkpoints.len(), 2);
+    }
+
+    #[test]
+    fn test_with_directory() {
+        use std::path::PathBuf;
+        let manager = CheckpointManager::new(5).with_directory(PathBuf::from("/tmp"));
+        assert!(manager.checkpoint_dir.is_some());
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut manager = CheckpointManager::new(5);
+        let state = AdaptiveState::new(1).unwrap();
+        manager.create_checkpoint(0, &state).unwrap();
+        manager.clear();
+        assert!(manager.latest_checkpoint().is_none());
+    }
+}

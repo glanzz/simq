@@ -890,4 +890,35 @@ mod tests {
         // Freshly created |0...0> state is normalized.
         assert!(state.is_normalized(1e-10));
     }
+
+    #[test]
+    fn test_get_probability_truly_sparse() {
+        // 4 qubits: density = 1/16 = 6.25% < 10% threshold, so stays Sparse.
+        let state = AdaptiveState::new(4).unwrap();
+        assert!(state.is_sparse());
+        // |0000⟩ has probability 1.0 for basis state 0
+        let prob = state.get_probability(0).unwrap();
+        assert!((prob - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_measure_qubit_truly_sparse() {
+        // 4 qubits stays Sparse — measuring qubit 0 on |0000⟩ always yields 0.
+        let mut state = AdaptiveState::new(4).unwrap();
+        assert!(state.is_sparse());
+        let outcome = state.measure_qubit(0, 0.5).unwrap();
+        assert_eq!(outcome, 0);
+    }
+
+    #[test]
+    fn test_partial_trace_truly_sparse() {
+        // 4 qubits stays Sparse — partial trace over qubits [0] on |0000⟩.
+        let state = AdaptiveState::new(4).unwrap();
+        assert!(state.is_sparse());
+        // Keep qubit 0; result is a 2×2 density matrix [[1,0],[0,0]]
+        let rho = state.partial_trace(&[0]).unwrap();
+        assert_eq!(rho.len(), 4);
+        assert!((rho[0].re - 1.0).abs() < 1e-10);
+        assert!(rho[3].re.abs() < 1e-10);
+    }
 }

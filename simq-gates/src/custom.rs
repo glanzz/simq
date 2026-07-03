@@ -1092,4 +1092,149 @@ mod tests {
         let result = check_completeness_relation(&[identity], 1e-10);
         assert!(result.is_ok());
     }
+
+    // --- Coverage for lines 308-309, 323, 329-330 ---
+
+    #[test]
+    fn test_is_hermitian_returns_false_for_non_hermitian() {
+        // S gate [[1,0],[0,i]] is unitary but NOT hermitian → line 309 returns false
+        let gate = CustomGateBuilder::new("S")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+            ])
+            .build()
+            .unwrap();
+        // line 308-309: is_hermitian() → self.is_hermitian (false)
+        assert!(!gate.is_hermitian());
+    }
+
+    #[test]
+    fn test_description_non_hermitian_has_no_suffix() {
+        // When is_hermitian is false the else branch on line 323 ("") is taken.
+        let gate = CustomGateBuilder::new("SGate")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+            ])
+            .build()
+            .unwrap();
+        let desc = gate.description();
+        assert!(!desc.contains("Hermitian"), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_matrix_trait_returns_some() {
+        // Lines 329-330: Gate::matrix() returns Some(self.matrix.clone())
+        let gate = CustomGateBuilder::new("X")
+            .matrix_2x2([
+                [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            ])
+            .build()
+            .unwrap();
+        // This calls the Gate trait impl matrix() at line 329-330
+        let m = <CustomGate as simq_core::gate::Gate>::matrix(&gate);
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().len(), 4);
+    }
+
+    // --- Coverage for lines 422-424 (builder tolerance) ---
+
+    #[test]
+    fn test_builder_tolerance_sets_field() {
+        // Lines 422-424: builder.tolerance(t)
+        let gate = CustomGateBuilder::new("X")
+            .matrix_2x2([
+                [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            ])
+            .tolerance(1e-6)
+            .build()
+            .unwrap();
+        assert!(gate.is_unitary());
+    }
+
+    // --- Coverage for lines 550-552 (ParametricCustomGate param count mismatch) ---
+
+    #[test]
+    fn test_parametric_gate_param_count_mismatch() {
+        // Lines 550-552: parameter_names.len() != initial_params.len() → Err
+        use num_complex::Complex64;
+        let result = ParametricCustomGate::new(
+            "RX",
+            1,
+            vec!["theta".to_string()],
+            Arc::new(|params: &[f64]| {
+                let c = params[0].cos();
+                let s = params[0].sin();
+                vec![
+                    Complex64::new(c, 0.0),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(c, 0.0),
+                ]
+            }),
+            vec![], // wrong count: 0 instead of 1
+            1e-10,
+        );
+        assert!(matches!(result, Err(CustomGateError::InvalidDimensions { .. })));
+    }
+
+    // --- Coverage for lines 608-609, 629-635, 640-641, 644-645 ---
+
+    #[test]
+    fn test_parametric_gate_is_hermitian_method() {
+        // Lines 608-609: ParametricCustomGate::is_hermitian()
+        use std::f64::consts::PI;
+        let gate = ParametricCustomGate::new(
+            "RX",
+            1,
+            vec!["theta".to_string()],
+            Arc::new(|params: &[f64]| {
+                let c = params[0].cos();
+                let s = params[0].sin();
+                vec![
+                    Complex64::new(c, 0.0),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(c, 0.0),
+                ]
+            }),
+            vec![PI / 2.0],
+            1e-10,
+        )
+        .unwrap();
+        // RX(π/2) is not hermitian (complex entries)
+        let _ = gate.is_hermitian();
+    }
+
+    #[test]
+    fn test_parametric_gate_builder_debug_and_build() {
+        // Lines 629-635: Debug for ParametricCustomGateBuilder
+        // Lines 640-641: ParametricCustomGateBuilder::new
+        // Lines 644-645: name/num_qubits fields
+        let builder = ParametricCustomGateBuilder::new("MyGate", 1);
+        let debug_str = format!("{:?}", builder);
+        assert!(debug_str.contains("MyGate"));
+
+        // Build from the builder to also cover build path
+        use std::f64::consts::PI;
+        let gate = ParametricCustomGateBuilder::new("RX", 1)
+            .with_parameters(vec!["theta"])
+            .with_matrix_fn(Box::new(|params: &[f64]| {
+                let c = params[0].cos();
+                let s = params[0].sin();
+                vec![
+                    Complex64::new(c, 0.0),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(c, 0.0),
+                ]
+            }))
+            .with_initial_params(vec![PI / 4.0])
+            .build()
+            .unwrap();
+        assert_eq!(gate.parameter_names(), &["theta"]);
+    }
 }

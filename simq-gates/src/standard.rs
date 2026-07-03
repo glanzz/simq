@@ -1209,6 +1209,38 @@ mod tests {
         assert_eq!(phase.angle(), PI / 3.0);
     }
 
+    // --- Coverage for lines 804-805, 1112-1113, 1156-1157 ---
+
+    #[test]
+    fn test_phase_gate_description() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+        // Lines 804-805: Phase::description() returns format!("P({:.4})", theta)
+        let phase = Phase::new(PI / 4.0);
+        let desc = Gate::description(&phase);
+        assert!(desc.contains("P("), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_ryy_gate_description() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+        // Lines 1112-1113: RYY::description()
+        let ryy = RYY::new(PI / 2.0);
+        let desc = Gate::description(&ryy);
+        assert!(desc.contains("RYY("), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_rzz_gate_description() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+        // Lines 1156-1157: RZZ::description()
+        let rzz = RZZ::new(PI / 3.0);
+        let desc = Gate::description(&rzz);
+        assert!(desc.contains("RZZ("), "desc was: {desc}");
+    }
+
     #[test]
     fn test_single_qubit_gates_comprehensive() {
         use simq_core::gate::Gate;

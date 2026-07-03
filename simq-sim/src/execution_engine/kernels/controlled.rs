@@ -359,4 +359,20 @@ mod tests {
         // target out of bounds
         assert!(apply_multi_controlled(&[0], 10, &x_gate(), &mut state, false, usize::MAX).is_err());
     }
+
+    #[test]
+    fn test_multi_controlled_parallel_applies_gate() {
+        // Use 4-qubit state (16 amplitudes) so there's enough work for parallel.
+        // controls=[0,1], target=2. Start in |1100> = index 12 (0b1100).
+        // When qubits 0 and 1 are both 1, flip qubit 2.
+        let mut state = vec![Complex64::new(0.0, 0.0); 16];
+        state[12] = Complex64::new(1.0, 0.0); // |1100>
+
+        // With threshold=0, forces parallel path
+        apply_multi_controlled(&[0, 1], 2, &x_gate(), &mut state, true, 0).unwrap();
+
+        // Norm should be preserved
+        let norm: f64 = state.iter().map(|a| a.norm_sqr()).sum();
+        assert!((norm - 1.0).abs() < 1e-10);
+    }
 }
