@@ -1208,4 +1208,370 @@ mod tests {
         let phase = Phase::new(PI / 3.0);
         assert_eq!(phase.angle(), PI / 3.0);
     }
+
+    // --- Coverage for lines 804-805, 1112-1113, 1156-1157 ---
+
+    #[test]
+    fn test_phase_gate_description() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+        // Lines 804-805: Phase::description() returns format!("P({:.4})", theta)
+        let phase = Phase::new(PI / 4.0);
+        let desc = Gate::description(&phase);
+        assert!(desc.contains("P("), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_ryy_gate_description() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+        // Lines 1112-1113: RYY::description()
+        let ryy = RYY::new(PI / 2.0);
+        let desc = Gate::description(&ryy);
+        assert!(desc.contains("RYY("), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_rzz_gate_description() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+        // Lines 1156-1157: RZZ::description()
+        let rzz = RZZ::new(PI / 3.0);
+        let desc = Gate::description(&rzz);
+        assert!(desc.contains("RZZ("), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_single_qubit_gates_comprehensive() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+
+        // Hadamard
+        assert_eq!(Hadamard.name(), "H");
+        assert_eq!(Hadamard.num_qubits(), 1);
+        assert!(Hadamard.is_hermitian());
+        assert!(Hadamard.matrix().is_some());
+        let h_vec = Hadamard.matrix().unwrap();
+        assert_eq!(h_vec.len(), 4); // 2x2 flattened
+
+        // PauliX
+        assert_eq!(PauliX.name(), "X");
+        assert_eq!(PauliX.num_qubits(), 1);
+        assert!(PauliX.is_hermitian());
+        assert!(PauliX.matrix().is_some());
+
+        // PauliY
+        assert_eq!(PauliY.name(), "Y");
+        assert_eq!(PauliY.num_qubits(), 1);
+        assert!(PauliY.is_hermitian());
+        assert!(PauliY.matrix().is_some());
+
+        // PauliZ
+        assert_eq!(PauliZ.name(), "Z");
+        assert_eq!(PauliZ.num_qubits(), 1);
+        assert!(PauliZ.is_hermitian());
+        assert!(PauliZ.is_diagonal());
+        assert!(PauliZ.matrix().is_some());
+
+        // SGate
+        assert_eq!(SGate.name(), "S");
+        assert_eq!(SGate.num_qubits(), 1);
+        assert!(SGate.is_diagonal());
+        assert!(SGate.matrix().is_some());
+
+        // SGateDagger
+        assert_eq!(SGateDagger.name(), "S†");
+        assert_eq!(SGateDagger.num_qubits(), 1);
+        assert!(SGateDagger.is_diagonal());
+        assert!(SGateDagger.matrix().is_some());
+
+        // TGate
+        assert_eq!(TGate.name(), "T");
+        assert_eq!(TGate.num_qubits(), 1);
+        assert!(TGate.is_diagonal());
+        assert!(TGate.matrix().is_some());
+
+        // TGateDagger
+        assert_eq!(TGateDagger.name(), "T†");
+        assert_eq!(TGateDagger.num_qubits(), 1);
+        assert!(TGateDagger.is_diagonal());
+        assert!(TGateDagger.matrix().is_some());
+
+        // Identity
+        assert_eq!(Identity.name(), "I");
+        assert_eq!(Identity.num_qubits(), 1);
+        assert!(Identity.is_hermitian());
+        assert!(Identity.is_diagonal());
+        assert!(Identity.matrix().is_some());
+
+        // SXGate
+        assert_eq!(SXGate.name(), "SX");
+        assert_eq!(SXGate.num_qubits(), 1);
+        assert!(SXGate.matrix().is_some());
+
+        // SXGateDagger
+        assert_eq!(SXGateDagger.name(), "SX†");
+        assert_eq!(SXGateDagger.num_qubits(), 1);
+        assert!(SXGateDagger.matrix().is_some());
+
+        // RotationX - struct's matrix() returns [[Complex64;2];2], use Gate trait for Option
+        let rx = RotationX::new(PI / 2.0);
+        assert_eq!(rx.name(), "RX");
+        assert_eq!(rx.num_qubits(), 1);
+        assert!(Gate::matrix(&rx).is_some());
+        assert_eq!(Gate::matrix(&rx).unwrap().len(), 4);
+
+        // RotationY - struct's matrix() returns [[Complex64;2];2], use Gate trait for Option
+        let ry = RotationY::new(PI / 4.0);
+        assert_eq!(ry.name(), "RY");
+        assert_eq!(ry.num_qubits(), 1);
+        assert!(Gate::matrix(&ry).is_some());
+
+        // RotationZ
+        let rz = RotationZ::new(PI / 4.0);
+        assert_eq!(rz.name(), "RZ");
+        assert_eq!(rz.num_qubits(), 1);
+        assert!(rz.is_diagonal());
+        assert!(Gate::matrix(&rz).is_some());
+
+        // Phase
+        let phase = Phase::new(PI / 3.0);
+        assert_eq!(phase.name(), "P");
+        assert_eq!(phase.num_qubits(), 1);
+        assert!(phase.is_diagonal());
+        assert!(Gate::matrix(&phase).is_some());
+
+        // U1 - struct's matrix() returns [[Complex64;2];2], use Gate trait for Option
+        let u1 = U1::new(PI / 4.0);
+        assert_eq!(u1.name(), "U1");
+        assert_eq!(u1.num_qubits(), 1);
+        assert!(u1.is_diagonal());
+        assert!(Gate::matrix(&u1).is_some());
+
+        // U2
+        let u2 = U2::new(PI / 4.0, PI / 4.0);
+        assert_eq!(u2.name(), "U2");
+        assert_eq!(u2.num_qubits(), 1);
+        assert!(Gate::matrix(&u2).is_some());
+
+        // U3
+        let u3 = U3::new(PI / 4.0, PI / 4.0, PI / 4.0);
+        assert_eq!(u3.name(), "U3");
+        assert_eq!(u3.num_qubits(), 1);
+        assert!(Gate::matrix(&u3).is_some());
+    }
+
+    #[test]
+    fn test_two_qubit_gates_comprehensive() {
+        use simq_core::gate::Gate;
+
+        // CNot
+        assert_eq!(CNot.name(), "CNOT");
+        assert_eq!(CNot.num_qubits(), 2);
+        assert!(CNot.matrix().is_some());
+        assert_eq!(CNot.matrix().unwrap().len(), 16); // 4x4 flattened
+
+        // CZ
+        assert_eq!(CZ.name(), "CZ");
+        assert_eq!(CZ.num_qubits(), 2);
+        assert!(CZ.is_hermitian());
+        assert!(CZ.is_diagonal());
+        assert!(CZ.matrix().is_some());
+
+        // Swap
+        assert_eq!(Swap.name(), "SWAP");
+        assert_eq!(Swap.num_qubits(), 2);
+        assert!(Swap.is_hermitian());
+        assert!(Swap.matrix().is_some());
+
+        // ISwap
+        assert_eq!(ISwap.name(), "iSWAP");
+        assert_eq!(ISwap.num_qubits(), 2);
+        assert!(ISwap.matrix().is_some());
+
+        // CY
+        assert_eq!(CY.name(), "CY");
+        assert_eq!(CY.num_qubits(), 2);
+        assert!(CY.matrix().is_some());
+
+        // ECR
+        assert_eq!(ECR.name(), "ECR");
+        assert_eq!(ECR.num_qubits(), 2);
+        assert!(ECR.matrix().is_some());
+    }
+
+    #[test]
+    fn test_three_qubit_gates_comprehensive() {
+        use simq_core::gate::Gate;
+
+        // Toffoli
+        let t = Toffoli;
+        assert_eq!(t.name(), "CCNOT");
+        assert_eq!(t.num_qubits(), 3);
+        assert!(t.matrix().is_some());
+        assert_eq!(t.matrix().unwrap().len(), 64); // 8x8 flattened
+        assert!(t.description().contains("Toffoli"));
+
+        // Fredkin
+        let f = Fredkin;
+        assert_eq!(f.name(), "CSWAP");
+        assert_eq!(f.num_qubits(), 3);
+        assert!(f.matrix().is_some());
+        assert_eq!(f.matrix().unwrap().len(), 64);
+        assert!(f.description().contains("Fredkin"));
+    }
+
+    #[test]
+    fn test_parameterized_two_qubit_gates() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+
+        // CPhase - struct method returns [[Complex64;4];4], Gate trait method returns Option<Vec>
+        let cp = CPhase::new(PI / 4.0);
+        assert_eq!(cp.name(), "CP");
+        assert_eq!(cp.num_qubits(), 2);
+        assert_eq!(cp.angle(), PI / 4.0);
+        // The Gate trait method
+        let cp_gate_matrix = Gate::matrix(&cp);
+        assert!(cp_gate_matrix.is_some());
+        assert_eq!(cp_gate_matrix.unwrap().len(), 16);
+        assert!(cp.description().contains("CP"));
+
+        // RXX
+        let rxx = RXX::new(PI / 4.0);
+        assert_eq!(rxx.name(), "RXX");
+        assert_eq!(rxx.num_qubits(), 2);
+        assert_eq!(rxx.angle(), PI / 4.0);
+        let rxx_gate_matrix = Gate::matrix(&rxx);
+        assert!(rxx_gate_matrix.is_some());
+        assert!(rxx.description().contains("RXX"));
+
+        // RYY
+        let ryy = RYY::new(PI / 4.0);
+        assert_eq!(ryy.name(), "RYY");
+        assert_eq!(ryy.num_qubits(), 2);
+        assert!(Gate::matrix(&ryy).is_some());
+
+        // RZZ
+        let rzz = RZZ::new(PI / 4.0);
+        assert_eq!(rzz.name(), "RZZ");
+        assert_eq!(rzz.num_qubits(), 2);
+        assert!(Gate::matrix(&rzz).is_some());
+    }
+
+    #[test]
+    fn test_diagonal_gates_diagonal_elements() {
+        use simq_core::gate::DiagonalGate;
+        use std::f64::consts::{FRAC_1_SQRT_2, PI};
+
+        // PauliZ diagonal: [1, -1]
+        let z_diag = PauliZ.diagonal_elements();
+        assert!((z_diag[0].re - 1.0).abs() < 1e-12);
+        assert!((z_diag[1].re - (-1.0)).abs() < 1e-12);
+
+        // SGate diagonal: [1, i]
+        let s_diag = SGate.diagonal_elements();
+        assert!((s_diag[0].re - 1.0).abs() < 1e-12);
+        assert!((s_diag[1].im - 1.0).abs() < 1e-12);
+
+        // SGateDagger diagonal: [1, -i]
+        let sd_diag = SGateDagger.diagonal_elements();
+        assert!((sd_diag[1].im - (-1.0)).abs() < 1e-12);
+
+        // TGate diagonal: [1, e^(iπ/4)]
+        let t_diag = TGate.diagonal_elements();
+        assert!((t_diag[0].re - 1.0).abs() < 1e-12);
+        assert!((t_diag[1].re - FRAC_1_SQRT_2).abs() < 1e-10);
+        assert!((t_diag[1].im - FRAC_1_SQRT_2).abs() < 1e-10);
+
+        // TGateDagger diagonal: [1, e^(-iπ/4)]
+        let td_diag = TGateDagger.diagonal_elements();
+        assert!((td_diag[1].re - FRAC_1_SQRT_2).abs() < 1e-10);
+        assert!((td_diag[1].im - (-FRAC_1_SQRT_2)).abs() < 1e-10);
+
+        // RotationZ diagonal
+        let rz = RotationZ::new(PI / 2.0);
+        let rz_diag = rz.diagonal_elements();
+        assert!((rz_diag[0].norm_sqr() - 1.0).abs() < 1e-10);
+        assert!((rz_diag[1].norm_sqr() - 1.0).abs() < 1e-10);
+
+        // Phase diagonal
+        let phase = Phase::new(PI / 4.0);
+        let p_diag = phase.diagonal_elements();
+        assert!((p_diag[0].re - 1.0).abs() < 1e-12);
+        assert!((p_diag[1].norm_sqr() - 1.0).abs() < 1e-10);
+
+        // U1 diagonal
+        let u1 = U1::new(PI);
+        let u1_diag = u1.diagonal_elements();
+        assert!((u1_diag[0].re - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_rotation_gate_angles_and_descriptions() {
+        use simq_core::gate::Gate;
+        use std::f64::consts::PI;
+
+        let rx = RotationX::new(1.23);
+        assert!((rx.angle() - 1.23).abs() < 1e-12);
+        assert!(rx.description().contains("1.23"));
+
+        let ry = RotationY::new(PI);
+        assert!(ry.description().contains("RY"));
+
+        let rz = RotationZ::new(PI / 2.0);
+        assert!(rz.description().contains("RZ"));
+
+        // U-gate descriptions
+        let u2 = U2::new(0.1, 0.2);
+        assert_eq!(u2.phi(), 0.1);
+        assert_eq!(u2.lambda(), 0.2);
+        assert!(u2.description().contains("U2"));
+
+        let u3 = U3::new(0.1, 0.2, 0.3);
+        assert_eq!(u3.theta(), 0.1);
+        assert_eq!(u3.phi(), 0.2);
+        assert_eq!(u3.lambda(), 0.3);
+        assert!(u3.description().contains("U3"));
+
+        let u1 = U1::new(0.5);
+        assert_eq!(u1.lambda(), 0.5);
+        assert!(u1.description().contains("U1"));
+    }
+
+    #[test]
+    fn test_rotation_gate_matrix_uncached() {
+        use std::f64::consts::PI;
+
+        let rx = RotationX::new(PI / 3.0);
+        let cached = rx.matrix();
+        let uncached = rx.matrix_uncached();
+        // Both should give same result
+        for i in 0..2 {
+            for j in 0..2 {
+                let diff_re = (cached[i][j].re - uncached[i][j].re).abs();
+                let diff_im = (cached[i][j].im - uncached[i][j].im).abs();
+                assert!(diff_re < 1e-10, "re diff at [{i}][{j}] = {diff_re}");
+                assert!(diff_im < 1e-10, "im diff at [{i}][{j}] = {diff_im}");
+            }
+        }
+
+        let ry = RotationY::new(PI / 3.0);
+        let ry_cached = ry.matrix();
+        let ry_uncached = ry.matrix_uncached();
+        for i in 0..2 {
+            for j in 0..2 {
+                assert!((ry_cached[i][j].re - ry_uncached[i][j].re).abs() < 1e-10);
+            }
+        }
+
+        let rz = RotationZ::new(PI / 3.0);
+        let rz_cached = rz.matrix();
+        let rz_uncached = rz.matrix_uncached();
+        for i in 0..2 {
+            for j in 0..2 {
+                assert!((rz_cached[i][j].re - rz_uncached[i][j].re).abs() < 1e-10);
+            }
+        }
+    }
 }

@@ -316,6 +316,29 @@ mod tests {
     }
 
     #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for DeadCodeElimination` (lines 123-124), which
+        // delegates to `Self::new()`.
+        let default_pass = DeadCodeElimination::default();
+        let new_pass = DeadCodeElimination::new();
+
+        // Both should behave identically: same settings enabled.
+        assert_eq!(default_pass.remove_inverse_pairs, new_pass.remove_inverse_pairs);
+        assert_eq!(default_pass.remove_identity, new_pass.remove_identity);
+
+        let mut circuit = Circuit::new(1);
+        let id_gate = Arc::new(MockGate {
+            name: "I".to_string(),
+            num_qubits: 1,
+        });
+        circuit.add_gate(id_gate, &[QubitId::new(0)]).unwrap();
+
+        let modified = default_pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0);
+    }
+
+    #[test]
     fn test_different_qubits_no_removal() {
         let pass = DeadCodeElimination::new();
         let mut circuit = Circuit::new(3);

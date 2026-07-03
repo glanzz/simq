@@ -270,4 +270,46 @@ mod tests {
         registry.clear();
         assert!(registry.is_empty());
     }
+
+    // --- Coverage for lines 138-153: print_gates ---
+
+    #[test]
+    fn test_print_gates_empty_registry() {
+        // Lines 139-141: empty registry prints "Gate registry is empty"
+        let registry = GateRegistry::new();
+        // Just call it; it prints to stdout. We verify it doesn't panic.
+        registry.print_gates();
+    }
+
+    #[test]
+    fn test_print_gates_with_gates() {
+        // Lines 144-156: non-empty registry prints table
+        let mut registry = GateRegistry::new();
+
+        // Hermitian gate (Pauli-Z)
+        let z_gate = CustomGateBuilder::new("Z")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0)],
+            ])
+            .build()
+            .unwrap();
+        registry.register("pauli_z", z_gate);
+
+        // Non-hermitian gate (S)
+        let s_gate = CustomGateBuilder::new("S")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+            ])
+            .build()
+            .unwrap();
+        registry.register("phase_s", s_gate);
+
+        // print_gates should not panic; it covers both Yes/No branches for is_hermitian
+        registry.print_gates();
+
+        let info = registry.list_gates();
+        assert_eq!(info.len(), 2);
+    }
 }

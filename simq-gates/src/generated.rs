@@ -300,4 +300,152 @@ mod tests {
             }
         }
     }
+
+    // --- Additional coverage for uncovered branches ---
+
+    #[test]
+    fn test_rx_clifford_t_all_branches() {
+        // line 23: PI/2
+        assert!(GeneratedAngleCache::rx_clifford_t(PI / 2.0).is_some());
+        // existing test covers PI/4 and PI/8
+        // line 29: PI/16
+        assert!(GeneratedAngleCache::rx_clifford_t(PI / 16.0).is_some());
+        // line 31: PI/32
+        assert!(GeneratedAngleCache::rx_clifford_t(PI / 32.0).is_some());
+        // None branch
+        assert!(GeneratedAngleCache::rx_clifford_t(1.23456).is_none());
+    }
+
+    #[test]
+    fn test_ry_clifford_t_all_branches() {
+        // line 43: PI/2
+        assert!(GeneratedAngleCache::ry_clifford_t(PI / 2.0).is_some());
+        // line 45: PI/4
+        assert!(GeneratedAngleCache::ry_clifford_t(PI / 4.0).is_some());
+        // line 47: PI/8 (already similar tests elsewhere, include for safety)
+        assert!(GeneratedAngleCache::ry_clifford_t(PI / 8.0).is_some());
+        // line 49: PI/16
+        assert!(GeneratedAngleCache::ry_clifford_t(PI / 16.0).is_some());
+        // line 51: PI/32
+        assert!(GeneratedAngleCache::ry_clifford_t(PI / 32.0).is_some());
+        // None
+        assert!(GeneratedAngleCache::ry_clifford_t(1.23456).is_none());
+    }
+
+    #[test]
+    fn test_rz_clifford_t_all_branches() {
+        // line 63: PI/2
+        assert!(GeneratedAngleCache::rz_clifford_t(PI / 2.0).is_some());
+        // line 65: PI/4
+        assert!(GeneratedAngleCache::rz_clifford_t(PI / 4.0).is_some());
+        // line 67: PI/8
+        assert!(GeneratedAngleCache::rz_clifford_t(PI / 8.0).is_some());
+        // line 69: PI/16
+        assert!(GeneratedAngleCache::rz_clifford_t(PI / 16.0).is_some());
+        // line 71: PI/32
+        assert!(GeneratedAngleCache::rz_clifford_t(PI / 32.0).is_some());
+        // None
+        assert!(GeneratedAngleCache::rz_clifford_t(1.23456).is_none());
+    }
+
+    #[test]
+    fn test_rx_qaoa_out_of_range() {
+        // line 84: theta outside [0, PI] → direct computation
+        let neg_angle = -0.5;
+        let cached = GeneratedAngleCache::rx_qaoa(neg_angle);
+        let computed = crate::matrices::rotation_x(neg_angle);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-10);
+            }
+        }
+        // Also test > PI
+        let big_angle = PI + 0.5;
+        let cached2 = GeneratedAngleCache::rx_qaoa(big_angle);
+        let computed2 = crate::matrices::rotation_x(big_angle);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(cached2[i][j].re, computed2[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rz_qaoa_out_of_range() {
+        // line 99: theta outside [0, PI] → direct computation
+        let neg_angle = -0.5;
+        let cached = GeneratedAngleCache::rz_qaoa(neg_angle);
+        let computed = crate::matrices::rotation_z(neg_angle);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rx_pi_fraction_more_branches() {
+        // line 114: PI/2
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 2.0).is_some());
+        // line 118: PI/4
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 4.0).is_some());
+        // line 124: PI/8
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 8.0).is_some());
+        // PI/5
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 5.0).is_some());
+        // PI/6
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 6.0).is_some());
+        // PI/10
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 10.0).is_some());
+        // PI/12
+        assert!(GeneratedAngleCache::rx_pi_fraction(PI / 12.0).is_some());
+        // None branch
+        assert!(GeneratedAngleCache::rx_pi_fraction(1.23456).is_none());
+    }
+
+    #[test]
+    fn test_enhanced_cache_ry_clifford_t() {
+        // line 157: ry uses clifford_t cache for PI/8
+        let matrix = EnhancedUniversalCache::ry(PI / 8.0);
+        let expected = crate::matrices::rotation_y(PI / 8.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(matrix[i][j].re, expected[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(matrix[i][j].im, expected[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_enhanced_cache_ry_runtime() {
+        // line 188: ry falls through to runtime computation (large angle outside VQE range)
+        let large_angle = 100.0;
+        let matrix = EnhancedUniversalCache::ry(large_angle);
+        let expected = crate::matrices::rotation_y(large_angle);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(matrix[i][j].re, expected[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(matrix[i][j].im, expected[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_enhanced_cache_rz_qaoa_branch() {
+        // line 206: rz in QAOA range (not in common angles or clifford_t, not in VQE, in [0,PI])
+        // Use a value that is in [0,PI] but not a common angle or clifford_t angle
+        // PI/3 is a pi_fraction for rx but not for rz; use something unusual
+        let angle = PI * 0.7; // 0.7π — not a standard Clifford+T angle
+        let matrix = EnhancedUniversalCache::rz(angle);
+        let expected = crate::matrices::rotation_z(angle);
+        // QAOA uses nearest-neighbor so allow larger epsilon
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(matrix[i][j].re, expected[i][j].re, epsilon = 1e-2);
+                assert_relative_eq!(matrix[i][j].im, expected[i][j].im, epsilon = 1e-2);
+            }
+        }
+    }
 }

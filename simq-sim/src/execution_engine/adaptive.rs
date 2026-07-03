@@ -69,4 +69,53 @@ mod tests {
         let strategy = AdaptiveStrategy::default();
         assert_eq!(strategy.sparse_threshold, 0.1);
     }
+
+    #[test]
+    fn test_select_gpu_mode_when_state_exceeds_gpu_threshold() {
+        // AdaptiveState::new creates a Sparse state with 1 non-zero amplitude (|0⟩).
+        // Set gpu_threshold=1 so that even a single-amplitude sparse state triggers Gpu.
+        let strategy = AdaptiveStrategy::new(0.1, 1, 2);
+        let state = AdaptiveState::new(4).unwrap();
+        let mode = strategy.select_execution_mode(&state, 1);
+        assert_eq!(mode, ExecutionMode::Gpu);
+    }
+
+    #[test]
+    fn test_select_parallel_mode_when_num_gates_exceeds_100() {
+        // Thresholds set high so state size alone doesn't trigger Parallel/Gpu
+        let strategy = AdaptiveStrategy::new(0.1, 1 << 30, 1 << 30);
+        let state = AdaptiveState::new(1).unwrap(); // 2 amplitudes, well below thresholds
+        let mode = strategy.select_execution_mode(&state, 101);
+        assert_eq!(mode, ExecutionMode::Parallel);
+    }
+
+    #[test]
+    fn test_select_sequential_mode_for_small_state_and_few_gates() {
+        let strategy = AdaptiveStrategy::new(0.1, 1 << 30, 1 << 30);
+        let state = AdaptiveState::new(1).unwrap();
+        let mode = strategy.select_execution_mode(&state, 10);
+        assert_eq!(mode, ExecutionMode::Sequential);
+    }
+
+    #[test]
+    fn test_should_convert_to_dense_and_sparse() {
+        // AdaptiveState::new creates Sparse |00⟩ with 1 non-zero amplitude out of 4 → density≈0.0625.
+        // Use a threshold of 0.05 so that density 0.0625 > 0.05 → should_convert_to_dense = true.
+        let strategy = AdaptiveStrategy::new(0.05, 1 << 20, 1 << 10);
+        let state = AdaptiveState::new(2).unwrap();
+        assert!(strategy.should_convert_to_dense(&state));
+        // density 0.0625 is not < 0.025 → should NOT convert to sparse
+        assert!(!strategy.should_convert_to_sparse(&state));
+    }
+
+    #[test]
+    fn test_should_parallelize_gate_sparse_is_false() {
+        let strategy = AdaptiveStrategy::default();
+        // Build a sparse state
+        let sparse_state = simq_state::AdaptiveState::Sparse {
+            state: simq_state::SparseState::new(2).unwrap(),
+            threshold: 0.1,
+        };
+        assert!(!strategy.should_parallelize_gate(&sparse_state));
+    }
 }

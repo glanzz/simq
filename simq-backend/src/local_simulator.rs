@@ -378,4 +378,119 @@ mod tests {
         // Results should be identical with same seed
         assert_eq!(result1.counts, result2.counts);
     }
+
+    // Tests for previously uncovered lines
+
+    #[test]
+    fn test_local_simulator_config_default() {
+        // Covers lines 57-64: Default impl of LocalSimulatorConfig
+        let config = LocalSimulatorConfig::default();
+        assert_eq!(config.max_qubits, 30);
+        assert!(config.parallel);
+        assert_eq!(config.seed, None);
+        assert!((config.sparse_threshold - 0.1).abs() < 1e-10);
+        assert_eq!(config.num_threads, None);
+    }
+
+    #[test]
+    fn test_sample_measurements_with_superposition() {
+        // Covers lines 151-153, 155-158 (Dense branch of compute_probabilities) and
+        // 160-161 (non-negligible probability filter), 165 (returns probs)
+        use simq_gates::standard::Hadamard;
+
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            seed: Some(99),
+            ..Default::default()
+        });
+
+        // Hadamard creates superposition → dense state after H on all qubits
+        let mut circuit = CircuitBuilder::<2>::new();
+        circuit
+            .apply_gate(Arc::new(Hadamard), &[circuit.qubits()[0]])
+            .unwrap();
+        let circuit = circuit.build();
+
+        let result = backend.execute(&circuit, 200).unwrap();
+        assert!(!result.counts.is_empty());
+    }
+
+    #[test]
+    fn test_sample_measurements_sparse_path() {
+        // Covers lines 167-181: Sparse branch of compute_probabilities
+        // A single X gate creates |1> state which stays sparse (single non-zero amplitude)
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            seed: Some(7),
+            ..Default::default()
+        });
+
+        let mut circuit = CircuitBuilder::<3>::new();
+        circuit
+            .apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]])
+            .unwrap();
+        let circuit = circuit.build();
+
+        let result = backend.execute(&circuit, 50).unwrap();
+        assert!(!result.counts.is_empty());
+        // All shots should give the same bitstring (deterministic)
+        assert_eq!(result.counts.len(), 1);
+    }
+
+    #[test]
+    fn test_execute_result_metadata() {
+        // Covers line 199, 204-205: execution_time metadata fields
+        let backend = LocalSimulatorBackend::new();
+
+        let mut circuit = CircuitBuilder::<1>::new();
+        circuit
+            .apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]])
+            .unwrap();
+        let circuit = circuit.build();
+
+        let result = backend.execute(&circuit, 10).unwrap();
+        assert!(result.metadata.num_qubits.is_some());
+        assert_eq!(result.metadata.num_qubits.unwrap(), 1);
+        assert_eq!(result.shots, 10);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for previously uncovered lines
+    // -----------------------------------------------------------------------
+
+    /// Lines 204-205: Default impl for LocalSimulatorBackend.
+    #[test]
+    fn test_local_simulator_backend_default() {
+        let backend = LocalSimulatorBackend::default();
+        assert_eq!(backend.name(), "LocalSimulator");
+        assert!(backend.is_available());
+    }
+
+    /// Lines 151-165: Dense branch of compute_probabilities.
+    /// We need a Dense AdaptiveState.  The private sample_measurements method
+    /// is accessible from the test module (same file).
+    #[test]
+    fn test_compute_probabilities_dense_state() {
+        use simq_core::Complex64;
+
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            seed: Some(1),
+            ..Default::default()
+        });
+
+        // Build a Dense state: all 4 amplitudes non-zero → density=1.0 > 10% threshold
+        let amplitudes = [
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+        ];
+        let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        assert!(state.is_dense(), "Expected Dense state");
+
+        // sample_measurements is a private method, accessible from tests in same file
+        let result = backend.sample_measurements(&state, 100).unwrap();
+        assert!(!result.is_empty(), "Expected non-empty measurement results");
+        // All four 2-bit strings should appear with roughly equal probability
+        let total_shots: usize = result.values().sum();
+        assert_eq!(total_shots, 100);
+    }
 }

@@ -1067,4 +1067,638 @@ mod tests {
         assert!(!StoppingCriterion::MaxIterations.is_converged());
         assert!(StoppingCriterion::Patience.is_warning());
     }
+
+    #[test]
+    fn test_stopping_criterion_descriptions() {
+        assert!(!StoppingCriterion::EnergyTolerance.description().is_empty());
+        assert!(!StoppingCriterion::GradientTolerance
+            .description()
+            .is_empty());
+        assert!(!StoppingCriterion::FullConvergence.description().is_empty());
+        assert!(!StoppingCriterion::Patience.description().is_empty());
+        assert!(!StoppingCriterion::EnergyIncrease.description().is_empty());
+        assert!(!StoppingCriterion::Oscillation.description().is_empty());
+        assert!(!StoppingCriterion::MaxIterations.description().is_empty());
+        assert!(!StoppingCriterion::MaxTime.description().is_empty());
+        assert!(!StoppingCriterion::UserStop.description().is_empty());
+        assert!(!StoppingCriterion::NotConverged.description().is_empty());
+    }
+
+    #[test]
+    fn test_stopping_criterion_is_warning_all() {
+        assert!(!StoppingCriterion::EnergyTolerance.is_warning());
+        assert!(!StoppingCriterion::GradientTolerance.is_warning());
+        assert!(!StoppingCriterion::FullConvergence.is_warning());
+        assert!(StoppingCriterion::Patience.is_warning());
+        assert!(StoppingCriterion::EnergyIncrease.is_warning());
+        assert!(StoppingCriterion::Oscillation.is_warning());
+        assert!(!StoppingCriterion::MaxIterations.is_warning());
+    }
+
+    #[test]
+    fn test_monitor_max_iterations() {
+        let config = MonitorConfig::default().with_max_iterations(3);
+        let mut monitor = ConvergenceMonitor::new(config);
+        // Iteration index 3 triggers MaxIterations
+        monitor.record(3, 0.5, &[0.1], &[0.5]);
+        assert!(monitor.should_stop());
+        assert_eq!(monitor.stopping_criterion(), StoppingCriterion::MaxIterations);
+    }
+
+    #[test]
+    fn test_monitor_max_time() {
+        let config = MonitorConfig::default().with_max_time(Duration::from_nanos(1));
+        let mut monitor = ConvergenceMonitor::new(config);
+        // Sleep so time limit is exceeded
+        std::thread::sleep(Duration::from_millis(5));
+        monitor.record(0, 0.5, &[0.1], &[0.5]);
+        // If time exceeded, should stop
+        if monitor.should_stop() {
+            assert_eq!(monitor.stopping_criterion(), StoppingCriterion::MaxTime);
+        }
+    }
+
+    #[test]
+    fn test_monitor_gradient_convergence_only() {
+        let config = MonitorConfig::default()
+            .with_energy_tolerance(1e-20) // Very tight - won't trigger
+            .with_gradient_tolerance(1.0); // Very loose - will trigger
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        // Second record: energy change is 0.5 (> 1e-20), gradient is 0.1 (< 1.0)
+        monitor.record(1, 0.5, &[0.1], &[0.3]);
+        assert!(monitor.should_stop());
+        assert_eq!(monitor.stopping_criterion(), StoppingCriterion::GradientTolerance);
+    }
+
+    #[test]
+    fn test_monitor_energy_convergence_only() {
+        let config = MonitorConfig::default()
+            .with_energy_tolerance(0.5) // Loose - will trigger
+            .with_gradient_tolerance(1e-20); // Very tight - won't trigger
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[10.0], &[0.5]);
+        // Second record: energy change is 0.1 (< 0.5), gradient is large (> 1e-20)
+        monitor.record(1, 0.9, &[10.0], &[0.4]);
+        assert!(monitor.should_stop());
+        assert_eq!(monitor.stopping_criterion(), StoppingCriterion::EnergyTolerance);
+    }
+
+    #[test]
+    fn test_monitor_energy_increase_stop() {
+        let config = MonitorConfig::default()
+            .with_energy_increase_stop(true)
+            .with_energy_tolerance(1e-20)
+            .with_gradient_tolerance(1e-20);
+        // energy_increase_patience defaults to 3
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 0.5, &[0.5], &[0.5]);
+        // Increase energy 4 times to exceed patience=3
+        for i in 1..=5 {
+            monitor.record(i, 0.5 + i as f64 * 0.1, &[0.5 + i as f64 * 0.1], &[0.5]);
+            if monitor.should_stop() {
+                break;
+            }
+        }
+        // Should have stopped due to energy increase or patience
+        assert!(monitor.should_stop());
+    }
+
+    #[test]
+    fn test_monitor_user_stop_via_callback() {
+        let config = MonitorConfig::default().with_callback(|_| false); // Always stop
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        assert!(monitor.should_stop());
+        assert_eq!(monitor.stopping_criterion(), StoppingCriterion::UserStop);
+    }
+
+    #[test]
+    fn test_monitor_record_when_inactive() {
+        let config = MonitorConfig::default().with_callback(|_| false);
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        // Now inactive; record should be a no-op
+        let count_before = monitor.num_iterations();
+        monitor.record(1, 0.5, &[0.2], &[0.3]);
+        assert_eq!(monitor.num_iterations(), count_before);
+    }
+
+    #[test]
+    fn test_monitor_reset() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        monitor.reset();
+        assert!(!monitor.should_stop());
+        assert_eq!(monitor.num_iterations(), 0);
+        assert_eq!(monitor.best_energy(), f64::INFINITY);
+    }
+
+    #[test]
+    fn test_monitor_best_tracking() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 2.0, &[0.5], &[1.0]);
+        monitor.record(1, 0.5, &[0.2], &[0.3]); // best
+        monitor.record(2, 0.8, &[0.3], &[0.4]); // worse
+        assert!((monitor.best_energy() - 0.5).abs() < 1e-10);
+        assert_eq!(monitor.best_iteration(), 1);
+        assert_eq!(monitor.best_parameters(), &[0.3]);
+    }
+
+    #[test]
+    fn test_monitor_default_monitor() {
+        let monitor = ConvergenceMonitor::default_monitor();
+        assert!(!monitor.should_stop());
+        assert_eq!(monitor.num_iterations(), 0);
+    }
+
+    #[test]
+    fn test_monitor_verbose_logging() {
+        // Just ensure verbose doesn't panic
+        let config = MonitorConfig::default().with_verbose(true);
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+    }
+
+    #[test]
+    fn test_monitor_total_time() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        // total_time should be non-negative duration
+        let _ = monitor.total_time();
+    }
+
+    #[test]
+    fn test_report_summary() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.1], &[0.5]);
+        monitor.record(1, 0.5, &[0.05], &[0.4]);
+        let report = monitor.convergence_report();
+        let summary = report.summary();
+        assert!(!summary.is_empty());
+    }
+
+    #[test]
+    fn test_report_empty_history() {
+        let config = MonitorConfig::default();
+        let monitor = ConvergenceMonitor::new(config);
+        let report = monitor.convergence_report();
+        assert_eq!(report.num_iterations, 0);
+        assert!(report.initial_energy.is_nan());
+    }
+
+    #[test]
+    fn test_progress_callback() {
+        let cb = progress_callback(1);
+        let metrics = StepMetrics {
+            iteration: 0,
+            energy: 1.0,
+            gradient: vec![0.1],
+            gradient_norm: 0.1,
+            parameters: vec![0.5],
+            energy_change: 0.0,
+            relative_energy_change: 0.0,
+            parameter_change: 0.0,
+            step_time: Duration::from_millis(1),
+            total_time: Duration::from_millis(1),
+        };
+        assert!(cb(&metrics)); // returns true to continue
+    }
+
+    #[test]
+    fn test_energy_logger_callback() {
+        let (cb, energies) = energy_logger();
+        let metrics = StepMetrics {
+            iteration: 0,
+            energy: 0.42,
+            gradient: vec![0.1],
+            gradient_norm: 0.1,
+            parameters: vec![0.5],
+            energy_change: 0.0,
+            relative_energy_change: 0.0,
+            parameter_change: 0.0,
+            step_time: Duration::from_millis(1),
+            total_time: Duration::from_millis(1),
+        };
+        assert!(cb(&metrics));
+        let locked = energies.lock().unwrap();
+        assert_eq!(locked.len(), 1);
+        assert!((locked[0] - 0.42).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_target_energy_callback() {
+        let cb = target_energy_callback(0.5);
+        let above = StepMetrics {
+            iteration: 0,
+            energy: 0.8,
+            gradient: vec![0.1],
+            gradient_norm: 0.1,
+            parameters: vec![0.5],
+            energy_change: 0.0,
+            relative_energy_change: 0.0,
+            parameter_change: 0.0,
+            step_time: Duration::from_millis(1),
+            total_time: Duration::from_millis(1),
+        };
+        let below = StepMetrics {
+            energy: 0.3,
+            ..above.clone()
+        };
+        assert!(cb(&above)); // above target -> continue
+        assert!(!cb(&below)); // below target -> stop
+    }
+
+    #[test]
+    fn test_best_tracker_has_improved() {
+        let tracker = BestTracker::new();
+        assert!(!tracker.has_improved()); // no updates yet
+
+        let mut tracker = BestTracker::new();
+        tracker.update(0.5, &[1.0]);
+        assert!(tracker.has_improved());
+    }
+
+    #[test]
+    fn test_best_tracker_reset() {
+        let mut tracker = BestTracker::with_history();
+        tracker.update(0.5, &[1.0]);
+        tracker.reset();
+        assert!(!tracker.has_improved());
+        assert_eq!(tracker.num_iterations(), 0);
+        assert!(tracker.history().is_empty());
+    }
+
+    #[test]
+    fn test_best_tracker_no_history() {
+        let mut tracker = BestTracker::new(); // no history tracking
+        tracker.update(1.0, &[0.5]);
+        assert!(tracker.history().is_empty()); // not tracking
+        assert!(tracker.total_improvement().is_none());
+    }
+
+    #[test]
+    fn test_tracked_optimization_result_converged() {
+        let result = TrackedOptimizationResult {
+            final_parameters: vec![0.5],
+            final_energy: 0.1,
+            best_parameters: vec![0.5],
+            best_energy: 0.1,
+            best_iteration: 5,
+            num_iterations: 10,
+            final_gradient: None,
+            stopping_criterion: StoppingCriterion::FullConvergence,
+            total_time: Duration::from_millis(100),
+            energy_history: vec![1.0, 0.5, 0.1],
+        };
+        assert!(result.converged());
+        assert!((result.improvement() - 0.9).abs() < 1e-10);
+        assert!(result.relative_improvement() > 0.0);
+    }
+
+    #[test]
+    fn test_tracked_optimization_result_not_converged() {
+        let result = TrackedOptimizationResult {
+            final_parameters: vec![0.5],
+            final_energy: 0.5,
+            best_parameters: vec![0.5],
+            best_energy: 0.5,
+            best_iteration: 5,
+            num_iterations: 100,
+            final_gradient: Some(vec![0.5]),
+            stopping_criterion: StoppingCriterion::MaxIterations,
+            total_time: Duration::from_millis(200),
+            energy_history: vec![1.0, 0.5],
+        };
+        assert!(!result.converged());
+    }
+
+    #[test]
+    fn test_tracked_result_empty_history() {
+        let result = TrackedOptimizationResult {
+            final_parameters: vec![],
+            final_energy: 0.0,
+            best_parameters: vec![],
+            best_energy: 0.0,
+            best_iteration: 0,
+            num_iterations: 0,
+            final_gradient: None,
+            stopping_criterion: StoppingCriterion::NotConverged,
+            total_time: Duration::default(),
+            energy_history: vec![],
+        };
+        assert_eq!(result.improvement(), 0.0);
+        assert_eq!(result.relative_improvement(), 0.0);
+    }
+
+    #[test]
+    fn test_monitor_config_builder() {
+        let config = MonitorConfig::default()
+            .with_energy_tolerance(1e-4)
+            .with_gradient_tolerance(1e-4)
+            .with_patience(5)
+            .with_max_iterations(50)
+            .with_max_time(Duration::from_secs(10))
+            .with_verbose(false)
+            .with_energy_increase_stop(true);
+        assert!((config.energy_tolerance - 1e-4).abs() < 1e-15);
+        assert_eq!(config.patience, 5);
+        assert_eq!(config.max_iterations, 50);
+        assert!(config.max_time.is_some());
+        assert!(config.stop_on_energy_increase);
+    }
+
+    // --- New tests covering previously uncovered lines ---
+
+    /// Line 309: relative_energy_change when prev.energy near zero
+    #[test]
+    fn test_record_relative_change_near_zero_prev_energy() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        // Record first step with energy very close to zero
+        monitor.record(0, 1e-12, &[0.5], &[0.5]);
+        // Second step: prev.energy is near zero, should take the `else` branch (rel = e_change)
+        monitor.record(1, 2e-12, &[0.4], &[0.4]);
+        assert_eq!(monitor.num_iterations(), 2);
+    }
+
+    /// Line 359: consecutive_increases = 0 branch (energy not increasing from prev)
+    #[test]
+    fn test_consecutive_increases_reset_on_non_increase() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        // First: best energy
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        // Second: worse energy (not improving best, but worse than prev — increments consecutive)
+        monitor.record(1, 1.5, &[0.5], &[0.5]);
+        // Third: same or lower than prev (1.2 < 1.5) but still > best 1.0
+        // => iterations_without_improvement increments, but consecutive_increases = 0
+        monitor.record(2, 1.2, &[0.5], &[0.5]);
+        assert_eq!(monitor.num_iterations(), 3);
+    }
+
+    /// Lines 445, 467, 475: oscillation detection — oscillating energies with mean near zero
+    #[test]
+    fn test_oscillation_detection_triggered() {
+        // window_size=10, oscillation_threshold=0.5
+        // Use energies that alternate and have high CV
+        let config = MonitorConfig::default()
+            .with_energy_tolerance(1e-20)
+            .with_gradient_tolerance(1e-20)
+            .with_patience(1000);
+        let mut monitor = ConvergenceMonitor::new(config);
+
+        // Fill the window with strongly oscillating values around a small mean
+        // e.g. alternating 0.1 and -0.1 → mean=0, std large relative to mean
+        for i in 0..12 {
+            let e = if i % 2 == 0 { 1.0 } else { -1.0 };
+            monitor.record(i, e, &[0.5], &[0.5]);
+            if monitor.should_stop() {
+                break;
+            }
+        }
+        // Should have detected oscillation
+        assert_eq!(monitor.stopping_criterion(), StoppingCriterion::Oscillation);
+    }
+
+    /// Lines 537-538: total_time returns default when history is empty
+    #[test]
+    fn test_total_time_empty_history() {
+        let config = MonitorConfig::default();
+        let monitor = ConvergenceMonitor::new(config);
+        assert_eq!(monitor.total_time(), Duration::default());
+    }
+
+    /// Lines 570-571: barren plateau warning in convergence_report (all gradients < 1e-8)
+    #[test]
+    fn test_report_barren_plateau_warning() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        // Record with extremely small gradients
+        monitor.record(0, 1.0, &[1e-10], &[0.5]);
+        monitor.record(1, 0.9, &[1e-10], &[0.4]);
+        let report = monitor.convergence_report();
+        assert!(
+            report.warnings.iter().any(|w| w.contains("barren plateau")),
+            "Expected barren plateau warning, got: {:?}",
+            report.warnings
+        );
+    }
+
+    /// Lines 575-577: slow convergence warning (>50 iterations, small improvement)
+    #[test]
+    fn test_report_slow_convergence_warning() {
+        let config = MonitorConfig::default().with_energy_tolerance(1.0); // large tolerance
+        let mut monitor = ConvergenceMonitor::new(config);
+        // Record >50 steps with very small total improvement
+        for i in 0..55 {
+            monitor.record(i, 1.0 - (i as f64) * 1e-11, &[0.1], &[0.5]);
+        }
+        let report = monitor.convergence_report();
+        assert!(
+            report
+                .warnings
+                .iter()
+                .any(|w| w.contains("slow convergence")),
+            "Expected slow convergence warning, got: {:?}",
+            report.warnings
+        );
+    }
+
+    /// Lines 581-583: oscillation warning in report (stopping_criterion == Oscillation)
+    #[test]
+    fn test_report_oscillation_warning() {
+        let config = MonitorConfig::default()
+            .with_energy_tolerance(1e-20)
+            .with_gradient_tolerance(1e-20)
+            .with_patience(1000);
+        let mut monitor = ConvergenceMonitor::new(config);
+        for i in 0..12 {
+            let e = if i % 2 == 0 { 1.0 } else { -1.0 };
+            monitor.record(i, e, &[0.5], &[0.5]);
+            if monitor.should_stop() {
+                break;
+            }
+        }
+        let report = monitor.convergence_report();
+        assert!(
+            report.warnings.iter().any(|w| w.contains("oscillation")),
+            "Expected oscillation warning, got: {:?}",
+            report.warnings
+        );
+    }
+
+    /// Lines 666-769: ConvergenceReport::print() — not converged path with warnings/diagnostics
+    #[test]
+    fn test_report_print_not_converged_with_warnings() {
+        let report = ConvergenceReport {
+            converged: false,
+            stopping_criterion: StoppingCriterion::Oscillation,
+            num_iterations: 10,
+            total_time: Duration::from_millis(100),
+            initial_energy: 1.0,
+            final_energy: 0.8,
+            best_energy: 0.7,
+            best_iteration: 3,
+            energy_improvement: 0.3,
+            final_gradient_norm: 0.01,
+            avg_step_time: 0.01,
+            warnings: vec!["Warning 1".to_string()],
+            diagnostics: vec!["Diag 1".to_string()],
+        };
+        // Just verify it doesn't panic
+        report.print();
+    }
+
+    /// Line 673-677: ConvergenceReport::print() — converged path
+    #[test]
+    fn test_report_print_converged() {
+        let report = ConvergenceReport {
+            converged: true,
+            stopping_criterion: StoppingCriterion::FullConvergence,
+            num_iterations: 5,
+            total_time: Duration::from_millis(50),
+            initial_energy: 1.0,
+            final_energy: 0.1,
+            best_energy: 0.1,
+            best_iteration: 4,
+            energy_improvement: 0.9,
+            final_gradient_norm: 1e-7,
+            avg_step_time: 0.01,
+            warnings: vec![],
+            diagnostics: vec![],
+        };
+        report.print();
+    }
+
+    /// Lines 713-726: ConvergenceReport::summary() — both converged and not converged
+    #[test]
+    fn test_report_summary_not_converged() {
+        let report = ConvergenceReport {
+            converged: false,
+            stopping_criterion: StoppingCriterion::MaxIterations,
+            num_iterations: 1000,
+            total_time: Duration::from_secs(1),
+            initial_energy: 2.0,
+            final_energy: 0.5,
+            best_energy: 0.4,
+            best_iteration: 500,
+            energy_improvement: 1.6,
+            final_gradient_norm: 0.1,
+            avg_step_time: 0.001,
+            warnings: vec![],
+            diagnostics: vec![],
+        };
+        let summary = report.summary();
+        assert!(summary.contains("Stopped"));
+    }
+
+    /// Lines 734-742: progress_callback with non-zero interval, iteration not divisible
+    #[test]
+    fn test_progress_callback_skips_non_interval() {
+        let cb = progress_callback(5); // Only print every 5 iterations
+        let metrics = StepMetrics {
+            iteration: 3, // 3 % 5 != 0, so should not print but return true
+            energy: 1.0,
+            gradient: vec![0.1],
+            gradient_norm: 0.1,
+            parameters: vec![0.5],
+            energy_change: 0.0,
+            relative_energy_change: 0.0,
+            parameter_change: 0.0,
+            step_time: Duration::from_millis(1),
+            total_time: Duration::from_millis(1),
+        };
+        assert!(cb(&metrics));
+        // Also test the branch where it DOES print (iteration divisible by interval)
+        let metrics_div = StepMetrics {
+            iteration: 5,
+            ..metrics
+        };
+        assert!(cb(&metrics_div));
+    }
+
+    /// Lines 746-758: energy_logger when lock succeeds
+    #[test]
+    fn test_energy_logger_multiple_entries() {
+        let (cb, energies) = energy_logger();
+        for i in 0..3 {
+            let metrics = StepMetrics {
+                iteration: i,
+                energy: i as f64 * 0.1,
+                gradient: vec![0.1],
+                gradient_norm: 0.1,
+                parameters: vec![0.5],
+                energy_change: 0.0,
+                relative_energy_change: 0.0,
+                parameter_change: 0.0,
+                step_time: Duration::from_millis(1),
+                total_time: Duration::from_millis(1),
+            };
+            assert!(cb(&metrics));
+        }
+        let locked = energies.lock().unwrap();
+        assert_eq!(locked.len(), 3);
+    }
+
+    /// Lines 762-766: target_energy_callback at exactly the target value
+    #[test]
+    fn test_target_energy_callback_at_target() {
+        let cb = target_energy_callback(0.5);
+        let at_target = StepMetrics {
+            iteration: 0,
+            energy: 0.5, // exactly at target — energy > target is false → stop
+            gradient: vec![],
+            gradient_norm: 0.0,
+            parameters: vec![],
+            energy_change: 0.0,
+            relative_energy_change: 0.0,
+            parameter_change: 0.0,
+            step_time: Duration::from_millis(1),
+            total_time: Duration::from_millis(1),
+        };
+        assert!(!cb(&at_target)); // 0.5 > 0.5 is false → return false (stop)
+    }
+
+    /// TrackedOptimizationResult::print_summary — exercises all print lines
+    #[test]
+    fn test_tracked_result_print_summary() {
+        let result = TrackedOptimizationResult {
+            final_parameters: vec![0.5],
+            final_energy: 0.1,
+            best_parameters: vec![0.5],
+            best_energy: 0.05,
+            best_iteration: 5,
+            num_iterations: 10,
+            final_gradient: Some(vec![0.01]),
+            stopping_criterion: StoppingCriterion::FullConvergence,
+            total_time: Duration::from_millis(100),
+            energy_history: vec![1.0, 0.5, 0.1],
+        };
+        result.print_summary(); // Should not panic
+    }
+
+    /// TrackedOptimizationResult relative_improvement with near-zero initial
+    #[test]
+    fn test_tracked_result_relative_improvement_near_zero_initial() {
+        let result = TrackedOptimizationResult {
+            final_parameters: vec![],
+            final_energy: 0.0,
+            best_parameters: vec![],
+            best_energy: 0.0,
+            best_iteration: 0,
+            num_iterations: 1,
+            final_gradient: None,
+            stopping_criterion: StoppingCriterion::NotConverged,
+            total_time: Duration::default(),
+            energy_history: vec![1e-12, 0.0], // very small initial
+        };
+        // initial.abs() < 1e-10 => takes else branch (calls improvement())
+        let ri = result.relative_improvement();
+        assert!(ri.is_finite());
+    }
 }

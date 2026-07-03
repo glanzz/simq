@@ -259,4 +259,17 @@ mod tests {
         };
         assert!(invalid.validate().is_err());
     }
+
+    #[test]
+    fn test_validate_optimization_level_too_high() {
+        // with_optimization_level clamps to 3, so construct directly to
+        // exercise the validate() branch for optimization_level > 3.
+        let invalid = SimulatorConfig {
+            optimization_level: 4,
+            ..Default::default()
+        };
+        let err = invalid.validate().unwrap_err();
+        assert!(err.contains("optimization_level must be 0-3"));
+        assert!(err.contains('4'));
+    }
 }

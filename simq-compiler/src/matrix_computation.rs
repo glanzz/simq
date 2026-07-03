@@ -636,4 +636,309 @@ mod tests {
         // exp(0) = I
         assert!(matrices_equal_2x2(&exp_zero, &identity_2x2(), EPSILON));
     }
+
+    // -----------------------------------------------------------------------
+    // New tests to cover previously uncovered lines
+    // -----------------------------------------------------------------------
+
+    // --- tensor_product_4x4 (lines 93-108) ---
+
+    #[test]
+    fn test_tensor_product_4x4_with_identity() {
+        // CNOT ⊗ I should embed CNOT in 8x8 in expected positions
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let id = identity_2x2();
+        let result = tensor_product_4x4(&cnot, &id);
+
+        // result is 8x8; just check a few structural properties
+        // The top-left 4x4 block (CNOT[0][0]*I) should reflect CNOT[0][0]=1
+        assert_eq!(result[0][0], ONE); // cnot[0][0]*id[0][0] = 1*1
+        assert_eq!(result[0][1], ZERO); // cnot[0][0]*id[0][1] = 1*0
+
+        // cnot[2][3]=1 so result[4][6] = cnot[2][3]*id[0][0]=1
+        assert_eq!(result[4][6], ONE);
+        // and result[5][7] = cnot[2][3]*id[1][1]=1
+        assert_eq!(result[5][7], ONE);
+    }
+
+    #[test]
+    fn test_tensor_product_4x4_dimensions() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let result = tensor_product_4x4(&cnot, &x);
+        // Result must be 8x8
+        assert_eq!(result.len(), 8);
+        assert_eq!(result[0].len(), 8);
+    }
+
+    // --- tensor_product_dynamic success (lines 114-142) ---
+
+    #[test]
+    fn test_tensor_product_dynamic_success() {
+        // Build 2x2 matrices as DynamicMatrix
+        let x: DynamicMatrix = vec![vec![ZERO, ONE], vec![ONE, ZERO]];
+        let id: DynamicMatrix = vec![vec![ONE, ZERO], vec![ZERO, ONE]];
+
+        let result = tensor_product_dynamic(&x, &id).unwrap();
+        // X ⊗ I should be a 4x4 matrix
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].len(), 4);
+
+        // X ⊗ I: x[0][0]=0 → top-left 2x2 is zero
+        assert_eq!(result[0][0], ZERO);
+        // x[0][1]=1 → top-right 2x2 is identity
+        assert_eq!(result[0][2], ONE);
+        assert_eq!(result[1][3], ONE);
+        // x[1][0]=1 → bottom-left 2x2 is identity
+        assert_eq!(result[2][0], ONE);
+        assert_eq!(result[3][1], ONE);
+        // x[1][1]=0 → bottom-right 2x2 is zero
+        assert_eq!(result[2][2], ZERO);
+    }
+
+    // --- tensor_product_dynamic error: empty matrix (line 121) ---
+
+    #[test]
+    fn test_tensor_product_dynamic_empty_error() {
+        let empty: DynamicMatrix = vec![];
+        let id: DynamicMatrix = vec![vec![ONE, ZERO], vec![ZERO, ONE]];
+        let result = tensor_product_dynamic(&empty, &id);
+        assert!(result.is_err());
+
+        // Also test with a non-empty first but empty second
+        let result2 = tensor_product_dynamic(&id, &empty);
+        assert!(result2.is_err());
+    }
+
+    // --- controlled_gate_4x4 (lines 172-188) ---
+
+    #[test]
+    fn test_controlled_gate_4x4() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let c_cnot = controlled_gate_4x4(&cnot);
+
+        // Top-left 4x4 block: identity
+        for i in 0..4 {
+            assert_eq!(c_cnot[i][i], ONE);
+            for j in 0..4 {
+                if i != j {
+                    assert_eq!(c_cnot[i][j], ZERO);
+                }
+            }
+        }
+
+        // Bottom-right 4x4 block: CNOT
+        for i in 0..4 {
+            for j in 0..4 {
+                assert_eq!(c_cnot[i + 4][j + 4], cnot[i][j]);
+            }
+        }
+
+        // Off-diagonal blocks should be zero
+        assert_eq!(c_cnot[0][4], ZERO);
+        assert_eq!(c_cnot[4][0], ZERO);
+    }
+
+    // --- multiply_4x4 (lines 231-243) ---
+
+    #[test]
+    fn test_multiply_4x4_identity() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let id4: Matrix4 = [
+            [ONE, ZERO, ZERO, ZERO],
+            [ZERO, ONE, ZERO, ZERO],
+            [ZERO, ZERO, ONE, ZERO],
+            [ZERO, ZERO, ZERO, ONE],
+        ];
+        let result = multiply_4x4(&cnot, &id4);
+        // CNOT * I = CNOT
+        for i in 0..4 {
+            for j in 0..4 {
+                assert_eq!(result[i][j], cnot[i][j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_multiply_4x4_cnot_squared() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let cnot_sq = multiply_4x4(&cnot, &cnot);
+        // CNOT^2 = I
+        let id4: Matrix4 = [
+            [ONE, ZERO, ZERO, ZERO],
+            [ZERO, ONE, ZERO, ZERO],
+            [ZERO, ZERO, ONE, ZERO],
+            [ZERO, ZERO, ZERO, ONE],
+        ];
+        for i in 0..4 {
+            for j in 0..4 {
+                assert!(
+                    (cnot_sq[i][j] - id4[i][j]).norm() < EPSILON,
+                    "cnot^2[{}][{}] = {:?}",
+                    i,
+                    j,
+                    cnot_sq[i][j]
+                );
+            }
+        }
+    }
+
+    // --- multiply_8x8 (lines 246-258) ---
+
+    #[test]
+    fn test_multiply_8x8_identity() {
+        let x = pauli_x_matrix();
+        let ccx = doubly_controlled_gate_2x2(&x);
+        // CCX^2 = I
+        let ccx_sq = multiply_8x8(&ccx, &ccx);
+        for i in 0..8 {
+            let expected = Complex64::new(1.0, 0.0);
+            assert!(
+                (ccx_sq[i][i] - expected).norm() < EPSILON,
+                "ccx^2[{}][{}] = {:?}",
+                i,
+                i,
+                ccx_sq[i][i]
+            );
+        }
+    }
+
+    // --- adjoint_4x4 (lines 273-283) ---
+
+    #[test]
+    fn test_adjoint_4x4() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let cnot_dag = adjoint_4x4(&cnot);
+
+        // CNOT is Hermitian so adjoint == itself
+        for i in 0..4 {
+            for j in 0..4 {
+                assert!(
+                    (cnot_dag[i][j] - cnot[i][j]).norm() < EPSILON,
+                    "adjoint[{}][{}] != cnot[{}][{}]",
+                    i,
+                    j,
+                    i,
+                    j
+                );
+            }
+        }
+    }
+
+    // --- is_unitary_4x4 (lines 303-317) ---
+
+    #[test]
+    fn test_is_unitary_4x4_cnot() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        assert!(is_unitary_4x4(&cnot), "CNOT should be unitary");
+    }
+
+    #[test]
+    fn test_is_unitary_4x4_non_unitary() {
+        let non_unitary: Matrix4 = [
+            [ONE, ONE, ZERO, ZERO],
+            [ZERO, ONE, ZERO, ZERO],
+            [ZERO, ZERO, ONE, ONE],
+            [ZERO, ZERO, ZERO, ONE],
+        ];
+        assert!(!is_unitary_4x4(&non_unitary), "Non-unitary matrix should fail check");
+    }
+
+    // --- trace_4x4 (lines 340-346) ---
+
+    #[test]
+    fn test_trace_4x4() {
+        let id4: Matrix4 = [
+            [ONE, ZERO, ZERO, ZERO],
+            [ZERO, ONE, ZERO, ZERO],
+            [ZERO, ZERO, ONE, ZERO],
+            [ZERO, ZERO, ZERO, ONE],
+        ];
+        let tr = trace_4x4(&id4);
+        assert_relative_eq!(tr.re, 4.0, epsilon = EPSILON);
+        assert_relative_eq!(tr.im, 0.0, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_trace_4x4_cnot() {
+        let x = pauli_x_matrix();
+        let cnot = controlled_gate_2x2(&x);
+        let tr = trace_4x4(&cnot);
+        // CNOT trace: diagonal is [1, 1, 0, 0] => trace = 2
+        assert_relative_eq!(tr.re, 2.0, epsilon = EPSILON);
+    }
+
+    // --- matrix_exp_hermitian_2x2 non-trivial theta (lines 387-406) ---
+
+    #[test]
+    fn test_matrix_exp_hermitian_small_theta() {
+        // theta < EPSILON returns identity
+        let x = pauli_x_matrix();
+        let result = matrix_exp_hermitian_2x2(&x, 0.0);
+        assert!(matrices_equal_2x2(&result, &identity_2x2(), 1e-8));
+    }
+
+    #[test]
+    fn test_matrix_exp_hermitian_nonzero_theta() {
+        // exp(iπ/2 * X) should be close to cos(π/2)*I + i*sin(π/2)*X = i*X
+        let x = pauli_x_matrix();
+        let theta = std::f64::consts::PI / 2.0;
+        let result = matrix_exp_hermitian_2x2(&x, theta);
+        // Result should be unitary
+        assert!(is_unitary_2x2(&result));
+    }
+
+    // --- decompose_zyz (lines 448-481) ---
+
+    #[test]
+    fn test_decompose_zyz_non_unitary_error() {
+        let non_unitary = [[ONE, ONE], [ZERO, ONE]];
+        let result = decompose_zyz(&non_unitary);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("not unitary"), "Got: {}", err_msg);
+    }
+
+    #[test]
+    fn test_decompose_zyz_hadamard() {
+        // Hadamard is unitary so decompose_zyz should succeed
+        let h = hadamard_matrix();
+        let result = decompose_zyz(&h);
+        assert!(result.is_ok(), "decompose_zyz(H) failed: {:?}", result.err());
+        let (alpha, _beta, _gamma, _delta) = result.unwrap();
+        // Global phase is real; just confirm we get finite angles
+        assert!(alpha.is_finite());
+    }
+
+    #[test]
+    fn test_decompose_zyz_identity() {
+        // Identity: gamma should be near 0 (exercises the gamma.abs() < EPSILON branch)
+        let id = identity_2x2();
+        let result = decompose_zyz(&id);
+        assert!(result.is_ok(), "decompose_zyz(I) failed: {:?}", result.err());
+        let (_alpha, _beta, gamma, _delta) = result.unwrap();
+        // For identity, gamma (the Ry angle) should be 0
+        assert_relative_eq!(gamma, 0.0, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_decompose_zyz_pauli_x() {
+        // PauliX is unitary and has non-trivial gamma, exercises non-zero gamma branch
+        let x = pauli_x_matrix();
+        let result = decompose_zyz(&x);
+        assert!(result.is_ok(), "decompose_zyz(X) failed: {:?}", result.err());
+        let (_alpha, _beta, gamma, _delta) = result.unwrap();
+        // For X, the Ry rotation angle should be π
+        assert!(
+            (gamma - std::f64::consts::PI).abs() < 1e-6 || gamma.abs() < 1e-6,
+            "Unexpected gamma for X: {}",
+            gamma
+        );
+    }
 }

@@ -172,4 +172,32 @@ mod tests {
 
         assert!((stats.peak_memory_mb() - 5.0).abs() < 0.01);
     }
+
+    #[test]
+    fn test_optimization_ratio_zero_gates() {
+        let stats = ExecutionStatistics::default();
+        assert_eq!(stats.optimization_ratio(), 0.0);
+    }
+
+    #[test]
+    fn test_gates_per_second_zero_time() {
+        let stats = ExecutionStatistics::default();
+        assert_eq!(stats.gates_per_second(), 0.0);
+    }
+
+    #[test]
+    fn test_compilation_overhead_zero_total_time() {
+        let stats = ExecutionStatistics::default();
+        assert_eq!(stats.compilation_overhead_percent(), 0.0);
+    }
+
+    #[test]
+    fn test_display_with_dense_state() {
+        let stats = ExecutionStatistics {
+            final_is_sparse: false,
+            ..ExecutionStatistics::default()
+        };
+        let display = format!("{}", stats);
+        assert!(display.contains("dense"));
+    }
 }

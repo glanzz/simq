@@ -326,4 +326,18 @@ mod tests {
         let result = StateVector::from_amplitudes(2, &amplitudes);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_as_mut_ptr() {
+        let mut state = StateVector::new(3).unwrap();
+        let ptr = state.as_mut_ptr();
+        assert_eq!(ptr as usize % SIMD_ALIGNMENT, 0);
+        // Writing through the mutable pointer should be observable via amplitudes().
+        unsafe {
+            *ptr = Complex64::new(0.0, 0.0);
+            *ptr.add(1) = Complex64::new(1.0, 0.0);
+        }
+        assert_eq!(state.amplitudes()[0], Complex64::new(0.0, 0.0));
+        assert_eq!(state.amplitudes()[1], Complex64::new(1.0, 0.0));
+    }
 }

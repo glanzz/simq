@@ -325,6 +325,17 @@ mod tests {
     }
 
     #[test]
+    fn test_depolarizing_mc_operation_out_of_range_falls_back_to_identity() {
+        let mc = DepolarizingMC::from_probability(0.1).unwrap();
+
+        // Index 4+ is not a valid sample outcome (only 0..=3 are produced by
+        // `sample`), but `get_operation` should gracefully fall back to
+        // Identity rather than panicking.
+        assert_eq!(mc.get_operation(4), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(100), PauliOperation::Identity);
+    }
+
+    #[test]
     fn test_amplitude_damping_mc() {
         let mc = AmplitudeDampingMC::from_gamma(0.1).unwrap();
 
@@ -349,6 +360,16 @@ mod tests {
     }
 
     #[test]
+    fn test_amplitude_damping_mc_operation_out_of_range_falls_back_to_identity() {
+        let mc = AmplitudeDampingMC::from_gamma(0.1).unwrap();
+
+        // Only indices 0 (no jump) and 1 (jump) are valid outcomes; anything
+        // else should fall back to Identity instead of panicking.
+        assert_eq!(mc.get_operation(2), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(42), PauliOperation::Identity);
+    }
+
+    #[test]
     fn test_phase_damping_mc() {
         let mc = PhaseDampingMC::from_lambda(0.2).unwrap();
 
@@ -356,6 +377,18 @@ mod tests {
         assert_eq!(mc.sample(0.85), 1); // Z error
 
         assert_eq!(mc.num_outcomes(), 2);
+    }
+
+    #[test]
+    fn test_phase_damping_mc_operations() {
+        let mc = PhaseDampingMC::from_lambda(0.2).unwrap();
+
+        assert_eq!(mc.get_operation(0), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(1), PauliOperation::Z);
+
+        // Out-of-range index should fall back to Identity rather than panic.
+        assert_eq!(mc.get_operation(2), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(99), PauliOperation::Identity);
     }
 
     #[test]
@@ -379,5 +412,19 @@ mod tests {
         assert!(DepolarizingMC::from_probability(1.1).is_err());
         assert!(AmplitudeDampingMC::from_gamma(1.5).is_err());
         assert!(PhaseDampingMC::from_lambda(0.6).is_err());
+    }
+
+    #[test]
+    fn test_readout_error_mc_invalid_probabilities() {
+        let result = ReadoutErrorMC::from_probabilities(-0.1, 0.1);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e
+                .to_string()
+                .contains("Readout error probabilities must be in [0,1]"));
+        }
+
+        assert!(ReadoutErrorMC::from_probabilities(0.1, 1.1).is_err());
+        assert!(ReadoutErrorMC::from_probabilities(1.5, 1.5).is_err());
     }
 }

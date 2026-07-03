@@ -595,4 +595,193 @@ mod tests {
         assert_eq!(status.total_gates, 3);
         assert_eq!(status.current_gate, Some("X".to_string()));
     }
+
+    // ---- New tests for uncovered branches ----
+
+    #[test]
+    fn test_current_gate_description_at_end() {
+        let circuit = Circuit::new(1);
+        let debugger = CircuitDebugger::new(&circuit);
+        // No gates, so immediately at end
+        assert_eq!(debugger.current_gate_description(), "(end of circuit)");
+    }
+
+    #[test]
+    fn test_current_gate_description_with_gate() {
+        let circuit = create_test_circuit();
+        let debugger = CircuitDebugger::new(&circuit);
+        let desc = debugger.current_gate_description();
+        // First gate is H, description should contain it
+        assert!(!desc.is_empty());
+    }
+
+    #[test]
+    fn test_current_qubits_at_end() {
+        let circuit = Circuit::new(1);
+        let debugger = CircuitDebugger::new(&circuit);
+        let qubits = debugger.current_qubits();
+        assert!(qubits.is_empty());
+    }
+
+    #[test]
+    fn test_visualize_current_position_with_gate() {
+        let circuit = create_test_circuit();
+        let debugger = CircuitDebugger::new(&circuit);
+        let vis = debugger.visualize_current_position();
+        assert!(vis.contains("Step 0/3"));
+        assert!(vis.contains("H"));
+    }
+
+    #[test]
+    fn test_visualize_current_position_at_end() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        // Step to the end
+        while debugger.step() {}
+        let vis = debugger.visualize_current_position();
+        assert!(vis.contains("(end of circuit)"));
+    }
+
+    #[test]
+    fn test_print_trace_does_not_panic() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.step();
+        // Should not panic
+        debugger.print_trace();
+    }
+
+    #[test]
+    fn test_print_trace_at_end() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        while debugger.step() {}
+        // Should print END OF CIRCUIT
+        debugger.print_trace();
+    }
+
+    #[test]
+    fn test_debugger_status_display() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.step();
+        let status = debugger.status();
+        let s = format!("{}", status);
+        assert!(s.contains("Debugger Status"));
+        assert!(s.contains("Step: 1/3"));
+        assert!(s.contains("X")); // current gate
+    }
+
+    #[test]
+    fn test_debugger_status_display_at_end() {
+        let circuit = Circuit::new(1);
+        let debugger = CircuitDebugger::new(&circuit);
+        let status = debugger.status();
+        let s = format!("{}", status);
+        assert!(s.contains("(end)"));
+    }
+
+    #[test]
+    fn test_step_info_display() {
+        let info = StepInfo {
+            step: 2,
+            gate_name: "H".to_string(),
+            qubits: vec![0, 1],
+            description: "Hadamard".to_string(),
+        };
+        let s = format!("{}", info);
+        assert!(s.contains("Step 2"));
+        assert!(s.contains("H"));
+        assert!(s.contains("Hadamard"));
+    }
+
+    #[test]
+    fn test_add_breakpoint_duplicate_ignored() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.add_breakpoint(1);
+        debugger.add_breakpoint(1); // duplicate
+        assert_eq!(debugger.breakpoints().len(), 1);
+    }
+
+    #[test]
+    fn test_add_breakpoint_out_of_bounds_ignored() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.add_breakpoint(100); // out of bounds
+        assert_eq!(debugger.breakpoints().len(), 0);
+    }
+
+    #[test]
+    fn test_jump_to_same_step_is_noop() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.step();
+        assert_eq!(debugger.step_number(), 1);
+        // Jumping to current step should succeed without changing position
+        assert!(debugger.jump_to(1));
+        assert_eq!(debugger.step_number(), 1);
+    }
+
+    #[test]
+    fn test_jump_to_end_step() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        assert!(debugger.jump_to(3)); // 3 == total_gates, valid
+        assert!(debugger.is_at_end());
+    }
+
+    #[test]
+    fn test_remaining_operations_at_end() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        while debugger.step() {}
+        let remaining = debugger.remaining_operations();
+        assert_eq!(remaining.len(), 0);
+    }
+
+    #[test]
+    fn test_to_executed_circuit_at_start() {
+        let circuit = create_test_circuit();
+        let debugger = CircuitDebugger::new(&circuit);
+        let partial = debugger.to_executed_circuit();
+        assert_eq!(partial.len(), 0);
+    }
+
+    #[test]
+    fn test_continue_execution_no_breakpoints() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        // No breakpoints - runs to end
+        let hit = debugger.continue_execution();
+        assert!(!hit);
+        assert!(debugger.is_at_end());
+    }
+
+    #[test]
+    fn test_history_step_info_fields() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.step();
+
+        let history = debugger.history();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].step, 0);
+        assert_eq!(history[0].gate_name, "H");
+        assert_eq!(history[0].qubits, vec![0]);
+        assert!(!history[0].description.is_empty());
+    }
+
+    #[test]
+    fn test_step_back_removes_history_entry() {
+        let circuit = create_test_circuit();
+        let mut debugger = CircuitDebugger::new(&circuit);
+        debugger.step();
+        debugger.step();
+        assert_eq!(debugger.history().len(), 2);
+
+        debugger.step_back();
+        assert_eq!(debugger.history().len(), 1);
+        assert_eq!(debugger.step_number(), 1);
+    }
 }

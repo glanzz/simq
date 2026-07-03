@@ -304,4 +304,54 @@ mod tests {
         // 1 MB / 16 bytes = 65536 amplitudes = 2^16, so 16 qubits
         assert_eq!(max_qubits, 16);
     }
+
+    #[test]
+    fn test_too_many_qubits_error() {
+        // Set a small memory limit to cap max qubits
+        let sim = Simulator::new(
+            SimulatorConfig::default().with_memory_limit(16), // only 1 amplitude → max 0 qubits
+        );
+
+        // Even a 1-qubit circuit with a gate should hit the qubit limit
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        let result = sim.run(&circuit);
+        assert!(matches!(result, Err(crate::error::SimulatorError::TooManyQubits { .. })));
+    }
+
+    #[test]
+    fn test_execution_failure_maps_to_gate_application_failed() {
+        use simq_core::gate::Gate;
+
+        // A gate with no matrix representation will cause execution to fail
+        #[derive(Debug)]
+        struct NoMatrixGate;
+        impl Gate for NoMatrixGate {
+            fn name(&self) -> &str {
+                "NoMatrix"
+            }
+            fn num_qubits(&self) -> usize {
+                1
+            }
+            fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+                None
+            }
+        }
+
+        // Disable optimization so compilation doesn't catch the bad gate first
+        let sim = Simulator::new(SimulatorConfig::default().with_optimization(false));
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+
+        let result = sim.run(&circuit);
+        assert!(matches!(
+            result,
+            Err(crate::error::SimulatorError::GateApplicationFailed { .. })
+        ));
+    }
 }

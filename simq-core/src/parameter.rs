@@ -470,4 +470,21 @@ mod tests {
         param.set_bounds(0.0, 2.0).unwrap();
         assert_eq!(param.bounds(), Some((0.0, 2.0)));
     }
+
+    #[test]
+    fn test_set_bounds_invalid_min_greater_than_max() {
+        let mut param = Parameter::new(1.0);
+        let result = param.set_bounds(2.0, 0.0);
+        assert!(result.is_err());
+        // Bounds should remain unset since the call failed
+        assert!(param.bounds().is_none());
+    }
+
+    #[test]
+    fn test_set_bounds_value_outside_new_bounds() {
+        let mut param = Parameter::new(5.0);
+        let result = param.set_bounds(0.0, 2.0);
+        assert!(result.is_err());
+        assert!(param.bounds().is_none());
+    }
 }

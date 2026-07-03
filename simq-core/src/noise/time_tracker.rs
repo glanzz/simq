@@ -305,6 +305,19 @@ mod tests {
     }
 
     #[test]
+    fn test_idle_time_out_of_range_qubit() {
+        let timing = GateTiming::default();
+        let mut tracker = QubitTimeTracker::new(2, timing);
+
+        tracker.apply_single_qubit_gate(0);
+
+        // An out-of-range qubit index should return 0.0 idle time rather
+        // than panicking on an out-of-bounds index.
+        assert_eq!(tracker.idle_time_since_last_operation(2), 0.0);
+        assert_eq!(tracker.idle_time_since_last_operation(100), 0.0);
+    }
+
+    #[test]
     fn test_all_idle_times() {
         let timing = GateTiming::default();
         let mut tracker = QubitTimeTracker::new(3, timing);
@@ -408,6 +421,21 @@ mod tests {
         tracker.apply_single_qubit_gate(0);
 
         assert_eq!(tracker.qubit_time(0), Some(0.05));
+    }
+
+    #[test]
+    fn test_timing_getter() {
+        let timing = GateTiming {
+            single_qubit_gate_time: 0.03,
+            two_qubit_gate_time: 0.15,
+            measurement_time: 1.5,
+        };
+        let tracker = QubitTimeTracker::new(1, timing);
+
+        let retrieved = tracker.timing();
+        assert_eq!(retrieved.single_qubit_gate_time, 0.03);
+        assert_eq!(retrieved.two_qubit_gate_time, 0.15);
+        assert_eq!(retrieved.measurement_time, 1.5);
     }
 
     #[test]

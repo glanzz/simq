@@ -603,4 +603,319 @@ mod tests {
         // 256 entries × 3 caches (RX, RY, RZ) × 64 bytes per matrix
         assert_eq!(bytes, 256 * 3 * 64);
     }
+
+    // =========================================================================
+    // Additional CommonAngles tests
+    // =========================================================================
+
+    #[test]
+    fn test_common_angles_all_rx() {
+        let rx_pi_4 = CommonAngles::rx_pi_over_4();
+        let rx_pi_2 = CommonAngles::rx_pi_over_2();
+        let rx_pi_val = CommonAngles::rx_pi();
+
+        // All should be non-trivial (not all zeros)
+        let sum_pi4: f64 = rx_pi_4.iter().flatten().map(|c| c.norm_sqr()).sum();
+        assert!(sum_pi4 > 0.0);
+        let sum_pi2: f64 = rx_pi_2.iter().flatten().map(|c| c.norm_sqr()).sum();
+        assert!(sum_pi2 > 0.0);
+        let sum_pi: f64 = rx_pi_val.iter().flatten().map(|c| c.norm_sqr()).sum();
+        assert!(sum_pi > 0.0);
+
+        // Check against computed values
+        let computed_pi4 = crate::matrices::rotation_x(PI / 4.0);
+        let computed_pi2 = crate::matrices::rotation_x(PI / 2.0);
+        let computed_pi = crate::matrices::rotation_x(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(rx_pi_4[i][j].re, computed_pi4[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rx_pi_2[i][j].re, computed_pi2[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rx_pi_val[i][j].re, computed_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_common_angles_all_ry() {
+        let ry_pi4 = CommonAngles::ry_pi_over_4();
+        let ry_pi2 = CommonAngles::ry_pi_over_2();
+        let ry_pi_val = CommonAngles::ry_pi();
+
+        let computed_pi4 = crate::matrices::rotation_y(PI / 4.0);
+        let computed_pi2 = crate::matrices::rotation_y(PI / 2.0);
+        let computed_pi = crate::matrices::rotation_y(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(ry_pi4[i][j].re, computed_pi4[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(ry_pi2[i][j].re, computed_pi2[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(ry_pi_val[i][j].re, computed_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_common_angles_all_rz() {
+        let rz_pi4 = CommonAngles::rz_pi_over_4();
+        let rz_pi2 = CommonAngles::rz_pi_over_2();
+        let rz_pi_val = CommonAngles::rz_pi();
+
+        let computed_pi4 = crate::matrices::rotation_z(PI / 4.0);
+        let computed_pi2 = crate::matrices::rotation_z(PI / 2.0);
+        let computed_pi = crate::matrices::rotation_z(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(rz_pi4[i][j].re, computed_pi4[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rz_pi2[i][j].re, computed_pi2[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rz_pi_val[i][j].re, computed_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rx_lookup_all_branches() {
+        // PI/4 branch
+        assert!(CommonAngles::rx_lookup(PI / 4.0).is_some());
+        // PI/2 branch
+        assert!(CommonAngles::rx_lookup(PI / 2.0).is_some());
+        // PI branch
+        assert!(CommonAngles::rx_lookup(PI).is_some());
+        // 0.0 branch (identity)
+        assert!(CommonAngles::rx_lookup(0.0).is_some());
+        // None branch
+        assert!(CommonAngles::rx_lookup(1.0).is_none());
+        assert!(CommonAngles::rx_lookup(0.123).is_none());
+    }
+
+    #[test]
+    fn test_ry_lookup_all_branches() {
+        assert!(CommonAngles::ry_lookup(PI / 4.0).is_some());
+        assert!(CommonAngles::ry_lookup(PI / 2.0).is_some());
+        assert!(CommonAngles::ry_lookup(PI).is_some());
+        assert!(CommonAngles::ry_lookup(0.0).is_some());
+        assert!(CommonAngles::ry_lookup(1.0).is_none());
+    }
+
+    #[test]
+    fn test_rz_lookup_all_branches() {
+        assert!(CommonAngles::rz_lookup(PI / 4.0).is_some());
+        assert!(CommonAngles::rz_lookup(PI / 2.0).is_some());
+        assert!(CommonAngles::rz_lookup(PI).is_some());
+        assert!(CommonAngles::rz_lookup(0.0).is_some());
+        assert!(CommonAngles::rz_lookup(1.0).is_none());
+    }
+
+    // =========================================================================
+    // VQEAngles additional tests
+    // =========================================================================
+
+    #[test]
+    fn test_vqe_angles_rx_cached_in_range() {
+        // theta=0.0 is exactly on a cache entry
+        let m0 = VQEAngles::rx_cached(0.0);
+        let computed0 = crate::matrices::rotation_x(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m0[i][j].re, computed0[i][j].re, epsilon = 1e-10);
+            }
+        }
+
+        // theta=0.1 is within range but may or may not hit exact cache
+        let m1 = VQEAngles::rx_cached(0.1);
+        let computed1 = crate::matrices::rotation_x(0.1);
+        // Allow looser epsilon because Taylor series approx
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m1[i][j].re, computed1[i][j].re, epsilon = 0.01);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_rx_cached_out_of_range() {
+        // PI is beyond MAX_ANGLE, falls back to runtime computation
+        let cached = VQEAngles::rx_cached(PI);
+        let computed = crate::matrices::rotation_x(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_rx_cached_negative() {
+        // Negative angles should work (negate off-diagonal)
+        let pos = VQEAngles::rx_cached(0.1);
+        let neg = VQEAngles::rx_cached(-0.1);
+        // cos(-θ/2) = cos(θ/2), so diagonal should match
+        assert_relative_eq!(pos[0][0].re, neg[0][0].re, epsilon = 0.01);
+        // The returned matrix is from runtime computation for non-exact entries
+        let computed_neg = crate::matrices::rotation_x(-0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(neg[i][j].re, computed_neg[i][j].re, epsilon = 0.01);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_ry_cached() {
+        // In-range
+        let m = VQEAngles::ry_cached(0.0);
+        let computed = crate::matrices::rotation_y(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m[i][j].re, computed[i][j].re, epsilon = 1e-10);
+            }
+        }
+        // Negative in-range
+        let m_neg = VQEAngles::ry_cached(-0.1);
+        let c_neg = crate::matrices::rotation_y(-0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 0.01);
+            }
+        }
+        // Out of range
+        let m_pi = VQEAngles::ry_cached(PI);
+        let c_pi = crate::matrices::rotation_y(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_pi[i][j].re, c_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_rz_cached() {
+        // In-range: theta=0
+        let m = VQEAngles::rz_cached(0.0);
+        let computed = crate::matrices::rotation_z(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m[i][j].re, computed[i][j].re, epsilon = 1e-10);
+            }
+        }
+        // Negative in-range
+        let m_neg = VQEAngles::rz_cached(-0.1);
+        let c_neg = crate::matrices::rotation_z(-0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 0.01);
+            }
+        }
+        // Out of range (fallback)
+        let m_pi = VQEAngles::rz_cached(PI);
+        let c_pi = crate::matrices::rotation_z(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_pi[i][j].re, c_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_memory_bytes() {
+        let bytes = VQEAngles::memory_bytes();
+        assert!(bytes > 0);
+        // Should be 256 * 3 * size_of([[Complex64;2];2])
+        let expected = 256 * 3 * std::mem::size_of::<[[Complex64; 2]; 2]>();
+        assert_eq!(bytes, expected);
+    }
+
+    // =========================================================================
+    // UniversalCache additional tests
+    // =========================================================================
+
+    #[test]
+    fn test_universal_cache_rx() {
+        // Level 1: PI/4 is a common angle
+        let m = UniversalCache::rx(PI / 4.0);
+        let expected = *CommonAngles::rx_pi_over_4();
+        assert_eq!(m, expected);
+
+        // Level 1: 0.0 is also a common angle (identity)
+        let m0 = UniversalCache::rx(0.0);
+        assert_eq!(m0, crate::matrices::IDENTITY);
+
+        // Level 2: VQE range hit
+        let m2 = UniversalCache::rx(0.1);
+        let c2 = crate::matrices::rotation_x(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m2[i][j].re, c2[i][j].re, epsilon = 0.01);
+            }
+        }
+
+        // Level 3: fallback to runtime
+        let m3 = UniversalCache::rx(PI); // PI is a common angle
+        let c3 = crate::matrices::rotation_x(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m3[i][j].re, c3[i][j].re, epsilon = 1e-10);
+            }
+        }
+
+        // Runtime fallback for non-common, out-of-range angle
+        let m4 = UniversalCache::rx(2.5);
+        let c4 = crate::matrices::rotation_x(2.5);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m4[i][j].re, c4[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_universal_cache_ry() {
+        // PI/2 is common angle
+        let m = UniversalCache::ry(PI / 2.0);
+        let expected = *CommonAngles::ry_pi_over_2();
+        assert_eq!(m, expected);
+
+        // VQE range
+        let m2 = UniversalCache::ry(0.1);
+        let c2 = crate::matrices::rotation_y(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m2[i][j].re, c2[i][j].re, epsilon = 0.01);
+            }
+        }
+
+        // Out of range
+        let m3 = UniversalCache::ry(2.0);
+        let c3 = crate::matrices::rotation_y(2.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m3[i][j].re, c3[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_universal_cache_rz() {
+        // PI/4 is common angle
+        let m = UniversalCache::rz(PI / 4.0);
+        let expected = *CommonAngles::rz_pi_over_4();
+        assert_eq!(m, expected);
+
+        // VQE range
+        let m2 = UniversalCache::rz(0.1);
+        let c2 = crate::matrices::rotation_z(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m2[i][j].re, c2[i][j].re, epsilon = 0.01);
+            }
+        }
+
+        // Out of range
+        let m3 = UniversalCache::rz(2.0);
+        let c3 = crate::matrices::rotation_z(2.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m3[i][j].re, c3[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
 }

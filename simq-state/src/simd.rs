@@ -52,11 +52,8 @@ pub fn apply_single_qubit_gate(
     num_qubits: usize,
 ) {
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            single_qubit::apply_gate_avx2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    unsafe {
+        single_qubit::apply_gate_avx2(state, matrix, qubit, num_qubits);
     }
 
     #[cfg(all(
@@ -96,11 +93,8 @@ pub fn apply_two_qubit_gate(
     num_qubits: usize,
 ) {
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            two_qubit::apply_gate_avx2(state, matrix, qubit1, qubit2, num_qubits);
-        }
-        return;
+    unsafe {
+        two_qubit::apply_gate_avx2(state, matrix, qubit1, qubit2, num_qubits);
     }
 
     #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
@@ -119,10 +113,8 @@ pub fn apply_two_qubit_gate(
 #[inline]
 pub fn norm_simd(vec: &[Complex64]) -> f64 {
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            return kernels::norm_avx2(vec);
-        }
+    unsafe {
+        kernels::norm_avx2(vec)
     }
 
     #[cfg(all(
@@ -151,14 +143,11 @@ pub fn normalize_simd(vec: &mut [Complex64]) {
         let inv_norm = 1.0 / norm;
 
         #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-        {
-            unsafe {
-                kernels::scale_avx2(vec, inv_norm);
-            }
-            return;
+        unsafe {
+            kernels::scale_avx2(vec, inv_norm);
         }
 
-        // Scalar fallback
+        #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
         for z in vec.iter_mut() {
             *z *= inv_norm;
         }
@@ -346,4 +335,175 @@ pub fn apply_diagonal_gate(
     num_qubits: usize,
 ) {
     diagonal::apply_diagonal_gate_optimized(state, diagonal, qubit, num_qubits);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    fn hadamard_matrix() -> [[Complex64; 2]; 2] {
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        [
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
+        ]
+    }
+
+    fn identity_4x4() -> [[Complex64; 4]; 4] {
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        [[i, o, o, o], [o, i, o, o], [o, o, i, o], [o, o, o, i]]
+    }
+
+    /// Covers apply_single_qubit_gate — exercises the SSE2 cfg path on x86_64
+    /// (no avx2 compile-time feature) or scalar on non-x86_64 targets.
+    #[test]
+    fn test_apply_single_qubit_gate_hadamard() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let h = hadamard_matrix();
+        apply_single_qubit_gate(&mut state, &h, 0, 1);
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        assert_relative_eq!(state[0].re, inv_sqrt2, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, inv_sqrt2, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_single_qubit_gate_multi_qubit() {
+        // 3-qubit state, apply Hadamard on qubit 0 — exercises the same path
+        let num_qubits = 3;
+        let mut state_ref = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_ref[0] = Complex64::new(1.0, 0.0);
+        let mut state_simd = state_ref.clone();
+        let h = hadamard_matrix();
+
+        // reference via the scalar implementation
+        single_qubit::apply_gate_scalar(&mut state_ref, &h, 0, num_qubits);
+        // public API (SSE2 path on this target)
+        apply_single_qubit_gate(&mut state_simd, &h, 0, num_qubits);
+
+        for i in 0..state_ref.len() {
+            assert_relative_eq!(state_ref[i].re, state_simd[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_ref[i].im, state_simd[i].im, epsilon = 1e-10);
+        }
+    }
+
+    /// Covers apply_two_qubit_gate — exercises the scalar cfg path on non-avx2 build.
+    #[test]
+    fn test_apply_two_qubit_gate_identity() {
+        let mut state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_two_qubit_gate(&mut state, &identity_4x4(), 0, 1, 2);
+        assert_relative_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_swap() {
+        // SWAP matrix: swaps |01⟩ and |10⟩
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        let swap = [[i, o, o, o], [o, o, i, o], [o, i, o, o], [o, o, o, i]];
+        // Start in |01⟩ state
+        let mut state = vec![o, i, o, o];
+        apply_two_qubit_gate(&mut state, &swap, 0, 1, 2);
+        // Should become |10⟩
+        assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, 0.0, epsilon = 1e-10);
+    }
+
+    /// Covers norm_simd — exercises the SSE2 cfg path on this target.
+    #[test]
+    fn test_norm_simd_simple() {
+        // |3+4i| = 5; |0+0i| = 0 => norm = 5
+        let state = vec![Complex64::new(3.0, 4.0), Complex64::new(0.0, 0.0)];
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 5.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_norm_simd_unit_state() {
+        // Normalized state should have norm 1
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let state = vec![
+            Complex64::new(inv_sqrt2, 0.0),
+            Complex64::new(inv_sqrt2, 0.0),
+        ];
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_norm_simd_odd_length() {
+        // 3-element vector to exercise potential tail handling
+        let state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 1.0),
+            Complex64::new(1.0, 1.0),
+        ];
+        let n = norm_simd(&state);
+        // norm_sqr: 1 + 1 + 2 = 4 => norm = 2
+        assert_relative_eq!(n, 2.0, epsilon = 1e-10);
+    }
+
+    /// Covers normalize_simd — the non-avx2 path scales element-by-element.
+    #[test]
+    fn test_normalize_simd_already_unit() {
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let mut state = vec![
+            Complex64::new(inv_sqrt2, 0.0),
+            Complex64::new(inv_sqrt2, 0.0),
+        ];
+        normalize_simd(&mut state);
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_simd_unnormalized() {
+        // Scale down by 2 then normalize — result must have norm 1
+        let mut state = vec![Complex64::new(2.0, 0.0), Complex64::new(0.0, 2.0)];
+        normalize_simd(&mut state);
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_simd_near_zero_is_noop() {
+        // A near-zero vector should not be normalized (guard against divide-by-zero)
+        let mut state = vec![Complex64::new(1e-15, 0.0), Complex64::new(0.0, 0.0)];
+        normalize_simd(&mut state);
+        // After the guard (norm <= 1e-10), state remains near zero
+        assert!(state[0].norm() < 1.0, "state should remain small");
+    }
+
+    /// Covers apply_diagonal_gate public wrapper.
+    #[test]
+    fn test_apply_diagonal_gate_z() {
+        let mut state = vec![
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+        ];
+        let z_diag = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        apply_diagonal_gate(&mut state, z_diag, 0, 2);
+        // Odd indices get negated
+        assert_relative_eq!(state[0].re, 0.5, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, -0.5, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 0.5, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, -0.5, epsilon = 1e-10);
+    }
 }

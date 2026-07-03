@@ -256,6 +256,29 @@ mod tests {
     }
 
     #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for TemplateSubstitution` (lines 206-207),
+        // which delegates to `Self::new()`.
+        let default_pass = TemplateSubstitution::default();
+        let new_pass = TemplateSubstitution::new();
+        assert_eq!(default_pass.templates.len(), new_pass.templates.len());
+
+        // Sanity-check the default pass actually works.
+        let mut circuit = Circuit::new(1);
+        let x_gate = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
+
+        let modified = default_pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0);
+    }
+
+    #[test]
     fn test_x_x_cancellation() {
         let pass = TemplateSubstitution::new();
         let mut circuit = Circuit::new(2);

@@ -101,4 +101,68 @@ mod tests {
         assert_abs_diff_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_abs_diff_eq!(state[1].im, 1.0, epsilon = 1e-10);
     }
+
+    #[test]
+    fn test_phase_gate_parallel() {
+        // threshold=0 forces parallel path
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
+        let phase = Complex64::new(0.0, 1.0); // i
+        apply_phase_gate(0, phase, &mut state, true, 0).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].im, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_diagonal_gate_sequential() {
+        // Single-qubit diagonal gate: phases = [1, -1] (Z gate)
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
+        let phases = vec![Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        apply_diagonal_gate(&[0], &phases, &mut state, false, usize::MAX).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, -1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_diagonal_gate_parallel() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
+        let phases = vec![Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        apply_diagonal_gate(&[0], &phases, &mut state, true, 0).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, -1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_diagonal_gate_wrong_phase_count() {
+        let mut state = vec![Complex64::new(1.0, 0.0); 2];
+        // 1 qubit needs 2 phases, not 3
+        let phases = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ];
+        let result = apply_diagonal_gate(&[0], &phases, &mut state, false, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_phase_index_two_qubits() {
+        // Two-qubit diagonal gate: phases cover |00>, |01>, |10>, |11>
+        let mut state = vec![
+            Complex64::new(1.0, 0.0), // |00>
+            Complex64::new(1.0, 0.0), // |01>
+            Complex64::new(1.0, 0.0), // |10>
+            Complex64::new(1.0, 0.0), // |11>
+        ];
+        // Identity phases (all 1.0)
+        let phases = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(-1.0, 0.0), // flip |11>
+        ];
+        apply_diagonal_gate(&[0, 1], &phases, &mut state, false, usize::MAX).unwrap();
+        assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[3].re, -1.0, epsilon = 1e-10);
+    }
 }

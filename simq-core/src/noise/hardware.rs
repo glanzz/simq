@@ -926,6 +926,91 @@ mod tests {
     }
 
     #[test]
+    fn test_crosstalk_properties_default() {
+        let props = CrosstalkProperties::default();
+        assert_eq!(props.zz_coupling, 0.0);
+        assert_eq!(props.spectator_error, 0.0);
+    }
+
+    #[test]
+    fn test_set_two_qubit_gate_reversed_order() {
+        let mut model = HardwareNoiseModel::new(5);
+
+        // Pass qubit1 > qubit2 to exercise the key-normalization else branch
+        model.set_two_qubit_gate(3, 1, 0.95, 0.25);
+
+        // Should be retrievable in either order since the key is normalized
+        let props = model.two_qubit_gate_properties(1, 3).unwrap();
+        assert_eq!(props.fidelity, 0.95);
+        assert_eq!(props.duration, 0.25);
+
+        let props_rev = model.two_qubit_gate_properties(3, 1).unwrap();
+        assert_eq!(props_rev.fidelity, 0.95);
+    }
+
+    #[test]
+    fn test_set_crosstalk_reversed_order() {
+        let mut model = HardwareNoiseModel::new(5);
+
+        // Pass qubit1 > qubit2 to exercise the key-normalization else branch
+        model.set_crosstalk(4, 2, 0.2, 0.005);
+
+        let crosstalk = model.crosstalk_properties(2, 4).unwrap();
+        assert_eq!(crosstalk.zz_coupling, 0.2);
+        assert_eq!(crosstalk.spectator_error, 0.005);
+    }
+
+    #[test]
+    fn test_amplitude_damping_single_gate_out_of_range() {
+        let model = HardwareNoiseModel::new(2);
+        let result = model.amplitude_damping_single_gate(5);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("out of range"));
+        }
+    }
+
+    #[test]
+    fn test_phase_damping_single_gate_out_of_range() {
+        let model = HardwareNoiseModel::new(2);
+        let result = model.phase_damping_single_gate(5);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("out of range"));
+        }
+    }
+
+    #[test]
+    fn test_depolarizing_single_gate_out_of_range() {
+        let model = HardwareNoiseModel::new(2);
+        let result = model.depolarizing_single_gate(5);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("out of range"));
+        }
+    }
+
+    #[test]
+    fn test_readout_error_out_of_range() {
+        let model = HardwareNoiseModel::new(2);
+        let result = model.readout_error(5);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("out of range"));
+        }
+    }
+
+    #[test]
+    fn test_single_qubit_gate_noise_out_of_range() {
+        let model = HardwareNoiseModel::new(2);
+        let result = model.single_qubit_gate_noise(5);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("out of range"));
+        }
+    }
+
+    #[test]
     fn test_two_qubit_gate_properties_getter() {
         let mut model = HardwareNoiseModel::new(5);
         model.set_two_qubit_gate(1, 3, 0.97, 0.4);

@@ -388,4 +388,120 @@ mod tests {
         assert_eq!(HardwareType::Google.name(), "Google Sycamore");
         assert_eq!(HardwareType::IonQ.name(), "IonQ Trapped-Ion");
     }
+
+    #[test]
+    fn test_default_impls() {
+        // Exercise the `Default` impls (lines 79-83, 145-149, 211-215)
+        let ibm = IBMHardware::default();
+        assert_eq!(ibm.name(), "IBM Quantum");
+
+        let google = GoogleHardware::default();
+        assert_eq!(google.name(), "Google Sycamore");
+
+        let ionq = IonQHardware::default();
+        assert_eq!(ionq.name(), "IonQ Trapped-Ion");
+    }
+
+    #[test]
+    fn test_circuit_cost_default_trait_method() {
+        // Exercise the default `circuit_cost` trait method (lines 33-41)
+        use simq_core::QubitId;
+        use simq_gates::standard::{Hadamard, PauliX};
+        use std::sync::Arc;
+
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        let ibm = IBMHardware::new();
+        let cost = ibm.circuit_cost(&circuit);
+        // H costs 1.0, X costs 1.0 on IBM hardware
+        assert_eq!(cost, 2.0);
+    }
+
+    #[test]
+    fn test_optimization_benefit_default_trait_method() {
+        // Exercise the default `optimization_benefit` trait method (lines 46-50)
+        let ibm = IBMHardware::new();
+        let benefit = ibm.optimization_benefit("CNOT");
+        assert_eq!(benefit, ibm.gate_cost_by_name("CNOT") / 10.0);
+
+        let cheap_benefit = ibm.optimization_benefit("RZ");
+        assert!(cheap_benefit < benefit);
+    }
+
+    #[test]
+    fn test_ibm_three_qubit_and_default_costs() {
+        let ibm = IBMHardware::new();
+        // Three-qubit gates (line 112)
+        assert_eq!(ibm.gate_cost_by_name("CCX"), 50.0);
+        assert_eq!(ibm.gate_cost_by_name("Toffoli"), 50.0);
+        assert_eq!(ibm.gate_cost_by_name("CSWAP"), 60.0);
+        assert_eq!(ibm.gate_cost_by_name("Fredkin"), 60.0);
+        // Default arm (line 115)
+        assert_eq!(ibm.gate_cost_by_name("UNKNOWN_GATE"), 5.0);
+    }
+
+    #[test]
+    fn test_google_three_qubit_and_default_costs() {
+        let google = GoogleHardware::new();
+        // Three-qubit gates (lines 177-178)
+        assert_eq!(google.gate_cost_by_name("CCX"), 45.0);
+        assert_eq!(google.gate_cost_by_name("Toffoli"), 45.0);
+        assert_eq!(google.gate_cost_by_name("CSWAP"), 55.0);
+        assert_eq!(google.gate_cost_by_name("Fredkin"), 55.0);
+        // Default arm (line 181)
+        assert_eq!(google.gate_cost_by_name("UNKNOWN_GATE"), 5.0);
+    }
+
+    #[test]
+    fn test_ionq_two_and_three_qubit_and_default_costs() {
+        let ionq = IonQHardware::new();
+        // Two-qubit gates (lines 241-242)
+        assert_eq!(ionq.gate_cost_by_name("SWAP"), 5.0);
+        assert_eq!(ionq.gate_cost_by_name("iSWAP"), 6.0);
+        // Three-qubit gates (lines 245-246)
+        assert_eq!(ionq.gate_cost_by_name("CCX"), 25.0);
+        assert_eq!(ionq.gate_cost_by_name("Toffoli"), 25.0);
+        assert_eq!(ionq.gate_cost_by_name("CSWAP"), 30.0);
+        assert_eq!(ionq.gate_cost_by_name("Fredkin"), 30.0);
+        // Default arm (line 249)
+        assert_eq!(ionq.gate_cost_by_name("UNKNOWN_GATE"), 3.0);
+    }
+
+    #[test]
+    fn test_cost_model_hardware_model_variants() {
+        // Exercise `CostModel::hardware_model` for all HardwareType variants
+        let ibm_model = CostModel::new(HardwareType::IBM);
+        assert_eq!(ibm_model.hardware_model().name(), "IBM Quantum");
+
+        let google_model = CostModel::new(HardwareType::Google);
+        assert_eq!(google_model.hardware_model().name(), "Google Sycamore");
+
+        let ionq_model = CostModel::new(HardwareType::IonQ);
+        assert_eq!(ionq_model.hardware_model().name(), "IonQ Trapped-Ion");
+    }
+
+    #[test]
+    fn test_cost_model_applies_decomposition_penalty() {
+        // Exercise the non-native branch in `CostModel::circuit_cost`
+        use simq_core::QubitId;
+        use simq_gates::standard::CZ;
+        use std::sync::Arc;
+
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(CZ), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let cost_model = CostModel::new(HardwareType::IBM);
+        // CZ is not native on IBM hardware, so the penalty should apply
+        let cost = cost_model.circuit_cost(&circuit);
+        let base = IBMHardware::new().gate_cost_by_name("CZ");
+        assert_eq!(cost, base * cost_model.decomposition_penalty);
+    }
 }

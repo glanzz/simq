@@ -497,4 +497,226 @@ mod tests {
         // CCZ should have similar complexity to Toffoli
         assert!(gates.len() >= 10);
     }
+
+    #[test]
+    fn test_mcx_linear_zero_controls() {
+        let decomposer = MultiQubitDecomposer::new();
+        let gates = decomposer.decompose_mcx_linear(0);
+        assert_eq!(gates, vec![MultiQubitInstruction::X { qubit: 0 }]);
+    }
+
+    #[test]
+    fn test_mcx_linear_one_control() {
+        let decomposer = MultiQubitDecomposer::new();
+        let gates = decomposer.decompose_mcx_linear(1);
+        assert_eq!(
+            gates,
+            vec![MultiQubitInstruction::CNOT {
+                control: 0,
+                target: 1
+            }]
+        );
+    }
+
+    #[test]
+    fn test_mcx_linear_two_controls_equals_toffoli() {
+        let decomposer = MultiQubitDecomposer::new();
+        let gates = decomposer.decompose_mcx_linear(2);
+        assert_eq!(gates, decomposer.decompose_toffoli_relative_phase());
+    }
+
+    #[test]
+    fn test_mcx_linear_more_than_two_controls() {
+        let decomposer = MultiQubitDecomposer::new();
+        let gates = decomposer.decompose_mcx_linear(5);
+        // Placeholder implementation falls back to the Toffoli sequence
+        assert_eq!(gates, decomposer.decompose_toffoli_relative_phase());
+    }
+
+    #[test]
+    fn test_mcx_logarithmic_small_num_controls_falls_back_to_linear() {
+        let decomposer = MultiQubitDecomposer::with_ancillas();
+        // num_controls <= 2 always falls back to linear regardless of ancilla count
+        let gates0 = decomposer.decompose_mcx_logarithmic(0, 0);
+        assert_eq!(gates0, decomposer.decompose_mcx_linear(0));
+
+        let gates2 = decomposer.decompose_mcx_logarithmic(2, 10);
+        assert_eq!(gates2, decomposer.decompose_mcx_linear(2));
+    }
+
+    #[test]
+    fn test_mcx_logarithmic_insufficient_ancillas_falls_back_to_linear() {
+        let decomposer = MultiQubitDecomposer::with_ancillas();
+        // num_controls=5 needs at least 3 ancillas; supply only 1
+        let gates = decomposer.decompose_mcx_logarithmic(5, 1);
+        assert_eq!(gates, decomposer.decompose_mcx_linear(5));
+    }
+
+    #[test]
+    fn test_mcx_logarithmic_sufficient_ancillas_uses_tree_path() {
+        let decomposer = MultiQubitDecomposer::with_ancillas();
+        // num_controls=4 needs >= 2 ancillas; supply exactly 2
+        let num_controls = 4;
+        let num_ancillas = 2;
+        let gates = decomposer.decompose_mcx_logarithmic(num_controls, num_ancillas);
+        assert_eq!(
+            gates,
+            vec![MultiQubitInstruction::CNOT {
+                control: num_controls + num_ancillas - 1,
+                target: num_controls,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_estimate_mcx_cost_with_ancillas() {
+        let decomposer = MultiQubitDecomposer::with_ancillas();
+        // n=4 with ancillas: n * log2(n) as usize = 4 * 2 = 8
+        assert_eq!(decomposer.estimate_mcx_cost(4), 8);
+    }
+
+    #[test]
+    fn test_estimate_mcx_cost_without_ancillas_linear_scaling() {
+        let decomposer = MultiQubitDecomposer::new();
+        // n=4 without ancillas: n*n*4 = 64
+        assert_eq!(decomposer.estimate_mcx_cost(4), 64);
+    }
+
+    #[derive(Debug)]
+    struct MockGate {
+        name: String,
+        n_qubits: usize,
+    }
+
+    impl simq_core::Gate for MockGate {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn num_qubits(&self) -> usize {
+            self.n_qubits
+        }
+        fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+            None
+        }
+    }
+
+    fn config_with_ancillas(allow: bool, num: usize) -> DecompositionConfig {
+        DecompositionConfig {
+            allow_ancillas: allow,
+            num_ancillas: num,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_less_than_three_qubits() {
+        let decomposer = MultiQubitDecomposer::new();
+        let config = DecompositionConfig::default();
+        let gate = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+        };
+        let result = decomposer.decompose(&gate, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_toffoli_without_ancillas() {
+        let decomposer = MultiQubitDecomposer::new();
+        let config = config_with_ancillas(false, 0);
+        let gate = MockGate {
+            name: "Toffoli".to_string(),
+            n_qubits: 3,
+        };
+        let result = decomposer.decompose(&gate, &config).unwrap();
+        assert!(result.gate_count > 0);
+        assert!(result.metadata.strategy.contains("Toffoli"));
+    }
+
+    #[test]
+    fn test_decomposer_trait_toffoli_with_ancillas() {
+        let decomposer = MultiQubitDecomposer::with_ancillas();
+        let config = config_with_ancillas(true, 1);
+        let gate = MockGate {
+            name: "CCX".to_string(),
+            n_qubits: 3,
+        };
+        let result = decomposer.decompose(&gate, &config).unwrap();
+        assert!(result.gate_count > 0);
+    }
+
+    #[test]
+    fn test_decomposer_trait_fredkin_and_cswap_names() {
+        let decomposer = MultiQubitDecomposer::new();
+        let config = DecompositionConfig::default();
+
+        let fredkin_gate = MockGate {
+            name: "Fredkin".to_string(),
+            n_qubits: 3,
+        };
+        let result = decomposer.decompose(&fredkin_gate, &config).unwrap();
+        assert!(result.gate_count > 0);
+
+        let cswap_gate = MockGate {
+            name: "CSWAP".to_string(),
+            n_qubits: 3,
+        };
+        let result2 = decomposer.decompose(&cswap_gate, &config).unwrap();
+        assert!(result2.gate_count > 0);
+    }
+
+    #[test]
+    fn test_decomposer_trait_ccz_name() {
+        let decomposer = MultiQubitDecomposer::new();
+        let config = DecompositionConfig::default();
+        let gate = MockGate {
+            name: "CCZ".to_string(),
+            n_qubits: 3,
+        };
+        let result = decomposer.decompose(&gate, &config).unwrap();
+        assert!(result.gate_count > 0);
+    }
+
+    #[test]
+    fn test_decomposer_trait_generic_mcx_linear_and_logarithmic() {
+        let decomposer_linear = MultiQubitDecomposer::new();
+        let config_linear = config_with_ancillas(false, 0);
+        let gate = MockGate {
+            name: "MCX".to_string(),
+            n_qubits: 5,
+        };
+        let result_linear = decomposer_linear.decompose(&gate, &config_linear).unwrap();
+        assert!(result_linear.gate_count > 0);
+
+        let decomposer_log = MultiQubitDecomposer::with_ancillas();
+        let config_log = config_with_ancillas(true, 5);
+        let result_log = decomposer_log.decompose(&gate, &config_log).unwrap();
+        assert!(result_log.gate_count > 0);
+    }
+
+    #[test]
+    fn test_decomposer_trait_name_can_decompose_estimate_cost() {
+        let decomposer_no_ancilla = MultiQubitDecomposer::new();
+        assert_eq!(decomposer_no_ancilla.name(), "MultiQubitLinear");
+
+        let decomposer_ancilla = MultiQubitDecomposer::with_ancillas();
+        assert_eq!(decomposer_ancilla.name(), "MultiQubitWithAncilla");
+
+        let three_qubit_gate = MockGate {
+            name: "Toffoli".to_string(),
+            n_qubits: 3,
+        };
+        assert!(decomposer_no_ancilla.can_decompose(&three_qubit_gate));
+        assert_eq!(
+            decomposer_no_ancilla.estimate_cost(&three_qubit_gate),
+            Some(decomposer_no_ancilla.estimate_mcx_cost(2))
+        );
+
+        let two_qubit_gate = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+        };
+        assert!(!decomposer_no_ancilla.can_decompose(&two_qubit_gate));
+        assert_eq!(decomposer_no_ancilla.estimate_cost(&two_qubit_gate), None);
+    }
 }

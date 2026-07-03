@@ -263,4 +263,35 @@ mod tests {
 
         assert_eq!(compiler.num_passes(), 4);
     }
+
+    #[test]
+    fn test_pipeline_builder_min_benefit_score() {
+        // Exercises PipelineBuilder::min_benefit_score (lines 172-174), which
+        // forwards to the inner CompilerBuilder.
+        let compiler = PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .min_benefit_score(0.95)
+            .build();
+
+        let mut circuit = Circuit::new(2);
+        let x = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(x, &[QubitId::new(0)]).unwrap();
+
+        // DeadCodeElimination has a benefit_score of 0.9, which is below
+        // this threshold of 0.95, so it should be filtered out and not
+        // modify the circuit.
+        let result = compiler.compile(&mut circuit).unwrap();
+        assert!(!result.modified);
+        assert_eq!(circuit.len(), 2);
+    }
+
+    #[test]
+    fn test_pipeline_builder_default() {
+        // Exercises the Default impl for PipelineBuilder (lines 184-185).
+        let compiler = PipelineBuilder::default().build();
+        assert_eq!(compiler.num_passes(), 0);
+    }
 }

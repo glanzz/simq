@@ -381,6 +381,150 @@ mod tests {
     }
 
     #[test]
+    fn test_y_y_removal() {
+        // Covers the y-y template's generator arm (line 125).
+        let pass = AdvancedTemplateMatching::new();
+        let mut circuit = Circuit::new(2);
+
+        circuit
+            .add_gate(Arc::new(PauliY), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY), &[QubitId::new(0)])
+            .unwrap();
+
+        assert_eq!(circuit.len(), 2);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0); // Y-Y removed
+    }
+
+    #[test]
+    fn test_z_z_removal() {
+        // Covers the z-z template's generator arm (line 136).
+        let pass = AdvancedTemplateMatching::new();
+        let mut circuit = Circuit::new(2);
+
+        circuit
+            .add_gate(Arc::new(PauliZ), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ), &[QubitId::new(0)])
+            .unwrap();
+
+        assert_eq!(circuit.len(), 2);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0); // Z-Z removed
+    }
+
+    #[test]
+    fn test_h_h_removal() {
+        // Covers the h-h template's generator arm (line 147).
+        let pass = AdvancedTemplateMatching::new();
+        let mut circuit = Circuit::new(2);
+
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+
+        assert_eq!(circuit.len(), 2);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0); // H-H removed
+    }
+
+    #[test]
+    fn test_x_y_x_to_y() {
+        // Covers the x-y-x template's matcher (lines 158-159) and generator
+        // (line 161).
+        let pass = AdvancedTemplateMatching::new();
+        let mut circuit = Circuit::new(2);
+
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        assert_eq!(circuit.len(), 3);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 1);
+
+        let op = circuit.get_operation(0).unwrap();
+        assert_eq!(op.gate().name(), "Y");
+    }
+
+    #[test]
+    fn test_z_y_z_to_y() {
+        // Covers the z-y-z template's matcher (line 187) and generator
+        // (line 189).
+        let pass = AdvancedTemplateMatching::new();
+        let mut circuit = Circuit::new(2);
+
+        circuit
+            .add_gate(Arc::new(PauliZ), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ), &[QubitId::new(0)])
+            .unwrap();
+
+        assert_eq!(circuit.len(), 3);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 1);
+
+        let op = circuit.get_operation(0).unwrap();
+        assert_eq!(op.gate().name(), "Y");
+    }
+
+    #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for AdvancedTemplateMatching` (lines 296-297),
+        // which delegates to `Self::new()`.
+        let default_pass = AdvancedTemplateMatching::default();
+        let new_pass = AdvancedTemplateMatching::new();
+        assert_eq!(default_pass.enabled, new_pass.enabled);
+    }
+
+    #[test]
+    fn test_disabled_pass_returns_false_without_modifying() {
+        // Covers the early-return branch in `apply` (line 308) when the pass
+        // is disabled.
+        let pass = AdvancedTemplateMatching { enabled: false };
+        let mut circuit = Circuit::new(2);
+
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        assert_eq!(circuit.len(), 2);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(!modified);
+        assert_eq!(circuit.len(), 2); // Unchanged since pass is disabled
+    }
+
+    #[test]
     fn test_self_inverse_removal() {
         let pass = AdvancedTemplateMatching::new();
         let mut circuit = Circuit::new(2);

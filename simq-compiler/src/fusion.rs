@@ -638,4 +638,124 @@ mod tests {
         assert!(desc.contains("X"));
         assert!(desc.contains("→")); // Arrow separator
     }
+
+    #[test]
+    fn test_fused_gate_accessors() {
+        use num_complex::Complex64;
+        use smallvec::smallvec;
+        let matrix = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let names: SmallVec<[String; 4]> = smallvec!["H".to_string(), "X".to_string()];
+        let gate = FusedGate::new(matrix, names);
+
+        assert_eq!(gate.component_gates(), &["H", "X"]);
+        assert_eq!(gate.num_components(), 2);
+        assert!(gate.is_unitary());
+        assert_eq!(gate.num_qubits(), 1);
+        assert_eq!(gate.name(), "FUSED");
+
+        // Gate trait matrix() method (via trait object to avoid field name collision)
+        let gate_dyn: &dyn Gate = &gate;
+        let mat_vec = gate_dyn.matrix().unwrap();
+        assert_eq!(mat_vec.len(), 4);
+    }
+
+    #[test]
+    fn test_fuse_single_qubit_gates_no_opportunities() {
+        // Circuit with a single gate on one qubit — too short to fuse (min_fusion_size=2)
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[QubitId::new(0)])
+            .unwrap();
+
+        let optimized = fuse_single_qubit_gates(&circuit, None).unwrap();
+        assert_eq!(optimized.len(), circuit.len()); // unchanged
+    }
+
+    #[test]
+    fn test_fused_gate_debug() {
+        use num_complex::Complex64;
+        use smallvec::smallvec;
+        let matrix = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let names: SmallVec<[String; 4]> = smallvec!["H".to_string()];
+        let gate = FusedGate::new(matrix, names);
+        let dbg = format!("{:?}", gate);
+        assert!(dbg.contains("FusedGate"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for previously uncovered lines
+    // -----------------------------------------------------------------------
+
+    /// Lines 104-105: FusedGate inherent method `matrix()` (field accessor).
+    /// The existing test_fused_gate_accessors called the Gate TRAIT method via
+    /// a trait object.  This test calls the inherent struct method directly.
+    #[test]
+    fn test_fused_gate_matrix_field_accessor() {
+        use num_complex::Complex64;
+        use smallvec::smallvec;
+        let matrix = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0)],
+        ];
+        let names: SmallVec<[String; 4]> = smallvec!["Z".to_string()];
+        let gate = FusedGate::new(matrix, names);
+        // Call the inherent method (not the Gate trait method)
+        let m: &[[Complex64; 2]; 2] = gate.matrix();
+        assert!((m[0][0].re - 1.0).abs() < 1e-10);
+        assert!((m[1][1].re - (-1.0)).abs() < 1e-10);
+    }
+
+    /// Lines 211-214: a gate with matrix()=None in the middle of a fuseable chain
+    /// terminates the chain and pushes it to fusion_chains.
+    /// Setup: two H gates (forming a chain of length 2 ≥ min_fusion_size=2) on q0,
+    /// followed by a no-matrix gate on q0 → chain is pushed, then fused into one.
+    #[test]
+    fn test_fuse_single_qubit_gates_no_matrix_gate_breaks_chain() {
+        /// A gate that returns no matrix (breaks fusion chains).
+        #[derive(Debug)]
+        struct LocalNoMatrixGate;
+
+        impl Gate for LocalNoMatrixGate {
+            fn name(&self) -> &str {
+                "LocalNoMatrix"
+            }
+
+            fn num_qubits(&self) -> usize {
+                1
+            }
+
+            fn matrix(&self) -> Option<Vec<Complex64>> {
+                None
+            }
+        }
+
+        let q0 = QubitId::new(0);
+        let mut circuit = Circuit::new(1);
+        // Two H gates on q0 → forms a chain of length 2
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        // No-matrix gate on q0 → breaks the chain; the chain of length 2 is pushed
+        circuit
+            .add_gate(Arc::new(LocalNoMatrixGate) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+
+        // fuse_single_qubit_gates should fuse the first two gates and leave the no-matrix one
+        let optimized = fuse_single_qubit_gates(&circuit, None).unwrap();
+        // Original: 3 operations.  After fusion: 1 fused gate + 1 no-matrix gate = 2.
+        assert_eq!(
+            optimized.len(),
+            2,
+            "Expected 2 operations after fusion: fused(H,X) + LocalNoMatrix"
+        );
+    }
 }

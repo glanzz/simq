@@ -6,7 +6,10 @@ use simq_compiler::decomposition::{
     clifford_t::{CliffordTDecomposer, CliffordTGate, GridSynthConfig},
     multi_qubit::{MultiQubitDecomposer, MultiQubitInstruction},
     single_qubit::{EulerAngles, EulerBasis, SingleQubitDecomposer},
-    two_qubit::{EntanglementGate, TwoQubitDecomposer},
+    two_qubit::{
+        CanonicalDecomposition, EntanglementGate, SingleQubitAngles, SingleQubitLayer,
+        TwoQubitDecomposer, TwoQubitGateInstruction,
+    },
     Decomposer, DecompositionConfig, UniversalDecomposer,
 };
 use simq_compiler::matrix_computation::{hadamard_matrix, identity_2x2, pauli_x_matrix, Matrix2};
@@ -548,4 +551,206 @@ fn test_universal_decomposer_multiple_gates() {
     assert!(results.is_ok());
     let rs = results.unwrap();
     assert_eq!(rs.len(), 2);
+}
+
+// ============================================================================
+// SingleQubitDecomposer: HT basis, name(), estimate_cost(), optimize_angles()
+// ============================================================================
+
+#[test]
+fn test_single_qubit_ht_basis_decompose() {
+    let decomposer = SingleQubitDecomposer::new(EulerBasis::HT);
+    let h = hadamard_matrix();
+    let result = decomposer.decompose_to_angles(&h);
+    assert!(result.is_ok(), "HT basis should succeed (falls back to ZYZ)");
+}
+
+#[test]
+fn test_single_qubit_decomposer_name_all_bases() {
+    assert_eq!(SingleQubitDecomposer::new(EulerBasis::ZYZ).name(), "ZYZ");
+    assert_eq!(SingleQubitDecomposer::new(EulerBasis::ZXZ).name(), "ZXZ");
+    assert_eq!(SingleQubitDecomposer::new(EulerBasis::XYX).name(), "XYX");
+    assert_eq!(SingleQubitDecomposer::new(EulerBasis::YZY).name(), "YZY");
+    assert_eq!(SingleQubitDecomposer::new(EulerBasis::U3).name(), "U3");
+    assert_eq!(SingleQubitDecomposer::new(EulerBasis::HT).name(), "H-T");
+}
+
+#[test]
+fn test_single_qubit_decomposer_estimate_cost() {
+    let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+
+    let single = MockGate {
+        name: "H".to_string(),
+        n_qubits: 1,
+        matrix: Some(matrix2_to_flat(&hadamard_matrix())),
+    };
+    assert_eq!(decomposer.estimate_cost(&single), Some(3));
+
+    let two = MockGate {
+        name: "CNOT".to_string(),
+        n_qubits: 2,
+        matrix: None,
+    };
+    assert_eq!(decomposer.estimate_cost(&two), None);
+}
+
+#[test]
+fn test_single_qubit_optimize_angles_normalizes() {
+    let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+    // Large angles (> π) should be normalized to [-π, π]
+    let mut angles = EulerAngles::new(0.0, 3.0 * PI, 5.0 * PI, -3.0 * PI);
+    decomposer.optimize_angles(&mut angles);
+    assert!(angles.beta.abs() <= PI + 1e-9);
+    assert!(angles.gamma.abs() <= PI + 1e-9);
+    assert!(angles.delta.abs() <= PI + 1e-9);
+}
+
+#[test]
+fn test_single_qubit_optimize_angles_zeroes_tiny() {
+    let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+    // Near-zero angles should be set to exactly 0.0
+    let mut angles = EulerAngles::new(0.0, 1e-11, 1e-11, 1e-11);
+    decomposer.optimize_angles(&mut angles);
+    assert_eq!(angles.beta, 0.0);
+    assert_eq!(angles.gamma, 0.0);
+    assert_eq!(angles.delta, 0.0);
+}
+
+#[test]
+fn test_single_qubit_optimize_angles_pi_gamma() {
+    let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+    // gamma ≈ π should be snapped to exactly π
+    let mut angles = EulerAngles::new(0.0, 0.5, PI + 1e-11, 0.3);
+    decomposer.optimize_angles(&mut angles);
+    assert!((angles.gamma - PI).abs() < 1e-9);
+}
+
+#[test]
+fn test_single_qubit_decompose_with_optimization_level() {
+    // optimization_level > 0 calls optimize_angles() inside decompose()
+    let config = DecompositionConfig {
+        basis: BasisGateSet::IBM,
+        optimization_level: 2,
+        max_depth: None,
+        fidelity_threshold: 0.99,
+        max_gates: None,
+        allow_ancillas: false,
+        num_ancillas: 0,
+        clifford_t_epsilon: 1e-6,
+    };
+    let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+    let gate = MockGate {
+        name: "H".to_string(),
+        n_qubits: 1,
+        matrix: Some(matrix2_to_flat(&hadamard_matrix())),
+    };
+    let result = decomposer.decompose(&gate, &config);
+    assert!(result.is_ok());
+    let dr = result.unwrap();
+    assert!(dr.metadata.optimized);
+    assert_eq!(dr.metadata.optimization_passes, 2);
+}
+
+// ============================================================================
+// TwoQubitDecomposer: early-return paths and CanonicalDecomposition::total_gates
+// ============================================================================
+
+#[test]
+fn test_two_qubit_decompose_iswap_early_return() {
+    // When the entangling gate IS iSWAP, decompose_iswap returns [ISWAP] immediately
+    let decomposer = TwoQubitDecomposer::new(EntanglementGate::ISWAP);
+    let instructions = decomposer.decompose_iswap();
+    assert_eq!(instructions.len(), 1);
+    assert_eq!(instructions[0], TwoQubitGateInstruction::ISWAP);
+}
+
+#[test]
+fn test_two_qubit_decompose_sqrt_iswap_early_return() {
+    // When the entangling gate IS SqrtISWAP, decompose_sqrt_iswap returns [SqrtISWAP]
+    let decomposer = TwoQubitDecomposer::new(EntanglementGate::SqrtISWAP);
+    let instructions = decomposer.decompose_sqrt_iswap();
+    assert_eq!(instructions.len(), 1);
+    assert_eq!(instructions[0], TwoQubitGateInstruction::SqrtISWAP);
+}
+
+#[test]
+fn test_two_qubit_decompose_swap_iswap_fallthrough() {
+    // ISWAP, SqrtISWAP, CPhase, SWAP all hit the _ => vec![] branch in decompose_swap
+    for gate in [
+        EntanglementGate::ISWAP,
+        EntanglementGate::SqrtISWAP,
+        EntanglementGate::CPhase,
+        EntanglementGate::SWAP,
+    ] {
+        let decomposer = TwoQubitDecomposer::new(gate);
+        let instructions = decomposer.decompose_swap();
+        assert!(
+            instructions.is_empty(),
+            "decompose_swap with {:?} should return empty (not yet implemented)",
+            gate
+        );
+    }
+}
+
+#[test]
+fn test_two_qubit_decomposer_name_and_estimate_cost() {
+    let decomposer = TwoQubitDecomposer::new(EntanglementGate::CNOT);
+    assert_eq!(decomposer.name(), "TwoQubitCanonical");
+
+    let two = MockGate {
+        name: "CZ".to_string(),
+        n_qubits: 2,
+        matrix: None,
+    };
+    assert_eq!(decomposer.estimate_cost(&two), Some(3));
+
+    let one = MockGate {
+        name: "H".to_string(),
+        n_qubits: 1,
+        matrix: None,
+    };
+    assert_eq!(decomposer.estimate_cost(&one), None);
+}
+
+#[test]
+fn test_canonical_decomposition_total_gates_with_some_layers() {
+    // total_gates counts: num_entangling + 3 per Some(gate_0) + 3 per Some(gate_1)
+    let decomp = CanonicalDecomposition {
+        entangling_gate: EntanglementGate::CNOT,
+        single_qubit_layers: vec![
+            SingleQubitLayer {
+                gate_0: Some(SingleQubitAngles {
+                    beta: 0.1,
+                    gamma: 0.2,
+                    delta: 0.3,
+                }),
+                gate_1: Some(SingleQubitAngles {
+                    beta: 0.4,
+                    gamma: 0.5,
+                    delta: 0.6,
+                }),
+            },
+            SingleQubitLayer {
+                gate_0: Some(SingleQubitAngles {
+                    beta: 0.1,
+                    gamma: 0.2,
+                    delta: 0.3,
+                }),
+                gate_1: None,
+            },
+        ],
+        num_entangling: 2,
+    };
+    // 2 + (3+3) + (3+0) = 11
+    assert_eq!(decomp.total_gates(), 11);
+}
+
+#[test]
+fn test_canonical_decomposition_total_gates_empty() {
+    let decomp = CanonicalDecomposition {
+        entangling_gate: EntanglementGate::CZ,
+        single_qubit_layers: vec![],
+        num_entangling: 3,
+    };
+    assert_eq!(decomp.total_gates(), 3);
 }

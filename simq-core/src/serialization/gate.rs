@@ -212,4 +212,188 @@ mod tests {
         let deserialized: SerializedGateOp = serde_json::from_str(&json).unwrap();
         assert_eq!(gate_op, deserialized);
     }
+
+    #[test]
+    fn test_standard_gate_registry_new() {
+        // Covers `StandardGateRegistry::new()`, which delegates to `Default`.
+        let registry = StandardGateRegistry::new();
+        let gate = registry.create_gate(&SerializedGate::StandardGate {
+            name: "H".to_string(),
+        });
+        assert!(gate.is_ok());
+    }
+
+    #[test]
+    fn test_create_gate_parameterized_dispatches() {
+        // Covers the `ParameterizedGate` match arm in `create_gate`, which
+        // dispatches to `create_standard_gate` with the given parameters.
+        let registry = StandardGateRegistry::new();
+        let gate = registry
+            .create_gate(&SerializedGate::ParameterizedGate {
+                name: "RX".to_string(),
+                parameters: vec![1.57],
+            })
+            .unwrap();
+        assert_eq!(gate.name(), "RX");
+        assert_eq!(gate.num_qubits(), 1);
+        assert!(gate.description().contains("1.57"));
+    }
+
+    #[test]
+    fn test_create_gate_custom_not_supported() {
+        // Covers the `CustomGate` match arm, which is not yet implemented.
+        let registry = StandardGateRegistry::new();
+        let result = registry.create_gate(&SerializedGate::CustomGate {
+            name: "MyGate".to_string(),
+            matrix: vec![[1.0, 0.0], [0.0, 1.0]],
+            num_qubits: 1,
+        });
+        assert!(result.is_err());
+        assert!(matches!(result, Err(QuantumError::UnknownGateType(_))));
+    }
+
+    #[test]
+    fn test_serialize_gate_rotation_name_pattern() {
+        // Covers the `name.starts_with("R") && name.len() > 1` branch in
+        // `serialize_gate`.
+        #[derive(Debug)]
+        struct RotationGate;
+        impl Gate for RotationGate {
+            fn name(&self) -> &str {
+                "RX"
+            }
+            fn num_qubits(&self) -> usize {
+                1
+            }
+        }
+
+        let registry = StandardGateRegistry::new();
+        let serialized = registry.serialize_gate(&RotationGate).unwrap();
+        assert_eq!(
+            serialized,
+            SerializedGate::StandardGate {
+                name: "RX".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_serialize_gate_non_rotation_name() {
+        // Covers the `else` branch in `serialize_gate` for non-"R*" names.
+        #[derive(Debug)]
+        struct HGate;
+        impl Gate for HGate {
+            fn name(&self) -> &str {
+                "H"
+            }
+            fn num_qubits(&self) -> usize {
+                1
+            }
+        }
+
+        let registry = StandardGateRegistry::new();
+        let serialized = registry.serialize_gate(&HGate).unwrap();
+        assert_eq!(
+            serialized,
+            SerializedGate::StandardGate {
+                name: "H".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_create_standard_gate_two_and_three_qubit_names() {
+        // Covers the CZ/CY/SWAP/ISWAP/ECR/TOFFOLI/FREDKIN match arms.
+        let registry = StandardGateRegistry::new();
+        for name in ["CZ", "CY", "SWAP", "ISWAP", "ECR"] {
+            let gate = registry
+                .create_gate(&SerializedGate::StandardGate {
+                    name: name.to_string(),
+                })
+                .unwrap();
+            assert_eq!(gate.num_qubits(), 2, "{name} should be 2-qubit");
+        }
+        for name in ["TOFFOLI", "CCX", "CCNOT", "FREDKIN", "CSWAP"] {
+            let gate = registry
+                .create_gate(&SerializedGate::StandardGate {
+                    name: name.to_string(),
+                })
+                .unwrap();
+            assert_eq!(gate.num_qubits(), 3, "{name} should be 3-qubit");
+        }
+    }
+
+    #[test]
+    fn test_create_standard_gate_unknown_name_errors() {
+        // Covers the `_ => Err(UnknownGateType(...))` fallback arm.
+        let registry = StandardGateRegistry::new();
+        let result = registry.create_gate(&SerializedGate::StandardGate {
+            name: "NOT_A_REAL_GATE".to_string(),
+        });
+        assert!(result.is_err());
+        if let Err(QuantumError::UnknownGateType(msg)) = result {
+            assert!(msg.contains("NOT_A_REAL_GATE"));
+        } else {
+            panic!("Expected UnknownGateType error");
+        }
+    }
+
+    #[test]
+    fn test_create_gate_op_invalid_qubit_index() {
+        // Covers the qubit-index validation error branch in `create_gate_op`.
+        let registry = StandardGateRegistry::new();
+        let serialized = SerializedGateOp {
+            gate: SerializedGate::StandardGate {
+                name: "H".to_string(),
+            },
+            qubits: vec![5],
+        };
+        let result = registry.create_gate_op(&serialized, 2);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(QuantumError::InvalidQubit(_, _))));
+    }
+
+    #[test]
+    fn test_create_gate_op_valid() {
+        let registry = StandardGateRegistry::new();
+        let serialized = SerializedGateOp {
+            gate: SerializedGate::StandardGate {
+                name: "CNOT".to_string(),
+            },
+            qubits: vec![0, 1],
+        };
+        let op = registry.create_gate_op(&serialized, 2).unwrap();
+        assert_eq!(op.qubits().len(), 2);
+        assert_eq!(op.gate().name(), "CNOT");
+    }
+
+    #[test]
+    fn test_deserialized_gate_name_and_description_no_params() {
+        // Covers `DeserializedGate::name()` and the empty-parameters branch
+        // of `description()`.
+        let registry = StandardGateRegistry::new();
+        let gate = registry
+            .create_gate(&SerializedGate::StandardGate {
+                name: "H".to_string(),
+            })
+            .unwrap();
+        assert_eq!(gate.name(), "H");
+        assert_eq!(gate.description(), "1-qubit gate 'H'");
+    }
+
+    #[test]
+    fn test_deserialized_gate_description_with_params() {
+        // Covers the non-empty-parameters branch of `description()`.
+        let registry = StandardGateRegistry::new();
+        let gate = registry
+            .create_gate(&SerializedGate::ParameterizedGate {
+                name: "RY".to_string(),
+                parameters: vec![0.5, 1.0],
+            })
+            .unwrap();
+        let desc = gate.description();
+        assert!(desc.starts_with("RY("));
+        assert!(desc.contains("0.5"));
+        assert!(desc.contains("1"));
+    }
 }

@@ -600,4 +600,217 @@ mod tests {
         assert_eq!(dag.num_edges(), 0);
         assert!(dag.is_acyclic());
     }
+
+    #[test]
+    fn test_dependency_graph_empty_constructor() {
+        let dag = DependencyGraph::empty();
+        assert_eq!(dag.num_nodes(), 0);
+        assert_eq!(dag.num_edges(), 0);
+        assert!(dag.is_acyclic());
+        assert!(dag.outgoing_edges(0).is_empty());
+        assert!(dag.incoming_edges(0).is_empty());
+        assert!(dag.get_node(0).is_none());
+        assert!(dag.get_edge(0).is_none());
+    }
+
+    #[test]
+    fn test_get_node_and_edge() {
+        let circuit = create_test_circuit();
+        let dag = DependencyGraph::from_circuit(&circuit).unwrap();
+
+        assert!(dag.get_node(0).is_some());
+        assert!(dag.get_node(100).is_none());
+        if dag.num_edges() > 0 {
+            assert!(dag.get_edge(0).is_some());
+        }
+        assert!(dag.get_edge(100).is_none());
+    }
+
+    #[test]
+    fn test_outgoing_incoming_edges_oob() {
+        let circuit = create_test_circuit();
+        let dag = DependencyGraph::from_circuit(&circuit).unwrap();
+        // Out-of-bounds node returns empty slice
+        assert!(dag.outgoing_edges(999).is_empty());
+        assert!(dag.incoming_edges(999).is_empty());
+    }
+
+    /// Build a DAG with two nodes and a manually inserted self-referential
+    /// cycle: node 0 -> node 1 -> node 0. This cannot arise from
+    /// `from_circuit` (which only ever produces forward edges), so we
+    /// construct the private fields directly since this test module is a
+    /// child of `dag` and can see them.
+    fn create_cyclic_graph() -> DependencyGraph {
+        let nodes = vec![
+            GateNode {
+                operation_index: 0,
+                gate_name: "A".to_string(),
+                qubits: vec![0],
+            },
+            GateNode {
+                operation_index: 1,
+                gate_name: "B".to_string(),
+                qubits: vec![0],
+            },
+        ];
+
+        let edges = vec![
+            DependencyEdge::DataDependency {
+                from: 0,
+                to: 1,
+                qubit: 0,
+            },
+            DependencyEdge::DataDependency {
+                from: 1,
+                to: 0,
+                qubit: 0,
+            },
+        ];
+
+        let outgoing_edges = vec![vec![0], vec![1]];
+        let incoming_edges = vec![vec![1], vec![0]];
+
+        DependencyGraph {
+            nodes,
+            edges,
+            outgoing_edges,
+            incoming_edges,
+        }
+    }
+
+    #[test]
+    fn test_find_cycles_detects_cycle_and_breaks_early() {
+        // Covers dag.rs:222-233 (cycle detection loop + early-exit break)
+        // and dag.rs:262-265 (cycle path reconstruction).
+        let dag = create_cyclic_graph();
+        let cycles = dag.find_cycles();
+        assert!(!cycles.is_empty());
+        // The reconstructed cycle should contain both nodes involved.
+        let cycle = &cycles[0];
+        assert!(cycle.contains(&0));
+        assert!(cycle.contains(&1));
+        // Only one cycle is reported due to the early-exit optimization.
+        assert_eq!(cycles.len(), 1);
+    }
+
+    #[test]
+    fn test_is_acyclic_false_for_cyclic_graph() {
+        let dag = create_cyclic_graph();
+        assert!(!dag.is_acyclic());
+    }
+
+    #[test]
+    fn test_topological_sort_fails_on_cycle() {
+        // Covers dag.rs:307-314 (TopologicalOrderError branch).
+        let dag = create_cyclic_graph();
+        let result = dag.topological_sort();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("cycle"));
+    }
+
+    #[test]
+    fn test_depth_propagates_topological_sort_error() {
+        let dag = create_cyclic_graph();
+        assert!(dag.depth().is_err());
+    }
+
+    #[test]
+    fn test_compute_parallel_layers_fails_on_cycle() {
+        // Covers dag.rs:373-376 (cycle detected in layer computation).
+        let dag = create_cyclic_graph();
+        let result = dag.compute_parallel_layers();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("cycle") || err.contains("invalid dependency graph"));
+    }
+
+    #[test]
+    fn test_analyze_parallelism_propagates_cycle_error() {
+        let dag = create_cyclic_graph();
+        assert!(dag.analyze_parallelism().is_err());
+    }
+
+    #[test]
+    fn test_avg_parallelism_empty_layers() {
+        // Covers dag.rs:433-434 (avg_parallelism with no layers).
+        let analysis = ParallelismAnalysis {
+            layers: Vec::new(),
+            parallelism_factor: 1.0,
+            max_parallelism: 0,
+        };
+        assert_eq!(analysis.avg_parallelism(), 0.0);
+        assert_eq!(analysis.num_layers(), 0);
+    }
+
+    #[test]
+    fn test_avg_parallelism_nonempty_layers() {
+        let analysis = ParallelismAnalysis {
+            layers: vec![vec![0, 1], vec![2]],
+            parallelism_factor: 1.5,
+            max_parallelism: 2,
+        };
+        assert_eq!(analysis.avg_parallelism(), 1.5);
+    }
+
+    #[test]
+    fn test_format_cycle_multiple_nodes() {
+        // Covers dag.rs:479-489 (format_cycle body, including the
+        // " -> " separator branch and the final message return).
+        let dag = create_cyclic_graph();
+        let formatted = dag.format_cycle(&[0, 1, 0]);
+        assert!(formatted.starts_with("Cycle: "));
+        assert!(formatted.contains("0:A"));
+        assert!(formatted.contains("1:B"));
+        assert!(formatted.contains(" -> "));
+        // No trailing " -> " after the final element.
+        assert!(!formatted.ends_with(" -> "));
+    }
+
+    #[test]
+    fn test_format_cycle_single_node() {
+        // Exercises the branch where i == cycle.len() - 1, so no
+        // separator is appended.
+        let dag = create_cyclic_graph();
+        let formatted = dag.format_cycle(&[0]);
+        assert_eq!(formatted, "Cycle: 0:A");
+    }
+
+    #[test]
+    fn test_format_cycle_unknown_node_skipped() {
+        // If a node index isn't found in the graph, it's silently skipped.
+        let dag = create_cyclic_graph();
+        let formatted = dag.format_cycle(&[42]);
+        assert_eq!(formatted, "Cycle: ");
+    }
+
+    #[test]
+    fn test_dependency_edge_variants() {
+        let data_dep = DependencyEdge::DataDependency {
+            from: 0,
+            to: 1,
+            qubit: 2,
+        };
+        assert_eq!(data_dep.from(), 0);
+        assert_eq!(data_dep.to(), 1);
+        assert_eq!(data_dep.qubit(), 2);
+
+        let anti_dep = DependencyEdge::AntiDependency {
+            from: 3,
+            to: 4,
+            qubit: 5,
+        };
+        assert_eq!(anti_dep.from(), 3);
+        assert_eq!(anti_dep.to(), 4);
+        assert_eq!(anti_dep.qubit(), 5);
+
+        let out_dep = DependencyEdge::OutputDependency {
+            from: 6,
+            to: 7,
+            qubit: 8,
+        };
+        assert_eq!(out_dep.from(), 6);
+        assert_eq!(out_dep.to(), 7);
+        assert_eq!(out_dep.qubit(), 8);
+    }
 }
