@@ -38,6 +38,7 @@ venv/
 
 # Coverage
 *.lcov
+lcov.info
 cobertura.xml
 tarpaulin-report.html
 
