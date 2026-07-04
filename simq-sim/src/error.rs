@@ -39,19 +39,13 @@ pub enum SimulatorError {
     InvalidQubit { qubit: usize, num_qubits: usize },
 
     /// Execution failed
-    ExecutionFailed {
-        message: String,
-    },
+    ExecutionFailed { message: String },
 
     /// State error
-    StateError {
-        message: String,
-    },
+    StateError { message: String },
 
     /// Timeout error
-    Timeout {
-        message: String,
-    },
+    Timeout { message: String },
 
     /// Other error
     Other(String),

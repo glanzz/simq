@@ -5,13 +5,6 @@ use crate::execution_engine::error::{ExecutionError, Result};
 use num_complex::Complex64;
 use rayon::prelude::*;
 
-// Safety wrapper for raw pointers to allow Send+Sync
-// This is safe because we partition the work to ensure no data races
-#[derive(Copy, Clone)]
-struct SendPtr<T>(*mut T);
-unsafe impl<T> Send for SendPtr<T> {}
-unsafe impl<T> Sync for SendPtr<T> {}
-
 /// Apply a controlled single-qubit gate
 ///
 /// Applies a single-qubit gate to the target qubit, conditioned on the control qubit being |1⟩.

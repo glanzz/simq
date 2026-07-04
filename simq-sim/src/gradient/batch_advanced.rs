@@ -7,7 +7,6 @@
 use super::batch::BatchResult;
 use crate::error::Result;
 use crate::Simulator;
-use rand::distributions::Distribution;
 use rayon::prelude::*;
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;

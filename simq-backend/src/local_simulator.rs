@@ -31,6 +31,7 @@ use simq_core::Circuit;
 use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::AdaptiveState;
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::Instant;
 
 /// Configuration for the local simulator backend
@@ -69,6 +70,7 @@ pub struct LocalSimulatorBackend {
     name: String,
     config: LocalSimulatorConfig,
     capabilities: BackendCapabilities,
+    jobs: Mutex<HashMap<String, BackendResult>>,
 }
 
 impl LocalSimulatorBackend {
@@ -105,6 +107,7 @@ impl LocalSimulatorBackend {
             name: "LocalSimulator".to_string(),
             config,
             capabilities,
+            jobs: Mutex::new(HashMap::new()),
         }
     }
 
@@ -260,7 +263,6 @@ impl QuantumBackend for LocalSimulatorBackend {
             cnot_count: None,
             cost: None,
             error_message: None,
-            queue_time: None,
             extra: HashMap::new(),
         };
 
@@ -270,6 +272,22 @@ impl QuantumBackend for LocalSimulatorBackend {
             job_id: None,
             metadata,
         })
+    }
+
+    fn submit_job(&self, circuit: &Circuit, shots: usize) -> Result<String> {
+        let result = self.execute(circuit, shots)?;
+        let job_id = format!("sync-{}", uuid::Uuid::new_v4());
+        self.jobs.lock().unwrap().insert(job_id.clone(), result);
+        Ok(job_id)
+    }
+
+    fn get_result(&self, job_id: &str) -> Result<BackendResult> {
+        self.jobs
+            .lock()
+            .unwrap()
+            .get(job_id)
+            .cloned()
+            .ok_or_else(|| BackendError::Other(format!("Unknown job id: {}", job_id)))
     }
 
     fn capabilities(&self) -> &BackendCapabilities {

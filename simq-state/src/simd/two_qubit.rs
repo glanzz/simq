@@ -17,12 +17,16 @@ pub fn apply_gate_scalar(
 ) {
     let dimension = 1usize << num_qubits;
 
-    // Order qubits so low < high
+    // Order qubits so low < high for cache-friendly striding.
     let (low, high) = if qubit1 < qubit2 {
         (qubit1, qubit2)
     } else {
         (qubit2, qubit1)
     };
+    // The gate matrix indexes rows/columns as 2*bit(qubit1) + bit(qubit2)
+    // (qubit1 is the more-significant bit), independent of which of the two
+    // qubits happens to have the smaller physical index.
+    let qubit1_is_low = qubit1 == low;
 
     let stride_low = 1usize << low;
     let stride_high = 1usize << high;
@@ -49,9 +53,17 @@ pub fn apply_gate_scalar(
             let block_base = base + mid;
             for k in 0..stride_low {
                 let i00 = block_base + k;
-                let i01 = i00 + stride_low;
-                let i10 = i00 + stride_high;
-                let i11 = i10 + stride_low;
+                let i_low_flip = i00 + stride_low;
+                let i_high_flip = i00 + stride_high;
+                let i11 = i_high_flip + stride_low;
+
+                // Map the physical low/high-bit-flip positions to matrix
+                // indices 1 (qubit1=0,qubit2=1) and 2 (qubit1=1,qubit2=0).
+                let (i01, i10) = if qubit1_is_low {
+                    (i_high_flip, i_low_flip)
+                } else {
+                    (i_low_flip, i_high_flip)
+                };
 
                 // Load amplitudes
                 let a0 = state[i00];
@@ -124,8 +136,9 @@ mod tests {
         [[i, o, o, o], [o, i, o, o], [o, o, i, o], [o, o, o, i]]
     }
 
+    /// CNOT matrix indexed as 2*bit(qubit1) + bit(qubit2), i.e. qubit1 is the
+    /// control (more-significant bit) and qubit2 is the target.
     fn cnot_matrix() -> [[Complex64; 4]; 4] {
-        // CNOT: |00⟩→|00⟩, |01⟩→|01⟩, |10⟩→|11⟩, |11⟩→|10⟩
         let o = Complex64::new(0.0, 0.0);
         let i = Complex64::new(1.0, 0.0);
         [[i, o, o, o], [o, i, o, o], [o, o, o, i], [o, o, i, o]]
@@ -149,17 +162,58 @@ mod tests {
 
     #[test]
     fn test_scalar_cnot() {
-        // CNOT on |10⟩ → |11⟩
+        // qubit1=0 is control, qubit2=1 is target. Starting with
+        // control=1, target=0 (physical index 1: bit0 set, bit1 clear),
+        // CNOT should flip the target, moving the amplitude to physical
+        // index 3 (control=1, target=1).
         let mut state = vec![
-            Complex64::new(0.0, 0.0), // |00⟩
-            Complex64::new(0.0, 0.0), // |01⟩
-            Complex64::new(1.0, 0.0), // |10⟩
-            Complex64::new(0.0, 0.0), // |11⟩
+            Complex64::new(0.0, 0.0), // control=0, target=0
+            Complex64::new(1.0, 0.0), // control=1, target=0
+            Complex64::new(0.0, 0.0), // control=0, target=1
+            Complex64::new(0.0, 0.0), // control=1, target=1
         ];
 
         apply_gate_scalar(&mut state, &cnot_matrix(), 0, 1, 2);
 
-        // |10⟩ → |11⟩: amplitude moves from index 2 to index 3
+        assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_scalar_cnot_control_low_target_high_unaffected() {
+        // With qubit1=0 (control) and qubit2=1 (target), control=0 should
+        // leave the state unchanged regardless of the target's value.
+        let mut state = vec![
+            Complex64::new(0.0, 0.0), // control=0, target=0
+            Complex64::new(0.0, 0.0), // control=1, target=0
+            Complex64::new(1.0, 0.0), // control=0, target=1
+            Complex64::new(0.0, 0.0), // control=1, target=1
+        ];
+
+        apply_gate_scalar(&mut state, &cnot_matrix(), 0, 1, 2);
+
+        assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_scalar_cnot_qubit_order_swapped() {
+        // Now qubit1=1 is control, qubit2=0 is target. Starting with
+        // control=1 (physical bit1), target=0, CNOT should flip the target,
+        // moving the amplitude from physical index 2 to physical index 3.
+        let mut state = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0), // control (bit1)=1, target (bit0)=0
+            Complex64::new(0.0, 0.0),
+        ];
+
+        apply_gate_scalar(&mut state, &cnot_matrix(), 1, 0, 2);
+
         assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[2].re, 0.0, epsilon = 1e-10);
@@ -198,10 +252,10 @@ mod tests {
         if !is_x86_feature_detected!("avx2") {
             return;
         }
-        // Apply CNOT starting from |10⟩ — should flip to |11⟩
+        // Apply CNOT with control=1, target=0 — scalar and AVX2 must agree
         let o = Complex64::new(0.0, 0.0);
         let i = Complex64::new(1.0, 0.0);
-        let start = vec![o, o, i, o]; // |10⟩
+        let start = vec![o, i, o, o];
         let mut state_scalar = start.clone();
         let mut state_avx2 = start.clone();
 

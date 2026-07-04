@@ -1,11 +1,8 @@
 use pyo3::prelude::*;
 use simq_core::noise::channels::{
-    DepolarizingChannel as RustDepolarizing,
-    AmplitudeDamping as RustAmplitudeDamping,
-    PhaseDamping as RustPhaseDamping,
-    ReadoutError as RustReadoutError,
+    AmplitudeDamping as RustAmplitudeDamping, DepolarizingChannel as RustDepolarizing,
+    PhaseDamping as RustPhaseDamping, ReadoutError as RustReadoutError,
 };
-use simq_core::noise::types::NoiseChannel;
 
 #[pyclass(name = "DepolarizingChannel")]
 #[derive(Clone)]
