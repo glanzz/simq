@@ -16,6 +16,7 @@ simq-gates.workspace = true
 simq-compiler.workspace = true
 simq-sim.workspace = true
 simq-backend.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 approx.workspace = true
