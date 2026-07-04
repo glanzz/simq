@@ -100,21 +100,26 @@ let circuit = builder.build();
 
 ### Built for Variational Algorithms
 
+Exact expectation values are one call away, so an energy function for VQE is
+a few lines:
+
 ```rust
-use simq::prelude::*;
-use simq::sim::vqe_hardware_efficient_ansatz;
+use simq::{PauliObservable, PauliString, QuantumCircuit};
 
-// Hardware-efficient ansatz: H layer, parameterized RY layer, CNOT chain
-let params = vec![0.1, 0.3, 0.2, 0.4];
-let circuit = vqe_hardware_efficient_ansatz(4, &params);
+let hamiltonian = PauliObservable::from_pauli_string(
+    PauliString::from_str("Z").unwrap(), 1.0);
 
-// Measure ⟨Z₀Z₁⟩ on the final state
-let result = Simulator::new(SimulatorConfig::default()).run(&circuit).unwrap();
-let observable = PauliString::from_str("ZZII").unwrap();
+let energy = |theta: f64| {
+    let mut qc = QuantumCircuit::new(1);
+    qc.ry(theta, 0);
+    qc.expectation_value(&hamiltonian).unwrap()
+};
+// energy(θ) = cos(θ); minimize with your favourite optimizer
 ```
 
-See `simq-sim/examples/` for complete VQE and QAOA workflows with
-gradient-based optimization (`vqe_h2_molecule`, `qaoa_maxcut`, ...).
+Run `cargo run -p simq --example vqe_fluent` for a complete gradient-descent
+VQE loop, and see `simq-sim/examples/` for full workflows with the built-in
+optimizers and gradient methods (`vqe_h2_molecule`, `qaoa_maxcut`, ...).
 
 ## Compile-Time Caching
 

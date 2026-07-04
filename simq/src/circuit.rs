@@ -28,7 +28,7 @@ use simq_gates::standard::{
     Toffoli, CY, CZ, ECR, RXX, RYY, RZZ, U1, U2, U3,
 };
 use simq_sim::{MeasurementCounts, SimulationResult, Simulator, SimulatorConfig, SimulatorError};
-use simq_state::{measurement::ComputationalBasis, AdaptiveState, DenseState};
+use simq_state::{measurement::ComputationalBasis, AdaptiveState, DenseState, PauliObservable};
 use std::sync::Arc;
 
 /// A quantum circuit under construction, with Qiskit-style gate methods
@@ -318,6 +318,58 @@ impl QuantumCircuit {
         }
         Ok(result)
     }
+
+    /// Simulate and compute the expectation value ⟨ψ|O|ψ⟩ of an observable
+    ///
+    /// This is the core VQE/QAOA primitive: run the circuit (statevector,
+    /// no measurement sampling) and evaluate the observable on the final
+    /// state exactly.
+    ///
+    /// ```
+    /// use simq::{QuantumCircuit, PauliObservable, PauliString};
+    ///
+    /// let mut qc = QuantumCircuit::new(2);
+    /// qc.h(0).cnot(0, 1);
+    ///
+    /// // ⟨Z₀Z₁⟩ = 1 for the Bell state (|00⟩ + |11⟩)/√2
+    /// let zz = PauliObservable::from_pauli_string(
+    ///     PauliString::from_str("ZZ").unwrap(), 1.0);
+    /// let value = qc.expectation_value(&zz).unwrap();
+    /// assert!((value - 1.0).abs() < 1e-10);
+    /// ```
+    pub fn expectation_value(&self, observable: &PauliObservable) -> Result<f64, SimulatorError> {
+        if let Some(e) = &self.error {
+            return Err(SimulatorError::InvalidCircuit(e.to_string()));
+        }
+        let result = Simulator::new(SimulatorConfig::default()).run(&self.circuit)?;
+        let dense =
+            DenseState::from_amplitudes(result.state.num_qubits(), &result.state.to_dense_vec())
+                .map_err(|e| SimulatorError::StateError {
+                    message: e.to_string(),
+                })?;
+        observable
+            .expectation_value(&dense)
+            .map_err(|e| SimulatorError::StateError {
+                message: e.to_string(),
+            })
+    }
+
+    /// Simulate and return the exact probability of each basis state
+    ///
+    /// Returns a vector of length 2^n where entry `i` is |⟨i|ψ⟩|². Useful
+    /// for verifying results against theory without sampling noise.
+    pub fn probabilities(&self) -> Result<Vec<f64>, SimulatorError> {
+        if let Some(e) = &self.error {
+            return Err(SimulatorError::InvalidCircuit(e.to_string()));
+        }
+        let result = Simulator::new(SimulatorConfig::default()).run(&self.circuit)?;
+        Ok(result
+            .state
+            .to_dense_vec()
+            .iter()
+            .map(|amp| amp.norm_sqr())
+            .collect())
+    }
 }
 
 /// Sample computational-basis measurement counts from a final state
@@ -419,6 +471,50 @@ mod tests {
         assert_eq!(qc.len(), 1);
         assert!(qc.simulate().is_err());
         assert!(qc.build().is_err());
+    }
+
+    #[test]
+    fn expectation_value_matches_theory() {
+        use simq_state::PauliString;
+
+        // RX(0.8)|0⟩: ⟨Z⟩ = cos(0.8). Uses an angle in the range issue #37
+        // used to corrupt, so this doubles as an accuracy check through the
+        // whole facade → simulator → gate-cache stack.
+        let theta = 0.8;
+        let mut qc = QuantumCircuit::new(1);
+        qc.rx(theta, 0);
+
+        let z = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let value = qc.expectation_value(&z).unwrap();
+        assert!(
+            (value - theta.cos()).abs() < 1e-10,
+            "⟨Z⟩ = {value}, expected cos(0.8) = {}",
+            theta.cos()
+        );
+    }
+
+    #[test]
+    fn probabilities_match_theory() {
+        let mut qc = QuantumCircuit::new(2);
+        qc.h(0).cnot(0, 1);
+
+        let probs = qc.probabilities().unwrap();
+        assert_eq!(probs.len(), 4);
+        assert!((probs[0] - 0.5).abs() < 1e-10); // |00⟩
+        assert!(probs[1].abs() < 1e-10); // |01⟩
+        assert!(probs[2].abs() < 1e-10); // |10⟩
+        assert!((probs[3] - 0.5).abs() < 1e-10); // |11⟩
+    }
+
+    #[test]
+    fn expectation_value_propagates_build_error() {
+        use simq_state::PauliString;
+
+        let mut qc = QuantumCircuit::new(1);
+        qc.h(9);
+        let z = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        assert!(qc.expectation_value(&z).is_err());
+        assert!(qc.probabilities().is_err());
     }
 
     #[test]
