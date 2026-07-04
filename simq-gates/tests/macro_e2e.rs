@@ -419,12 +419,37 @@ mod tests {
     fn test_range_rx_matches_simq_gates() {
         use simq_gates::matrices::rotation_x;
 
+        // lookup() must be exact for EVERY angle: in-range angles that miss
+        // the grid fall back to on-demand computation instead of being
+        // snapped to the nearest cached entry (same bug class as issue #37).
         for angle in [0.0, 0.3, 0.7, 1.2, std::f64::consts::FRAC_PI_2, 3.0, -1.0] {
             let range_result = rx_range::RXRangeCache::lookup(angle);
             let reference = rotation_x(angle);
-            if !(0.0..=std::f64::consts::FRAC_PI_2).contains(&angle) {
-                assert_matrix_close(&range_result, &reference, TOLERANCE);
-            }
+            assert_matrix_close(&range_result, &reference, TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_range_lookup_never_snaps_in_range_angles() {
+        use simq_gates::matrices::{rotation_x, rotation_y, rotation_z};
+
+        // Angles inside the cached range but off the grid: exact to 1e-12
+        let m = rx_range::RXRangeCache::lookup(0.7);
+        assert_matrix_close(&m, &rotation_x(0.7), 1e-12);
+
+        let m = ry_range::RYRangeCache::lookup(1.9);
+        assert_matrix_close(&m, &rotation_y(1.9), 1e-12);
+
+        let m = rz_range::RZRangeCache::lookup(0.6);
+        assert_matrix_close(&m, &rotation_z(0.6), 1e-12);
+
+        // Angles exactly on the grid still hit the cache and agree with
+        // runtime computation
+        let step = std::f64::consts::FRAC_PI_2 / 9.0;
+        for i in 0..10 {
+            let angle = step * i as f64;
+            let m = rx_range::RXRangeCache::lookup(angle);
+            assert_matrix_close(&m, &rotation_x(angle), 1e-12);
         }
     }
 }
