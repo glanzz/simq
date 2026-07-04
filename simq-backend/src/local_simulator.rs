@@ -28,7 +28,7 @@ use crate::{
 };
 use rand::SeedableRng;
 use simq_core::Circuit;
-use simq_sim::Simulator;
+use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::AdaptiveState;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -116,7 +116,20 @@ impl LocalSimulatorBackend {
 
     /// Create a simulator instance for this backend
     fn create_simulator(&self, _num_qubits: usize) -> Simulator {
-        Simulator::new(simq_sim::SimulatorConfig::default())
+        let mut config = SimulatorConfig::default();
+        config.sparse_threshold = self.config.sparse_threshold;
+        config.seed = self.config.seed;
+        config.optimize_circuit = false; // We don't want automatic optimization here
+
+        // Set parallel threshold based on config
+        if !self.config.parallel {
+            config.parallel_threshold = usize::MAX; // Effectively disable parallelism
+        } else if let Some(threads) = self.config.num_threads {
+            // Adjust parallel threshold based on number of threads
+            config.parallel_threshold = if threads > 1 { 6 } else { usize::MAX };
+        }
+
+        Simulator::new(config)
     }
 
     /// Convert simulator state to measurement counts
@@ -168,7 +181,7 @@ impl LocalSimulatorBackend {
                 let num_qubits = state.num_qubits();
                 let mut probs = Vec::new();
 
-                for (basis_state, amp) in state.amplitudes().iter() {
+                for (&basis_state, amp) in state.amplitudes() {
                     let prob = amp.norm_sqr();
                     if prob > 1e-10 {
                         let bitstring = format!("{:0width$b}", basis_state, width = num_qubits);
@@ -236,6 +249,7 @@ impl QuantumBackend for LocalSimulatorBackend {
         let execution_time = start_time.elapsed();
         let metadata = ExecutionMetadata {
             execution_time: Some(execution_time),
+            queue_time: None, // No queue time for local simulator
             total_time: Some(execution_time),
             backend_name: Some(self.name.clone()),
             backend_version: Some(env!("CARGO_PKG_VERSION").to_string()),

@@ -5,6 +5,13 @@ use crate::execution_engine::error::{ExecutionError, Result};
 use num_complex::Complex64;
 use rayon::prelude::*;
 
+// Safety wrapper for raw pointers to allow Send+Sync
+// This is safe because we partition the work to ensure no data races
+#[derive(Copy, Clone)]
+struct SendPtr<T>(*mut T);
+unsafe impl<T> Send for SendPtr<T> {}
+unsafe impl<T> Sync for SendPtr<T> {}
+
 /// Apply a controlled single-qubit gate
 ///
 /// Applies a single-qubit gate to the target qubit, conditioned on the control qubit being |1⟩.
@@ -88,25 +95,25 @@ fn apply_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
-    let state_ptr_addr = state.as_ptr() as usize;
+    state
+        .par_chunks_mut(target_stride * 2)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base_idx = chunk_idx * target_stride * 2;
 
-    state.par_chunks_mut(target_stride * 2).for_each(|chunk| {
-        for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
-            // Reconstruct pointer to avoid borrowing state in closure
-            let state_ptr = state_ptr_addr as *const Complex64;
-            let base_idx = chunk.as_ptr() as usize - state_ptr as usize;
-            let idx0 = base_idx / std::mem::size_of::<Complex64>() + j;
+            for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
+                let idx = base_idx + j;
 
-            // Only apply if control qubit is |1⟩
-            if idx0 & control_mask != 0 {
-                let a = chunk[j];
-                let b = chunk[j + target_stride];
+                // Only apply if control qubit is |1⟩
+                if idx & control_mask != 0 {
+                    let a = chunk[j];
+                    let b = chunk[j + target_stride];
 
-                chunk[j] = gate[0][0] * a + gate[0][1] * b;
-                chunk[j + target_stride] = gate[1][0] * a + gate[1][1] * b;
+                    chunk[j] = gate[0][0] * a + gate[0][1] * b;
+                    chunk[j + target_stride] = gate[1][0] * a + gate[1][1] * b;
+                }
             }
-        }
-    });
+        });
 }
 
 /// Apply a multi-controlled gate (Toffoli, etc.)
@@ -205,27 +212,21 @@ fn apply_multi_controlled_parallel(
     gate: &Matrix2x2,
     state: &mut [Complex64],
 ) {
-    let state_ptr_addr = state.as_mut_ptr() as usize;
+    state
+        .par_chunks_mut(target_stride * 2)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base_idx = chunk_idx * target_stride * 2;
 
-    (0..state.len())
-        .into_par_iter()
-        .step_by(target_stride * 2)
-        .for_each(|i| {
-            let state_ptr = state_ptr_addr as *mut Complex64;
-            for j in 0..target_stride {
-                let idx = i + j;
-                // Safety: we are checking bounds and using raw pointers to avoid borrow checker issues
-                // with disjoint access patterns that the compiler can't see
-                unsafe {
-                    if idx + target_stride < state.len()
-                        && (idx & control_mask).count_ones() as usize == num_controls
-                    {
-                        let a = *state_ptr.add(idx);
-                        let b = *state_ptr.add(idx + target_stride);
+            for j in 0..target_stride.min(chunk.len().saturating_sub(target_stride)) {
+                let idx = base_idx + j; // Global index for control mask check
 
-                        *state_ptr.add(idx) = gate[0][0] * a + gate[0][1] * b;
-                        *state_ptr.add(idx + target_stride) = gate[1][0] * a + gate[1][1] * b;
-                    }
+                if (idx & control_mask).count_ones() as usize == num_controls {
+                    let a = chunk[j];
+                    let b = chunk[j + target_stride];
+
+                    chunk[j] = gate[0][0] * a + gate[0][1] * b;
+                    chunk[j + target_stride] = gate[1][0] * a + gate[1][1] * b;
                 }
             }
         });

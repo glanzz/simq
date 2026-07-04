@@ -38,6 +38,21 @@ pub enum SimulatorError {
     /// Invalid qubit index
     InvalidQubit { qubit: usize, num_qubits: usize },
 
+    /// Execution failed
+    ExecutionFailed {
+        message: String,
+    },
+
+    /// State error
+    StateError {
+        message: String,
+    },
+
+    /// Timeout error
+    Timeout {
+        message: String,
+    },
+
     /// Other error
     Other(String),
 }
@@ -78,6 +93,15 @@ impl fmt::Display for SimulatorError {
             },
             SimulatorError::InvalidQubit { qubit, num_qubits } => {
                 write!(f, "Invalid qubit index {}: circuit has {} qubits", qubit, num_qubits)
+            },
+            SimulatorError::ExecutionFailed { message } => {
+                write!(f, "Execution failed: {}", message)
+            },
+            SimulatorError::StateError { message } => {
+                write!(f, "State error: {}", message)
+            },
+            SimulatorError::Timeout { message } => {
+                write!(f, "Timeout: {}", message)
             },
             SimulatorError::Other(msg) => write!(f, "{}", msg),
         }
