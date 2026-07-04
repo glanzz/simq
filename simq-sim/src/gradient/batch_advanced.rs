@@ -7,7 +7,6 @@
 use super::batch::BatchResult;
 use crate::error::Result;
 use crate::Simulator;
-use rand::distributions::Distribution;
 use rayon::prelude::*;
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
@@ -272,6 +271,7 @@ impl ImportanceSampler {
         (0..num_samples)
             .map(|_| {
                 // Select a center according to weights
+                use rand::prelude::Distribution;
                 let center_idx = dist.sample(&mut rng);
                 let center = &self.centers[center_idx];
 

@@ -28,9 +28,10 @@ use crate::{
 };
 use rand::SeedableRng;
 use simq_core::Circuit;
-use simq_sim::Simulator;
+use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::AdaptiveState;
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::Instant;
 
 /// Configuration for the local simulator backend
@@ -69,6 +70,7 @@ pub struct LocalSimulatorBackend {
     name: String,
     config: LocalSimulatorConfig,
     capabilities: BackendCapabilities,
+    jobs: Mutex<HashMap<String, BackendResult>>,
 }
 
 impl LocalSimulatorBackend {
@@ -105,6 +107,7 @@ impl LocalSimulatorBackend {
             name: "LocalSimulator".to_string(),
             config,
             capabilities,
+            jobs: Mutex::new(HashMap::new()),
         }
     }
 
@@ -116,7 +119,20 @@ impl LocalSimulatorBackend {
 
     /// Create a simulator instance for this backend
     fn create_simulator(&self, _num_qubits: usize) -> Simulator {
-        Simulator::new(simq_sim::SimulatorConfig::default())
+        let mut config = SimulatorConfig::default();
+        config.sparse_threshold = self.config.sparse_threshold;
+        config.seed = self.config.seed;
+        config.optimize_circuit = false; // We don't want automatic optimization here
+
+        // Set parallel threshold based on config
+        if !self.config.parallel {
+            config.parallel_threshold = usize::MAX; // Effectively disable parallelism
+        } else if let Some(threads) = self.config.num_threads {
+            // Adjust parallel threshold based on number of threads
+            config.parallel_threshold = if threads > 1 { 6 } else { usize::MAX };
+        }
+
+        Simulator::new(config)
     }
 
     /// Convert simulator state to measurement counts
@@ -168,7 +184,7 @@ impl LocalSimulatorBackend {
                 let num_qubits = state.num_qubits();
                 let mut probs = Vec::new();
 
-                for (basis_state, amp) in state.amplitudes().iter() {
+                for (&basis_state, amp) in state.amplitudes() {
                     let prob = amp.norm_sqr();
                     if prob > 1e-10 {
                         let bitstring = format!("{:0width$b}", basis_state, width = num_qubits);
@@ -236,6 +252,7 @@ impl QuantumBackend for LocalSimulatorBackend {
         let execution_time = start_time.elapsed();
         let metadata = ExecutionMetadata {
             execution_time: Some(execution_time),
+            queue_time: None, // No queue time for local simulator
             total_time: Some(execution_time),
             backend_name: Some(self.name.clone()),
             backend_version: Some(env!("CARGO_PKG_VERSION").to_string()),
@@ -246,7 +263,6 @@ impl QuantumBackend for LocalSimulatorBackend {
             cnot_count: None,
             cost: None,
             error_message: None,
-            queue_time: None,
             extra: HashMap::new(),
         };
 
@@ -256,6 +272,22 @@ impl QuantumBackend for LocalSimulatorBackend {
             job_id: None,
             metadata,
         })
+    }
+
+    fn submit_job(&self, circuit: &Circuit, shots: usize) -> Result<String> {
+        let result = self.execute(circuit, shots)?;
+        let job_id = format!("sync-{}", uuid::Uuid::new_v4());
+        self.jobs.lock().unwrap().insert(job_id.clone(), result);
+        Ok(job_id)
+    }
+
+    fn get_result(&self, job_id: &str) -> Result<BackendResult> {
+        self.jobs
+            .lock()
+            .unwrap()
+            .get(job_id)
+            .cloned()
+            .ok_or_else(|| BackendError::Other(format!("Unknown job id: {}", job_id)))
     }
 
     fn capabilities(&self) -> &BackendCapabilities {
@@ -354,6 +386,47 @@ mod tests {
         assert!(most_frequent.is_some());
         let (_, count) = most_frequent.unwrap();
         assert!(*count > 80); // At least 80% probability for the most likely outcome
+    }
+
+    fn simple_circuit() -> simq_core::Circuit {
+        let mut circuit = CircuitBuilder::<2>::new();
+        circuit
+            .apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]])
+            .unwrap();
+        circuit.build()
+    }
+
+    #[test]
+    fn test_create_simulator_with_parallel_disabled() {
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            parallel: false,
+            ..Default::default()
+        });
+        assert!(backend.execute(&simple_circuit(), 10).is_ok());
+    }
+
+    #[test]
+    fn test_create_simulator_with_num_threads() {
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            num_threads: Some(4),
+            ..Default::default()
+        });
+        assert!(backend.execute(&simple_circuit(), 10).is_ok());
+    }
+
+    #[test]
+    fn test_submit_job_and_get_result() {
+        let backend = LocalSimulatorBackend::new();
+
+        let job_id = backend.submit_job(&simple_circuit(), 50).unwrap();
+        let result = backend.get_result(&job_id).unwrap();
+        assert_eq!(result.shots, 50);
+    }
+
+    #[test]
+    fn test_get_result_unknown_job_id() {
+        let backend = LocalSimulatorBackend::new();
+        assert!(backend.get_result("no-such-job").is_err());
     }
 
     #[test]
