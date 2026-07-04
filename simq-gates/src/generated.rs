@@ -524,6 +524,64 @@ mod tests {
     }
 
     #[test]
+    fn test_full_dispatch_exact_for_all_angles() {
+        // Master accuracy guarantee: EnhancedUniversalCache (the dispatch
+        // behind RotationX/Y/Z::matrix()) must agree with runtime trig to
+        // 1e-12 for EVERY angle, regardless of which of the six cache levels
+        // answers. A dense sweep over [-2pi, 2pi] crosses all levels:
+        // common angles, Clifford+T, pi fractions, VQE range, QAOA range,
+        // and runtime fallback.
+        let samples = 20_000;
+        for i in 0..=samples {
+            let theta = -2.0 * PI + 4.0 * PI * (i as f64) / (samples as f64);
+            let rx_exact = crate::matrices::rotation_x(theta);
+            let ry_exact = crate::matrices::rotation_y(theta);
+            let rz_exact = crate::matrices::rotation_z(theta);
+            assert!(
+                max_diff(&EnhancedUniversalCache::rx(theta), &rx_exact) < 1e-12,
+                "RX({theta}) inexact"
+            );
+            assert!(
+                max_diff(&EnhancedUniversalCache::ry(theta), &ry_exact) < 1e-12,
+                "RY({theta}) inexact"
+            );
+            assert!(
+                max_diff(&EnhancedUniversalCache::rz(theta), &rz_exact) < 1e-12,
+                "RZ({theta}) inexact"
+            );
+        }
+
+        // Also hit the exact cache angles themselves (the sweep may miss them)
+        for &theta in &[
+            0.0,
+            PI / 32.0,
+            PI / 16.0,
+            PI / 12.0,
+            PI / 10.0,
+            PI / 8.0,
+            PI / 6.0,
+            PI / 5.0,
+            PI / 4.0,
+            PI / 3.0,
+            PI / 2.0,
+            PI,
+        ] {
+            assert!(
+                max_diff(&EnhancedUniversalCache::rx(theta), &crate::matrices::rotation_x(theta))
+                    < 1e-10
+            );
+            assert!(
+                max_diff(&EnhancedUniversalCache::ry(theta), &crate::matrices::rotation_y(theta))
+                    < 1e-10
+            );
+            assert!(
+                max_diff(&EnhancedUniversalCache::rz(theta), &crate::matrices::rotation_z(theta))
+                    < 1e-10
+            );
+        }
+    }
+
+    #[test]
     fn test_issue_37_exact_grid_points_still_hit_cache() {
         // Angles exactly on the π/99 grid should agree with runtime
         // computation (build-time entries are computed with full f64 trig).

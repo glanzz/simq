@@ -1015,3 +1015,113 @@ fn batch_config_default() {
     assert!(config.adaptive_sizing);
     assert!(!config.enable_cache);
 }
+
+// ============================================================================
+// Regression tests for issue #37: angle-snapping gate cache zeroed FD gradients
+// ============================================================================
+
+/// RX(θ) on |0⟩: ⟨Z⟩ = cos(θ), d⟨Z⟩/dθ = −sin(θ)
+fn rx_circuit_generic_angle(params: &[f64]) -> Circuit {
+    let mut c = Circuit::new(1);
+    c.add_gate(Arc::new(RotationX::new(params[0])), &[q(0)])
+        .unwrap();
+    c
+}
+
+/// H then RZ(θ) on |0⟩: ⟨X⟩ = cos(θ), d⟨X⟩/dθ = −sin(θ)
+fn h_rz_circuit_generic_angle(params: &[f64]) -> Circuit {
+    let mut c = Circuit::new(1);
+    c.add_gate(Arc::new(Hadamard), &[q(0)]).unwrap();
+    c.add_gate(Arc::new(RotationZ::new(params[0])), &[q(0)])
+        .unwrap();
+    c
+}
+
+#[test]
+fn issue_37_fd_gradient_nonzero_for_rx_generic_angle() {
+    // θ = 0.8 lies in (π/4, π], the range the old QAOA-grid cache snapped.
+    // Before the fix, RX(0.8 ± 1e-7) returned identical matrices, so the
+    // finite-difference gradient was identically zero. Analytically it is
+    // −sin(0.8) ≈ −0.717.
+    let sim = make_sim();
+    let params = [0.8];
+    let config = FiniteDifferenceConfig::default(); // epsilon = 1e-7
+
+    let result = compute_gradient_finite_difference(
+        &sim,
+        rx_circuit_generic_angle,
+        &z_observable(),
+        &params,
+        &config,
+    )
+    .unwrap();
+
+    let expected = -(0.8_f64).sin();
+    assert!(
+        (result.gradients[0] - expected).abs() < 1e-4,
+        "FD gradient {} should match analytic {expected}",
+        result.gradients[0]
+    );
+}
+
+#[test]
+fn issue_37_fd_gradient_nonzero_for_rz_generic_angle() {
+    let sim = make_sim();
+    let params = [0.8];
+    let config = FiniteDifferenceConfig::default();
+
+    let x_observable = PauliObservable::from_pauli_string(PauliString::from_str("X").unwrap(), 1.0);
+
+    let result = compute_gradient_finite_difference(
+        &sim,
+        h_rz_circuit_generic_angle,
+        &x_observable,
+        &params,
+        &config,
+    )
+    .unwrap();
+
+    let expected = -(0.8_f64).sin();
+    assert!(
+        (result.gradients[0] - expected).abs() < 1e-4,
+        "FD gradient {} should match analytic {expected}",
+        result.gradients[0]
+    );
+}
+
+#[test]
+fn issue_37_fd_matches_parameter_shift_in_former_snap_range() {
+    // Parameter-shift is exact and was unaffected by the cache bug (shifts
+    // of ±π/2 usually landed on exact cache angles). FD must now agree with
+    // it across the formerly-snapped range.
+    let sim = make_sim();
+    let fd_config = FiniteDifferenceConfig::default();
+    let ps_config = ParameterShiftConfig::default();
+
+    for &theta in &[0.9, 1.3, 2.0, 2.7] {
+        let params = [theta];
+        let fd = compute_gradient_finite_difference(
+            &sim,
+            rx_circuit_generic_angle,
+            &z_observable(),
+            &params,
+            &fd_config,
+        )
+        .unwrap();
+        let ps = compute_gradient_parameter_shift(
+            &sim,
+            rx_circuit_generic_angle,
+            &z_observable(),
+            &params,
+            &ps_config,
+        )
+        .unwrap();
+
+        assert!(
+            (fd.gradients[0] - ps.gradients[0]).abs() < 1e-4,
+            "theta = {theta}: FD {} vs parameter-shift {}",
+            fd.gradients[0],
+            ps.gradients[0]
+        );
+    }
+}
