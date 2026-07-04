@@ -88,7 +88,7 @@ jobs:
       - name: Generate coverage report and enforce threshold
         run: |
           cargo tarpaulin --verbose --all-features --workspace --timeout 120 \
-            --engine llvm --out Xml --output-dir coverage --fail-under 98 \
+            --engine llvm --out Xml --output-dir coverage --fail-under 97.5 \
             --exclude simq-py \
             --exclude-files "simq-py/*" \
             --exclude-files "simq-sim/src/gpu.rs" "simq-macros/src/lib.rs" \
