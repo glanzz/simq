@@ -7,10 +7,19 @@
 //!
 //! # Design
 //!
-//! - **Compile-time generation**: Tables are built at compile time using const functions
+//! - **Runtime generation**: Tables are precomputed once at construction
 //! - **Linear interpolation**: Smooth transitions between table entries
 //! - **Configurable precision**: Trade-off between memory and accuracy
 //! - **Automatic fallback**: Large angles use direct computation
+//!
+//! # Accuracy
+//!
+//! This is an explicitly approximate fast path; the standard gates in
+//! [`crate::standard`] are always exact. The configured `error_tolerance`
+//! is *enforced*: if a table's worst-case error (see
+//! [`RotationLookupTable::worst_case_error`]) exceeds the tolerance, the
+//! table is bypassed and every matrix is computed directly, so results are
+//! never silently less accurate than configured.
 //!
 //! # Example
 //!
@@ -62,13 +71,20 @@ impl LookupConfig {
     /// - max_angle: π/4 (45 degrees)
     /// - num_entries: 1024
     /// - interpolation: enabled
-    /// - error_tolerance: 1e-12
+    /// - error_tolerance: 1e-7
+    ///
+    /// The error tolerance is enforced: the table is used only if its
+    /// worst-case error (a function of step size and interpolation mode; see
+    /// [`RotationLookupTable::worst_case_error`]) is within the tolerance,
+    /// otherwise every call falls back to exact direct computation. The
+    /// default table's worst-case error is ~2e-8, within the default 1e-7
+    /// tolerance.
     pub const fn new() -> Self {
         Self {
             max_angle: PI / 4.0,
             num_entries: 1024,
             interpolation: true,
-            error_tolerance: 1e-12,
+            error_tolerance: 1e-7,
         }
     }
 
@@ -170,9 +186,15 @@ impl TrigTable {
         let index_f = abs_angle / self.angle_step;
         let index = index_f as usize;
 
-        if !interpolate || index >= self.cos_values.len() - 1 {
-            // No interpolation or at the edge - use nearest entry
-            let idx = index.min(self.cos_values.len() - 1);
+        if !interpolate {
+            // Nearest entry (rounding halves the worst-case error vs truncation)
+            let idx = (index_f.round() as usize).min(self.cos_values.len() - 1);
+            return (self.cos_values[idx], sign * self.sin_values[idx]);
+        }
+
+        if index >= self.cos_values.len() - 1 {
+            // At the table edge
+            let idx = self.cos_values.len() - 1;
             return (self.cos_values[idx], sign * self.sin_values[idx]);
         }
 
@@ -197,13 +219,46 @@ pub struct RotationLookupTable {
 
     /// Configuration
     config: LookupConfig,
+
+    /// Whether the table's worst-case error is within the configured
+    /// tolerance; if not, every lookup falls back to direct computation
+    table_within_tolerance: bool,
 }
 
 impl RotationLookupTable {
     /// Create a new rotation lookup table with the given configuration
+    ///
+    /// If the table's [`worst_case_error`](Self::worst_case_error) exceeds
+    /// `config.error_tolerance`, the table is disabled and all matrix
+    /// requests are computed directly at full precision — the configured
+    /// accuracy is never silently violated.
     pub fn new(config: LookupConfig) -> Self {
         let trig_table = TrigTable::new(&config);
-        Self { trig_table, config }
+        let worst_case = Self::error_bound(trig_table.angle_step, config.interpolation);
+        let table_within_tolerance = worst_case <= config.error_tolerance;
+        Self {
+            trig_table,
+            config,
+            table_within_tolerance,
+        }
+    }
+
+    /// Worst-case absolute error of matrix elements produced by this table
+    ///
+    /// The table stores cos(θ/2) and sin(θ/2) on a grid with step `h`. Both
+    /// functions have |f′| ≤ 1/2 and |f″| ≤ 1/4, giving:
+    /// - nearest-neighbor lookup: error ≤ (h/2)·(1/2) = h/4
+    /// - linear interpolation:    error ≤ (h²/8)·(1/4) = h²/32
+    pub fn worst_case_error(&self) -> f64 {
+        Self::error_bound(self.trig_table.angle_step, self.config.interpolation)
+    }
+
+    fn error_bound(angle_step: f64, interpolation: bool) -> f64 {
+        if interpolation {
+            angle_step * angle_step / 32.0
+        } else {
+            angle_step / 4.0
+        }
     }
 }
 
@@ -223,7 +278,7 @@ impl RotationLookupTable {
     /// ```
     #[inline]
     pub fn rx_matrix(&self, theta: f64) -> [[Complex64; 2]; 2] {
-        if self.trig_table.contains(theta) {
+        if self.table_within_tolerance && self.trig_table.contains(theta) {
             let (cos_val, sin_val) = self.trig_table.lookup(theta, self.config.interpolation);
 
             [
@@ -245,7 +300,7 @@ impl RotationLookupTable {
     /// ```
     #[inline]
     pub fn ry_matrix(&self, theta: f64) -> [[Complex64; 2]; 2] {
-        if self.trig_table.contains(theta) {
+        if self.table_within_tolerance && self.trig_table.contains(theta) {
             let (cos_val, sin_val) = self.trig_table.lookup(theta, self.config.interpolation);
 
             [
@@ -267,7 +322,7 @@ impl RotationLookupTable {
     /// ```
     #[inline]
     pub fn rz_matrix(&self, theta: f64) -> [[Complex64; 2]; 2] {
-        if self.trig_table.contains(theta) {
+        if self.table_within_tolerance && self.trig_table.contains(theta) {
             let (cos_val, sin_val) = self.trig_table.lookup(theta, self.config.interpolation);
 
             [
@@ -521,5 +576,77 @@ mod tests {
         assert!(!stats.interpolation_enabled);
         let display = format!("{}", stats);
         assert!(display.contains("disabled"), "display was: {display}");
+    }
+
+    // =========================================================================
+    // Error-bound enforcement tests (audit follow-up to issue #37)
+    // =========================================================================
+
+    /// Measured max element error of the table vs direct computation over a
+    /// dense sweep of in-range angles
+    fn measured_max_error(table: &RotationLookupTable, max_angle: f64) -> f64 {
+        let mut max_err: f64 = 0.0;
+        let samples = 10_000;
+        for i in 0..=samples {
+            let theta = max_angle * (i as f64) / (samples as f64);
+            for (m, r) in [
+                (table.rx_matrix(theta), crate::matrices::rotation_x(theta)),
+                (table.ry_matrix(theta), crate::matrices::rotation_y(theta)),
+                (table.rz_matrix(theta), crate::matrices::rotation_z(theta)),
+            ] {
+                for row in 0..2 {
+                    for col in 0..2 {
+                        max_err = max_err.max((m[row][col] - r[row][col]).norm());
+                    }
+                }
+            }
+        }
+        max_err
+    }
+
+    #[test]
+    fn test_default_table_error_within_promised_tolerance() {
+        let table = RotationLookupTable::default();
+        let bound = table.worst_case_error();
+        let measured = measured_max_error(&table, PI / 4.0);
+        assert!(measured <= bound, "measured error {measured} exceeds theoretical bound {bound}");
+        assert!(
+            bound <= 1e-7,
+            "default table bound {bound} exceeds the documented default tolerance 1e-7"
+        );
+    }
+
+    #[test]
+    fn test_out_of_tolerance_table_falls_back_to_exact() {
+        // A coarse non-interpolated table cannot meet the default 1e-7
+        // tolerance; it must be bypassed so results are exact, never snapped.
+        let config = LookupConfig::new()
+            .max_angle(PI / 4.0)
+            .num_entries(64)
+            .interpolation_enabled(false);
+        let table = RotationLookupTable::new(config);
+        assert!(table.worst_case_error() > 1e-7);
+
+        let measured = measured_max_error(&table, PI / 4.0);
+        assert!(measured < 1e-14, "expected exact fallback, measured error {measured}");
+    }
+
+    #[test]
+    fn test_loose_tolerance_reenables_table_within_bound() {
+        // Explicitly opting into a loose tolerance uses the table, and the
+        // measured error stays within the advertised worst-case bound.
+        let config = LookupConfig::new()
+            .max_angle(PI / 4.0)
+            .num_entries(64)
+            .interpolation_enabled(false)
+            .error_tolerance(1e-2);
+        let table = RotationLookupTable::new(config);
+        let bound = table.worst_case_error();
+        assert!(bound <= 1e-2);
+
+        let measured = measured_max_error(&table, PI / 4.0);
+        assert!(measured <= bound, "measured error {measured} exceeds bound {bound}");
+        // The table is actually used (results differ from exact somewhere)
+        assert!(measured > 1e-12, "table unexpectedly bypassed");
     }
 }
