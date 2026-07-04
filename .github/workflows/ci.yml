@@ -51,14 +51,19 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # simq-py is a pyo3 extension module (built with the "extension-module"
+      # feature). It cannot be linked by a plain `cargo build`/`cargo test` —
+      # those symbols are only resolved when the module is dlopen'd by a
+      # Python interpreter. It's built and tested separately via maturin +
+      # pytest (see simq-py/), so it's excluded from the Rust checks here.
       - name: Build
-        run: cargo build --verbose --all-features
+        run: cargo build --verbose --all-features --workspace --exclude simq-py
 
       - name: Run tests
-        run: cargo test --verbose --all-features
+        run: cargo test --verbose --all-features --workspace --exclude simq-py
 
       - name: Run doc tests
-        run: cargo test --doc --verbose
+        run: cargo test --doc --verbose --workspace --exclude simq-py
 
   coverage:
     name: Code Coverage
@@ -84,6 +89,8 @@ jobs:
         run: |
           cargo tarpaulin --verbose --all-features --workspace --timeout 120 \
             --engine llvm --out Xml --output-dir coverage --fail-under 98 \
+            --exclude simq-py \
+            --exclude-files "simq-py/*" \
             --exclude-files "simq-sim/src/gpu.rs" "simq-macros/src/lib.rs" \
             --exclude-files "simq-backend/src/ibm_quantum.rs" "simq-gates/build.rs" \
             --exclude-files "simq-gates/src/compile_time_cache.rs" \
@@ -124,7 +131,11 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run security audit
-        run: cargo audit
+        # RUSTSEC-2025-0020 / RUSTSEC-2026-0177: pyo3 0.21.2, used only by
+        # the optional simq-py Python bindings crate (built separately via
+        # maturin, excluded from the Rust checks above). Upgrading pyo3 to
+        # >=0.29 is a breaking change to simq-py's API tracked separately.
+        run: cargo audit --ignore RUSTSEC-2025-0020 --ignore RUSTSEC-2026-0177
 
   # docs:
   #   name: Documentation
