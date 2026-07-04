@@ -214,6 +214,36 @@ mod tests {
     }
 
     #[test]
+    fn test_execution_failed_display() {
+        let e = SimulatorError::ExecutionFailed {
+            message: "kernel panic".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Execution failed"));
+        assert!(msg.contains("kernel panic"));
+    }
+
+    #[test]
+    fn test_state_error_display() {
+        let e = SimulatorError::StateError {
+            message: "corrupted amplitudes".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("State error"));
+        assert!(msg.contains("corrupted amplitudes"));
+    }
+
+    #[test]
+    fn test_timeout_display() {
+        let e = SimulatorError::Timeout {
+            message: "deadline exceeded".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Timeout"));
+        assert!(msg.contains("deadline exceeded"));
+    }
+
+    #[test]
     fn test_error_is_std_error() {
         let e = SimulatorError::Other("test".to_string());
         // Can be used as a std::error::Error

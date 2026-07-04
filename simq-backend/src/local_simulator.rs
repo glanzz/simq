@@ -388,6 +388,47 @@ mod tests {
         assert!(*count > 80); // At least 80% probability for the most likely outcome
     }
 
+    fn simple_circuit() -> simq_core::Circuit {
+        let mut circuit = CircuitBuilder::<2>::new();
+        circuit
+            .apply_gate(Arc::new(PauliX), &[circuit.qubits()[0]])
+            .unwrap();
+        circuit.build()
+    }
+
+    #[test]
+    fn test_create_simulator_with_parallel_disabled() {
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            parallel: false,
+            ..Default::default()
+        });
+        assert!(backend.execute(&simple_circuit(), 10).is_ok());
+    }
+
+    #[test]
+    fn test_create_simulator_with_num_threads() {
+        let backend = LocalSimulatorBackend::with_config(LocalSimulatorConfig {
+            num_threads: Some(4),
+            ..Default::default()
+        });
+        assert!(backend.execute(&simple_circuit(), 10).is_ok());
+    }
+
+    #[test]
+    fn test_submit_job_and_get_result() {
+        let backend = LocalSimulatorBackend::new();
+
+        let job_id = backend.submit_job(&simple_circuit(), 50).unwrap();
+        let result = backend.get_result(&job_id).unwrap();
+        assert_eq!(result.shots, 50);
+    }
+
+    #[test]
+    fn test_get_result_unknown_job_id() {
+        let backend = LocalSimulatorBackend::new();
+        assert!(backend.get_result("no-such-job").is_err());
+    }
+
     #[test]
     fn test_reproducibility_with_seed() {
         let config = LocalSimulatorConfig {
