@@ -275,6 +275,100 @@ impl ExecutionEngine {
         Ok(())
     }
 
+    /// Whether a gate's matrix is safe to cache by name alone.
+    ///
+    /// The `Gate` trait does not expose parameters, so parameterized gates
+    /// (rotations, phase gates, ...) cannot be distinguished by name: caching
+    /// them would return the matrix of a previous instance with a different
+    /// angle. Only cache gates whose matrix is fixed.
+    fn is_fixed_matrix_gate(gate_name: &str) -> bool {
+        matches!(
+            gate_name,
+            "H" | "Hadamard"
+                | "X"
+                | "PauliX"
+                | "Y"
+                | "PauliY"
+                | "Z"
+                | "PauliZ"
+                | "S"
+                | "S†"
+                | "T"
+                | "T†"
+                | "I"
+                | "Identity"
+                | "SX"
+                | "SX†"
+                | "CNOT"
+                | "CX"
+                | "CZ"
+                | "SWAP"
+                | "CCNOT"
+                | "Toffoli"
+                | "CSWAP"
+                | "Fredkin"
+        )
+    }
+
+    /// Convert a flat gate matrix into the fixed-size representation used by
+    /// the dense kernels
+    fn build_cached_matrix(
+        gate_name: &str,
+        qubits: &[QubitId],
+        matrix_vec: &[Complex64],
+    ) -> Result<CachedMatrix> {
+        match qubits.len() {
+            1 => {
+                if matrix_vec.len() != 4 {
+                    return Err(ExecutionError::InvalidGateMatrix {
+                        gate: gate_name.to_string(),
+                        reason: format!("Expected 4 elements, got {}", matrix_vec.len()),
+                    });
+                }
+                let mat: Matrix2x2 = [
+                    [matrix_vec[0], matrix_vec[1]],
+                    [matrix_vec[2], matrix_vec[3]],
+                ];
+                Ok(CachedMatrix::Single(mat))
+            },
+            2 => {
+                if matrix_vec.len() != 16 {
+                    return Err(ExecutionError::InvalidGateMatrix {
+                        gate: gate_name.to_string(),
+                        reason: format!("Expected 16 elements, got {}", matrix_vec.len()),
+                    });
+                }
+                let mut mat: Matrix4x4 = [[Complex64::new(0.0, 0.0); 4]; 4];
+                for i in 0..4 {
+                    for j in 0..4 {
+                        mat[i][j] = matrix_vec[i * 4 + j];
+                    }
+                }
+                Ok(CachedMatrix::Two(mat))
+            },
+            3 => {
+                if matrix_vec.len() != 64 {
+                    return Err(ExecutionError::InvalidGateMatrix {
+                        gate: gate_name.to_string(),
+                        reason: format!("Expected 64 elements, got {}", matrix_vec.len()),
+                    });
+                }
+                let mut mat: Matrix8x8 = [[Complex64::new(0.0, 0.0); 8]; 8];
+                for i in 0..8 {
+                    for j in 0..8 {
+                        mat[i][j] = matrix_vec[i * 8 + j];
+                    }
+                }
+                Ok(CachedMatrix::Three(Box::new(mat)))
+            },
+            n => Err(ExecutionError::GateApplicationFailed {
+                gate: gate_name.to_string(),
+                qubits: qubits.to_vec(),
+                reason: format!("Gates with {} qubits not yet supported", n),
+            }),
+        }
+    }
+
     /// Apply gate to dense state
     fn apply_gate_dense(
         &mut self,
@@ -287,69 +381,42 @@ impl ExecutionEngine {
         let gate_name = gate.name();
         let num_qubits = qubits.len();
 
-        // Try to get matrix from cache
-        let cache_key = GateCacheKey {
-            gate_name: gate_name.to_string(),
-            params: vec![], // TODO: Extract parameters from gate
-        };
+        let cacheable = Self::is_fixed_matrix_gate(gate_name);
 
-        let matrix = if let Some(cached) = self.matrix_cache.get(&cache_key) {
-            self.telemetry.cache_hit();
-            cached
+        let matrix = if cacheable {
+            let cache_key = GateCacheKey {
+                gate_name: gate_name.to_string(),
+                params: vec![],
+            };
+
+            if let Some(cached) = self.matrix_cache.get(&cache_key) {
+                self.telemetry.cache_hit();
+                cached
+            } else {
+                self.telemetry.cache_miss();
+
+                let matrix_vec =
+                    gate.matrix()
+                        .ok_or_else(|| ExecutionError::InvalidGateMatrix {
+                            gate: gate_name.to_string(),
+                            reason: "Gate has no matrix representation".to_string(),
+                        })?;
+
+                let cached_matrix =
+                    Arc::new(Self::build_cached_matrix(gate_name, qubits, &matrix_vec)?);
+                self.matrix_cache
+                    .insert(cache_key, (*cached_matrix).clone());
+                cached_matrix
+            }
         } else {
-            self.telemetry.cache_miss();
-
-            // Get matrix from gate
+            // Parameterized (or unknown) gate: always rebuild the matrix
             let matrix_vec = gate
                 .matrix()
                 .ok_or_else(|| ExecutionError::InvalidGateMatrix {
                     gate: gate_name.to_string(),
                     reason: "Gate has no matrix representation".to_string(),
                 })?;
-
-            // Convert to appropriate format and cache
-            let cached_matrix = match num_qubits {
-                1 => {
-                    if matrix_vec.len() != 4 {
-                        return Err(ExecutionError::InvalidGateMatrix {
-                            gate: gate_name.to_string(),
-                            reason: format!("Expected 4 elements, got {}", matrix_vec.len()),
-                        });
-                    }
-                    let mat: Matrix2x2 = [
-                        [matrix_vec[0], matrix_vec[1]],
-                        [matrix_vec[2], matrix_vec[3]],
-                    ];
-                    CachedMatrix::Single(mat)
-                },
-                2 => {
-                    if matrix_vec.len() != 16 {
-                        return Err(ExecutionError::InvalidGateMatrix {
-                            gate: gate_name.to_string(),
-                            reason: format!("Expected 16 elements, got {}", matrix_vec.len()),
-                        });
-                    }
-                    let mut mat: Matrix4x4 = [[Complex64::new(0.0, 0.0); 4]; 4];
-                    for i in 0..4 {
-                        for j in 0..4 {
-                            mat[i][j] = matrix_vec[i * 4 + j];
-                        }
-                    }
-                    CachedMatrix::Two(mat)
-                },
-                _ => {
-                    return Err(ExecutionError::GateApplicationFailed {
-                        gate: gate_name.to_string(),
-                        qubits: qubits.to_vec(),
-                        reason: format!("Unsupported gate with {} qubits", num_qubits),
-                    });
-                },
-            };
-
-            let cached_matrix = Arc::new(cached_matrix);
-            self.matrix_cache
-                .insert(cache_key, (*cached_matrix).clone());
-            cached_matrix
+            Arc::new(Self::build_cached_matrix(gate_name, qubits, &matrix_vec)?)
         };
 
         // Apply the gate using optimized kernels
@@ -457,6 +524,19 @@ impl ExecutionEngine {
                     }
                 }
             },
+            3 => {
+                if let CachedMatrix::Three(ref mat) = *matrix {
+                    three_qubit::apply_three_qubit_dense(
+                        mat,
+                        qubits[0].index(),
+                        qubits[1].index(),
+                        qubits[2].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                }
+            },
             _ => {
                 return Err(ExecutionError::GateApplicationFailed {
                     gate: gate_name.to_string(),
@@ -532,6 +612,29 @@ impl ExecutionEngine {
                     num_qubits_total,
                 )?;
             },
+            3 => {
+                if matrix_vec.len() != 64 {
+                    return Err(ExecutionError::InvalidGateMatrix {
+                        gate: gate_name.to_string(),
+                        reason: format!("Expected 64 elements, got {}", matrix_vec.len()),
+                    });
+                }
+                let mut mat = [[Complex64::new(0.0, 0.0); 8]; 8];
+                for i in 0..8 {
+                    for j in 0..8 {
+                        mat[i][j] = matrix_vec[i * 8 + j];
+                    }
+                }
+
+                sparse::apply_three_qubit_sparse(
+                    &mat,
+                    qubits[0].index(),
+                    qubits[1].index(),
+                    qubits[2].index(),
+                    state.amplitudes_mut(),
+                    num_qubits_total,
+                )?;
+            },
             _ => {
                 return Err(ExecutionError::GateApplicationFailed {
                     gate: gate_name.to_string(),
@@ -544,19 +647,33 @@ impl ExecutionEngine {
         Ok(())
     }
 
-    /// Maybe convert state representation based on density
+    /// Convert the state representation when its density crosses the
+    /// configured thresholds (sparse → dense when dense enough, dense →
+    /// sparse when it becomes very sparse again)
     fn maybe_convert_state(&mut self, state: &mut AdaptiveState) {
-        if self.adaptive_strategy.should_convert_to_dense(state) {
-            if let AdaptiveState::Sparse { .. } = state {
-                self.telemetry.log_event("convert_sparse_to_dense");
-                self.telemetry.sparse_dense_transitions += 1;
-                // TODO: Implement actual conversion
+        if state.is_sparse() && self.adaptive_strategy.should_convert_to_dense(state) {
+            match state.force_to_dense() {
+                Ok(true) => {
+                    self.telemetry.log_event("convert_sparse_to_dense");
+                    self.telemetry.sparse_dense_transitions += 1;
+                },
+                Ok(false) => {},
+                Err(e) => {
+                    self.telemetry
+                        .log_error(format!("Sparse→Dense conversion failed: {}", e));
+                },
             }
-        } else if self.adaptive_strategy.should_convert_to_sparse(state) {
-            if let AdaptiveState::Dense(_) = state {
-                self.telemetry.log_event("convert_dense_to_sparse");
-                self.telemetry.sparse_dense_transitions += 1;
-                // TODO: Implement actual conversion
+        } else if state.is_dense() && self.adaptive_strategy.should_convert_to_sparse(state) {
+            match state.force_to_sparse() {
+                Ok(true) => {
+                    self.telemetry.log_event("convert_dense_to_sparse");
+                    self.telemetry.sparse_dense_transitions += 1;
+                },
+                Ok(false) => {},
+                Err(e) => {
+                    self.telemetry
+                        .log_error(format!("Dense→Sparse conversion failed: {}", e));
+                },
             }
         }
     }
@@ -576,7 +693,9 @@ impl ExecutionEngine {
 mod tests {
     use super::*;
     use simq_core::QubitId;
-    use simq_gates::standard::{CNot, Hadamard, PauliX, PauliZ, RotationY, Swap, CZ};
+    use simq_gates::standard::{
+        CNot, Fredkin, Hadamard, PauliX, PauliZ, RotationY, Swap, Toffoli, CZ,
+    };
 
     fn make_sequential_engine() -> ExecutionEngine {
         let config = ExecutionConfig {
@@ -848,19 +967,19 @@ mod tests {
         }
     }
 
-    /// A gate that claims to be 3-qubit (unsupported)
+    /// A gate that claims to be 4-qubit (unsupported)
     #[derive(Debug)]
-    struct ThreeQubitGate;
+    struct FourQubitGate;
 
-    impl simq_core::Gate for ThreeQubitGate {
+    impl simq_core::Gate for FourQubitGate {
         fn name(&self) -> &str {
-            "ThreeQubitGate"
+            "FourQubitGate"
         }
         fn num_qubits(&self) -> usize {
-            3
+            4
         }
         fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
-            Some(vec![num_complex::Complex64::new(1.0, 0.0); 64])
+            Some(vec![num_complex::Complex64::new(1.0, 0.0); 256])
         }
     }
 
@@ -977,16 +1096,21 @@ mod tests {
     }
 
     #[test]
-    fn test_three_qubit_gate_unsupported() {
+    fn test_four_qubit_gate_unsupported() {
         let mut engine = make_sequential_engine();
-        let mut circuit = Circuit::new(3);
+        let mut circuit = Circuit::new(4);
         circuit
             .add_gate(
-                Arc::new(ThreeQubitGate),
-                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+                Arc::new(FourQubitGate),
+                &[
+                    QubitId::new(0),
+                    QubitId::new(1),
+                    QubitId::new(2),
+                    QubitId::new(3),
+                ],
             )
             .unwrap();
-        let mut state = AdaptiveState::new(3).unwrap();
+        let mut state = AdaptiveState::new(4).unwrap();
         let result = engine.execute(&circuit, &mut state);
         assert!(result.is_err());
     }
@@ -1077,15 +1201,6 @@ mod tests {
         state
     }
 
-    /// Create a Dense 3-qubit state (all 8 amplitudes non-zero → density=1.0 > 10%).
-    fn make_dense_3q_state() -> AdaptiveState {
-        let amp = 1.0 / (8.0_f64).sqrt();
-        let amplitudes = vec![Complex64::new(amp, 0.0); 8];
-        let state = AdaptiveState::from_amplitudes(3, &amplitudes).unwrap();
-        assert!(state.is_dense(), "Expected Dense state for density=1.0");
-        state
-    }
-
     /// Cache hit in apply_gate_dense (lines 297-298):
     /// Same gate applied twice on Dense state; second application hits cache.
     #[test]
@@ -1143,20 +1258,226 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// 3-qubit gate on Dense state hits the `_` arm (lines 341-344).
+    /// 4-qubit gate on Dense state hits the unsupported `_` arm.
     #[test]
-    fn test_dense_state_three_qubit_gate() {
+    fn test_dense_state_four_qubit_gate() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(4);
+        circuit
+            .add_gate(
+                Arc::new(FourQubitGate),
+                &[
+                    QubitId::new(0),
+                    QubitId::new(1),
+                    QubitId::new(2),
+                    QubitId::new(3),
+                ],
+            )
+            .unwrap();
+        let amp = 0.25;
+        let amplitudes = vec![Complex64::new(amp, 0.0); 16];
+        let mut state = AdaptiveState::from_amplitudes(4, &amplitudes).unwrap();
+        assert!(state.is_dense());
+        let result = engine.execute(&circuit, &mut state);
+        assert!(result.is_err());
+    }
+
+    /// Toffoli via the sparse path: |110⟩ (controls q0,q1 set) flips target q2.
+    #[test]
+    fn test_toffoli_sparse_path() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            adaptive_state: false, // stay on the sparse path
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Toffoli), &[QubitId::new(0), QubitId::new(1), QubitId::new(2)])
+            .unwrap();
+        let mut state = AdaptiveState::new(3).unwrap();
+        engine.execute(&circuit, &mut state).unwrap();
+        assert!(state.is_sparse());
+
+        let amps = state.to_dense_vec();
+        // Little-endian: q0=q1=q2=1 → index 7
+        assert!((amps[7].re - 1.0).abs() < 1e-10);
+        assert!(amps[3].norm() < 1e-10);
+    }
+
+    /// Toffoli via the dense path (uniform superposition converts the state).
+    /// H(0), CNOT(0,1), Toffoli(0,1,2) produces the GHZ state.
+    #[test]
+    fn test_toffoli_builds_ghz_state() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut engine = ExecutionEngine::new(config);
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Toffoli), &[QubitId::new(0), QubitId::new(1), QubitId::new(2)])
+            .unwrap();
+        let mut state = AdaptiveState::new(3).unwrap();
+        engine.execute(&circuit, &mut state).unwrap();
+
+        let amps = state.to_dense_vec();
+        let expected = std::f64::consts::FRAC_1_SQRT_2;
+        assert!((amps[0].re - expected).abs() < 1e-10, "amps = {:?}", amps);
+        assert!((amps[7].re - expected).abs() < 1e-10, "amps = {:?}", amps);
+        for (i, amp) in amps.iter().enumerate().take(7).skip(1) {
+            assert!(amp.norm() < 1e-10, "amps[{}] = {:?}", i, amp);
+        }
+    }
+
+    /// Fredkin (CSWAP): control q0 set swaps targets q1 and q2.
+    #[test]
+    fn test_fredkin_swaps_targets() {
         let mut engine = make_sequential_engine();
         let mut circuit = Circuit::new(3);
         circuit
-            .add_gate(
-                Arc::new(ThreeQubitGate),
-                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
-            )
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
             .unwrap();
-        let mut state = make_dense_3q_state();
-        let result = engine.execute(&circuit, &mut state);
-        assert!(result.is_err());
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Fredkin), &[QubitId::new(0), QubitId::new(1), QubitId::new(2)])
+            .unwrap();
+        let mut state = AdaptiveState::new(3).unwrap();
+        engine.execute(&circuit, &mut state).unwrap();
+
+        let amps = state.to_dense_vec();
+        // |q2 q1 q0⟩ = |011⟩ (index 3) → swap q1↔q2 → |101⟩ (index 5)
+        assert!((amps[5].re - 1.0).abs() < 1e-10, "amps = {:?}", amps);
+        assert!(amps[3].norm() < 1e-10);
+    }
+
+    /// Sparse→dense conversion actually happens once density crosses the
+    /// threshold, and telemetry records a real transition (issue #41).
+    #[test]
+    fn test_sparse_to_dense_conversion_happens() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(3);
+        for q in 0..3 {
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(q)])
+                .unwrap();
+        }
+        let mut state = AdaptiveState::new(3).unwrap();
+        assert!(state.is_sparse());
+        engine.execute(&circuit, &mut state).unwrap();
+
+        // Density reaches 1.0 (well above the 10% threshold), so the state
+        // must be dense at the end and the transition must be counted.
+        assert!(state.is_dense(), "state should have converted to dense");
+        assert_eq!(engine.telemetry.sparse_dense_transitions, 1);
+
+        let amps = state.to_dense_vec();
+        let expected = 1.0 / (8.0_f64).sqrt();
+        for amp in amps {
+            assert!((amp.re - expected).abs() < 1e-10);
+        }
+    }
+
+    /// The dense and sparse paths must agree on the final state (endianness
+    /// regression test: they previously used opposite bit orders).
+    #[test]
+    fn test_dense_and_sparse_paths_agree() {
+        let build_circuit = || {
+            let mut circuit = Circuit::new(3);
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(2)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(0.7)), &[QubitId::new(1)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(CZ), &[QubitId::new(1), QubitId::new(2)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(Swap), &[QubitId::new(0), QubitId::new(1)])
+                .unwrap();
+            circuit
+        };
+
+        // Sparse-only execution
+        let sparse_config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            adaptive_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut sparse_engine = ExecutionEngine::new(sparse_config);
+        let mut sparse_state = AdaptiveState::new(3).unwrap();
+        sparse_engine
+            .execute(&build_circuit(), &mut sparse_state)
+            .unwrap();
+
+        // Dense-only execution (state converted up front)
+        let dense_config = ExecutionConfig {
+            mode: ExecutionMode::Sequential,
+            validate_state: false,
+            adaptive_state: false,
+            ..ExecutionConfig::default()
+        };
+        let mut dense_engine = ExecutionEngine::new(dense_config);
+        let mut dense_state = AdaptiveState::new(3).unwrap();
+        dense_state.force_to_dense().unwrap();
+        dense_engine
+            .execute(&build_circuit(), &mut dense_state)
+            .unwrap();
+
+        let sparse_amps = sparse_state.to_dense_vec();
+        let dense_amps = dense_state.to_dense_vec();
+        for i in 0..8 {
+            assert!(
+                (sparse_amps[i].re - dense_amps[i].re).abs() < 1e-10
+                    && (sparse_amps[i].im - dense_amps[i].im).abs() < 1e-10,
+                "amplitude {} differs: sparse={:?} dense={:?}",
+                i,
+                sparse_amps[i],
+                dense_amps[i]
+            );
+        }
+    }
+
+    /// Rotation gates must not share cache entries across different angles
+    /// (the cache key cannot see gate parameters).
+    #[test]
+    fn test_rotation_gates_not_cross_cached() {
+        let mut engine = make_sequential_engine();
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(RotationY::new(0.5)), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(RotationY::new(1.0)), &[QubitId::new(0)])
+            .unwrap();
+        let mut state = AdaptiveState::new(1).unwrap();
+        engine.execute(&circuit, &mut state).unwrap();
+
+        // RY(0.5) then RY(1.0) equals RY(1.5): |0⟩ → cos(0.75)|0⟩ + sin(0.75)|1⟩
+        let amps = state.to_dense_vec();
+        assert!((amps[0].re - (0.75_f64).cos()).abs() < 1e-10, "amps = {:?}", amps);
+        assert!((amps[1].re - (0.75_f64).sin()).abs() < 1e-10, "amps = {:?}", amps);
     }
 
     /// 2-qubit gate with wrong matrix size on SPARSE state (lines 515-517).

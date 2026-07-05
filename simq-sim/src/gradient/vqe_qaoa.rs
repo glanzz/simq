@@ -17,7 +17,7 @@ use simq_state::observable::PauliObservable;
 use simq_state::AdaptiveState;
 use std::time::{Duration, Instant};
 
-use super::{compute_gradient_auto, GradientConfig, GradientMethod};
+use super::{compute_gradient, compute_gradient_auto, GradientConfig, GradientMethod};
 
 /// Helper function to compute expectation value
 fn compute_expectation(
@@ -244,9 +244,14 @@ where
             let circuit = (self.circuit_builder)(&params);
             let energy = compute_expectation(simulator, &circuit, observable)?;
 
-            // Compute gradient
-            let grad_result =
-                compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
+            // Compute gradient using the configured method
+            let grad_result = compute_gradient(
+                simulator,
+                &self.circuit_builder,
+                observable,
+                &params,
+                &self.config.gradient_config,
+            )?;
 
             let gradient = grad_result.gradients.clone();
             let gradient_norm = grad_result.norm();
@@ -306,8 +311,13 @@ where
         // Max iterations reached
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad =
-            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
+        let final_grad = compute_gradient(
+            simulator,
+            &self.circuit_builder,
+            observable,
+            &params,
+            &self.config.gradient_config,
+        )?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -342,7 +352,21 @@ where
         } else if energy_converged {
             ConvergenceStatus::EnergyConverged
         } else if gradient_converged {
-            ConvergenceStatus::GradientConverged
+            if iteration == 0 {
+                // A vanishing gradient before any progress has been made is
+                // more likely a broken gradient (e.g. an inapplicable
+                // parameter-shift rule) than a true optimum. Keep going; if
+                // the gradient really is zero the energy will not move and
+                // the next iteration converges on energy instead.
+                tracing::warn!(
+                    gradient_norm,
+                    "gradient norm below tolerance on the first VQE iteration; \
+                     treating as suspicious and continuing"
+                );
+                ConvergenceStatus::NotConverged
+            } else {
+                ConvergenceStatus::GradientConverged
+            }
         } else {
             ConvergenceStatus::NotConverged
         }
@@ -448,11 +472,16 @@ where
         for iteration in 0..self.config.max_iterations {
             let step_start = Instant::now();
 
-            // Compute energy and gradient
+            // Compute energy and gradient using the configured method
             let circuit = (self.circuit_builder)(&params);
             let energy = compute_expectation(simulator, &circuit, observable)?;
-            let grad_result =
-                compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
+            let grad_result = compute_gradient(
+                simulator,
+                &self.circuit_builder,
+                observable,
+                &params,
+                &self.config.gradient_config,
+            )?;
 
             let gradient = grad_result.gradients.clone();
             let gradient_norm = grad_result.norm();
@@ -468,7 +497,20 @@ where
             } else if energy_change < self.config.energy_tolerance {
                 ConvergenceStatus::EnergyConverged
             } else if gradient_norm < self.config.gradient_tolerance {
-                ConvergenceStatus::GradientConverged
+                if iteration == 0 {
+                    // A vanishing gradient before any progress usually means
+                    // the gradient itself is broken (see issue #39), not that
+                    // the initial parameters happen to be optimal. Continue;
+                    // a genuinely zero gradient converges on energy next step.
+                    tracing::warn!(
+                        gradient_norm,
+                        "gradient norm below tolerance on the first QAOA iteration; \
+                         treating as suspicious and continuing"
+                    );
+                    ConvergenceStatus::NotConverged
+                } else {
+                    ConvergenceStatus::GradientConverged
+                }
             } else {
                 ConvergenceStatus::NotConverged
             };
@@ -514,8 +556,13 @@ where
         // Max iterations reached
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad =
-            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
+        let final_grad = compute_gradient(
+            simulator,
+            &self.circuit_builder,
+            observable,
+            &params,
+            &self.config.gradient_config,
+        )?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -547,8 +594,13 @@ where
             for _iteration in 0..self.config.max_iterations {
                 let circuit = (self.circuit_builder)(&params);
                 let _energy = compute_expectation(simulator, &circuit, observable)?;
-                let grad_result =
-                    compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
+                let grad_result = compute_gradient(
+                    simulator,
+                    &self.circuit_builder,
+                    observable,
+                    &params,
+                    &self.config.gradient_config,
+                )?;
 
                 // Update only this layer's parameters
                 let gamma_idx = layer_start_idx;
@@ -571,8 +623,13 @@ where
         // Final evaluation
         let final_circuit = (self.circuit_builder)(&params);
         let final_energy = compute_expectation(simulator, &final_circuit, observable)?;
-        let final_grad =
-            compute_gradient_auto(simulator, &self.circuit_builder, observable, &params)?;
+        let final_grad = compute_gradient(
+            simulator,
+            &self.circuit_builder,
+            observable,
+            &params,
+            &self.config.gradient_config,
+        )?;
 
         Ok(OptimizationResult {
             parameters: params,
@@ -1277,6 +1334,83 @@ mod tests {
         let mut optimizer = QAOAOptimizer::new(circuit_builder, config);
         let result = optimizer.optimize(&sim, &obs, &[0.5, 0.5]).unwrap();
         assert_eq!(result.status, ConvergenceStatus::FullyConverged);
+    }
+
+    /// Issue #39 regression: doubled-angle circuits (the shape produced by
+    /// QAOA builders) have an identically zero ±π/2 parameter-shift gradient.
+    /// The optimizer must not stop after one bogus "GradientConverged"
+    /// iteration; with the Auto fallback it actually optimizes.
+    #[test]
+    fn test_qaoa_optimizer_escapes_zero_parameter_shift() {
+        use simq_gates::standard::RotationX;
+        let sim = make_sim();
+        let obs = z_observable();
+        let builder = |params: &[f64]| {
+            let mut c = Circuit::new(1);
+            c.add_gate(Arc::new(RotationX::new(2.0 * params[0])), &[q(0)])
+                .unwrap();
+            c.add_gate(Arc::new(RotationX::new(2.0 * params[1])), &[q(0)])
+                .unwrap();
+            c
+        };
+        let config = QAOAConfig {
+            num_layers: 1,
+            max_iterations: 50,
+            gamma_learning_rate: 0.05,
+            beta_learning_rate: 0.05,
+            ..QAOAConfig::default()
+        };
+        let mut optimizer = QAOAOptimizer::new(builder, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.3, 0.4]).unwrap();
+
+        // E(γ, β) = cos(2(γ+β)); initial energy = cos(1.4)
+        let initial_energy = (1.4_f64).cos();
+        assert!(
+            result.num_iterations > 1,
+            "stopped after {} iteration(s) with {:?}",
+            result.num_iterations,
+            result.status
+        );
+        assert!(
+            result.energy < initial_energy - 1e-3,
+            "no progress: final {} vs initial {}",
+            result.energy,
+            initial_energy
+        );
+    }
+
+    /// QAOAConfig::gradient_config must be honored (it used to be ignored in
+    /// favor of a hardcoded Auto). An explicitly configured parameter-shift
+    /// method on a doubled-angle circuit yields a zero gradient, so the
+    /// parameters must not move.
+    #[test]
+    fn test_qaoa_optimizer_honors_explicit_gradient_method() {
+        use simq_gates::standard::RotationX;
+        let sim = make_sim();
+        let obs = z_observable();
+        let builder = |params: &[f64]| {
+            let mut c = Circuit::new(1);
+            c.add_gate(Arc::new(RotationX::new(2.0 * params[0])), &[q(0)])
+                .unwrap();
+            c.add_gate(Arc::new(RotationX::new(2.0 * params[1])), &[q(0)])
+                .unwrap();
+            c
+        };
+        let config = QAOAConfig {
+            num_layers: 1,
+            max_iterations: 10,
+            gradient_config: GradientConfig {
+                method: GradientMethod::ParameterShift,
+                ..GradientConfig::default()
+            },
+            ..QAOAConfig::default()
+        };
+        let mut optimizer = QAOAOptimizer::new(builder, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.3, 0.4]).unwrap();
+        // Zero parameter-shift gradient → parameters unchanged, which proves
+        // the configured method was used instead of the Auto fallback.
+        assert!((result.parameters[0] - 0.3).abs() < 1e-12);
+        assert!((result.parameters[1] - 0.4).abs() < 1e-12);
     }
 
     /// QAOA history() and reset()

@@ -163,17 +163,14 @@ fn cnot_ket00_unchanged() {
 
 #[test]
 fn cnot_ket10_to_ket11() {
-    // |10⟩ in big-endian: qubit0=1, qubit1=0
-    // State index for big-endian |10⟩ = bit0(MSB)=1 → index depends on convention
-    // apply_cnot uses big-endian, so for 2 qubits:
-    // qubit 0 → bit position 1 (MSB), qubit 1 → bit position 0 (LSB)
-    // |10⟩ → index 2 (binary 10)
+    // Little-endian: qubit k is bit k of the state index, so the control
+    // (qubit 0) being set corresponds to index 1.
     let mut state = vec![zero(); 4];
-    state[2] = one(); // |10⟩
+    state[1] = one(); // control (qubit 0) = 1, target (qubit 1) = 0
     apply_cnot(0, 1, &mut state, false, 1024).unwrap();
-    // CNOT flips target when control=1: |10⟩ → |11⟩ (index 3)
+    // CNOT flips target when control=1 → index 3 (both bits set)
     assert_close(state[3], one(), 1e-12);
-    assert_close(state[2], zero(), 1e-12);
+    assert_close(state[1], zero(), 1e-12);
 }
 
 #[test]

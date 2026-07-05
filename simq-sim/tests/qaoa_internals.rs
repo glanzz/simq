@@ -219,7 +219,9 @@ fn qaoa_config_default() {
     assert_eq!(cfg.depth, 1);
     assert_eq!(cfg.mixer, MixerType::StandardX);
     assert_eq!(cfg.initial_state, InitialState::UniformSuperposition);
-    assert!(!cfg.final_mixer);
+    // Standard QAOA applies the mixer in every layer, including the last
+    // (issue #40): the default must include the final mixer.
+    assert!(cfg.final_mixer);
 }
 
 // ============================================================================
