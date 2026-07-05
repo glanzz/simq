@@ -7,6 +7,11 @@ use rayon::prelude::*;
 
 /// Apply a general two-qubit gate to a dense state vector
 ///
+/// The state uses the little-endian convention (qubit k is bit k of the state
+/// index). The 4×4 matrix uses the standard basis ordering |q1 q2⟩, i.e. matrix
+/// index `m = (bit(qubit1) << 1) | bit(qubit2)`, matching the sparse kernel and
+/// the matrices in `simq-gates` (for CNOT, `qubit1` is the control).
+///
 /// # Arguments
 ///
 /// * `gate` - The 4x4 gate matrix
@@ -57,119 +62,78 @@ pub fn apply_two_qubit_dense(
         (qubit2, qubit1)
     };
 
-    let stride_min = 1 << q_min;
-    let stride_max = 1 << q_max;
+    let num_subspaces = n / 4;
 
     if use_parallel && n >= parallel_threshold {
-        apply_two_qubit_parallel(gate, stride_min, stride_max, state, qubit1, qubit2);
+        let state_ptr_addr = state.as_mut_ptr() as usize;
+        (0..num_subspaces).into_par_iter().for_each(|k| {
+            let base = expand_two_qubit_base(k, q_min, q_max);
+            let idx = get_two_qubit_indices(base, qubit1, qubit2);
+
+            // Safety: each k maps to a disjoint 4-tuple of in-bounds indices
+            unsafe {
+                let state_ptr = state_ptr_addr as *mut Complex64;
+                let a = [
+                    *state_ptr.add(idx[0]),
+                    *state_ptr.add(idx[1]),
+                    *state_ptr.add(idx[2]),
+                    *state_ptr.add(idx[3]),
+                ];
+
+                for (out_idx, &out) in idx.iter().enumerate() {
+                    let mut sum = Complex64::new(0.0, 0.0);
+                    for (in_idx, &amp) in a.iter().enumerate() {
+                        sum += gate[out_idx][in_idx] * amp;
+                    }
+                    *state_ptr.add(out) = sum;
+                }
+            }
+        });
     } else {
-        apply_two_qubit_sequential(gate, stride_min, stride_max, state, qubit1, qubit2);
+        for k in 0..num_subspaces {
+            let base = expand_two_qubit_base(k, q_min, q_max);
+            let idx = get_two_qubit_indices(base, qubit1, qubit2);
+
+            let a = [state[idx[0]], state[idx[1]], state[idx[2]], state[idx[3]]];
+
+            for (out_idx, &out) in idx.iter().enumerate() {
+                let mut sum = Complex64::new(0.0, 0.0);
+                for (in_idx, &amp) in a.iter().enumerate() {
+                    sum += gate[out_idx][in_idx] * amp;
+                }
+                state[out] = sum;
+            }
+        }
     }
 
     Ok(())
 }
 
-/// Apply two-qubit gate sequentially
+/// Expand a compact subspace counter into a base state index that has zero bits
+/// at positions `q_min` and `q_max` (with `q_min < q_max`)
 #[inline]
-fn apply_two_qubit_sequential(
-    gate: &Matrix4x4,
-    stride_min: usize,
-    stride_max: usize,
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-) {
-    let n = state.len();
-    let mut i = 0;
-
-    while i < n {
-        for j in 0..stride_min {
-            for k in 0..stride_min {
-                if (i + j) & stride_min == 0 && (i + j + k * stride_max) & stride_max == 0 {
-                    let base = i + j;
-
-                    // Calculate the 4 indices for the 2-qubit subspace
-                    let idx = get_two_qubit_indices(base, qubit1, qubit2);
-
-                    // Load amplitudes
-                    let a = [state[idx[0]], state[idx[1]], state[idx[2]], state[idx[3]]];
-
-                    // Apply gate matrix
-                    for (out_idx, out) in idx.iter().enumerate() {
-                        let mut sum = Complex64::new(0.0, 0.0);
-                        for (in_idx, &amp) in a.iter().enumerate() {
-                            sum += gate[out_idx][in_idx] * amp;
-                        }
-                        state[*out] = sum;
-                    }
-                }
-            }
-        }
-        i += stride_max * 2;
-    }
-}
-
-/// Apply two-qubit gate in parallel
-#[inline]
-fn apply_two_qubit_parallel(
-    gate: &Matrix4x4,
-    stride_min: usize,
-    stride_max: usize,
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-) {
-    let chunk_size = stride_max * 2;
-    let num_chunks = state.len() / chunk_size;
-
-    // Capture state pointer as usize to avoid Send/Sync issues with raw pointers
-    let state_ptr_addr = state.as_mut_ptr() as usize;
-
-    (0..num_chunks).into_par_iter().for_each(|chunk_idx| {
-        let base_offset = chunk_idx * chunk_size;
-
-        for j in 0..stride_min {
-            for k in 0..stride_min {
-                let base = base_offset + j;
-
-                if (base & stride_min == 0) && ((base + k * stride_max) & stride_max == 0) {
-                    let idx = get_two_qubit_indices(base, qubit1, qubit2);
-
-                    // Safety: indices are computed to be within bounds
-                    unsafe {
-                        let state_ptr = state_ptr_addr as *mut Complex64;
-                        let a = [
-                            *state_ptr.add(idx[0]),
-                            *state_ptr.add(idx[1]),
-                            *state_ptr.add(idx[2]),
-                            *state_ptr.add(idx[3]),
-                        ];
-
-                        for (out_idx, &out) in idx.iter().enumerate() {
-                            let mut sum = Complex64::new(0.0, 0.0);
-                            for (in_idx, &amp) in a.iter().enumerate() {
-                                sum += gate[out_idx][in_idx] * amp;
-                            }
-                            *state_ptr.add(out) = sum;
-                        }
-                    }
-                }
-            }
-        }
-    });
+fn expand_two_qubit_base(k: usize, q_min: usize, q_max: usize) -> usize {
+    let low = (1usize << q_min) - 1;
+    let x = (k & low) | ((k & !low) << 1); // insert 0 at bit q_min
+    let mid = (1usize << q_max) - 1;
+    (x & mid) | ((x & !mid) << 1) // insert 0 at bit q_max
 }
 
 /// Get the 4 indices for a 2-qubit gate application
+///
+/// Index `m` of the returned array corresponds to matrix basis state
+/// `m = (bit(qubit1) << 1) | bit(qubit2)` (first qubit is the most
+/// significant bit of the matrix index, as in `simq-gates` matrices).
 #[inline]
 fn get_two_qubit_indices(base: usize, qubit1: usize, qubit2: usize) -> [usize; 4] {
     let mask1 = 1 << qubit1;
     let mask2 = 1 << qubit2;
 
     [
-        base,                 // |00⟩
-        base | mask1,         // |10⟩ or |01⟩ depending on qubit order
-        base | mask2,         // |01⟩ or |10⟩ depending on qubit order
-        base | mask1 | mask2, // |11⟩
+        base,                 // |q1=0, q2=0⟩
+        base | mask2,         // |q1=0, q2=1⟩
+        base | mask1,         // |q1=1, q2=0⟩
+        base | mask1 | mask2, // |q1=1, q2=1⟩
     ]
 }
 
@@ -210,11 +174,9 @@ pub fn apply_cnot(
         });
     }
 
-    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
-    let control_bit = num_qubits - 1 - control;
-    let target_bit = num_qubits - 1 - target;
-    let control_mask = 1 << control_bit;
-    let target_mask = 1 << target_bit;
+    // Little-endian convention: qubit k corresponds to bit k of the state index
+    let control_mask = 1 << control;
+    let target_mask = 1 << target;
 
     if use_parallel && n >= parallel_threshold {
         let state_ptr_addr = state.as_mut_ptr() as usize;
@@ -278,11 +240,9 @@ pub fn apply_cz(
         });
     }
 
-    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
-    let control_bit = num_qubits - 1 - control;
-    let target_bit = num_qubits - 1 - target;
-    let control_mask = 1 << control_bit;
-    let target_mask = 1 << target_bit;
+    // Little-endian convention: qubit k corresponds to bit k of the state index
+    let control_mask = 1 << control;
+    let target_mask = 1 << target;
     let both_mask = control_mask | target_mask;
 
     if use_parallel && n >= parallel_threshold {
@@ -335,11 +295,9 @@ pub fn apply_swap(
         return Ok(()); // SWAP on same qubit is identity
     }
 
-    // Convert qubit indices to bit positions (big-endian: qubit 0 is MSB)
-    let bit1 = num_qubits - 1 - qubit1;
-    let bit2 = num_qubits - 1 - qubit2;
-    let mask1 = 1 << bit1;
-    let mask2 = 1 << bit2;
+    // Little-endian convention: qubit k corresponds to bit k of the state index
+    let mask1 = 1 << qubit1;
+    let mask2 = 1 << qubit2;
 
     if use_parallel && n >= parallel_threshold {
         let state_ptr_addr = state.as_mut_ptr() as usize;
@@ -392,17 +350,18 @@ mod tests {
         assert_abs_diff_eq!(state[0].re, 1.0, epsilon = 1e-10);
         assert_abs_diff_eq!(state[1].re, 0.0, epsilon = 1e-10);
 
-        // |10⟩ → |11⟩
+        // Little-endian: index 1 = |q1=0, q0=1⟩. With control=0 set, the target
+        // (qubit 1) flips: index 1 → index 3.
         let mut state = vec![
             Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0),
             Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
             Complex64::new(0.0, 0.0),
         ];
 
         apply_cnot(0, 1, &mut state, false, usize::MAX).unwrap();
 
-        assert_abs_diff_eq!(state[2].re, 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_abs_diff_eq!(state[3].re, 1.0, epsilon = 1e-10);
     }
 
@@ -450,16 +409,16 @@ mod tests {
 
     #[test]
     fn test_cnot_parallel() {
-        // |10⟩ → |11⟩ with parallel execution enabled
+        // control=0 set (index 1) flips target qubit 1: index 1 → index 3
         let mut state = vec![
             Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0),
             Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
             Complex64::new(0.0, 0.0),
         ];
         apply_cnot(0, 1, &mut state, true, 0).unwrap(); // threshold=0 forces parallel
         assert_abs_diff_eq!(state[3].re, 1.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(state[2].re, 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[1].re, 0.0, epsilon = 1e-10);
     }
 
     #[test]
@@ -668,6 +627,49 @@ mod tests {
         // State norm should be preserved
         let norm: f64 = state.iter().map(|a| a.norm_sqr()).sum();
         assert!((norm - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_general_dense_cnot_matches_specialized() {
+        // The general 4x4 path with the CNOT matrix must agree with the
+        // specialized apply_cnot kernel, including for non-adjacent qubits.
+        let cnot = cnot_matrix();
+        for &(control, target, n_qubits) in &[(0, 1, 2), (1, 0, 2), (0, 2, 3), (2, 0, 3), (1, 3, 4)]
+        {
+            let dim = 1usize << n_qubits;
+            // Superposition with distinct amplitudes so any index mix-up shows up
+            let mut general: Vec<Complex64> = (0..dim)
+                .map(|i| Complex64::new(1.0 + i as f64, 0.5 * i as f64))
+                .collect();
+            let mut specialized = general.clone();
+
+            apply_two_qubit_dense(&cnot, control, target, &mut general, false, usize::MAX).unwrap();
+            apply_cnot(control, target, &mut specialized, false, usize::MAX).unwrap();
+
+            for i in 0..dim {
+                assert_abs_diff_eq!(general[i].re, specialized[i].re, epsilon = 1e-10);
+                assert_abs_diff_eq!(general[i].im, specialized[i].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_general_dense_non_adjacent_qubits_cover_all_subspaces() {
+        // Regression: the old enumeration skipped subspaces for non-adjacent
+        // qubits. An X⊗X-style gate on qubits (0, 2) of a 3-qubit state must
+        // move every amplitude.
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        // X on both qubits: |q1 q2⟩ → |!q1 !q2⟩, i.e. anti-diagonal matrix
+        let xx = [[o, o, o, i], [o, o, i, o], [o, i, o, o], [i, o, o, o]];
+
+        let mut state: Vec<Complex64> = (0..8).map(|k| Complex64::new(k as f64, 0.0)).collect();
+        apply_two_qubit_dense(&xx, 0, 2, &mut state, false, usize::MAX).unwrap();
+
+        // Flipping bits 0 and 2 maps index k → k ^ 0b101
+        for (k, amp) in state.iter().enumerate() {
+            assert_abs_diff_eq!(amp.re, (k ^ 0b101) as f64, epsilon = 1e-10);
+        }
     }
 
     #[test]

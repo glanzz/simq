@@ -18,7 +18,8 @@ const DEFAULT_SPARSE_TO_DENSE_THRESHOLD: f32 = 0.1;
 /// AdaptiveState automatically switches between sparse and dense representations:
 /// - Starts in sparse mode for initial states
 /// - Converts to dense when density exceeds threshold (default 10%)
-/// - Never converts back to sparse (avoids thrashing)
+/// - Automatic conversion never goes back to sparse (avoids thrashing);
+///   callers can re-sparsify explicitly via [`force_to_sparse`](Self::force_to_sparse)
 ///
 /// # Example
 ///
@@ -371,6 +372,28 @@ impl AdaptiveState {
         }
     }
 
+    /// Force conversion to sparse representation
+    ///
+    /// This is the inverse of [`force_to_dense`](Self::force_to_dense) and is
+    /// used by adaptive execution engines to re-sparsify a state whose density
+    /// has dropped (e.g. after measurement collapse).
+    ///
+    /// # Returns
+    /// True if conversion occurred, false if already sparse
+    pub fn force_to_sparse(&mut self) -> Result<bool> {
+        if let Self::Dense(state) = self {
+            let sparse =
+                SparseState::from_dense_amplitudes(state.num_qubits(), state.amplitudes())?;
+            *self = Self::Sparse {
+                state: sparse,
+                threshold: DEFAULT_SPARSE_TO_DENSE_THRESHOLD,
+            };
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Get statistics about the current state
     pub fn stats(&self) -> StateStats {
         match self {
@@ -550,6 +573,44 @@ mod tests {
         // Second call should not convert
         let converted_again = state.force_to_dense().unwrap();
         assert!(!converted_again);
+    }
+
+    #[test]
+    fn test_force_to_sparse() {
+        let mut state = AdaptiveState::new(3).unwrap();
+        state.force_to_dense().unwrap();
+        assert!(state.is_dense());
+
+        let converted = state.force_to_sparse().unwrap();
+        assert!(converted);
+        assert!(state.is_sparse());
+        // |000⟩ has a single nonzero amplitude
+        assert_eq!(state.stats().memory_entries, 1);
+        assert_relative_eq!(state.norm(), 1.0, epsilon = 1e-10);
+
+        // Second call should not convert
+        let converted_again = state.force_to_sparse().unwrap();
+        assert!(!converted_again);
+    }
+
+    #[test]
+    fn test_force_to_sparse_preserves_amplitudes() {
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        let mut state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        state.force_to_dense().unwrap();
+        state.force_to_sparse().unwrap();
+        assert!(state.is_sparse());
+        let round_trip = state.to_dense_vec();
+        for (a, b) in amplitudes.iter().zip(round_trip.iter()) {
+            assert_relative_eq!(a.re, b.re, epsilon = 1e-12);
+            assert_relative_eq!(a.im, b.im, epsilon = 1e-12);
+        }
     }
 
     #[test]

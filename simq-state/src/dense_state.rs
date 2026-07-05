@@ -1817,6 +1817,28 @@ mod tests {
         assert!(state.apply_cnot(0, 0).is_err()); // same qubit
     }
 
+    /// Regression test for issue #30: H(0) followed by CNOT(control=0,
+    /// target=1) must produce the Bell state (|00⟩ + |11⟩)/√2, not leave the
+    /// state as (|00⟩ + |01⟩)/√2.
+    #[test]
+    fn test_bell_state_via_hadamard_and_cnot() {
+        let h = 1.0 / 2.0_f64.sqrt();
+        let hadamard = [
+            [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
+            [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
+        ];
+
+        let mut state = DenseState::new(2).unwrap();
+        state.apply_single_qubit_gate(&hadamard, 0).unwrap();
+        state.apply_cnot(0, 1).unwrap();
+
+        let amps = state.amplitudes();
+        assert_relative_eq!(amps[0].re, h, epsilon = 1e-10); // |00⟩
+        assert_relative_eq!(amps[3].re, h, epsilon = 1e-10); // |11⟩
+        assert!(amps[1].norm() < 1e-10, "|01⟩ amplitude must vanish");
+        assert!(amps[2].norm() < 1e-10, "|10⟩ amplitude must vanish");
+    }
+
     #[test]
     fn test_apply_cz_invalid_qubits() {
         let mut state = DenseState::new(2).unwrap();

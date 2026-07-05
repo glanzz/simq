@@ -38,6 +38,7 @@ pub use vqe_qaoa::{
     VQEOptimizer,
 };
 
+use num_complex::Complex64;
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
 
@@ -197,6 +198,26 @@ where
         },
 
         GradientMethod::Auto => {
+            // The ±π/2 parameter shift rule is only exact when each parameter
+            // appears once, unscaled, as the angle of a single one-qubit
+            // rotation. QAOA-style circuits (one parameter feeding many gates
+            // with doubled angles) violate this and can produce identically
+            // zero "gradients", so fall back to finite differences for them.
+            if !parameter_shift_compatible(&circuit_builder, params) {
+                let fd_config = finite_difference::FiniteDifferenceConfig {
+                    method: finite_difference::FiniteDifferenceMethod::Central,
+                    epsilon: config.epsilon,
+                    parallel: config.parallel,
+                };
+                return compute_gradient_finite_difference(
+                    simulator,
+                    circuit_builder,
+                    observable,
+                    params,
+                    &fd_config,
+                );
+            }
+
             // Try parameter shift first, fall back to finite differences
             let ps_config = parameter_shift::ParameterShiftConfig {
                 shift: config.shift,
@@ -230,6 +251,106 @@ where
             }
         },
     }
+}
+
+/// Probe angle used to detect how a parameter enters the circuit's gates.
+/// Deliberately not a "nice" fraction of π so that special-angle code paths
+/// (caches, snapping) cannot mask the dependence.
+const PS_PROBE_SHIFT: f64 = 0.31;
+
+/// Tolerance for deciding that two gate matrices differ
+const PS_MATRIX_TOL: f64 = 1e-9;
+
+/// Relative tolerance on the recovered angular speed |s - 1|
+const PS_SCALE_TOL: f64 = 1e-3;
+
+/// Structural check: is the standard ±π/2 parameter shift rule applicable to
+/// every parameter of the circuit family produced by `circuit_builder`?
+///
+/// For each parameter, the circuit is rebuilt with that parameter perturbed
+/// and the gate matrices are compared against the unperturbed circuit:
+///
+/// * the parameter must affect **at most one** gate (a parameter feeding
+///   several gates needs the summed per-gate shift rule);
+/// * that gate must be a **one-qubit** gate (controlled rotations have a
+///   different eigenvalue structure and need a four-term rule);
+/// * the gate's angle must advance at the **same rate** as the parameter
+///   (an angle like `2γ` halves the period of the expectation value, which
+///   breaks the ±π/2 rule). The rate is recovered from
+///   `|tr(M(θ+δ) M(θ)†)| = 2·|cos(s·δ/2)|`, which is insensitive to global
+///   phase conventions.
+///
+/// Parameters that affect no gate are fine (their gradient is zero under any
+/// method). The check is conservative: any structural surprise (gate count
+/// changing with a parameter, missing matrices, multi-qubit parameterized
+/// gates) disqualifies parameter shift and the caller should use finite
+/// differences instead.
+fn parameter_shift_compatible<F>(circuit_builder: &F, params: &[f64]) -> bool
+where
+    F: Fn(&[f64]) -> Circuit,
+{
+    let base_circuit = circuit_builder(params);
+    let base_matrices: Vec<Option<Vec<Complex64>>> = base_circuit
+        .operations()
+        .map(|op| op.gate().matrix())
+        .collect();
+
+    for i in 0..params.len() {
+        let mut shifted = params.to_vec();
+        shifted[i] += PS_PROBE_SHIFT;
+        let probe_circuit = circuit_builder(&shifted);
+        let probe_matrices: Vec<Option<Vec<Complex64>>> = probe_circuit
+            .operations()
+            .map(|op| op.gate().matrix())
+            .collect();
+
+        if probe_matrices.len() != base_matrices.len() {
+            return false; // circuit structure depends on the parameter value
+        }
+
+        let mut changed: Option<usize> = None;
+        for (j, (base, probe)) in base_matrices.iter().zip(&probe_matrices).enumerate() {
+            match (base, probe) {
+                (Some(mb), Some(mp)) => {
+                    if mb.len() != mp.len() {
+                        return false;
+                    }
+                    let differs = mb
+                        .iter()
+                        .zip(mp)
+                        .any(|(a, b)| (a - b).norm() > PS_MATRIX_TOL);
+                    if differs {
+                        if changed.is_some() {
+                            return false; // parameter feeds multiple gates
+                        }
+                        changed = Some(j);
+                    }
+                },
+                (None, None) => {},
+                _ => return false,
+            }
+        }
+
+        if let Some(j) = changed {
+            let mb = base_matrices[j].as_ref().unwrap();
+            let mp = probe_matrices[j].as_ref().unwrap();
+            if mb.len() != 4 {
+                return false; // only single-qubit rotations support the ±π/2 rule
+            }
+            // tr(Mp · Mb†) = Σ_{r,c} Mp[r,c] · conj(Mb[r,c])
+            let mut trace = Complex64::new(0.0, 0.0);
+            for (a, b) in mp.iter().zip(mb) {
+                trace += a * b.conj();
+            }
+            let cos_half = (trace.norm() / 2.0).clamp(0.0, 1.0);
+            let speed = 2.0 * cos_half.acos() / PS_PROBE_SHIFT;
+            if (speed - 1.0).abs() > PS_SCALE_TOL {
+                return false; // angle is scaled relative to the parameter
+            }
+        }
+    }
+
+    true
 }
 
 /// Compute gradients with automatic fallback (simplified interface)
@@ -279,7 +400,7 @@ mod tests {
     use super::*;
     use crate::{Simulator, SimulatorConfig};
     use simq_core::{circuit::Circuit, QubitId};
-    use simq_gates::standard::RotationY;
+    use simq_gates::standard::{RotationX, RotationY};
     use simq_state::observable::{PauliObservable, PauliString};
     use std::sync::Arc;
 
@@ -394,6 +515,71 @@ mod tests {
         let grad = compute_gradient(&sim, circuit_builder, &obs, &[0.5], &config).unwrap();
         assert_eq!(grad.gradients.len(), 1);
         assert!(grad.gradients[0].is_finite());
+    }
+
+    /// A plain one-parameter rotation satisfies the parameter-shift
+    /// preconditions.
+    #[test]
+    fn test_parameter_shift_compatible_plain_rotation() {
+        assert!(parameter_shift_compatible(&ry_circuit, &[0.5]));
+    }
+
+    /// A doubled angle (RX(2θ), as generated by QAOA mixers) breaks the ±π/2
+    /// shift rule and must be detected.
+    #[test]
+    fn test_parameter_shift_incompatible_scaled_angle() {
+        let scaled = |params: &[f64]| {
+            let mut c = Circuit::new(1);
+            c.add_gate(Arc::new(RotationX::new(2.0 * params[0])), &[q(0)])
+                .unwrap();
+            c
+        };
+        assert!(!parameter_shift_compatible(&scaled, &[0.3]));
+    }
+
+    /// A parameter feeding several gates (QAOA cost/mixer layers) needs the
+    /// summed shift rule and must be detected.
+    #[test]
+    fn test_parameter_shift_incompatible_shared_parameter() {
+        let shared = |params: &[f64]| {
+            let mut c = Circuit::new(2);
+            c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+                .unwrap();
+            c.add_gate(Arc::new(RotationY::new(params[0])), &[q(1)])
+                .unwrap();
+            c
+        };
+        assert!(!parameter_shift_compatible(&shared, &[0.5]));
+    }
+
+    /// Issue #39 regression: for RX(2θ) with observable Z, E(θ) = cos(2θ) and
+    /// the ±π/2 parameter shift is identically zero even though the true
+    /// gradient is -2·sin(2θ). Auto must fall back to finite differences and
+    /// return the correct value.
+    #[test]
+    fn test_auto_uses_finite_differences_for_scaled_angles() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let scaled = |params: &[f64]| {
+            let mut c = Circuit::new(1);
+            c.add_gate(Arc::new(RotationX::new(2.0 * params[0])), &[q(0)])
+                .unwrap();
+            c
+        };
+        let config = GradientConfig {
+            method: GradientMethod::Auto,
+            ..GradientConfig::default()
+        };
+        let theta = 0.3;
+        let result = compute_gradient(&sim, scaled, &obs, &[theta], &config).unwrap();
+        assert_eq!(result.method_used, GradientMethod::FiniteDifference);
+        let expected = -2.0 * (2.0 * theta).sin();
+        assert!(
+            (result.gradients[0] - expected).abs() < 1e-3,
+            "gradient {} but expected {}",
+            result.gradients[0],
+            expected
+        );
     }
 
     /// GradientConfig default values

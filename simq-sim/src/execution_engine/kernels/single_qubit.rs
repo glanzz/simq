@@ -37,9 +37,10 @@ pub fn apply_single_qubit_dense(
         });
     }
 
-    // Convert qubit index to bit position (big-endian: qubit 0 is MSB)
-    let bit_position = num_qubits - 1 - qubit;
-    let stride = 1 << bit_position;
+    // Little-endian convention: qubit k corresponds to bit k of the state index.
+    // This matches the sparse kernels, the specialized X/Z/H kernels below, and
+    // the simq-state DenseState implementation.
+    let stride = 1 << qubit;
 
     // Validate gate matrix (optional in release builds)
     #[cfg(debug_assertions)]

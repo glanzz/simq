@@ -330,7 +330,13 @@ pub struct QAOAConfig {
     /// Initial state preparation strategy
     pub initial_state: InitialState,
 
-    /// Whether to apply final layer of mixer
+    /// Whether to apply the mixer on the last layer.
+    ///
+    /// Standard QAOA (Farhi et al.) applies the mixer in *every* layer,
+    /// including the last: U(β_p, γ_p)···U(β_1, γ_1)|+⟩^⊗n with
+    /// U(β, γ) = e^{-iβB} e^{-iγC}. Disabling this is a niche variation;
+    /// with it off, a depth-1 circuit contains no mixer at all and β has no
+    /// effect on the output distribution.
     pub final_mixer: bool,
 }
 
@@ -340,7 +346,7 @@ impl Default for QAOAConfig {
             depth: 1,
             mixer: MixerType::StandardX,
             initial_state: InitialState::UniformSuperposition,
-            final_mixer: false,
+            final_mixer: true,
         }
     }
 }
@@ -937,6 +943,65 @@ mod tests {
         let params = vec![0.5, 0.3, 0.7, 0.4];
         let circuit = builder.build(&params);
         assert_eq!(circuit.num_qubits(), 3);
+    }
+
+    /// Regression test for issue #40: with the default config, a depth-1 QAOA
+    /// circuit must contain a mixer layer, so its output distribution depends
+    /// on β and is not uniform.
+    #[test]
+    fn test_depth1_distribution_depends_on_beta() {
+        use crate::{Simulator, SimulatorConfig};
+
+        let simulator = Simulator::new(SimulatorConfig::default().with_optimization(false));
+        let probabilities = |gamma: f64, beta: f64| -> Vec<f64> {
+            let builder = QAOACircuitBuilder::new(
+                ProblemType::MaxCut(Graph::cycle(5)),
+                MixerType::StandardX,
+                1,
+            );
+            let circuit = builder.build(&[gamma, beta]);
+            let result = simulator.run(&circuit).unwrap();
+            result
+                .state
+                .to_dense_vec()
+                .iter()
+                .map(|a| a.norm_sqr())
+                .collect()
+        };
+
+        let probs = probabilities(0.4, 0.6);
+        let min = probs.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        assert!(
+            max - min > 1e-3,
+            "p=1 QAOA distribution is uniform (min={}, max={}): mixer missing",
+            min,
+            max
+        );
+
+        // And β must actually change the distribution
+        let probs_other_beta = probabilities(0.4, 0.9);
+        let diff: f64 = probs
+            .iter()
+            .zip(&probs_other_beta)
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(diff > 1e-3, "β has no effect on the p=1 distribution");
+    }
+
+    #[test]
+    fn test_final_mixer_opt_out_still_available() {
+        let config = QAOAConfig {
+            depth: 1,
+            final_mixer: false,
+            ..QAOAConfig::default()
+        };
+        let builder = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
+        let circuit = builder.build(&[0.4, 0.6]);
+        // 3 Hadamards + 3 edges × (CNOT, RZ, CNOT) and no RX mixer gates
+        assert!(!circuit
+            .operations()
+            .any(|op| op.gate().name().starts_with("RX")));
     }
 
     #[test]

@@ -44,6 +44,70 @@ pub fn apply_single_qubit_sparse(
     Ok(())
 }
 
+/// Apply a three-qubit gate to a sparse state
+///
+/// The 8×8 matrix uses the standard basis ordering |q1 q2 q3⟩, i.e. matrix
+/// index `m = (bit(qubit1) << 2) | (bit(qubit2) << 1) | bit(qubit3)`.
+pub fn apply_three_qubit_sparse(
+    gate: &[[Complex64; 8]; 8],
+    qubit1: usize,
+    qubit2: usize,
+    qubit3: usize,
+    amplitudes: &mut AHashMap<u64, Complex64>,
+    _num_qubits: usize,
+) -> Result<()> {
+    let mask1 = 1u64 << qubit1;
+    let mask2 = 1u64 << qubit2;
+    let mask3 = 1u64 << qubit3;
+    let all_masks = mask1 | mask2 | mask3;
+    let mut new_amplitudes: AHashMap<u64, Complex64> = AHashMap::new();
+
+    // Collect all 8-dimensional subspaces containing nonzero amplitudes
+    let mut basis_states = std::collections::HashSet::new();
+    for &idx in amplitudes.keys() {
+        basis_states.insert(idx & !all_masks);
+    }
+
+    for &base in &basis_states {
+        let mut indices = [0u64; 8];
+        for (m, slot) in indices.iter_mut().enumerate() {
+            let mut i = base;
+            if m & 0b100 != 0 {
+                i |= mask1;
+            }
+            if m & 0b010 != 0 {
+                i |= mask2;
+            }
+            if m & 0b001 != 0 {
+                i |= mask3;
+            }
+            *slot = i;
+        }
+
+        let mut amp = [Complex64::new(0.0, 0.0); 8];
+        for (m, &i) in indices.iter().enumerate() {
+            amp[m] = amplitudes
+                .get(&i)
+                .copied()
+                .unwrap_or(Complex64::new(0.0, 0.0));
+        }
+
+        for (out_idx, &idx) in indices.iter().enumerate() {
+            let mut sum = Complex64::new(0.0, 0.0);
+            for (in_idx, &a) in amp.iter().enumerate() {
+                sum += gate[out_idx][in_idx] * a;
+            }
+
+            if sum.norm_sqr() > 1e-15 {
+                new_amplitudes.insert(idx, sum);
+            }
+        }
+    }
+
+    *amplitudes = new_amplitudes;
+    Ok(())
+}
+
 /// Apply a two-qubit gate to a sparse state
 pub fn apply_two_qubit_sparse(
     gate: &[[Complex64; 4]; 4],

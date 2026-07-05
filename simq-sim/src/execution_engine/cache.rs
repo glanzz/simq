@@ -1,6 +1,6 @@
 //! Gate matrix caching
 
-use crate::execution_engine::kernels::{Matrix2x2, Matrix4x4};
+use crate::execution_engine::kernels::{Matrix2x2, Matrix4x4, Matrix8x8};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,6 +35,7 @@ impl std::hash::Hash for OrderedFloat {
 pub enum CachedMatrix {
     Single(Matrix2x2),
     Two(Matrix4x4),
+    Three(Box<Matrix8x8>),
 }
 
 /// LRU cache for gate matrices
