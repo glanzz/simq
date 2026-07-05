@@ -6,6 +6,9 @@ use simq_state::AdaptiveState;
 /// Adaptive strategy selector
 pub struct AdaptiveStrategy {
     sparse_threshold: f32,
+    /// Retained for when a real GPU backend lands; `select_execution_mode`
+    /// deliberately ignores it until then.
+    #[allow(dead_code)]
     gpu_threshold: usize,
     parallel_threshold: usize,
 }
@@ -30,15 +33,19 @@ impl AdaptiveStrategy {
     }
 
     /// Decide which execution mode to use
+    ///
+    /// Never selects [`ExecutionMode::Gpu`]: the GPU backend is not
+    /// implemented, and routing large states there would either fail every
+    /// big-circuit run or (previously) silently execute sequentially. The
+    /// `gpu_threshold` field is kept so the policy can be re-enabled once a
+    /// real backend exists.
     pub fn select_execution_mode(&self, state: &AdaptiveState, num_gates: usize) -> ExecutionMode {
         let state_size = match state {
             AdaptiveState::Dense(dense) => dense.dimension(),
             AdaptiveState::Sparse { state, .. } => state.amplitudes().len(),
         };
 
-        if state_size >= self.gpu_threshold {
-            ExecutionMode::Gpu
-        } else if state_size >= self.parallel_threshold || num_gates > 100 {
+        if state_size >= self.parallel_threshold || num_gates > 100 {
             ExecutionMode::Parallel
         } else {
             ExecutionMode::Sequential
@@ -71,13 +78,13 @@ mod tests {
     }
 
     #[test]
-    fn test_select_gpu_mode_when_state_exceeds_gpu_threshold() {
-        // AdaptiveState::new creates a Sparse state with 1 non-zero amplitude (|0⟩).
-        // Set gpu_threshold=1 so that even a single-amplitude sparse state triggers Gpu.
+    fn test_never_selects_unimplemented_gpu_mode() {
+        // Even when the state size exceeds the GPU threshold, the strategy
+        // must not route execution to the unimplemented GPU backend.
         let strategy = AdaptiveStrategy::new(0.1, 1, 2);
         let state = AdaptiveState::new(4).unwrap();
         let mode = strategy.select_execution_mode(&state, 1);
-        assert_eq!(mode, ExecutionMode::Gpu);
+        assert_ne!(mode, ExecutionMode::Gpu);
     }
 
     #[test]

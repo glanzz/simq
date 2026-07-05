@@ -18,6 +18,10 @@ pub struct ExecutionConfig {
     pub use_simd: bool,
 
     /// Enable GPU acceleration
+    ///
+    /// **Not implemented**: setting this to `true` (or selecting
+    /// [`ExecutionMode::Gpu`]) fails validation instead of silently running
+    /// on the CPU.
     pub use_gpu: bool,
 
     /// GPU device index (if multiple GPUs available)
@@ -96,13 +100,17 @@ impl ExecutionConfig {
     }
 
     /// Configure for maximum performance
+    ///
+    /// Does not enable GPU acceleration: no GPU backend exists, and a preset
+    /// that advertised one would validate-fail (or, historically, silently
+    /// run on the CPU).
     pub fn performance() -> Self {
         Self {
             mode: ExecutionMode::Parallel,
             parallel_strategy: ParallelStrategy::LayerBased,
             parallel_threshold: 1 << 8,
             use_simd: true,
-            use_gpu: true,
+            use_gpu: false,
             adaptive_state: true,
             validate_state: false,
             enable_checkpoints: false,
@@ -178,6 +186,14 @@ impl ExecutionConfig {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
+        if self.use_gpu || self.mode == ExecutionMode::Gpu {
+            return Err(
+                "GPU execution is not implemented: refusing to accept use_gpu/ExecutionMode::Gpu \
+                 and silently run on the CPU. Use Sequential, Parallel, or Adaptive mode."
+                    .to_string(),
+            );
+        }
+
         if self.parallel_threshold == 0 {
             return Err("parallel_threshold must be > 0".to_string());
         }
@@ -215,6 +231,9 @@ pub enum ExecutionMode {
     Adaptive,
 
     /// GPU-accelerated execution
+    ///
+    /// **Not implemented**: selecting this mode fails
+    /// [`ExecutionConfig::validate`] instead of silently executing on the CPU.
     Gpu,
 }
 
@@ -250,8 +269,25 @@ mod tests {
     fn test_performance_config() {
         let config = ExecutionConfig::performance();
         assert_eq!(config.mode, ExecutionMode::Parallel);
-        assert!(config.use_gpu);
+        // The performance preset must not advertise the unimplemented GPU path
+        assert!(!config.use_gpu);
+        assert!(config.validate().is_ok());
         assert!(!config.validate_state);
+    }
+
+    #[test]
+    fn test_gpu_config_rejected() {
+        let config = ExecutionConfig {
+            use_gpu: true,
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Gpu,
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 
     #[test]
@@ -289,11 +325,15 @@ mod tests {
     fn test_builder() {
         let config = ExecutionConfig::new()
             .with_mode(ExecutionMode::Parallel)
-            .with_gpu(true)
             .with_validation(false);
 
         assert_eq!(config.mode, ExecutionMode::Parallel);
-        assert!(config.use_gpu);
         assert!(!config.validate_state);
+
+        // Requesting the GPU through the builder is possible, but such a
+        // config must not pass validation while no backend exists.
+        let gpu_config = ExecutionConfig::new().with_gpu(true);
+        assert!(gpu_config.use_gpu);
+        assert!(gpu_config.validate().is_err());
     }
 }

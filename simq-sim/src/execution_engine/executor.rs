@@ -178,16 +178,25 @@ impl ExecutionEngine {
     }
 
     /// Execute circuit on GPU
+    ///
+    /// GPU execution is not implemented. An explicit request for it fails
+    /// loudly instead of silently running on the CPU: a caller who selected
+    /// `ExecutionMode::Gpu` for a 2^20-amplitude state must not discover at
+    /// benchmark time that "GPU" numbers were sequential-CPU numbers.
+    /// (Configs with `use_gpu`/`ExecutionMode::Gpu` are already rejected by
+    /// `ExecutionConfig::validate`; this guards direct calls.)
     fn execute_gpu(
         &mut self,
-        circuit: &Circuit,
-        state: &mut AdaptiveState,
+        _circuit: &Circuit,
+        _state: &mut AdaptiveState,
         _timeout_check: Option<(Instant, std::time::Duration)>,
     ) -> Result<()> {
-        // TODO: Implement GPU execution
-        // For now, fallback to sequential
-        self.telemetry.log_event("gpu_fallback_to_sequential");
-        self.execute_sequential(circuit, state, None)
+        self.telemetry.log_event("gpu_unavailable");
+        Err(ExecutionError::GpuError {
+            reason: "GPU execution is not implemented; use Sequential, Parallel, or Adaptive \
+                     mode instead of relying on a silent CPU fallback"
+                .to_string(),
+        })
     }
 
     /// Execute a single gate with retry logic
@@ -715,15 +724,6 @@ mod tests {
         ExecutionEngine::new(config)
     }
 
-    fn make_gpu_engine() -> ExecutionEngine {
-        let config = ExecutionConfig {
-            mode: ExecutionMode::Gpu,
-            validate_state: false,
-            ..ExecutionConfig::default()
-        };
-        ExecutionEngine::new(config)
-    }
-
     #[test]
     fn test_engine_creation() {
         let config = ExecutionConfig::default();
@@ -794,16 +794,33 @@ mod tests {
         assert!(engine.execute(&circuit, &mut state).is_ok());
     }
 
+    /// GPU mode must be rejected loudly, not silently executed on the CPU.
     #[test]
-    fn test_gpu_mode_fallback_to_sequential() {
-        let mut engine = make_gpu_engine();
+    #[should_panic(expected = "Invalid execution config")]
+    fn test_gpu_mode_rejected_at_construction() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Gpu,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let _ = ExecutionEngine::new(config);
+    }
+
+    /// Even if a Gpu-mode engine could be constructed, execution must fail
+    /// loudly rather than fall back to sequential CPU execution.
+    #[test]
+    fn test_gpu_execution_errors_loudly() {
+        let mut engine = make_sequential_engine();
         let mut circuit = Circuit::new(1);
         circuit
             .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
             .unwrap();
         let mut state = AdaptiveState::new(1).unwrap();
-        // GPU mode falls back to sequential
-        assert!(engine.execute(&circuit, &mut state).is_ok());
+        let result = engine.execute_gpu(&circuit, &mut state, None);
+        assert!(matches!(
+            result,
+            Err(crate::execution_engine::error::ExecutionError::GpuError { .. })
+        ));
     }
 
     #[test]

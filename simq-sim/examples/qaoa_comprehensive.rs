@@ -108,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
+    let mut optimizer = AdamOptimizer::new(|p| builder.build(p).expect("QAOA circuit construction failed"), adam_config);
     let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
     println!("\nOptimization Results:");
@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Converged:     {}", result.converged());
 
     // Analyze solution
-    let final_circuit = builder.build(&result.parameters);
+    let final_circuit = builder.build(&result.parameters)?;
     let final_result = simulator.run(&final_circuit)?;
 
     println!("\nTop solutions (probability > 5%):");
@@ -191,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         };
 
-        let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
+        let mut optimizer = AdamOptimizer::new(|p| builder.build(p).expect("QAOA circuit construction failed"), adam_config);
         let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
         println!(
@@ -239,7 +239,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
+    let mut optimizer = AdamOptimizer::new(|p| builder.build(p).expect("QAOA circuit construction failed"), adam_config);
     let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
     println!("Optimization completed:");
@@ -292,13 +292,13 @@ fn run_maxcut_example(
         ..Default::default()
     };
 
-    let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
+    let mut optimizer = AdamOptimizer::new(|p| builder.build(p).expect("QAOA circuit construction failed"), adam_config);
     let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
     println!("  Final cost: {:.6} (in {} iterations)", result.energy, result.num_iterations);
 
     // Find best cut
-    let final_circuit = builder.build(&result.parameters);
+    let final_circuit = builder.build(&result.parameters)?;
     let final_result = simulator.run(&final_circuit)?;
     let amplitudes = final_result.state.to_dense_vec();
 
@@ -341,7 +341,7 @@ fn run_maxcut_with_mixer(
         ..Default::default()
     };
 
-    let mut optimizer = AdamOptimizer::new(|p| builder.build(p), adam_config);
+    let mut optimizer = AdamOptimizer::new(|p| builder.build(p).expect("QAOA circuit construction failed"), adam_config);
     let result = optimizer.optimize(&simulator, &observable, &initial_params)?;
 
     println!(

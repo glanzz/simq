@@ -232,9 +232,21 @@ fn checkpoint_clear() {
 }
 
 #[test]
-fn checkpoint_restore_not_implemented() {
+fn checkpoint_restore_missing_index_errors() {
     let mgr = CheckpointManager::new(5);
     assert!(mgr.restore_checkpoint(0).is_err());
+}
+
+#[test]
+fn checkpoint_restore_round_trips_state() {
+    let mut mgr = CheckpointManager::new(5);
+    let state = AdaptiveState::new(2).unwrap();
+    mgr.create_checkpoint(4, &state).unwrap();
+    let (gate_index, restored) = mgr.restore_checkpoint(0).unwrap();
+    assert_eq!(gate_index, 4);
+    assert_eq!(restored.num_qubits(), 2);
+    let amps = restored.to_dense_vec();
+    assert!((amps[0].re - 1.0).abs() < 1e-15);
 }
 
 #[test]
@@ -263,7 +275,9 @@ fn execution_config_defaults() {
 fn execution_config_performance_preset() {
     let config = ExecutionConfig::performance();
     assert_eq!(config.mode, ExecutionMode::Parallel);
-    assert!(config.use_gpu);
+    // Must not advertise the unimplemented GPU backend
+    assert!(!config.use_gpu);
+    assert!(config.validate().is_ok());
     assert!(!config.validate_state);
     assert!(!config.enable_checkpoints);
 }
@@ -290,18 +304,21 @@ fn execution_config_builder_chain() {
     let config = ExecutionConfig::new()
         .with_mode(ExecutionMode::Parallel)
         .with_parallel_threshold(512)
-        .with_gpu(true)
         .with_validation(true)
         .with_checkpoints(true, 50)
         .with_timeout(Duration::from_secs(60));
 
     assert_eq!(config.mode, ExecutionMode::Parallel);
     assert_eq!(config.parallel_threshold, 512);
-    assert!(config.use_gpu);
     assert!(config.validate_state);
     assert!(config.enable_checkpoints);
     assert_eq!(config.checkpoint_interval, 50);
     assert_eq!(config.timeout, Some(Duration::from_secs(60)));
+
+    // GPU configs must fail validation while no backend exists
+    let gpu_config = ExecutionConfig::new().with_gpu(true);
+    assert!(gpu_config.use_gpu);
+    assert!(gpu_config.validate().is_err());
 }
 
 #[test]

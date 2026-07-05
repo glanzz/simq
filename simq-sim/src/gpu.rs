@@ -1,11 +1,22 @@
 //! GPU backend for SimQ using wgpu
+//!
+//! **Status: not implemented.** No wgpu device initialization, kernel
+//! dispatch, or read-back has been written yet. Every entry point returns an
+//! error so callers cannot mistake CPU execution (or, worse, *no* execution)
+//! for GPU acceleration. An earlier version of this module dispatched a
+//! compute pass and then returned `Ok` while leaving the state untouched —
+//! that silent no-op is exactly what this module now refuses to do.
+//!
+//! The WGSL kernels under `shaders/` are kept as a starting point for a real
+//! implementation.
 
 #[cfg(feature = "gpu")]
 use num_complex::Complex;
+
+/// Error message shared by every unimplemented GPU entry point
 #[cfg(feature = "gpu")]
-use wgpu;
-#[cfg(feature = "gpu")]
-use wgpu::util::DeviceExt;
+const GPU_UNIMPLEMENTED: &str = "GPU backend is not implemented: gate kernels have no device \
+     initialization or result read-back; run with the CPU execution engine instead";
 
 #[cfg(feature = "gpu")]
 pub struct GpuContext {
@@ -15,153 +26,20 @@ pub struct GpuContext {
 
 #[cfg(feature = "gpu")]
 impl GpuContext {
-    // NOTE: This should be async in real use, but for now, provide a sync stub for integration
+    /// GPU contexts cannot be constructed yet.
     pub fn new() -> Result<Self, String> {
-        // TODO: Implement actual wgpu initialization (async)
-        Err("GPU backend not yet implemented".to_string())
+        Err(GPU_UNIMPLEMENTED.to_string())
     }
 
+    /// Unimplemented: fails loudly instead of returning `Ok` with an
+    /// unmodified state.
     pub fn apply_single_qubit_dense_gpu(
         &self,
-        gate: [[Complex<f64>; 2]; 2],
-        qubit: usize,
-        state: &mut [Complex<f64>],
+        _gate: [[Complex<f64>; 2]; 2],
+        _qubit: usize,
+        _state: &mut [Complex<f64>],
     ) -> Result<(), String> {
-        // Load shader source
-        let shader_src = include_str!("./shaders/single_qubit_gate.wgsl");
-        let shader = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("SingleQubitGate"),
-                source: wgpu::ShaderSource::Wgsl(shader_src.into()),
-            });
-
-        // Prepare buffers
-        // Convert Complex<f64> to interleaved f64 array (real, imag, real, imag, ...)
-        let state_f64: Vec<f64> = state.iter().flat_map(|c| [c.re, c.im]).collect();
-        let state_bytes = bytemuck::cast_slice(&state_f64);
-        let state_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("StateBuffer"),
-                contents: state_bytes,
-                usage: wgpu::BufferUsages::STORAGE
-                    | wgpu::BufferUsages::COPY_SRC
-                    | wgpu::BufferUsages::COPY_DST,
-            });
-        let gate_flat: [f64; 4] = [gate[0][0].re, gate[0][1].re, gate[1][0].re, gate[1][1].re];
-        let gate_bytes = bytemuck::cast_slice(&gate_flat);
-        let gate_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("GateBuffer"),
-                contents: gate_bytes,
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let qubit_data = [qubit as u32];
-        let qubit_bytes = bytemuck::cast_slice(&qubit_data);
-        let qubit_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("QubitBuffer"),
-                contents: qubit_bytes,
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-
-        // Create pipeline
-        let bind_group_layout =
-            self.device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("BindGroupLayout"),
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::COMPUTE,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::COMPUTE,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 2,
-                            visibility: wgpu::ShaderStages::COMPUTE,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-        let pipeline_layout = self
-            .device
-            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("PipelineLayout"),
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
-            });
-        let compute_pipeline =
-            self.device
-                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some("ComputePipeline"),
-                    layout: Some(&pipeline_layout),
-                    module: &shader,
-                    entry_point: "main",
-                });
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BindGroup"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: state_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: gate_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: qubit_buf.as_entire_binding(),
-                },
-            ],
-        });
-
-        // Dispatch compute
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("CommandEncoder"),
-            });
-        {
-            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("ComputePass"),
-                timestamp_writes: None,
-            });
-            cpass.set_pipeline(&compute_pipeline);
-            cpass.set_bind_group(0, &bind_group, &[]);
-            let workgroups = (state.len() as u32).div_ceil(64);
-            cpass.dispatch_workgroups(workgroups, 1, 1);
-        }
-        self.queue.submit(Some(encoder.finish()));
-
-        // Read back result
-        // NOTE: In real code, use async mapping and polling
-        // For now, return Ok and leave state unchanged
-        Ok(())
+        Err(GPU_UNIMPLEMENTED.to_string())
     }
 }
 
@@ -172,6 +50,19 @@ pub struct GpuContext;
 #[cfg(not(feature = "gpu"))]
 impl GpuContext {
     pub fn new() -> Result<Self, String> {
-        Err("GPU backend not enabled".to_string())
+        Err("GPU backend not enabled (build with the `gpu` feature; note the backend itself is \
+             also not implemented yet)"
+            .to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gpu_context_construction_fails_loudly() {
+        let err = GpuContext::new().err().expect("GPU context must not construct");
+        assert!(err.contains("not"), "error should explain unavailability: {}", err);
     }
 }

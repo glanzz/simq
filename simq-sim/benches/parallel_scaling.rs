@@ -61,16 +61,9 @@ fn bench_parallel_scaling(c: &mut Criterion) {
             }
         }
 
-        // GPU (if available)
-        let config = SimulatorConfig {
-            parallel_threshold: 0,
-            use_gpu: true,
-            ..Default::default()
-        };
-        let simulator = Simulator::new(config.clone());
-        group.bench_with_input(BenchmarkId::new("GPU", num_qubits), &num_qubits, |b, &_| {
-            b.iter(|| simulator.run(&circuit))
-        });
+        // No GPU benchmark: the GPU backend is not implemented, and
+        // `use_gpu: true` is rejected at Simulator construction. The previous
+        // "GPU" series here silently measured sequential CPU execution.
     }
     group.finish();
 }
