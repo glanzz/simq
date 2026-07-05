@@ -104,26 +104,49 @@ impl CliffordTDecomposer {
 
     /// Decompose a rotation around Z-axis into Clifford+T gates
     ///
-    /// Rz(θ) can be approximated using a sequence of H, S, and T gates.
-    ///
-    /// For exact angles that are multiples of π/4:
+    /// Succeeds only for angles that are multiples of π/4 (within
+    /// `config.epsilon`), which decompose exactly:
     /// - Rz(π/4) = T
     /// - Rz(π/2) = S
     /// - Rz(π) = Z = S²
     ///
-    /// For other angles, uses gridsynth-like approximation.
-    pub fn decompose_rz(&self, angle: f64) -> Vec<CliffordTGate> {
+    /// # Errors
+    ///
+    /// Returns an error for any other angle: exact Clifford+T synthesis of
+    /// arbitrary rotations (gridsynth) is not implemented, and silently
+    /// substituting the nearest π/4 multiple would change the circuit's
+    /// semantics (angle error up to π/8). Callers that explicitly want that
+    /// approximation should use [`decompose_rz_approx`](Self::decompose_rz_approx),
+    /// which reports the incurred angle error.
+    pub fn decompose_rz(&self, angle: f64) -> Result<Vec<CliffordTGate>> {
         // Normalize angle to [0, 2π)
         let normalized_angle = angle.rem_euclid(2.0 * PI);
 
-        // Check for exact multiples of π/8
+        // Check for exact multiples of π/4
         let k = (normalized_angle / (PI / 4.0)).round();
         if (normalized_angle - k * PI / 4.0).abs() < self.config.epsilon {
-            return self.exact_rz_pi_over_4(k as i32);
+            return Ok(self.exact_rz_pi_over_4(k as i32));
         }
 
-        // For arbitrary angles, use approximation
-        self.approximate_rz(normalized_angle)
+        Err(QuantumError::ValidationError(format!(
+            "Rz({angle}) is not a multiple of π/4 (within epsilon = {}); exact Clifford+T \
+             synthesis of arbitrary angles is not implemented. Use decompose_rz_approx() to \
+             explicitly opt into nearest-π/4 approximation with a reported angle error.",
+            self.config.epsilon
+        )))
+    }
+
+    /// Approximate Rz(θ) by the nearest multiple of π/4
+    ///
+    /// This is an explicit opt-in to lossy decomposition. Returns the gate
+    /// sequence together with the signed angle error θ_normalized − k·π/4
+    /// actually incurred (up to ±π/8), so callers can decide whether the
+    /// approximation is acceptable.
+    pub fn decompose_rz_approx(&self, angle: f64) -> (Vec<CliffordTGate>, f64) {
+        let normalized_angle = angle.rem_euclid(2.0 * PI);
+        let k = (normalized_angle / (PI / 4.0)).round();
+        let angle_error = normalized_angle - k * PI / 4.0;
+        (self.exact_rz_pi_over_4(k as i32), angle_error)
     }
 
     /// Exact decomposition for Rz(k·π/4) where k is an integer
@@ -142,22 +165,6 @@ impl CliffordTDecomposer {
             7 => vec![CliffordTGate::TDagger, CliffordTGate::SDagger],
             _ => vec![],
         }
-    }
-
-    /// Approximate Rz(θ) for arbitrary angle θ
-    ///
-    /// Uses a simplified gridsynth-like algorithm. The full implementation would
-    /// involve solving Diophantine equations over Z[ω] where ω = e^(iπ/4).
-    fn approximate_rz(&self, angle: f64) -> Vec<CliffordTGate> {
-        // Simple approximation: find closest π/8 multiple
-        let k = (angle / (PI / 4.0)).round() as i32;
-        self.exact_rz_pi_over_4(k)
-
-        // TODO: Implement full gridsynth algorithm:
-        // 1. Represent target angle as point on unit circle
-        // 2. Use continued fraction expansion to find approximation in Z[ω]
-        // 3. Convert to gate sequence
-        // 4. Optimize T-count
     }
 
     /// Decompose arbitrary single-qubit unitary into Clifford+T gates
@@ -191,17 +198,17 @@ impl CliffordTDecomposer {
         let mut gates = Vec::new();
 
         // Decompose first Rz(alpha)
-        gates.extend(self.decompose_rz(alpha));
+        gates.extend(self.decompose_rz(alpha)?);
 
         // Decompose Ry(gamma) = H Rz(gamma) H
         if gamma.abs() > EPSILON {
             gates.push(CliffordTGate::H);
-            gates.extend(self.decompose_rz(gamma));
+            gates.extend(self.decompose_rz(gamma)?);
             gates.push(CliffordTGate::H);
         }
 
         // Decompose last Rz(delta)
-        gates.extend(self.decompose_rz(delta));
+        gates.extend(self.decompose_rz(delta)?);
 
         Ok(gates)
     }
@@ -459,15 +466,15 @@ mod tests {
         let decomposer = CliffordTDecomposer::new();
 
         // Rz(π/4) = T
-        let gates = decomposer.decompose_rz(PI / 4.0);
+        let gates = decomposer.decompose_rz(PI / 4.0).unwrap();
         assert_eq!(gates, vec![CliffordTGate::T]);
 
         // Rz(π/2) = S
-        let gates = decomposer.decompose_rz(PI / 2.0);
+        let gates = decomposer.decompose_rz(PI / 2.0).unwrap();
         assert_eq!(gates, vec![CliffordTGate::S]);
 
         // Rz(π) = Z
-        let gates = decomposer.decompose_rz(PI);
+        let gates = decomposer.decompose_rz(PI).unwrap();
         assert_eq!(gates, vec![CliffordTGate::Z]);
     }
 
@@ -600,15 +607,29 @@ mod tests {
     }
 
     #[test]
-    fn test_approximate_rz_arbitrary_angle() {
+    fn test_decompose_rz_arbitrary_angle_errors() {
         let decomposer = CliffordTDecomposer::new();
-        // An angle that is not close to any k*pi/4 multiple within epsilon,
-        // forcing decompose_rz to fall through to approximate_rz.
+        // An angle that is not a k*pi/4 multiple within epsilon must be
+        // rejected rather than silently snapped to the nearest multiple.
         let angle = PI / 4.0 + 0.2;
-        let gates = decomposer.decompose_rz(angle);
-        // approximate_rz rounds to nearest pi/4 multiple, so should match exact_rz_pi_over_4
+        assert!(decomposer.decompose_rz(angle).is_err());
+    }
+
+    #[test]
+    fn test_decompose_rz_approx_reports_error() {
+        let decomposer = CliffordTDecomposer::new();
+        let angle = PI / 4.0 + 0.2;
+        let (gates, angle_error) = decomposer.decompose_rz_approx(angle);
+        // Snaps to the nearest pi/4 multiple...
         let k = (angle / (PI / 4.0)).round() as i32;
         assert_eq!(gates, decomposer.exact_rz_pi_over_4(k));
+        // ...and reports exactly how far off that is.
+        assert!((angle_error - 0.2).abs() < 1e-12, "angle_error = {angle_error}");
+
+        // Exact angles report zero error
+        let (gates_exact, err_exact) = decomposer.decompose_rz_approx(PI / 2.0);
+        assert_eq!(gates_exact, vec![CliffordTGate::S]);
+        assert!(err_exact.abs() < 1e-12);
     }
 
     #[test]

@@ -391,21 +391,25 @@ pub fn cache_rotation_range(input: TokenStream) -> TokenStream {
 
             #range_compute_on_demand
 
-            /// Lookup with nearest neighbor or linear interpolation
+            /// Exact lookup with on-demand fallback
             ///
-            /// For angles within the cache range, uses nearest neighbor lookup.
-            /// For angles outside the range, computes on-demand.
+            /// Returns a cached matrix only when `theta` lands exactly
+            /// (within 1e-12) on a cached grid angle; any other angle is
+            /// computed on demand at full precision. Gate matrices are never
+            /// snapped to the nearest grid point — use
+            /// [`lookup_interpolated`](Self::lookup_interpolated) to
+            /// explicitly opt into approximate lookups.
             #[inline]
             pub fn lookup(theta: f64) -> [[Complex64; 2]; 2] {
-                if !(Self::START..=Self::END).contains(&theta) {
-                    return Self::compute_matrix(theta);
+                if (Self::START..=Self::END).contains(&theta) {
+                    let index = ((theta - Self::START) / Self::STEP).round() as usize;
+                    let index = index.min(#steps - 1);
+                    if (theta - Self::ANGLES[index]).abs() < 1e-12 {
+                        return Self::MATRICES[index];
+                    }
                 }
 
-                // Find nearest cached angle
-                let index = ((theta - Self::START) / Self::STEP).round() as usize;
-                let index = index.min(#steps - 1);
-
-                Self::MATRICES[index]
+                Self::compute_matrix(theta)
             }
 
             /// Lookup with linear interpolation for better accuracy

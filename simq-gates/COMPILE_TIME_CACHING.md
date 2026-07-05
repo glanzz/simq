@@ -61,8 +61,9 @@ let memory = VQEAngles::memory_bytes();  // 49,152 bytes (48 KB)
 **Configuration:**
 - Range: 0 to π/4 (typical learning rate range)
 - Steps: 256 entries
-- Lookup: Nearest neighbor
-- Accuracy: ~1e-4 for small angles
+- Lookup: Exact match only (within 1e-12 of a grid angle); anything else
+  falls back to runtime computation
+- Accuracy: exact (~1e-16); matrices are never approximated
 
 ### 3. Build-Time Generated Caches
 
@@ -126,9 +127,14 @@ let rx6 = EnhancedUniversalCache::rx(10.0);        // Level 6: Runtime compute
 1. Common angles (exact match)
 2. Clifford+T angles (exact match)
 3. π fraction angles (exact match)
-4. VQE range cache (nearest neighbor)
-5. QAOA range cache (nearest neighbor)
+4. VQE range cache (exact match, runtime fallback)
+5. QAOA range cache (exact match, runtime fallback)
 6. Runtime computation
+
+Every level is exact-match only: a cached matrix is returned only when the
+requested angle equals the cached angle (within 1e-12 for the range caches,
+1e-10 for the named-angle levels). Angles that miss every cache are computed
+at full precision — gate matrices are never snapped to a nearby grid point.
 
 ---
 
@@ -273,15 +279,21 @@ fn generate_rotation_matrix(gate: &str, angle: f64) {
 
 ### Array-Based Range Caches
 
-VQE and QAOA caches use const arrays with nearest neighbor lookup:
+VQE and QAOA caches use const arrays indexed by rounding, guarded by an
+exact-match check so a cached matrix is only used when the angle actually
+lies on the grid:
 
 ```rust
 const MATRICES: [[[Complex64; 2]; 2]; 256] = [...];
 const STEP: f64 = MAX_ANGLE / 255.0;
 
 pub fn lookup(theta: f64) -> [[Complex64; 2]; 2] {
-    let index = (theta / STEP).round() as usize;
-    MATRICES[index.min(255)]
+    let index = ((theta / STEP).round() as usize).min(255);
+    let cached_theta = index as f64 * STEP;
+    if (theta - cached_theta).abs() < 1e-12 {
+        return MATRICES[index];
+    }
+    compute_at_runtime(theta) // never return a matrix for a different angle
 }
 ```
 

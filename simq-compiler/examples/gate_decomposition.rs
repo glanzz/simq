@@ -172,15 +172,15 @@ fn clifford_t_example() {
     // Exact rotations
     println!("Exact Rz Rotations:");
     println!("  - Rz(π/4) = T");
-    let rz_pi4 = decomposer.decompose_rz(PI / 4.0);
+    let rz_pi4 = decomposer.decompose_rz(PI / 4.0).unwrap();
     println!("    Gates: {:?}", rz_pi4);
 
     println!("  - Rz(π/2) = S");
-    let rz_pi2 = decomposer.decompose_rz(PI / 2.0);
+    let rz_pi2 = decomposer.decompose_rz(PI / 2.0).unwrap();
     println!("    Gates: {:?}", rz_pi2);
 
     println!("  - Rz(π) = Z = S²");
-    let rz_pi = decomposer.decompose_rz(PI);
+    let rz_pi = decomposer.decompose_rz(PI).unwrap();
     println!("    Gates: {:?}\n", rz_pi);
 
     // T-count optimization

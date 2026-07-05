@@ -416,13 +416,13 @@ fn test_multi_qubit_decomposer_trait_gate_check() {
 fn test_clifford_t_decompose_rz_special_angles() {
     let decomposer = CliffordTDecomposer::new();
 
-    let gates_pi = decomposer.decompose_rz(PI);
+    let gates_pi = decomposer.decompose_rz(PI).unwrap();
     assert!(!gates_pi.is_empty(), "Rz(pi) should decompose to Clifford+T gates");
 
-    let gates_half_pi = decomposer.decompose_rz(PI / 2.0);
+    let gates_half_pi = decomposer.decompose_rz(PI / 2.0).unwrap();
     assert!(!gates_half_pi.is_empty());
 
-    let gates_quarter_pi = decomposer.decompose_rz(PI / 4.0);
+    let gates_quarter_pi = decomposer.decompose_rz(PI / 4.0).unwrap();
     assert!(!gates_quarter_pi.is_empty());
 }
 
@@ -471,8 +471,13 @@ fn test_clifford_t_with_config() {
         optimize_t_depth: false,
     };
     let decomposer = CliffordTDecomposer::with_config(config);
-    let gates = decomposer.decompose_rz(PI / 7.0);
-    assert!(!gates.is_empty());
+    // PI/7 is not a pi/4 multiple: exact synthesis must refuse rather than
+    // silently snap to the nearest multiple.
+    assert!(decomposer.decompose_rz(PI / 7.0).is_err());
+    // The explicit approximation API reports the incurred angle error.
+    let (gates, angle_error) = decomposer.decompose_rz_approx(PI / 7.0);
+    assert!(!gates.is_empty() || angle_error.abs() > 0.0);
+    assert!(angle_error.abs() <= PI / 8.0 + 1e-12);
 }
 
 #[test]
