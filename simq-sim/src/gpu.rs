@@ -50,9 +50,11 @@ pub struct GpuContext;
 #[cfg(not(feature = "gpu"))]
 impl GpuContext {
     pub fn new() -> Result<Self, String> {
-        Err("GPU backend not enabled (build with the `gpu` feature; note the backend itself is \
+        Err(
+            "GPU backend not enabled (build with the `gpu` feature; note the backend itself is \
              also not implemented yet)"
-            .to_string())
+                .to_string(),
+        )
     }
 }
 
@@ -62,7 +64,9 @@ mod tests {
 
     #[test]
     fn gpu_context_construction_fails_loudly() {
-        let err = GpuContext::new().err().expect("GPU context must not construct");
+        let err = GpuContext::new()
+            .err()
+            .expect("GPU context must not construct");
         assert!(err.contains("not"), "error should explain unavailability: {}", err);
     }
 }

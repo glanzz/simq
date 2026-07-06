@@ -246,10 +246,7 @@ impl Cursor<'_> {
             Ok(())
         } else {
             Err(ExecutionError::CheckpointFailed {
-                reason: format!(
-                    "corrupt snapshot: {} trailing bytes",
-                    self.bytes.len() - self.pos
-                ),
+                reason: format!("corrupt snapshot: {} trailing bytes", self.bytes.len() - self.pos),
             })
         }
     }
@@ -276,7 +273,11 @@ mod tests {
         assert!(manager.latest_checkpoint().is_some());
         assert_eq!(manager.latest_checkpoint().unwrap().gate_index, 0);
         // Snapshots must not be empty placeholders
-        assert!(!manager.latest_checkpoint().unwrap().state_snapshot.is_empty());
+        assert!(!manager
+            .latest_checkpoint()
+            .unwrap()
+            .state_snapshot
+            .is_empty());
     }
 
     #[test]

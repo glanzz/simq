@@ -79,10 +79,7 @@ pub enum QAOAError {
 
     /// The configured initial state needs data that was not provided
     #[error("initial state {state:?} requires {detail}")]
-    MissingInitialStateData {
-        state: InitialState,
-        detail: String,
-    },
+    MissingInitialStateData { state: InitialState, detail: String },
 
     /// Underlying circuit construction failed
     #[error("circuit construction failed: {0}")]
@@ -405,9 +402,9 @@ impl ProblemType {
 
             // Unsupported problems are rejected at build/observable time with a
             // more specific error; nothing to validate structurally here.
-            ProblemType::GraphColoring(..) | ProblemType::TSP { .. } | ProblemType::Portfolio { .. } => {
-                Ok(())
-            },
+            ProblemType::GraphColoring(..)
+            | ProblemType::TSP { .. }
+            | ProblemType::Portfolio { .. } => Ok(()),
         }
     }
 
@@ -436,9 +433,7 @@ fn validate_maxksat(
     const MAX_CLAUSE_SIZE: usize = 16;
 
     if clauses.is_empty() {
-        return Err(QAOAError::InvalidProblem(
-            "Max k-SAT instance has no clauses".to_string(),
-        ));
+        return Err(QAOAError::InvalidProblem("Max k-SAT instance has no clauses".to_string()));
     }
     for (idx, (vars, negations, _)) in clauses.iter().enumerate() {
         if vars.is_empty() {
@@ -465,10 +460,7 @@ fn validate_maxksat(
         seen.sort_unstable();
         seen.dedup();
         if seen.len() != vars.len() {
-            return Err(QAOAError::InvalidProblem(format!(
-                "clause {} repeats a variable",
-                idx
-            )));
+            return Err(QAOAError::InvalidProblem(format!("clause {} repeats a variable", idx)));
         }
         if let Some(&v) = vars.iter().find(|&&v| v >= num_variables) {
             return Err(QAOAError::InvalidProblem(format!(
@@ -492,9 +484,7 @@ fn validate_maxksat(
 ///
 /// Returns terms keyed by their (sorted) qubit support; the empty support is
 /// the constant (identity) contribution.
-fn maxksat_z_terms(
-    clauses: &[(Vec<usize>, Vec<bool>, f64)],
-) -> BTreeMap<Vec<usize>, f64> {
+fn maxksat_z_terms(clauses: &[(Vec<usize>, Vec<bool>, f64)]) -> BTreeMap<Vec<usize>, f64> {
     let mut terms: BTreeMap<Vec<usize>, f64> = BTreeMap::new();
 
     for (vars, negations, weight) in clauses {
@@ -800,13 +790,15 @@ impl QAOACircuitBuilder {
                 // Qubits start in |0⟩
             },
             InitialState::WarmStart => {
-                let bits = self.warm_start.as_ref().ok_or_else(|| {
-                    QAOAError::MissingInitialStateData {
-                        state: InitialState::WarmStart,
-                        detail: "a bitstring; supply one with QAOACircuitBuilder::with_warm_start"
-                            .to_string(),
-                    }
-                })?;
+                let bits =
+                    self.warm_start
+                        .as_ref()
+                        .ok_or_else(|| QAOAError::MissingInitialStateData {
+                            state: InitialState::WarmStart,
+                            detail:
+                                "a bitstring; supply one with QAOACircuitBuilder::with_warm_start"
+                                    .to_string(),
+                        })?;
                 if bits.len() != self.num_qubits {
                     return Err(QAOAError::MissingInitialStateData {
                         state: InitialState::WarmStart,
@@ -932,11 +924,16 @@ impl QAOACircuitBuilder {
 
             ProblemType::Custom { terms, .. } => Ok(terms.clone()),
 
-            ProblemType::GraphColoring(..) | ProblemType::TSP { .. } | ProblemType::Portfolio { .. } => {
+            ProblemType::GraphColoring(..)
+            | ProblemType::TSP { .. }
+            | ProblemType::Portfolio { .. } => {
                 // Unreachable from build()/cost_observable(), which reject these
                 // up front. Guard anyway so a future direct call cannot silently
                 // produce a no-op Hamiltonian.
-                Err(self.problem.unsupported_error().expect("unsupported problem"))
+                Err(self
+                    .problem
+                    .unsupported_error()
+                    .expect("unsupported problem"))
             },
         }
     }
@@ -1275,13 +1272,17 @@ mod tests {
 
     #[test]
     fn test_wrong_parameter_count_is_error() {
-        let builder = QAOACircuitBuilder::new(
-            ProblemType::MaxCut(Graph::cycle(3)),
-            MixerType::StandardX,
-            2,
-        );
+        let builder =
+            QAOACircuitBuilder::new(ProblemType::MaxCut(Graph::cycle(3)), MixerType::StandardX, 2);
         let err = builder.build(&[0.5, 0.3]).unwrap_err();
-        assert!(matches!(err, QAOAError::ParameterCountMismatch { expected: 4, actual: 2, .. }));
+        assert!(matches!(
+            err,
+            QAOAError::ParameterCountMismatch {
+                expected: 4,
+                actual: 2,
+                ..
+            }
+        ));
     }
 
     /// Regression test for issue #40: with the default config, a depth-1 QAOA
@@ -1373,10 +1374,7 @@ mod tests {
             MixerType::StandardX,
             1,
         );
-        assert!(matches!(
-            builder.build(&[0.5, 0.3]).unwrap_err(),
-            QAOAError::Unsupported { .. }
-        ));
+        assert!(matches!(builder.build(&[0.5, 0.3]).unwrap_err(), QAOAError::Unsupported { .. }));
     }
 
     #[test]
@@ -1386,10 +1384,7 @@ mod tests {
             MixerType::StandardX,
             1,
         );
-        assert!(matches!(
-            builder.build(&[0.5, 0.3]).unwrap_err(),
-            QAOAError::Unsupported { .. }
-        ));
+        assert!(matches!(builder.build(&[0.5, 0.3]).unwrap_err(), QAOAError::Unsupported { .. }));
         assert!(builder.cost_observable().is_err());
     }
 
@@ -1399,12 +1394,8 @@ mod tests {
             mixer: MixerType::Grover,
             ..QAOAConfig::default()
         };
-        let builder =
-            QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
-        assert!(matches!(
-            builder.build(&[0.5, 0.3]).unwrap_err(),
-            QAOAError::Unsupported { .. }
-        ));
+        let builder = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
+        assert!(matches!(builder.build(&[0.5, 0.3]).unwrap_err(), QAOAError::Unsupported { .. }));
     }
 
     #[test]
@@ -1413,8 +1404,7 @@ mod tests {
             initial_state: InitialState::WarmStart,
             ..QAOAConfig::default()
         };
-        let builder =
-            QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
+        let builder = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
         assert!(matches!(
             builder.build(&[0.5, 0.3]).unwrap_err(),
             QAOAError::MissingInitialStateData { .. }
@@ -1457,8 +1447,7 @@ mod tests {
             initial_state: InitialState::Custom,
             ..QAOAConfig::default()
         };
-        let builder =
-            QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
+        let builder = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config);
         assert!(matches!(
             builder.build(&[0.5, 0.3]).unwrap_err(),
             QAOAError::MissingInitialStateData { .. }
@@ -1504,10 +1493,7 @@ mod tests {
             MixerType::StandardX,
             1,
         );
-        assert!(matches!(
-            builder.build(&[0.5, 0.3]).unwrap_err(),
-            QAOAError::InvalidProblem(_)
-        ));
+        assert!(matches!(builder.build(&[0.5, 0.3]).unwrap_err(), QAOAError::InvalidProblem(_)));
     }
 
     #[test]
@@ -1520,10 +1506,7 @@ mod tests {
             MixerType::StandardX,
             1,
         );
-        assert!(matches!(
-            builder.build(&[0.5, 0.3]).unwrap_err(),
-            QAOAError::InvalidProblem(_)
-        ));
+        assert!(matches!(builder.build(&[0.5, 0.3]).unwrap_err(), QAOAError::InvalidProblem(_)));
     }
 
     // ------------------------------------------------------------------
@@ -1597,8 +1580,11 @@ mod tests {
     #[test]
     fn test_vertex_cover_observable_matches_classical_cost() {
         let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.5)]);
-        let builder =
-            QAOACircuitBuilder::new(ProblemType::MinVertexCover(g.clone()), MixerType::StandardX, 1);
+        let builder = QAOACircuitBuilder::new(
+            ProblemType::MinVertexCover(g.clone()),
+            MixerType::StandardX,
+            1,
+        );
         let obs = builder.cost_observable().unwrap();
         for bits in all_bitstrings(3) {
             let expected = evaluate_vertex_cover_solution(&g, &bits);
@@ -1677,12 +1663,7 @@ mod tests {
         assert!((amp.norm() - 1.0).abs() < 1e-10);
         // Phase must be e^{-iγ·coeff·(+1)}
         let expected = num_complex::Complex64::from_polar(1.0, -gamma * coeff);
-        assert!(
-            (amp - expected).norm() < 1e-10,
-            "amp = {:?}, expected {:?}",
-            amp,
-            expected
-        );
+        assert!((amp - expected).norm() < 1e-10, "amp = {:?}, expected {:?}", amp, expected);
     }
 
     /// The XY mixer must preserve Hamming weight: starting from |0011⟩ the
@@ -1695,11 +1676,8 @@ mod tests {
             initial_state: InitialState::WarmStart,
             final_mixer: true,
         };
-        let builder = QAOACircuitBuilder::with_config(
-            ProblemType::MaxCut(Graph::cycle(4)),
-            config,
-        )
-        .with_warm_start(vec![true, true, false, false]);
+        let builder = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(4)), config)
+            .with_warm_start(vec![true, true, false, false]);
         let circuit = builder.build(&[0.4, 0.7]).unwrap();
         let result = make_sim().run(&circuit).unwrap();
         let amps = result.state.to_dense_vec();
@@ -1733,11 +1711,8 @@ mod tests {
             initial_state: InitialState::WarmStart,
             final_mixer: true,
         };
-        let builder = QAOACircuitBuilder::with_config(
-            ProblemType::MaxCut(Graph::cycle(3)),
-            config,
-        )
-        .with_warm_start(vec![true, false, false]);
+        let builder = QAOACircuitBuilder::with_config(ProblemType::MaxCut(Graph::cycle(3)), config)
+            .with_warm_start(vec![true, false, false]);
         let circuit = builder.build(&[0.0, 0.6]).unwrap();
         let result = make_sim().run(&circuit).unwrap();
         let amps = result.state.to_dense_vec();
