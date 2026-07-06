@@ -258,8 +258,8 @@ impl QuantumBackend for LocalSimulatorBackend {
             backend_version: Some(env!("CARGO_PKG_VERSION").to_string()),
             status: JobStatus::Completed,
             num_qubits: Some(circuit.num_qubits()),
-            circuit_depth: None, // TODO: Add when Circuit supports depth()
-            gate_count: None,    // TODO: Add when Circuit supports gate count
+            circuit_depth: Some(circuit.depth()),
+            gate_count: Some(circuit.len()),
             cnot_count: None,
             cost: None,
             error_message: None,
