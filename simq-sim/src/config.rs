@@ -4,7 +4,11 @@
 #[derive(Debug, Clone)]
 pub struct SimulatorConfig {
     /// Enable GPU backend (wgpu)
-    /// When true, uses GPU for gate application if available.
+    ///
+    /// **Not implemented**: setting this to `true` fails
+    /// [`validate`](Self::validate) (and thus `Simulator::new`) instead of
+    /// silently executing on the CPU.
+    ///
     /// Default: false
     pub use_gpu: bool,
     /// Density threshold for switching from sparse to dense representation
@@ -181,6 +185,14 @@ impl SimulatorConfig {
 
     /// Validate the configuration
     pub fn validate(&self) -> Result<(), String> {
+        if self.use_gpu {
+            return Err(
+                "use_gpu = true, but GPU acceleration is not implemented: SimQ would silently \
+                 execute on the CPU. Remove the flag until a GPU backend exists."
+                    .to_string(),
+            );
+        }
+
         if self.sparse_threshold < 0.0 || self.sparse_threshold > 1.0 {
             return Err(format!(
                 "sparse_threshold must be in [0,1], got {}",
@@ -258,6 +270,16 @@ mod tests {
             ..Default::default()
         };
         assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_unimplemented_gpu() {
+        let invalid = SimulatorConfig {
+            use_gpu: true,
+            ..Default::default()
+        };
+        let err = invalid.validate().unwrap_err();
+        assert!(err.contains("not implemented"), "got: {}", err);
     }
 
     #[test]

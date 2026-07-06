@@ -254,7 +254,7 @@ fn builder_with_config() {
 fn builder_build_maxcut_produces_circuit() {
     let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)]);
     let b = QAOACircuitBuilder::new(ProblemType::MaxCut(g), MixerType::StandardX, 1);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert_eq!(circuit.num_qubits(), 3);
     assert!(!circuit.gate_counts().is_empty());
 }
@@ -264,7 +264,7 @@ fn builder_build_maxcut_runs_on_simulator() {
     let sim = make_sim();
     let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)]);
     let b = QAOACircuitBuilder::new(ProblemType::MaxCut(g), MixerType::StandardX, 1);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     let result = sim.run(&circuit);
     assert!(result.is_ok());
 }
@@ -323,11 +323,11 @@ fn builder_cost_observable_empty_custom_errors() {
 }
 
 #[test]
-#[should_panic(expected = "Expected")]
-fn builder_build_wrong_param_count_panics() {
+fn builder_build_wrong_param_count_errors() {
     let g = Graph::cycle(3);
     let b = QAOACircuitBuilder::new(ProblemType::MaxCut(g), MixerType::StandardX, 2);
-    let _ = b.build(&[0.5, 0.3]);
+    let err = b.build(&[0.5, 0.3]).unwrap_err();
+    assert!(err.to_string().contains("expected 4 parameters"), "got: {}", err);
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn builder_vertex_cover_runs() {
     let sim = make_sim();
     let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)]);
     let b = QAOACircuitBuilder::new(ProblemType::MinVertexCover(g), MixerType::StandardX, 1);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -356,7 +356,7 @@ fn builder_independent_set_runs() {
     let sim = make_sim();
     let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)]);
     let b = QAOACircuitBuilder::new(ProblemType::MaxIndependentSet(g), MixerType::StandardX, 1);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -368,7 +368,7 @@ fn builder_number_partition_runs() {
         MixerType::StandardX,
         1,
     );
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -383,7 +383,7 @@ fn builder_maxsat_runs() {
         MixerType::StandardX,
         1,
     );
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -398,7 +398,7 @@ fn builder_custom_problem_runs() {
         MixerType::StandardX,
         1,
     );
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -417,7 +417,7 @@ fn builder_standard_y_mixer_runs() {
         final_mixer: true,
     };
     let b = QAOACircuitBuilder::with_config(ProblemType::MaxCut(g), cfg);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -432,13 +432,14 @@ fn builder_xy_mixer_runs() {
         final_mixer: true,
     };
     let b = QAOACircuitBuilder::with_config(ProblemType::MaxCut(g), cfg);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
 #[test]
-fn builder_grover_mixer_runs() {
-    let sim = make_sim();
+fn builder_grover_mixer_fails_loudly() {
+    // The Grover mixer is not implemented; requesting it must be an error,
+    // not a silently different mixer.
     let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0)]);
     let cfg = QAOAConfig {
         depth: 1,
@@ -447,8 +448,8 @@ fn builder_grover_mixer_runs() {
         final_mixer: true,
     };
     let b = QAOACircuitBuilder::with_config(ProblemType::MaxCut(g), cfg);
-    let circuit = b.build(&[0.5, 0.3]);
-    assert!(sim.run(&circuit).is_ok());
+    let err = b.build(&[0.5, 0.3]).unwrap_err();
+    assert!(err.to_string().contains("not implemented"), "got: {}", err);
 }
 
 #[test]
@@ -462,7 +463,7 @@ fn builder_ring_mixer_runs() {
         final_mixer: true,
     };
     let b = QAOACircuitBuilder::with_config(ProblemType::MaxCut(g), cfg);
-    let circuit = b.build(&[0.5, 0.3]);
+    let circuit = b.build(&[0.5, 0.3]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 }
 
@@ -481,7 +482,7 @@ fn builder_zero_initial_state() {
         final_mixer: true,
     };
     let b = QAOACircuitBuilder::with_config(ProblemType::MaxCut(g), cfg);
-    let circuit = b.build(&[0.0, 0.0]);
+    let circuit = b.build(&[0.0, 0.0]).unwrap();
     let result = sim.run(&circuit).unwrap();
     let amps = match &result.state {
         AdaptiveState::Dense(d) => d.amplitudes().to_vec(),
@@ -503,7 +504,7 @@ fn builder_depth_2_maxcut() {
     let g = Graph::from_edges(3, &[(0, 1, 1.0), (1, 2, 1.0), (0, 2, 1.0)]);
     let b = QAOACircuitBuilder::new(ProblemType::MaxCut(g.clone()), MixerType::StandardX, 2);
     assert_eq!(b.num_parameters(), 4);
-    let circuit = b.build(&[0.5, 0.3, 0.4, 0.2]);
+    let circuit = b.build(&[0.5, 0.3, 0.4, 0.2]).unwrap();
     assert!(sim.run(&circuit).is_ok());
 
     let obs = b.cost_observable().unwrap();
@@ -533,8 +534,8 @@ fn builder_final_mixer_affects_output() {
     let b2 = QAOACircuitBuilder::with_config(ProblemType::MaxCut(g.clone()), cfg_with_final);
 
     let obs = b1.cost_observable().unwrap();
-    let e1 = expectation(&sim, &b1.build(&[0.5, 0.3]), &obs);
-    let e2 = expectation(&sim, &b2.build(&[0.5, 0.3]), &obs);
+    let e1 = expectation(&sim, &b1.build(&[0.5, 0.3]).unwrap(), &obs);
+    let e2 = expectation(&sim, &b2.build(&[0.5, 0.3]).unwrap(), &obs);
     assert!((e1 - e2).abs() > 1e-10);
 }
 
@@ -638,17 +639,19 @@ fn qaoa_maxcut_expectation_varies_with_params() {
         cfg,
     );
 
-    let e1 = expectation(&sim, &b.build(&[0.1, 0.1]), &obs);
-    let e2 = expectation(&sim, &b.build(&[1.0, 1.0]), &obs);
+    let e1 = expectation(&sim, &b.build(&[0.1, 0.1]).unwrap(), &obs);
+    let e2 = expectation(&sim, &b.build(&[1.0, 1.0]).unwrap(), &obs);
     assert!((e1 - e2).abs() > 1e-6);
 }
 
 #[test]
-fn qaoa_graph_coloring_runs() {
-    let sim = make_sim();
+fn qaoa_graph_coloring_fails_loudly() {
+    // The graph-coloring encoding is not implemented; historically this
+    // silently applied a MaxCut Hamiltonian on the wrong qubits.
     let g = Graph::from_edges(2, &[(0, 1, 1.0)]);
     let b = QAOACircuitBuilder::new(ProblemType::GraphColoring(g, 2), MixerType::StandardX, 1);
     assert_eq!(b.num_qubits(), 4);
-    let circuit = b.build(&[0.5, 0.3]);
-    assert!(sim.run(&circuit).is_ok());
+    let err = b.build(&[0.5, 0.3]).unwrap_err();
+    assert!(err.to_string().contains("not implemented"), "got: {}", err);
+    assert!(b.cost_observable().is_err());
 }
