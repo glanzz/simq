@@ -777,7 +777,7 @@ mod tests {
 
             let counts = IBMQuantumBackend::parse_ibm_counts(&results, 3, 100).unwrap();
             assert_eq!(counts.get("001"), Some(&100));
-            assert!(counts.get("1").is_none());
+            assert!(!counts.contains_key("1"));
         }
 
         #[test]
