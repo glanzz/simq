@@ -264,7 +264,6 @@ fn execution_config_defaults() {
     let config = ExecutionConfig::default();
     assert_eq!(config.mode, ExecutionMode::Adaptive);
     assert_eq!(config.parallel_strategy, ParallelStrategy::LayerBased);
-    assert!(config.use_simd);
     assert!(!config.use_gpu);
     assert!(config.adaptive_state);
     assert!(config.enable_gate_fusion);
@@ -627,23 +626,6 @@ fn dense_state_hadamard() {
 #[test]
 fn dense_state_general_single_qubit() {
     let mut engine = make_seq_engine();
-    let mut circuit = Circuit::new(1);
-    circuit
-        .add_gate(Arc::new(RotationY::new(0.5)), &[q(0)])
-        .unwrap();
-    let mut state = AdaptiveState::Dense(DenseState::new(1).unwrap());
-    assert!(engine.execute(&circuit, &mut state).is_ok());
-}
-
-#[test]
-fn dense_state_general_single_qubit_no_simd() {
-    let config = ExecutionConfig {
-        mode: ExecutionMode::Sequential,
-        validate_state: false,
-        use_simd: false,
-        ..ExecutionConfig::default()
-    };
-    let mut engine = ExecutionEngine::new(config);
     let mut circuit = Circuit::new(1);
     circuit
         .add_gate(Arc::new(RotationY::new(0.5)), &[q(0)])

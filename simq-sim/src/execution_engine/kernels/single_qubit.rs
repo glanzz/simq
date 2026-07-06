@@ -93,22 +93,6 @@ fn apply_single_qubit_parallel(gate: &Matrix2x2, stride: usize, state: &mut [Com
     });
 }
 
-/// Apply single-qubit gate with SIMD optimizations
-///
-/// This version uses explicit vectorization for better performance
-/// on modern CPUs with AVX/AVX2/AVX-512.
-pub fn apply_single_qubit_dense_simd(
-    gate: &Matrix2x2,
-    qubit: usize,
-    state: &mut [Complex64],
-    use_parallel: bool,
-    parallel_threshold: usize,
-) -> Result<()> {
-    // For now, delegate to non-SIMD version
-    // TODO: Implement explicit SIMD using portable_simd or platform intrinsics
-    apply_single_qubit_dense(gate, qubit, state, use_parallel, parallel_threshold)
-}
-
 /// Validate that a gate matrix is unitary (in debug mode)
 #[cfg(debug_assertions)]
 fn validate_gate_matrix(gate: &Matrix2x2) -> Result<()> {
