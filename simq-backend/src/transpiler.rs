@@ -201,12 +201,15 @@ impl Transpiler {
             let physical_qubits = logical_qubits
                 .iter()
                 .map(|q| {
-                    mapping.get_physical(q.index()).map(QubitId::new).ok_or_else(|| {
-                        BackendError::Other(format!(
-                            "No physical qubit mapped for logical qubit {}",
-                            q.index()
-                        ))
-                    })
+                    mapping
+                        .get_physical(q.index())
+                        .map(QubitId::new)
+                        .ok_or_else(|| {
+                            BackendError::Other(format!(
+                                "No physical qubit mapped for logical qubit {}",
+                                q.index()
+                            ))
+                        })
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -803,10 +806,7 @@ mod tests {
 
         let mut circuit = simq_core::Circuit::new(3);
         circuit
-            .add_gate(
-                Arc::new(Toffoli),
-                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
-            )
+            .add_gate(Arc::new(Toffoli), &[QubitId::new(0), QubitId::new(1), QubitId::new(2)])
             .unwrap();
 
         // Toffoli is neither IBM-native nor covered by a registered
