@@ -90,7 +90,30 @@ pub trait QuantumBackend: Send + Sync {
             )));
         }
 
-        // TODO: Add circuit depth and gate support checks once Circuit API is stable
+        // Check circuit depth
+        if let Some(max_depth) = caps.max_circuit_depth {
+            let depth = circuit.depth();
+            if depth > max_depth {
+                return Err(crate::BackendError::CapabilityExceeded(format!(
+                    "Circuit depth {} exceeds backend max depth {}",
+                    depth, max_depth
+                )));
+            }
+        }
+
+        // Check every gate is supported by the backend
+        let mut unsupported: Vec<String> = circuit
+            .gate_counts()
+            .into_keys()
+            .filter(|name| !caps.supported_gates.contains(name))
+            .collect();
+        if !unsupported.is_empty() {
+            unsupported.sort();
+            return Err(crate::BackendError::CapabilityExceeded(format!(
+                "Circuit contains gate(s) unsupported by backend: {}",
+                unsupported.join(", ")
+            )));
+        }
 
         Ok(())
     }
@@ -338,6 +361,62 @@ mod tests {
         match err {
             crate::BackendError::CapabilityExceeded(msg) => {
                 assert!(msg.contains("5 qubits"));
+            },
+            other => panic!("expected CapabilityExceeded, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_circuit_rejects_excessive_depth() {
+        use simq_core::QubitId;
+        use simq_gates::standard::PauliX;
+        use std::sync::Arc;
+
+        let mut caps = BackendCapabilities::simulator();
+        caps.max_circuit_depth = Some(2);
+        let backend = MockBackend {
+            name: "depth_limited".to_string(),
+            capabilities: caps,
+        };
+
+        let mut circuit = Circuit::new(1);
+        for _ in 0..3 {
+            circuit
+                .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+                .unwrap();
+        }
+
+        let err = backend.validate_circuit(&circuit).unwrap_err();
+        match err {
+            crate::BackendError::CapabilityExceeded(msg) => {
+                assert!(msg.contains("depth"));
+            },
+            other => panic!("expected CapabilityExceeded, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_circuit_rejects_unsupported_gate() {
+        use simq_core::QubitId;
+        use simq_gates::standard::Hadamard;
+        use std::sync::Arc;
+
+        let mut caps = BackendCapabilities::simulator();
+        caps.supported_gates = crate::GateSet::new(); // supports nothing
+        let backend = MockBackend {
+            name: "no_gates".to_string(),
+            capabilities: caps,
+        };
+
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+            .unwrap();
+
+        let err = backend.validate_circuit(&circuit).unwrap_err();
+        match err {
+            crate::BackendError::CapabilityExceeded(msg) => {
+                assert!(msg.contains('H'));
             },
             other => panic!("expected CapabilityExceeded, got {:?}", other),
         }
