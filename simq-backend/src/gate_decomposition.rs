@@ -45,6 +45,27 @@ impl GateDecomposer {
         decomposer
     }
 
+    /// Create a decomposer targeting an arbitrary backend's native gate set.
+    ///
+    /// Selects decomposition rules based on which native single- and
+    /// two-qubit gate families are present in `native_gates`: RZ/SX/CNOT
+    /// (IBM-style) and/or RZ/RX/CZ (Rigetti-style). If neither family is
+    /// present, no rules are registered and `decompose_gate` will error on
+    /// any gate outside `native_gates`.
+    pub fn for_capabilities(native_gates: &GateSet) -> Self {
+        let mut decomposer = Self::new(native_gates.clone());
+
+        if native_gates.contains(&"SX".to_string()) {
+            decomposer.register_ibm_rules();
+        }
+
+        if native_gates.contains(&"RX".to_string()) && native_gates.contains(&"CZ".to_string()) {
+            decomposer.register_rigetti_rules();
+        }
+
+        decomposer
+    }
+
     /// IBM native gate set
     fn ibm_gate_set() -> GateSet {
         let mut gates = GateSet::new();
@@ -653,6 +674,53 @@ mod tests {
         assert!(decomposer.needs_decomposition("H"));
         // CNOT needs decomposition too
         assert!(decomposer.needs_decomposition("CNOT"));
+    }
+
+    #[test]
+    fn test_for_capabilities_ibm_style() {
+        let mut native = GateSet::new();
+        native.insert("RZ".to_string());
+        native.insert("SX".to_string());
+        native.insert("X".to_string());
+        native.insert("CNOT".to_string());
+
+        let decomposer = GateDecomposer::for_capabilities(&native);
+        assert!(!decomposer.needs_decomposition("RZ"));
+        assert!(decomposer.needs_decomposition("H"));
+
+        let q0 = QubitId::new(0);
+        let h_op = GateOp::new(Arc::new(Hadamard), &[q0]).unwrap();
+        let decomposed = decomposer.decompose_gate(&h_op).unwrap();
+        assert_eq!(decomposed.len(), 3);
+        assert_eq!(decomposed[1].gate().name(), "SX");
+    }
+
+    #[test]
+    fn test_for_capabilities_rigetti_style() {
+        let mut native = GateSet::new();
+        native.insert("RZ".to_string());
+        native.insert("RX".to_string());
+        native.insert("CZ".to_string());
+
+        let decomposer = GateDecomposer::for_capabilities(&native);
+        assert!(decomposer.needs_decomposition("H"));
+
+        let q0 = QubitId::new(0);
+        let h_op = GateOp::new(Arc::new(Hadamard), &[q0]).unwrap();
+        let decomposed = decomposer.decompose_gate(&h_op).unwrap();
+        assert_eq!(decomposed.len(), 3);
+        assert_eq!(decomposed[1].gate().name(), "RX");
+    }
+
+    #[test]
+    fn test_for_capabilities_no_known_family_errors_on_unsupported_gate() {
+        let mut native = GateSet::new();
+        native.insert("X".to_string());
+
+        let decomposer = GateDecomposer::for_capabilities(&native);
+        let q0 = QubitId::new(0);
+        let h_op = GateOp::new(Arc::new(Hadamard), &[q0]).unwrap();
+        assert!(decomposer.decompose_gate(&h_op).is_err());
     }
 
     #[test]
