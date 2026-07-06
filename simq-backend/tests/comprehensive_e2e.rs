@@ -713,11 +713,23 @@ fn optimize_inverse_gates_no_inverse() {
 
 #[test]
 fn optimize_merge_rotations_basic() {
+    // Adjacent same-axis rotations on the same qubit are a real mergeable
+    // pair; since angle extraction isn't implemented, this must error
+    // instead of silently returning the circuit unmerged.
     let mut c = Circuit::new(1);
     c.add_gate(Arc::new(RotationZ::new(0.5)), &[q(0)]).unwrap();
     c.add_gate(Arc::new(RotationZ::new(0.3)), &[q(0)]).unwrap();
     let result = optimize_merge_rotations(&c);
-    assert!(result.is_ok());
+    assert!(result.is_err());
+}
+
+#[test]
+fn optimize_merge_rotations_no_mergeable_pair_is_a_true_no_op() {
+    let mut c = Circuit::new(2);
+    c.add_gate(Arc::new(RotationZ::new(0.5)), &[q(0)]).unwrap();
+    c.add_gate(Arc::new(RotationZ::new(0.3)), &[q(1)]).unwrap();
+    let result = optimize_merge_rotations(&c).unwrap();
+    assert_eq!(result.len(), c.len());
 }
 
 // ============================================================================

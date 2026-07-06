@@ -286,11 +286,38 @@ fn is_inverse_pair(op1: &GateOp, op2: &GateOp) -> bool {
     false
 }
 
-/// Optimization pass to merge single-qubit rotations
+/// Optimization pass to merge adjacent same-axis single-qubit rotations
+/// (RZ·RZ, RX·RX, RY·RY on the same qubit with nothing in between).
+///
+/// This is not yet implemented: the `Gate` trait exposes no way to read a
+/// rotation gate's angle back out, so there is no way to compute the merged
+/// angle or construct the replacement gate. Rather than silently returning
+/// the circuit unchanged (which looks identical to "there was nothing to
+/// merge" to a caller measuring gate counts), this returns an error whenever
+/// it finds a mergeable pair, so no caller mistakes an unoptimized circuit
+/// for an optimized one. Circuits with no mergeable pairs pass through
+/// unchanged, since there is genuinely nothing to do.
 pub fn optimize_merge_rotations(circuit: &Circuit) -> Result<Circuit> {
-    // This would merge adjacent RZ, RX, RY gates on the same qubit
-    // For now, return as-is
-    // Full implementation requires parameter extraction and gate construction
+    const ROTATION_GATES: [&str; 3] = ["RZ", "RX", "RY"];
+
+    let ops = circuit.operations_slice();
+    for window in ops.windows(2) {
+        let (op1, op2) = (&window[0], &window[1]);
+        let name = op1.gate().name();
+        if op1.qubits() == op2.qubits()
+            && op1.qubits().len() == 1
+            && name == op2.gate().name()
+            && ROTATION_GATES.contains(&name)
+        {
+            return Err(BackendError::Other(format!(
+                "optimize_merge_rotations: found adjacent {name}·{name} on qubit {:?} that \
+                 could be merged, but rotation-angle extraction is not implemented (Gate trait \
+                 exposes no parameter accessor), so no merge was performed",
+                op1.qubits()[0]
+            )));
+        }
+    }
+
     Ok(circuit.clone())
 }
 
