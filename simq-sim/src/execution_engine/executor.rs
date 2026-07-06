@@ -464,23 +464,13 @@ impl ExecutionEngine {
                         },
                         _ => {
                             // General single-qubit gate
-                            if self.config.use_simd {
-                                single_qubit::apply_single_qubit_dense_simd(
-                                    mat,
-                                    qubit_idx,
-                                    amplitudes,
-                                    use_parallel,
-                                    threshold,
-                                )?;
-                            } else {
-                                single_qubit::apply_single_qubit_dense(
-                                    mat,
-                                    qubit_idx,
-                                    amplitudes,
-                                    use_parallel,
-                                    threshold,
-                                )?;
-                            }
+                            single_qubit::apply_single_qubit_dense(
+                                mat,
+                                qubit_idx,
+                                amplitudes,
+                                use_parallel,
+                                threshold,
+                            )?;
                         },
                     }
                 }
@@ -1133,12 +1123,10 @@ mod tests {
     }
 
     #[test]
-    fn test_general_single_qubit_no_simd() {
-        // Use use_simd=false to go through the non-SIMD general path
+    fn test_general_single_qubit() {
         let config = ExecutionConfig {
             mode: ExecutionMode::Sequential,
             validate_state: false,
-            use_simd: false,
             ..ExecutionConfig::default()
         };
         let mut engine = ExecutionEngine::new(config);

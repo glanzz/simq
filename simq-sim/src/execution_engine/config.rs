@@ -14,9 +14,6 @@ pub struct ExecutionConfig {
     /// Threshold for using parallel execution (state vector size)
     pub parallel_threshold: usize,
 
-    /// Enable SIMD optimizations
-    pub use_simd: bool,
-
     /// Enable GPU acceleration
     ///
     /// **Not implemented**: setting this to `true` (or selecting
@@ -73,7 +70,6 @@ impl Default for ExecutionConfig {
             mode: ExecutionMode::Adaptive,
             parallel_strategy: ParallelStrategy::LayerBased,
             parallel_threshold: 1 << 10, // 1024 amplitudes
-            use_simd: true,
             use_gpu: false,
             gpu_device_id: 0,
             adaptive_state: true,
@@ -109,7 +105,6 @@ impl ExecutionConfig {
             mode: ExecutionMode::Parallel,
             parallel_strategy: ParallelStrategy::LayerBased,
             parallel_threshold: 1 << 8,
-            use_simd: true,
             use_gpu: false,
             adaptive_state: true,
             validate_state: false,
@@ -261,7 +256,6 @@ mod tests {
     fn test_default_config() {
         let config = ExecutionConfig::default();
         assert_eq!(config.mode, ExecutionMode::Adaptive);
-        assert!(config.use_simd);
         assert!(config.validate().is_ok());
     }
 

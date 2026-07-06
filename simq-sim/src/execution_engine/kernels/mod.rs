@@ -14,7 +14,7 @@ pub mod two_qubit;
 pub use controlled::{apply_controlled_gate, apply_multi_controlled};
 pub use diagonal::{apply_diagonal_gate, apply_phase_gate};
 pub use matrix::GateMatrix;
-pub use single_qubit::{apply_single_qubit_dense, apply_single_qubit_dense_simd};
+pub use single_qubit::apply_single_qubit_dense;
 pub use sparse::{apply_single_qubit_sparse, apply_three_qubit_sparse, apply_two_qubit_sparse};
 pub use three_qubit::apply_three_qubit_dense;
 pub use two_qubit::{apply_cnot, apply_cz, apply_swap, apply_two_qubit_dense};
