@@ -13,7 +13,7 @@ const NEG_I: Complex64 = Complex64::new(0.0, -1.0);
 const NEG_ONE: Complex64 = Complex64::new(-1.0, 0.0);
 
 // Common mathematical constants
-const INV_SQRT2: f64 = 0.7071067811865476; // 1/√2
+const INV_SQRT2: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
 
 // Single-qubit gate matrices (2x2)
 
@@ -34,50 +34,32 @@ pub const HADAMARD: [[Complex64; 2]; 2] = [
 /// Pauli-X gate matrix (NOT gate)
 /// X = [[0, 1],
 ///      [1, 0]]
-pub const PAULI_X: [[Complex64; 2]; 2] = [
-    [ZERO, ONE],
-    [ONE, ZERO],
-];
+pub const PAULI_X: [[Complex64; 2]; 2] = [[ZERO, ONE], [ONE, ZERO]];
 
 /// Pauli-Y gate matrix
 /// Y = [[0, -i],
 ///      [i,  0]]
-pub const PAULI_Y: [[Complex64; 2]; 2] = [
-    [ZERO, NEG_I],
-    [I, ZERO],
-];
+pub const PAULI_Y: [[Complex64; 2]; 2] = [[ZERO, NEG_I], [I, ZERO]];
 
 /// Pauli-Z gate matrix
 /// Z = [[1,  0],
 ///      [0, -1]]
-pub const PAULI_Z: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, NEG_ONE],
-];
+pub const PAULI_Z: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, NEG_ONE]];
 
 /// Identity gate matrix
 /// I = [[1, 0],
 ///      [0, 1]]
-pub const IDENTITY: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, ONE],
-];
+pub const IDENTITY: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, ONE]];
 
 /// S gate matrix (Phase gate, √Z)
 /// S = [[1, 0],
 ///      [0, i]]
-pub const S_GATE: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, I],
-];
+pub const S_GATE: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, I]];
 
 /// S† gate matrix (adjoint of S gate)
 /// S† = [[1,  0],
 ///       [0, -i]]
-pub const S_GATE_DAGGER: [[Complex64; 2]; 2] = [
-    [ONE, ZERO],
-    [ZERO, NEG_I],
-];
+pub const S_GATE_DAGGER: [[Complex64; 2]; 2] = [[ONE, ZERO], [ZERO, NEG_I]];
 
 /// T gate matrix (π/8 gate, √S)
 /// T = [[1, 0],
@@ -100,12 +82,12 @@ pub const T_GATE_DAGGER: [[Complex64; 2]; 2] = [
 ///             [1-i, 1+i]]
 pub const SX_GATE: [[Complex64; 2]; 2] = [
     [
-        Complex64::new(0.5, 0.5),   // (1+i)/2
-        Complex64::new(0.5, -0.5),  // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
     ],
     [
-        Complex64::new(0.5, -0.5),  // (1-i)/2
-        Complex64::new(0.5, 0.5),   // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
     ],
 ];
 
@@ -114,12 +96,12 @@ pub const SX_GATE: [[Complex64; 2]; 2] = [
 ///              [1+i, 1-i]]
 pub const SX_GATE_DAGGER: [[Complex64; 2]; 2] = [
     [
-        Complex64::new(0.5, -0.5),  // (1-i)/2
-        Complex64::new(0.5, 0.5),   // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
     ],
     [
-        Complex64::new(0.5, 0.5),   // (1+i)/2
-        Complex64::new(0.5, -0.5),  // (1-i)/2
+        Complex64::new(0.5, 0.5),  // (1+i)/2
+        Complex64::new(0.5, -0.5), // (1-i)/2
     ],
 ];
 
@@ -257,14 +239,8 @@ pub fn rotation_x(theta: f64) -> [[Complex64; 2]; 2] {
     let sin_val = half_theta.sin();
 
     [
-        [
-            Complex64::new(cos_val, 0.0),
-            Complex64::new(0.0, -sin_val),
-        ],
-        [
-            Complex64::new(0.0, -sin_val),
-            Complex64::new(cos_val, 0.0),
-        ],
+        [Complex64::new(cos_val, 0.0), Complex64::new(0.0, -sin_val)],
+        [Complex64::new(0.0, -sin_val), Complex64::new(cos_val, 0.0)],
     ]
 }
 
@@ -278,14 +254,8 @@ pub fn rotation_y(theta: f64) -> [[Complex64; 2]; 2] {
     let sin_val = half_theta.sin();
 
     [
-        [
-            Complex64::new(cos_val, 0.0),
-            Complex64::new(-sin_val, 0.0),
-        ],
-        [
-            Complex64::new(sin_val, 0.0),
-            Complex64::new(cos_val, 0.0),
-        ],
+        [Complex64::new(cos_val, 0.0), Complex64::new(-sin_val, 0.0)],
+        [Complex64::new(sin_val, 0.0), Complex64::new(cos_val, 0.0)],
     ]
 }
 
@@ -297,14 +267,8 @@ pub fn rotation_z(theta: f64) -> [[Complex64; 2]; 2] {
     let half_theta = theta / 2.0;
 
     [
-        [
-            Complex64::new(half_theta.cos(), -half_theta.sin()),
-            ZERO,
-        ],
-        [
-            ZERO,
-            Complex64::new(half_theta.cos(), half_theta.sin()),
-        ],
+        [Complex64::new(half_theta.cos(), -half_theta.sin()), ZERO],
+        [ZERO, Complex64::new(half_theta.cos(), half_theta.sin())],
     ]
 }
 
@@ -337,14 +301,8 @@ pub fn u2(phi: f64, lambda: f64) -> [[Complex64; 2]; 2] {
     let e_phi_lambda = Complex64::new((phi + lambda).cos(), (phi + lambda).sin());
 
     [
-        [
-            Complex64::new(INV_SQRT2, 0.0),
-            -e_lambda * INV_SQRT2,
-        ],
-        [
-            e_phi * INV_SQRT2,
-            e_phi_lambda * INV_SQRT2,
-        ],
+        [Complex64::new(INV_SQRT2, 0.0), -e_lambda * INV_SQRT2],
+        [e_phi * INV_SQRT2, e_phi_lambda * INV_SQRT2],
     ]
 }
 
@@ -362,14 +320,8 @@ pub fn u3(theta: f64, phi: f64, lambda: f64) -> [[Complex64; 2]; 2] {
     let e_phi_lambda = Complex64::new((phi + lambda).cos(), (phi + lambda).sin());
 
     [
-        [
-            Complex64::new(cos_val, 0.0),
-            -e_lambda * sin_val,
-        ],
-        [
-            e_phi * sin_val,
-            e_phi_lambda * cos_val,
-        ],
+        [Complex64::new(cos_val, 0.0), -e_lambda * sin_val],
+        [e_phi * sin_val, e_phi_lambda * cos_val],
     ]
 }
 
@@ -442,6 +394,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_pauli_x_squaring() {
         // X² = I
         let mut result = [[ZERO; 2]; 2];
@@ -462,6 +415,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_hadamard_self_inverse() {
         // H² = I
         let mut result = [[ZERO; 2]; 2];
@@ -482,6 +436,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_s_gate_squaring() {
         // S² = Z
         let mut result = [[ZERO; 2]; 2];
@@ -502,6 +457,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_t_gate_squaring() {
         // T² = S
         let mut result = [[ZERO; 2]; 2];
@@ -590,6 +546,285 @@ mod tests {
                 assert_relative_eq!(rx_pi[i][j].re, expected.re, epsilon = 1e-10);
                 assert_relative_eq!(rx_pi[i][j].im, expected.im, epsilon = 1e-10);
             }
+        }
+    }
+
+    // =========================================================================
+    // Additional matrix constant tests
+    // =========================================================================
+
+    #[test]
+    fn test_hadamard_values() {
+        // H[0][0] = H[0][1] = H[1][0] = 1/√2, H[1][1] = -1/√2
+        let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
+        assert_relative_eq!(HADAMARD[0][0].re, inv_sqrt2, epsilon = 1e-12);
+        assert_relative_eq!(HADAMARD[0][1].re, inv_sqrt2, epsilon = 1e-12);
+        assert_relative_eq!(HADAMARD[1][0].re, inv_sqrt2, epsilon = 1e-12);
+        assert_relative_eq!(HADAMARD[1][1].re, -inv_sqrt2, epsilon = 1e-12);
+        // All imaginary parts are zero
+        for row in HADAMARD.iter() {
+            for val in row.iter() {
+                assert_relative_eq!(val.im, 0.0, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_pauli_matrices_values() {
+        // X = [[0,1],[1,0]]
+        assert_relative_eq!(PAULI_X[0][0].re, 0.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_X[0][1].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_X[1][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_X[1][1].re, 0.0, epsilon = 1e-12);
+
+        // Y = [[0,-i],[i,0]]
+        assert_relative_eq!(PAULI_Y[0][1].im, -1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_Y[1][0].im, 1.0, epsilon = 1e-12);
+
+        // Z = [[1,0],[0,-1]]
+        assert_relative_eq!(PAULI_Z[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(PAULI_Z[1][1].re, -1.0, epsilon = 1e-12);
+
+        // Identity
+        assert_relative_eq!(IDENTITY[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(IDENTITY[1][1].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(IDENTITY[0][1].re, 0.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_phase_gate_values() {
+        use std::f64::consts::FRAC_1_SQRT_2;
+
+        // S = [[1,0],[0,i]]
+        assert_relative_eq!(S_GATE[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(S_GATE[1][1].im, 1.0, epsilon = 1e-12);
+
+        // S† = [[1,0],[0,-i]]
+        assert_relative_eq!(S_GATE_DAGGER[1][1].im, -1.0, epsilon = 1e-12);
+
+        // T = [[1,0],[0,e^(iπ/4)]]
+        assert_relative_eq!(T_GATE[1][1].re, FRAC_1_SQRT_2, epsilon = 1e-12);
+        assert_relative_eq!(T_GATE[1][1].im, FRAC_1_SQRT_2, epsilon = 1e-12);
+
+        // T† = [[1,0],[0,e^(-iπ/4)]]
+        assert_relative_eq!(T_GATE_DAGGER[1][1].re, FRAC_1_SQRT_2, epsilon = 1e-12);
+        assert_relative_eq!(T_GATE_DAGGER[1][1].im, -FRAC_1_SQRT_2, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_sx_gate_values() {
+        // SX = 1/2 * [[1+i, 1-i],[1-i, 1+i]]
+        assert_relative_eq!(SX_GATE[0][0].re, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE[0][0].im, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE[0][1].re, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE[0][1].im, -0.5, epsilon = 1e-12);
+
+        // SX† should be the adjoint of SX
+        assert_relative_eq!(SX_GATE_DAGGER[0][0].re, 0.5, epsilon = 1e-12);
+        assert_relative_eq!(SX_GATE_DAGGER[0][0].im, -0.5, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_two_qubit_matrices_dimensions() {
+        // All two-qubit matrices are 4x4
+        assert_eq!(CNOT.len(), 4);
+        assert_eq!(CNOT[0].len(), 4);
+        assert_eq!(CZ.len(), 4);
+        assert_eq!(SWAP.len(), 4);
+        assert_eq!(ISWAP.len(), 4);
+        assert_eq!(CY.len(), 4);
+        assert_eq!(ECR.len(), 4);
+    }
+
+    #[test]
+    fn test_three_qubit_matrices_dimensions() {
+        // Both three-qubit matrices are 8x8
+        assert_eq!(TOFFOLI.len(), 8);
+        assert_eq!(TOFFOLI[0].len(), 8);
+        assert_eq!(FREDKIN.len(), 8);
+        assert_eq!(FREDKIN[0].len(), 8);
+    }
+
+    #[test]
+    fn test_toffoli_flips_target() {
+        // TOFFOLI|111⟩ = |110⟩ (flips target=qubit 2 when control1=control0=1)
+        // Ordering: |q0 q1 q2⟩ => index 7 = |111⟩, index 6 = |110⟩
+        // The TOFFOLI matrix swaps rows 6 and 7
+        assert_relative_eq!(TOFFOLI[6][7].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(TOFFOLI[7][6].re, 1.0, epsilon = 1e-12);
+        // Row 7 should map to row 6 (they're swapped)
+        // Everything else is identity
+        for (i, row) in TOFFOLI.iter().enumerate().take(6) {
+            assert_relative_eq!(row[i].re, 1.0, epsilon = 1e-12);
+        }
+    }
+
+    #[test]
+    fn test_rotation_y_identity() {
+        // RY(0) = I
+        let ry_0 = rotation_y(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(ry_0[i][j].re, IDENTITY[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(ry_0[i][j].im, IDENTITY[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rotation_y_pi() {
+        // RY(π) = [[0, -1],[1, 0]]
+        use std::f64::consts::PI;
+        let ry_pi = rotation_y(PI);
+        assert_relative_eq!(ry_pi[0][0].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(ry_pi[0][1].re, -1.0, epsilon = 1e-10);
+        assert_relative_eq!(ry_pi[1][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(ry_pi[1][1].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_rotation_z_identity() {
+        // RZ(0) = I
+        let rz_0 = rotation_z(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(rz_0[i][j].re, IDENTITY[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rz_0[i][j].im, IDENTITY[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rotation_z_half_pi() {
+        // RZ(π/2): e^(-iπ/4) on [0][0], e^(iπ/4) on [1][1]
+        use std::f64::consts::{FRAC_1_SQRT_2, PI};
+        let rz = rotation_z(PI / 2.0);
+        assert_relative_eq!(rz[0][0].re, FRAC_1_SQRT_2, epsilon = 1e-10);
+        assert_relative_eq!(rz[0][0].im, -FRAC_1_SQRT_2, epsilon = 1e-10);
+        assert_relative_eq!(rz[1][1].re, FRAC_1_SQRT_2, epsilon = 1e-10);
+        assert_relative_eq!(rz[1][1].im, FRAC_1_SQRT_2, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_phase_function() {
+        // P(0) = I
+        let p0 = phase(0.0);
+        assert_relative_eq!(p0[0][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(p0[1][1].re, 1.0, epsilon = 1e-10);
+
+        // P(π) = [[1,0],[0,-1]] = diag(1,-1)
+        use std::f64::consts::PI;
+        let p_pi = phase(PI);
+        assert_relative_eq!(p_pi[1][1].re, -1.0, epsilon = 1e-10);
+        assert_relative_eq!(p_pi[0][0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_u1_equals_phase() {
+        use std::f64::consts::PI;
+        let lam = PI / 3.0;
+        let u1_m = u1(lam);
+        let p_m = phase(lam);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(u1_m[i][j].re, p_m[i][j].re, epsilon = 1e-12);
+                assert_relative_eq!(u1_m[i][j].im, p_m[i][j].im, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_u2_normalization() {
+        // U2 should be unitary: U·U† = I
+        use std::f64::consts::PI;
+        let u = u2(PI / 4.0, PI / 3.0);
+        let mut product = [[ZERO; 2]; 2];
+        for (i, ui) in u.iter().enumerate() {
+            for (j, uj) in u.iter().enumerate() {
+                product[i][j] = ui.iter().zip(uj.iter()).map(|(&a, &b)| a * b.conj()).sum();
+            }
+        }
+        assert_relative_eq!(product[0][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(product[1][1].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(product[0][1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(product[1][0].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_u3_normalization() {
+        use std::f64::consts::PI;
+        let u = u3(PI / 4.0, PI / 3.0, PI / 6.0);
+        let mut product = [[ZERO; 2]; 2];
+        for (i, ui) in u.iter().enumerate() {
+            for (j, uj) in u.iter().enumerate() {
+                product[i][j] = ui.iter().zip(uj.iter()).map(|(&a, &b)| a * b.conj()).sum();
+            }
+        }
+        assert_relative_eq!(product[0][0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(product[1][1].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_controlled_phase_structure() {
+        use std::f64::consts::PI;
+        let cp = controlled_phase(PI / 2.0);
+        // CP is 4x4: identity on top-left 3x3, e^(iθ) at [3][3]
+        assert_relative_eq!(cp[0][0].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(cp[1][1].re, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(cp[2][2].re, 1.0, epsilon = 1e-12);
+        // cp[3][3] = e^(iπ/2) = i
+        assert_relative_eq!(cp[3][3].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(cp[3][3].im, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_rxx_unitarity() {
+        use std::f64::consts::PI;
+        let m = rxx(PI / 4.0);
+        // Check unitarity: M·M† = I
+        let mut product = [[ZERO; 4]; 4];
+        for (i, mi) in m.iter().enumerate() {
+            for (j, mj) in m.iter().enumerate() {
+                product[i][j] = mi.iter().zip(mj.iter()).map(|(&a, &b)| a * b.conj()).sum();
+            }
+        }
+        for (i, row) in product.iter().enumerate() {
+            assert_relative_eq!(row[i].re, 1.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_ryy_unitarity() {
+        use std::f64::consts::PI;
+        let m = ryy(PI / 4.0);
+        let mut product = [[ZERO; 4]; 4];
+        for (i, mi) in m.iter().enumerate() {
+            for (j, mj) in m.iter().enumerate() {
+                product[i][j] = mi.iter().zip(mj.iter()).map(|(&a, &b)| a * b.conj()).sum();
+            }
+        }
+        for (i, row) in product.iter().enumerate() {
+            assert_relative_eq!(row[i].re, 1.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_rzz_structure() {
+        // RZZ: diagonal matrix with e^(-iθ/2) and e^(iθ/2) alternating
+        use std::f64::consts::PI;
+        let m = rzz(PI / 2.0);
+        // Off-diagonals should all be zero
+        for (i, row) in m.iter().enumerate() {
+            for (j, val) in row.iter().enumerate() {
+                if i != j {
+                    assert_relative_eq!(val.re, 0.0, epsilon = 1e-12);
+                    assert_relative_eq!(val.im, 0.0, epsilon = 1e-12);
+                }
+            }
+        }
+        // Diagonal elements should have unit norm
+        for (i, row) in m.iter().enumerate() {
+            assert_relative_eq!(row[i].norm_sqr(), 1.0, epsilon = 1e-10);
         }
     }
 }

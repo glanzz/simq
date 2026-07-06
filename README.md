@@ -1,6 +1,6 @@
 # SimQ - High-Performance Quantum Computing SDK
 
-[![codecov](https://codecov.io/gh/yourusername/simq/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/simq)
+[![Coverage Status](https://coveralls.io/repos/github/glanzz/simq/badge.svg?branch=main)](https://coveralls.io/github/glanzz/simq?branch=main)
 [![Crates.io](https://img.shields.io/crates/v/simq.svg)](https://crates.io/crates/simq)
 [![Documentation](https://docs.rs/simq/badge.svg)](https://docs.rs/simq)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
@@ -30,20 +30,45 @@ simq = "0.1"
 Create your first quantum circuit:
 
 ```rust
-use simq::{Circuit, gates::*};
+use simq::QuantumCircuit;
 
 fn main() {
-    // Create a 3-qubit circuit
-    let mut circuit = Circuit::new(3);
+    // Create a 3-qubit GHZ circuit
+    let mut qc = QuantumCircuit::new(3);
+    qc.h(0)          // Hadamard on qubit 0
+        .cnot(0, 1)  // CNOT: control=0, target=1
+        .cnot(1, 2); // CNOT: control=1, target=2
 
-    // Apply gates
-    circuit.h(0);           // Hadamard on qubit 0
-    circuit.cnot(0, 1);     // CNOT: control=0, target=1
-    circuit.cnot(1, 2);     // CNOT: control=1, target=2
+    // Simulate with 1024 measurement shots
+    let result = qc.simulate_with_shots(1024).unwrap();
+    let counts = result.measurements.unwrap();
+    println!("Results: {:?}", counts.sorted());
+    // e.g. [("000", 517), ("111", 507)]
+}
+```
 
-    // Simulate
-    let result = circuit.simulate(shots=1024);
-    println!("Results: {:?}", result.counts());
+Gate methods chain fluently and never panic: the first invalid operation
+(e.g. an out-of-range qubit) is recorded and returned as an error from
+`build()` or `simulate()`. The full standard gate set is available —
+`h`, `x`, `y`, `z`, `s`, `t`, `sx` (and daggers), `rx`, `ry`, `rz`, `p`,
+`u1`/`u2`/`u3`, `cnot`/`cx`, `cy`, `cz`, `cp`, `swap`, `iswap`, `ecr`,
+`rxx`/`ryy`/`rzz`, `toffoli`/`ccx`, `cswap` — plus a `gate(...)` escape
+hatch for custom gates.
+
+If you need lower-level control, the subcrate APIs remain fully accessible
+through the same dependency:
+
+```rust
+use simq::prelude::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut circuit = Circuit::new(2);
+    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)])?;
+    circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])?;
+
+    let result = Simulator::new(SimulatorConfig::default()).run(&circuit)?;
+    println!("Final state has {} qubits", result.num_qubits());
+    Ok(())
 }
 ```
 
@@ -61,27 +86,40 @@ SimQ is designed from the ground up for speed:
 
 ### Type Safety Without Compromise
 
+For compile-time qubit bounds, use the const-generic `CircuitBuilder`:
+
 ```rust
-let mut circuit = Circuit::<4>::new();  // 4-qubit circuit
-circuit.h(q!(0));   // OK
-circuit.h(q!(5));   // Compile error: qubit 5 doesn't exist!
+use simq::prelude::*;
+
+let mut builder = CircuitBuilder::<4>::new(); // 4-qubit circuit
+let [q0, q1, q2, q3] = builder.qubits();      // typed qubit references
+builder.apply_gate(Arc::new(Hadamard), &[q0]).unwrap();
+builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist — caught immediately
+let circuit = builder.build();
 ```
 
 ### Built for Variational Algorithms
 
+Exact expectation values are one call away, so an energy function for VQE is
+a few lines:
+
 ```rust
-use simq::algorithms::VQE;
+use simq::{PauliObservable, PauliString, QuantumCircuit};
 
-// Define your parametric circuit
-let ansatz = parametric_circuit(|params| {
-    // Build circuit with parameters
-});
+let hamiltonian = PauliObservable::from_pauli_string(
+    PauliString::from_str("Z").unwrap(), 1.0);
 
-// Run VQE
-let vqe = VQE::new(hamiltonian, ansatz);
-let result = vqe.minimize();
-println!("Ground state energy: {}", result.energy);
+let energy = |theta: f64| {
+    let mut qc = QuantumCircuit::new(1);
+    qc.ry(theta, 0);
+    qc.expectation_value(&hamiltonian).unwrap()
+};
+// energy(θ) = cos(θ); minimize with your favourite optimizer
 ```
+
+Run `cargo run -p simq --example vqe_fluent` for a complete gradient-descent
+VQE loop, and see `simq-sim/examples/` for full workflows with the built-in
+optimizers and gradient methods (`vqe_h2_molecule`, `qaoa_maxcut`, ...).
 
 ## Compile-Time Caching
 
@@ -97,6 +135,11 @@ SimQ features a revolutionary **multi-level compile-time gate matrix caching sys
 | Level 6: Runtime Compute (any angle) | ~20-50 ns | 1× | 0 bytes |
 
 **Total static memory: ~70 KB** (embedded in binary)
+
+**Accuracy guarantee**: every cache level is exact-match only — a cached
+matrix is returned only when the requested angle equals the cached angle to
+within 1e-12. Any other angle falls through to full-precision runtime
+computation. Gate matrices are never approximated or snapped to a grid.
 
 ```rust
 use simq_gates::RotationX;
@@ -114,6 +157,7 @@ let rx3 = RotationX::new(10.0);        // ~20-50 ns (runtime fallback)
 
 SimQ consists of several optimized crates:
 
+- **simq**: Umbrella crate — the fluent `QuantumCircuit` builder plus re-exports of everything below
 - **simq-core**: Core types and traits
 - **simq-state**: Quantum state representations (sparse/dense)
 - **simq-gates**: Gate library with SIMD optimizations and compile-time caching

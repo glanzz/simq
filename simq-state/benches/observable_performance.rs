@@ -36,9 +36,7 @@ fn bench_diagonal_pauli_expectation(c: &mut Criterion) {
                 let state = create_random_state(num_qubits, 42);
                 let pauli = PauliString::all_z(num_qubits);
 
-                b.iter(|| {
-                    black_box(pauli.expectation_value(&state).unwrap())
-                });
+                b.iter(|| black_box(pauli.expectation_value(&state).unwrap()));
             },
         );
     }
@@ -63,9 +61,7 @@ fn bench_non_diagonal_pauli_expectation(c: &mut Criterion) {
                 let paulis = vec![Pauli::X; num_qubits];
                 let pauli = PauliString::from_paulis(paulis);
 
-                b.iter(|| {
-                    black_box(pauli.expectation_value(&state).unwrap())
-                });
+                b.iter(|| black_box(pauli.expectation_value(&state).unwrap()));
             },
         );
     }
@@ -92,9 +88,7 @@ fn bench_mixed_pauli_expectation(c: &mut Criterion) {
                     .collect();
                 let pauli = PauliString::from_paulis(paulis);
 
-                b.iter(|| {
-                    black_box(pauli.expectation_value(&state).unwrap())
-                });
+                b.iter(|| black_box(pauli.expectation_value(&state).unwrap()));
             },
         );
     }
@@ -124,12 +118,11 @@ fn bench_pauli_observable_multi_term(c: &mut Criterion) {
                         if (i as usize) < num_qubits {
                             paulis[i as usize] = Pauli::Z;
                         }
-                        observable.add_term(PauliString::from_paulis(paulis), 1.0 / num_terms as f64);
+                        observable
+                            .add_term(PauliString::from_paulis(paulis), 1.0 / num_terms as f64);
                     }
 
-                    b.iter(|| {
-                        black_box(observable.expectation_value(&state).unwrap())
-                    });
+                    b.iter(|| black_box(observable.expectation_value(&state).unwrap()));
                 },
             );
         }
@@ -167,9 +160,7 @@ fn bench_hamiltonian_expectation(c: &mut Criterion) {
                     hamiltonian.add_term(PauliString::from_paulis(paulis), -0.5);
                 }
 
-                b.iter(|| {
-                    black_box(hamiltonian.expectation_value(&state).unwrap())
-                });
+                b.iter(|| black_box(hamiltonian.expectation_value(&state).unwrap()));
             },
         );
     }
@@ -192,9 +183,7 @@ fn bench_single_qubit_observables(c: &mut Criterion) {
                 let state = create_random_state(num_qubits, 42);
                 let observable = PauliObservable::single_z(num_qubits, 0);
 
-                b.iter(|| {
-                    black_box(observable.expectation_value(&state).unwrap())
-                });
+                b.iter(|| black_box(observable.expectation_value(&state).unwrap()));
             },
         );
 
@@ -209,9 +198,7 @@ fn bench_single_qubit_observables(c: &mut Criterion) {
                 let pauli_string = PauliString::from_paulis(paulis);
                 let observable = PauliObservable::from_pauli_string(pauli_string, 1.0);
 
-                b.iter(|| {
-                    black_box(observable.expectation_value(&state).unwrap())
-                });
+                b.iter(|| black_box(observable.expectation_value(&state).unwrap()));
             },
         );
     }
@@ -231,18 +218,14 @@ fn bench_diagonal_vs_non_diagonal(c: &mut Criterion) {
     // Diagonal (all Z)
     group.bench_function("diagonal_ZZZ", |b| {
         let pauli = PauliString::all_z(num_qubits);
-        b.iter(|| {
-            black_box(pauli.expectation_value(&state).unwrap())
-        });
+        b.iter(|| black_box(pauli.expectation_value(&state).unwrap()));
     });
 
     // Non-diagonal (all X)
     group.bench_function("non_diagonal_XXX", |b| {
         let paulis = vec![Pauli::X; num_qubits];
         let pauli = PauliString::from_paulis(paulis);
-        b.iter(|| {
-            black_box(pauli.expectation_value(&state).unwrap())
-        });
+        b.iter(|| black_box(pauli.expectation_value(&state).unwrap()));
     });
 
     // Mixed (alternating)
@@ -251,9 +234,7 @@ fn bench_diagonal_vs_non_diagonal(c: &mut Criterion) {
             .map(|i| if i % 2 == 0 { Pauli::X } else { Pauli::Z })
             .collect();
         let pauli = PauliString::from_paulis(paulis);
-        b.iter(|| {
-            black_box(pauli.expectation_value(&state).unwrap())
-        });
+        b.iter(|| black_box(pauli.expectation_value(&state).unwrap()));
     });
 
     group.finish();

@@ -40,12 +40,12 @@ pub fn apply_diagonal_gate_scalar(
     // For each block of size 2*stride
     for base in (0..dimension).step_by(2 * stride) {
         // Process |0⟩ amplitudes: multiply by diagonal[0]
-        for i in base..(base + stride) {
-            state[i] *= diagonal[0];
+        for amp in state.iter_mut().skip(base).take(stride) {
+            *amp *= diagonal[0];
         }
         // Process |1⟩ amplitudes: multiply by diagonal[1]
-        for i in (base + stride)..(base + 2 * stride) {
-            state[i] *= diagonal[1];
+        for amp in state.iter_mut().take(base + 2 * stride).skip(base + stride) {
+            *amp *= diagonal[1];
         }
     }
 }
@@ -54,6 +54,9 @@ pub fn apply_diagonal_gate_scalar(
 ///
 /// Processes 2 complex numbers (4 f64s) at once.
 /// This is optimal for small stride values where cache locality is critical.
+///
+/// # Safety
+/// Requires SSE2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
 #[inline]
@@ -68,8 +71,8 @@ pub unsafe fn apply_diagonal_gate_sse2(
 
     // Load diagonal elements into SIMD registers
     // Each diagonal element gets duplicated for complex multiplication
-    let diag0 = _mm_set_pd(diagonal[0].im, diagonal[0].re);
-    let diag1 = _mm_set_pd(diagonal[1].im, diagonal[1].re);
+    let _diag0 = _mm_set_pd(diagonal[0].im, diagonal[0].re);
+    let _diag1 = _mm_set_pd(diagonal[1].im, diagonal[1].re);
 
     let state_ptr = state.as_mut_ptr() as *mut f64;
 
@@ -130,6 +133,9 @@ pub unsafe fn apply_diagonal_gate_sse2(
 ///
 /// Processes 4 complex numbers (8 f64s) at once.
 /// Optimal for large stride values where SIMD throughput is more important than cache.
+///
+/// # Safety
+/// Requires AVX2 CPU support.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[inline]
@@ -240,11 +246,10 @@ pub fn apply_diagonal_gate_parallel(
     state: &mut [Complex64],
     diagonal: [Complex64; 2],
     qubit: usize,
-    num_qubits: usize,
+    _num_qubits: usize,
 ) {
     use rayon::prelude::*;
 
-    let dimension = 1usize << num_qubits;
     let stride = 1usize << qubit;
 
     // Split state into mutable chunks and process in parallel
@@ -253,8 +258,8 @@ pub fn apply_diagonal_gate_parallel(
         let actual_stride = chunk.len().min(stride);
 
         // Process |0⟩ amplitudes
-        for i in 0..actual_stride {
-            chunk[i] *= diagonal[0];
+        for amp in chunk.iter_mut().take(actual_stride) {
+            *amp *= diagonal[0];
         }
 
         // Process |1⟩ amplitudes (if they exist in this chunk)
@@ -316,7 +321,6 @@ pub fn apply_diagonal_gate_optimized(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::f64::consts::PI;
 
     /// Helper to create a simple test state
     fn create_test_state(num_qubits: usize) -> Vec<Complex64> {
@@ -328,6 +332,142 @@ mod tests {
             *amp = Complex64::new(norm, 0.0);
         }
         state
+    }
+
+    // ---- New coverage tests ----
+
+    #[test]
+    fn test_diagonal_gate_parallel_matches_scalar() {
+        // apply_diagonal_gate_parallel directly, num_qubits=4 qubit=1
+        let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        let mut state_scalar = create_test_state(4);
+        let mut state_parallel = state_scalar.clone();
+
+        apply_diagonal_gate_scalar(&mut state_scalar, diagonal, 1, 4);
+        apply_diagonal_gate_parallel(&mut state_parallel, diagonal, 1, 4);
+
+        for i in 0..state_scalar.len() {
+            assert!(
+                (state_scalar[i].re - state_parallel[i].re).abs() < 1e-10,
+                "re mismatch at {i}"
+            );
+            assert!(
+                (state_scalar[i].im - state_parallel[i].im).abs() < 1e-10,
+                "im mismatch at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_diagonal_gate_optimized_large_num_qubits_parallel_branch() {
+        // num_qubits >= PARALLEL_THRESHOLD (16) triggers parallel branch
+        // Use num_qubits=17 with a Z-like diagonal
+        let num_qubits = 17;
+        let dim = 1usize << num_qubits;
+        let norm = (dim as f64).sqrt().recip();
+        let mut state_scalar = vec![Complex64::new(norm, 0.0); dim];
+        let mut state_optimized = state_scalar.clone();
+
+        let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        apply_diagonal_gate_scalar(&mut state_scalar, diagonal, 0, num_qubits);
+        apply_diagonal_gate_optimized(&mut state_optimized, diagonal, 0, num_qubits);
+
+        for i in 0..state_scalar.len() {
+            assert!(
+                (state_scalar[i].re - state_optimized[i].re).abs() < 1e-10,
+                "re mismatch at {i}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_large_stride_matches_scalar() {
+        // stride >= 8: use qubit=4 (stride=16), num_qubits=6
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        let diagonal = [Complex64::new(0.6, 0.8), Complex64::new(-0.8, 0.6)];
+        let mut state_scalar = create_test_state(6);
+        let mut state_avx2 = state_scalar.clone();
+
+        apply_diagonal_gate_scalar(&mut state_scalar, diagonal, 4, 6);
+        unsafe {
+            apply_diagonal_gate_avx2(&mut state_avx2, diagonal, 4, 6);
+        }
+
+        for i in 0..state_scalar.len() {
+            assert!((state_scalar[i].re - state_avx2[i].re).abs() < 1e-10, "re mismatch at {i}");
+            assert!((state_scalar[i].im - state_avx2[i].im).abs() < 1e-10, "im mismatch at {i}");
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_sse2_directly() {
+        if !is_x86_feature_detected!("sse2") {
+            return;
+        }
+        let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        let mut state_scalar = create_test_state(3);
+        let mut state_sse2 = state_scalar.clone();
+
+        apply_diagonal_gate_scalar(&mut state_scalar, diagonal, 0, 3);
+        unsafe {
+            apply_diagonal_gate_sse2(&mut state_sse2, diagonal, 0, 3);
+        }
+
+        for i in 0..state_scalar.len() {
+            assert!((state_scalar[i].re - state_sse2[i].re).abs() < 1e-10, "re mismatch at {i}");
+            assert!((state_scalar[i].im - state_sse2[i].im).abs() < 1e-10, "im mismatch at {i}");
+        }
+    }
+
+    #[test]
+    fn test_diagonal_gate_scalar_higher_qubit_index() {
+        // qubit=2, num_qubits=3 — covers higher qubit iteration path
+        let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        let mut state = create_test_state(3); // 8-element equal superposition
+
+        // After Z on qubit 2 (most significant), indices 4-7 get negated
+        apply_diagonal_gate_scalar(&mut state, diagonal, 2, 3);
+
+        let norm = (8.0_f64).sqrt().recip();
+        for (i, s) in state[..4].iter().enumerate() {
+            assert!((s.re - norm).abs() < 1e-10, "index {i} should be +norm");
+        }
+        for (i, s) in state[4..].iter().enumerate() {
+            assert!((s.re + norm).abs() < 1e-10, "index {} should be -norm", i + 4);
+        }
+    }
+
+    #[test]
+    fn test_identity_diagonal_leaves_state_unchanged() {
+        // Identity diagonal [1, 1] on any path — state must not change
+        let identity = [Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
+
+        for num_qubits in 1usize..=5 {
+            for qubit in 0..num_qubits {
+                let original = create_test_state(num_qubits);
+                let mut state = original.clone();
+                apply_diagonal_gate_scalar(&mut state, identity, qubit, num_qubits);
+                for i in 0..state.len() {
+                    assert!(
+                        (state[i].re - original[i].re).abs() < 1e-12,
+                        "scalar identity changed state at qubit={qubit} nq={num_qubits} i={i}"
+                    );
+                }
+
+                let mut state2 = original.clone();
+                apply_diagonal_gate_optimized(&mut state2, identity, qubit, num_qubits);
+                for i in 0..state2.len() {
+                    assert!(
+                        (state2[i].re - original[i].re).abs() < 1e-12,
+                        "optimized identity changed state at qubit={qubit} nq={num_qubits} i={i}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
@@ -370,10 +510,7 @@ mod tests {
         let mut state_scalar = create_test_state(4);
         let mut state_avx2 = state_scalar.clone();
 
-        let diagonal = [
-            Complex64::new(0.707, 0.707),
-            Complex64::new(-0.707, 0.707),
-        ];
+        let diagonal = [Complex64::new(0.707, 0.707), Complex64::new(-0.707, 0.707)];
 
         apply_diagonal_gate_scalar(&mut state_scalar, diagonal, 2, 4);
         unsafe {

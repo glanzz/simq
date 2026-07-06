@@ -28,30 +28,30 @@
 //! let dense_amplitudes = sparse.to_dense();
 //! ```
 
-pub mod state_vector;
-pub mod sparse_state;
-pub mod dense_state;
 pub mod adaptive_state;
 pub mod cow_state;
+pub mod dense_state;
 pub mod density_matrix;
 pub mod density_matrix_simulator;
-pub mod monte_carlo_simulator;
-pub mod validation;
-pub mod simd;
 pub mod error;
 pub mod measurement;
+pub mod monte_carlo_simulator;
 pub mod observable;
+pub mod simd;
+pub mod sparse_state;
+pub mod state_vector;
+pub mod validation;
 
-pub use state_vector::StateVector;
-pub use sparse_state::SparseState;
-pub use dense_state::DenseState;
 pub use adaptive_state::{AdaptiveState, StateStats};
 pub use cow_state::{CowState, CowStats, MemoryStats};
+pub use dense_state::DenseState;
 pub use density_matrix::DensityMatrix;
 pub use density_matrix_simulator::{DensityMatrixConfig, DensityMatrixSimulator, SimulationStats};
-pub use monte_carlo_simulator::{MonteCarloConfig, MonteCarloSimulator, MonteCarloStats};
-pub use error::{StateError, Result};
+pub use error::{Result, StateError};
 pub use measurement::{
     ComputationalBasis, Measurement, MeasurementResult, MidCircuitMeasurement, SamplingResult,
 };
+pub use monte_carlo_simulator::{MonteCarloConfig, MonteCarloSimulator, MonteCarloStats};
 pub use observable::{Pauli, PauliObservable, PauliString};
+pub use sparse_state::SparseState;
+pub use state_vector::StateVector;

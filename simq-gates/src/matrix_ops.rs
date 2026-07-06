@@ -92,14 +92,8 @@ pub fn embed_gate_matrix(
     num_qubits: usize,
     qubit_indices: &[usize],
 ) -> Vec<Complex64> {
-    assert!(
-        !qubit_indices.is_empty(),
-        "Qubit indices cannot be empty"
-    );
-    assert!(
-        qubit_indices.len() == 1,
-        "Currently only single-qubit gates are supported"
-    );
+    assert!(!qubit_indices.is_empty(), "Qubit indices cannot be empty");
+    assert!(qubit_indices.len() == 1, "Currently only single-qubit gates are supported");
     assert!(
         qubit_indices[0] < num_qubits,
         "Qubit index {} out of bounds for {} qubits",
@@ -159,35 +153,29 @@ pub fn embed_gate_matrix_vec(
             }
         }
     } else {
-        // For multi-qubit gates, use a more general approach
-        // This is less efficient but more general
+        let mut gate_mask: usize = 0;
+        for &qubit in qubit_indices {
+            gate_mask |= 1 << qubit;
+        }
+        let non_gate_mask = !gate_mask & ((1 << num_qubits) - 1);
+
         for i in 0..system_size {
             for j in 0..system_size {
-                // Extract the relevant qubit bits
-                let mut gate_input = 0;
-                let mut gate_output = 0;
-                let mut matches = true;
+                if (i & non_gate_mask) != (j & non_gate_mask) {
+                    continue;
+                }
 
+                let mut gate_row = 0;
+                let mut gate_col = 0;
                 for (idx, &qubit) in qubit_indices.iter().enumerate() {
                     let mask = 1 << qubit;
                     let i_bit = (i & mask) >> qubit;
                     let j_bit = (j & mask) >> qubit;
-                    gate_input |= (i_bit as usize) << idx;
-                    gate_output |= (j_bit as usize) << idx;
-
-                    // Check if non-gate qubits match
-                    if (i ^ (i_bit << qubit)) != (j ^ (j_bit << qubit)) {
-                        matches = false;
-                        break;
-                    }
+                    gate_row |= i_bit << (num_gate_qubits - 1 - idx);
+                    gate_col |= j_bit << (num_gate_qubits - 1 - idx);
                 }
 
-                if matches {
-                    let gate_idx = gate_input * gate_size + gate_output;
-                    result[i * system_size + j] = gate_matrix[gate_idx];
-                } else {
-                    result[i * system_size + j] = Complex64::new(0.0, 0.0);
-                }
+                result[i * system_size + j] = gate_matrix[gate_row * gate_size + gate_col];
             }
         }
     }
@@ -332,10 +320,7 @@ pub fn matrix_to_vec<const N: usize>(matrix: &[[Complex64; N]; N]) -> Vec<Comple
 /// Convert a flattened vector to 2D array (for small matrices)
 pub fn vec_to_matrix_2x2(vec: &[Complex64]) -> [[Complex64; 2]; 2] {
     assert_eq!(vec.len(), 4, "Vector must have 4 elements for 2x2 matrix");
-    [
-        [vec[0], vec[1]],
-        [vec[2], vec[3]],
-    ]
+    [[vec[0], vec[1]], [vec[2], vec[3]]]
 }
 
 /// Compute the full matrix representation of a circuit
@@ -367,28 +352,28 @@ pub fn vec_to_matrix_2x2(vec: &[Complex64]) -> [[Complex64; 2]; 2] {
 pub fn circuit_matrix(circuit: &simq_core::Circuit) -> std::result::Result<Vec<Complex64>, String> {
     let num_qubits = circuit.num_qubits();
     let system_size = 1 << num_qubits;
-    
+
     // Start with identity matrix
     let mut result = identity_matrix(system_size);
-    
+
     // Apply each gate in sequence
     for op in circuit.operations() {
         // Get the gate matrix
-        let gate_matrix = op.gate()
-            .matrix()
-            .ok_or_else(|| format!("Gate {} does not have a matrix representation", op.gate().name()))?;
-        
+        let gate_matrix = op.gate().matrix().ok_or_else(|| {
+            format!("Gate {} does not have a matrix representation", op.gate().name())
+        })?;
+
         // Extract qubit indices
         let qubit_indices: Vec<usize> = op.qubits().iter().map(|q| q.index()).collect();
-        
+
         // Embed the gate matrix into the full system
         let embedded_matrix = embed_gate_matrix_vec(&gate_matrix, num_qubits, &qubit_indices);
-        
+
         // Compose with current circuit matrix: result = embedded_matrix * result
         // (gates are applied right to left, so we multiply on the left)
         result = matrix_multiply(&embedded_matrix, &result);
     }
-    
+
     Ok(result)
 }
 
@@ -405,33 +390,34 @@ where
 {
     let num_qubits = circuit.num_qubits();
     let system_size = 1 << num_qubits;
-    
+
     // Start with identity matrix
     let mut result = identity_matrix(system_size);
-    
+
     // Apply each gate in sequence
     for op in circuit.operations() {
         // Get the gate matrix using the provider
-        let gate_matrix = matrix_provider(op.gate().as_ref())
-            .ok_or_else(|| format!("Gate {} does not have a matrix representation", op.gate().name()))?;
-        
+        let gate_matrix = matrix_provider(op.gate().as_ref()).ok_or_else(|| {
+            format!("Gate {} does not have a matrix representation", op.gate().name())
+        })?;
+
         // Extract qubit indices
         let qubit_indices: Vec<usize> = op.qubits().iter().map(|q| q.index()).collect();
-        
+
         // Embed the gate matrix into the full system
         let embedded_matrix = embed_gate_matrix_vec(&gate_matrix, num_qubits, &qubit_indices);
-        
+
         // Compose with current circuit matrix
         result = matrix_multiply(&embedded_matrix, &result);
     }
-    
+
     Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::matrices::{HADAMARD, IDENTITY, PAULI_X, PAULI_Y, PAULI_Z, CNOT};
+    use crate::matrices::{CNOT, HADAMARD, IDENTITY, PAULI_X, PAULI_Y, PAULI_Z};
     use approx::assert_relative_eq;
 
     #[test]
@@ -469,10 +455,10 @@ mod tests {
 
         // X on qubit 0: |q1 q0⟩ → |q1 (X q0)⟩
         // |00⟩ → |01⟩ (flip qubit 0: 0→1)
-        assert_relative_eq!(x_embedded[1 * 4 + 0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(x_embedded[4].re, 1.0, epsilon = 1e-10);
 
         // |01⟩ → |00⟩ (flip qubit 0: 1→0)
-        assert_relative_eq!(x_embedded[0 * 4 + 1].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(x_embedded[1].re, 1.0, epsilon = 1e-10);
 
         // |10⟩ → |11⟩ (flip qubit 0: 0→1)
         assert_relative_eq!(x_embedded[3 * 4 + 2].re, 1.0, epsilon = 1e-10);
@@ -582,14 +568,18 @@ mod tests {
 
     #[test]
     fn test_circuit_matrix() {
-        use simq_core::Circuit;
         use crate::standard::{Hadamard, PauliX};
+        use simq_core::Circuit;
         use std::sync::Arc;
 
         // Create a simple circuit: H on qubit 0, X on qubit 1
         let mut circuit = Circuit::new(2);
-        circuit.add_gate(Arc::new(Hadamard), &[simq_core::QubitId::new(0)]).unwrap();
-        circuit.add_gate(Arc::new(PauliX), &[simq_core::QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[simq_core::QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX), &[simq_core::QubitId::new(1)])
+            .unwrap();
 
         // Compute circuit matrix
         let matrix = circuit_matrix(&circuit).unwrap();
@@ -614,5 +604,97 @@ mod tests {
             assert_relative_eq!(matrix[i].im, identity[i].im, epsilon = 1e-10);
         }
     }
-}
 
+    // --- Additional coverage for lines 100 (embed_gate_matrix 3-qubit), 165 (multi-qubit embed), ---
+    // --- 363 (circuit_matrix error path), 384-414 (circuit_matrix_with_provider) ---
+
+    #[test]
+    fn test_embed_gate_matrix_vec_two_qubit_gate() {
+        // Covers the multi-qubit branch in embed_gate_matrix_vec (line 155+, incl. 165 `continue`).
+        // Embed a 2-qubit gate (CNOT as flat vec) into a 2-qubit system.
+        let cnot = matrix_to_vec(&CNOT);
+        let embedded = embed_gate_matrix_vec(&cnot, 2, &[0, 1]);
+        // CNOT embedded in a 2-qubit system should equal the CNOT itself (4x4)
+        assert_eq!(embedded.len(), 16);
+        assert!(is_unitary(&embedded, 1e-10));
+    }
+
+    #[test]
+    fn test_circuit_matrix_no_matrix_gate() {
+        // Covers line 363: gate that returns None for matrix() → Err
+        use simq_core::{gate::Gate, Circuit, QubitId};
+        use std::sync::Arc;
+
+        #[derive(Debug)]
+        struct NoMatrixGate;
+        impl Gate for NoMatrixGate {
+            fn name(&self) -> &str {
+                "NoMatrix"
+            }
+            fn num_qubits(&self) -> usize {
+                1
+            }
+            fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+                None
+            }
+        }
+
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+
+        let result = circuit_matrix(&circuit);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_circuit_matrix_with_provider_basic() {
+        // Covers lines 391-414: circuit_matrix_with_provider happy path
+        use crate::standard::PauliX;
+        use simq_core::{Circuit, QubitId};
+        use std::sync::Arc;
+
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        // Provider that uses Gate::matrix()
+        let result = circuit_matrix_with_provider(&circuit, |g| g.matrix());
+        assert!(result.is_ok());
+        let mat = result.unwrap();
+        assert_eq!(mat.len(), 4); // 2x2 system for 1 qubit
+
+        // X applied twice → identity
+        let mut circuit2 = Circuit::new(1);
+        circuit2
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        circuit2
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+        let mat2 = circuit_matrix_with_provider(&circuit2, |g| g.matrix()).unwrap();
+        let identity = identity_matrix(2);
+        for i in 0..4 {
+            assert_relative_eq!(mat2[i].re, identity[i].re, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_circuit_matrix_with_provider_error() {
+        // Covers the error path in circuit_matrix_with_provider
+        use crate::standard::PauliX;
+        use simq_core::{Circuit, QubitId};
+        use std::sync::Arc;
+
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        // Provider that always returns None → error
+        let result = circuit_matrix_with_provider(&circuit, |_| None);
+        assert!(result.is_err());
+    }
+}

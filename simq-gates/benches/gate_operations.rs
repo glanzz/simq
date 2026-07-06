@@ -88,13 +88,9 @@ fn benchmark_rotation_lookup_configs(c: &mut Criterion) {
     for (name, config) in configs {
         let table = RotationLookupTable::new(config);
 
-        group.bench_with_input(
-            BenchmarkId::new("RX", name),
-            &angle,
-            |b, &angle| {
-                b.iter(|| black_box(table.rx_matrix(angle)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("RX", name), &angle, |b, &angle| {
+            b.iter(|| black_box(table.rx_matrix(angle)));
+        });
     }
 
     group.finish();
@@ -132,9 +128,7 @@ fn benchmark_vqe_workload(c: &mut Criterion) {
 
     // Simulate a typical VQE circuit: many small-angle rotations
     let num_gates = 100;
-    let angles: Vec<f64> = (0..num_gates)
-        .map(|i| 0.01 + (i as f64 * 0.001))
-        .collect();
+    let angles: Vec<f64> = (0..num_gates).map(|i| 0.01 + (i as f64 * 0.001)).collect();
 
     group.bench_function("direct_computation", |b| {
         b.iter(|| {

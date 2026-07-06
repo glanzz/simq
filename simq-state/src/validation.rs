@@ -104,10 +104,7 @@ pub fn validate_normalization(amplitudes: &[Complex64], tolerance: f64) -> Valid
     let message = if valid {
         format!("State is normalized (norm = {:.10})", norm)
     } else {
-        format!(
-            "State normalization error: norm = {:.10}, error = {:.2e}",
-            norm, norm_error
-        )
+        format!("State normalization error: norm = {:.10}, error = {:.2e}", norm, norm_error)
     };
 
     ValidationResult {
@@ -136,10 +133,7 @@ pub fn validate_probabilities(probabilities: &[f64], tolerance: f64) -> Validati
     let message = if valid {
         format!("Probabilities sum to 1.0 (sum = {:.10})", total)
     } else {
-        format!(
-            "Probability sum error: sum = {:.10}, error = {:.2e}",
-            total, error
-        )
+        format!("Probability sum error: sum = {:.10}, error = {:.2e}", total, error)
     };
 
     ValidationResult {
@@ -170,22 +164,22 @@ pub fn validate_unitary_2x2(matrix: &[[Complex64; 2]; 2], tolerance: f64) -> boo
     for i in 0..2 {
         for j in 0..2 {
             let mut sum = Complex64::new(0.0, 0.0);
-            for k in 0..2 {
-                sum += matrix[k][i].conj() * matrix[k][j];
+            for row in matrix.iter().take(2) {
+                sum += row[i].conj() * row[j];
             }
             result[i][j] = sum;
         }
     }
 
     // Check if result is identity matrix
-    for i in 0..2 {
-        for j in 0..2 {
+    for (i, row) in result.iter().enumerate() {
+        for (j, val) in row.iter().enumerate() {
             let expected = if i == j {
                 Complex64::new(1.0, 0.0)
             } else {
                 Complex64::new(0.0, 0.0)
             };
-            let diff = (result[i][j] - expected).norm();
+            let diff = (val - expected).norm();
             if diff > tolerance {
                 return false;
             }
@@ -221,7 +215,10 @@ pub fn check_finite(amplitudes: &[Complex64]) -> bool {
 ///
 /// # Returns
 /// Validation result or error if state is invalid
-pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Result<ValidationResult> {
+pub fn validate_state(
+    amplitudes: &[Complex64],
+    policy: ValidationPolicy,
+) -> Result<ValidationResult> {
     match policy {
         ValidationPolicy::None => Ok(ValidationResult {
             valid: true,
@@ -235,9 +232,7 @@ pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Res
         ValidationPolicy::Critical | ValidationPolicy::Strict => {
             // Check for NaN/infinity
             if !check_finite(amplitudes) {
-                return Err(StateError::NotNormalized {
-                    norm: f64::NAN,
-                });
+                return Err(StateError::NotNormalized { norm: f64::NAN });
             }
 
             // Check normalization
@@ -248,7 +243,7 @@ pub fn validate_state(amplitudes: &[Complex64], policy: ValidationPolicy) -> Res
             }
 
             Ok(result)
-        }
+        },
     }
 }
 
@@ -575,5 +570,109 @@ mod tests {
         let bad_amplitudes = vec![Complex64::new(2.0, 0.0)];
         let result = validate_state(&bad_amplitudes, ValidationPolicy::Strict);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_needs_normalization() {
+        let amplitudes = vec![
+            Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+        ];
+        let good = validate_normalization(&amplitudes, DEFAULT_NORM_TOLERANCE);
+        assert!(!good.needs_normalization());
+
+        let bad_amplitudes = vec![Complex64::new(2.0, 0.0), Complex64::new(1.0, 0.0)];
+        let bad = validate_normalization(&bad_amplitudes, DEFAULT_NORM_TOLERANCE);
+        assert!(bad.needs_normalization());
+    }
+
+    #[test]
+    fn test_validation_result_display() {
+        let result = ValidationResult {
+            valid: true,
+            norm: 1.0,
+            norm_error: 1e-12,
+            total_probability: 1.0,
+            probability_error: 1e-12,
+            message: "ok".to_string(),
+        };
+        let text = result.to_string();
+        assert!(text.starts_with("ValidationResult(valid=true, norm=1.000000, error="));
+    }
+
+    #[test]
+    fn test_validate_state_nan_amplitude_errors() {
+        // NaN amplitudes must be rejected before normalization is checked,
+        // for both Critical and Strict policies.
+        let bad_amplitudes = vec![Complex64::new(f64::NAN, 0.0)];
+
+        let err = validate_state(&bad_amplitudes, ValidationPolicy::Critical).unwrap_err();
+        match err {
+            StateError::NotNormalized { norm } => assert!(norm.is_nan()),
+            other => panic!("expected NotNormalized error, got {:?}", other),
+        }
+
+        let err = validate_state(&bad_amplitudes, ValidationPolicy::Strict).unwrap_err();
+        assert!(matches!(err, StateError::NotNormalized { norm } if norm.is_nan()));
+    }
+
+    #[test]
+    fn test_auto_normalize_zero_state_cannot_normalize() {
+        // A near-zero-norm state cannot be normalized and must report false.
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)];
+        let normalized = auto_normalize(&mut amplitudes, 1e-10);
+        assert!(!normalized);
+
+        // Amplitudes must remain unchanged (still zero).
+        assert_relative_eq!(amplitudes[0].re, 0.0, epsilon = 1e-15);
+        assert_relative_eq!(amplitudes[1].re, 0.0, epsilon = 1e-15);
+    }
+
+    #[test]
+    fn test_normalization_tracker_trims_history() {
+        // Recording more than max_history entries must evict the oldest one.
+        let mut tracker = NormalizationTracker::new(3);
+        tracker.record(1.0);
+        tracker.record(1.01);
+        tracker.record(1.02);
+        tracker.record(1.03); // Should evict the first entry (1.0)
+
+        let stats = tracker.stats();
+        assert_eq!(stats.measurements, 3);
+        assert_relative_eq!(stats.current_norm, 1.03, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalization_tracker_empty_average_drift() {
+        // With no recorded measurements, average_drift must return 0.0
+        // without dividing by zero.
+        let tracker = NormalizationTracker::new(5);
+        assert_relative_eq!(tracker.average_drift(), 0.0, epsilon = 1e-15);
+        assert_eq!(tracker.cumulative_drift(), 0.0);
+    }
+
+    #[test]
+    fn test_normalization_tracker_cumulative_drift() {
+        let mut tracker = NormalizationTracker::new(5);
+        tracker.record(1.001);
+        tracker.record(0.999);
+
+        // cumulative_drift accumulates absolute deviations, unaffected by
+        // history trimming.
+        assert_relative_eq!(tracker.cumulative_drift(), 0.002, epsilon = 1e-9);
+    }
+
+    #[test]
+    fn test_normalization_stats_display() {
+        let stats = NormalizationStats {
+            measurements: 4,
+            average_drift: 1.5e-5,
+            max_drift: 3.2e-4,
+            cumulative_drift: 6e-5,
+            current_norm: 1.0000000001,
+        };
+        let text = stats.to_string();
+        assert!(text.starts_with("NormStats(measurements=4, avg_drift="));
+        assert!(text.contains("current=1.0000000001"));
     }
 }

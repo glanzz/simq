@@ -41,17 +41,17 @@
 //! - Shende & Markov, "On the CNOT-cost of TOFFOLI gates" (2009)
 //! - IBM Qiskit documentation on gate decomposition
 
-use crate::decomposition::{Decomposer, DecompositionConfig, DecompositionResult, DecompositionMetadata};
-use crate::matrix_computation::{Matrix2, is_unitary_2x2, determinant_2x2};
+use crate::decomposition::{
+    Decomposer, DecompositionConfig, DecompositionMetadata, DecompositionResult,
+};
+use crate::matrix_computation::{determinant_2x2, is_unitary_2x2, Matrix2};
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
-use std::sync::Arc;
+use simq_core::{Gate, QuantumError, Result};
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 // Constants
 const EPSILON: f64 = 1e-10;
-const ZERO: Complex64 = Complex64::new(0.0, 0.0);
-const ONE: Complex64 = Complex64::new(1.0, 0.0);
 const I: Complex64 = Complex64::new(0.0, 1.0);
 
 /// Euler angle basis for single-qubit decomposition
@@ -90,9 +90,7 @@ impl SingleQubitDecomposer {
     /// Decompose a single-qubit gate into Euler angles
     pub fn decompose_to_angles(&self, matrix: &Matrix2) -> Result<EulerAngles> {
         if !is_unitary_2x2(matrix) {
-            return Err(QuantumError::ValidationError(
-                "Matrix is not unitary".to_string()
-            ));
+            return Err(QuantumError::ValidationError("Matrix is not unitary".to_string()));
         }
 
         match self.basis {
@@ -217,8 +215,12 @@ impl SingleQubitDecomposer {
         }
 
         let sin_half_gamma = (gamma / 2.0).sin();
-        let beta = ((u_normalized[1][0] + u_normalized[0][1]) / (Complex64::new(0.0, 2.0) * sin_half_gamma)).arg();
-        let delta = ((u_normalized[1][0] - u_normalized[0][1]) / (Complex64::new(0.0, 2.0) * sin_half_gamma)).arg();
+        let beta = ((u_normalized[1][0] + u_normalized[0][1])
+            / (Complex64::new(0.0, 2.0) * sin_half_gamma))
+            .arg();
+        let delta = ((u_normalized[1][0] - u_normalized[0][1])
+            / (Complex64::new(0.0, 2.0) * sin_half_gamma))
+            .arg();
 
         Ok(EulerAngles::new(alpha, beta, gamma, delta))
     }
@@ -235,7 +237,8 @@ impl SingleQubitDecomposer {
             [u[1][0] * phase_factor, u[1][1] * phase_factor],
         ];
 
-        let gamma = 2.0 * (u_normalized[0][0] + u_normalized[1][1]).re.acos();
+        let trace = u_normalized[0][0] + u_normalized[1][1];
+        let gamma = 2.0 * (trace.re / 2.0).acos();
 
         if gamma.abs() < EPSILON {
             let delta = 2.0 * u_normalized[0][0].arg();
@@ -248,8 +251,12 @@ impl SingleQubitDecomposer {
         }
 
         let sin_half_gamma = (gamma / 2.0).sin();
-        let beta = ((u_normalized[1][0] - u_normalized[0][1]) / (Complex64::new(0.0, -2.0) * sin_half_gamma)).arg();
-        let delta = ((u_normalized[1][0] + u_normalized[0][1]) / (Complex64::new(0.0, -2.0) * sin_half_gamma)).arg();
+        let beta = ((u_normalized[1][0] - u_normalized[0][1])
+            / (Complex64::new(0.0, -2.0) * sin_half_gamma))
+            .arg();
+        let delta = ((u_normalized[1][0] + u_normalized[0][1])
+            / (Complex64::new(0.0, -2.0) * sin_half_gamma))
+            .arg();
 
         Ok(EulerAngles::new(alpha, beta, gamma, delta))
     }
@@ -265,7 +272,7 @@ impl SingleQubitDecomposer {
         // IBM U3(θ, φ, λ) = Rz(φ) Ry(θ) Rz(λ)
         // Maps to our ZYZ angles: θ=gamma, φ=beta, λ=delta
         Ok(EulerAngles {
-            alpha: 0.0,  // Global phase discarded
+            alpha: 0.0, // Global phase discarded
             beta: angles.beta,
             gamma: angles.gamma,
             delta: angles.delta,
@@ -312,11 +319,16 @@ impl SingleQubitDecomposer {
 }
 
 impl Decomposer for SingleQubitDecomposer {
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult> {
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult> {
         if gate.num_qubits() != 1 {
-            return Err(QuantumError::ValidationError(
-                format!("Expected single-qubit gate, got {}-qubit gate", gate.num_qubits())
-            ));
+            return Err(QuantumError::ValidationError(format!(
+                "Expected single-qubit gate, got {}-qubit gate",
+                gate.num_qubits()
+            )));
         }
 
         // Get gate matrix
@@ -355,7 +367,7 @@ impl Decomposer for SingleQubitDecomposer {
         Ok(DecompositionResult {
             gates,
             fidelity: 1.0,
-            depth: 3,  // Typically 3 rotations
+            depth: 3, // Typically 3 rotations
             gate_count: 3,
             two_qubit_count: 0,
             metadata: DecompositionMetadata {
@@ -384,7 +396,7 @@ impl Decomposer for SingleQubitDecomposer {
 
     fn estimate_cost(&self, gate: &dyn Gate) -> Option<usize> {
         if gate.num_qubits() == 1 {
-            Some(3)  // Typically 3 rotations
+            Some(3) // Typically 3 rotations
         } else {
             None
         }
@@ -410,14 +422,17 @@ pub struct EulerAngles {
 impl EulerAngles {
     /// Create new Euler angles
     pub fn new(alpha: f64, beta: f64, gamma: f64, delta: f64) -> Self {
-        Self { alpha, beta, gamma, delta }
+        Self {
+            alpha,
+            beta,
+            gamma,
+            delta,
+        }
     }
 
     /// Check if this represents the identity gate (all angles ≈ 0)
     pub fn is_identity(&self) -> bool {
-        self.beta.abs() < EPSILON
-            && self.gamma.abs() < EPSILON
-            && self.delta.abs() < EPSILON
+        self.beta.abs() < EPSILON && self.gamma.abs() < EPSILON && self.delta.abs() < EPSILON
     }
 
     /// Count non-zero angles (gates needed)
@@ -450,7 +465,10 @@ fn normalize_angle(angle: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::matrix_computation::{hadamard_matrix, pauli_x_matrix, pauli_z_matrix};
+    use crate::matrix_computation::{hadamard_matrix, pauli_x_matrix};
+
+    const ZERO: Complex64 = Complex64::new(0.0, 0.0);
+    const ONE: Complex64 = Complex64::new(1.0, 0.0);
 
     #[test]
     fn test_zyz_identity() {
@@ -496,5 +514,189 @@ mod tests {
     fn test_euler_angles_gate_count() {
         let angles = EulerAngles::new(0.0, PI / 4.0, PI / 2.0, 0.0);
         assert_eq!(angles.gate_count(), 2);
+    }
+
+    fn non_unitary_matrix() -> Matrix2 {
+        [
+            [Complex64::new(2.0, 0.0), ZERO],
+            [ZERO, Complex64::new(1.0, 0.0)],
+        ]
+    }
+
+    #[test]
+    fn test_decompose_to_angles_rejects_non_unitary() {
+        let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+        let result = decomposer.decompose_to_angles(&non_unitary_matrix());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompose_zxz_identity_gamma_near_zero() {
+        let id: Matrix2 = [[ONE, ZERO], [ZERO, ONE]];
+        let angles = SingleQubitDecomposer::decompose_zxz(&id).unwrap();
+        assert!(angles.gamma.abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_zxz_pauli_x_gamma_near_pi() {
+        let x = pauli_x_matrix();
+        let angles = SingleQubitDecomposer::decompose_zxz(&x).unwrap();
+        assert!((angles.gamma - PI).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_zxz_hadamard_general_case() {
+        let h = hadamard_matrix();
+        let angles = SingleQubitDecomposer::decompose_zxz(&h).unwrap();
+        assert!(angles.gamma.abs() > EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_xyx_identity_gamma_near_zero() {
+        let id: Matrix2 = [[ONE, ZERO], [ZERO, ONE]];
+        let angles = SingleQubitDecomposer::decompose_xyx(&id).unwrap();
+        assert!(angles.gamma.abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_xyx_pauli_z_gamma_near_pi() {
+        // Pauli-Z has zero trace after phase normalization, giving gamma = 2*acos(0) = pi
+        let z = crate::matrix_computation::pauli_z_matrix();
+        let angles = SingleQubitDecomposer::decompose_xyx(&z).unwrap();
+        assert!((angles.gamma - PI).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_xyx_hadamard_general_case() {
+        let h = hadamard_matrix();
+        let angles = SingleQubitDecomposer::decompose_xyx(&h).unwrap();
+        assert!(angles.gate_count() > 0);
+    }
+
+    #[test]
+    fn test_decompose_yzy_identity_gamma_near_zero() {
+        let id: Matrix2 = [[ONE, ZERO], [ZERO, ONE]];
+        let angles = SingleQubitDecomposer::decompose_yzy(&id).unwrap();
+        assert!(angles.gamma.abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_yzy_pauli_z_gamma_near_pi() {
+        let z = crate::matrix_computation::pauli_z_matrix();
+        let angles = SingleQubitDecomposer::decompose_yzy(&z).unwrap();
+        assert!((angles.gamma - PI).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_decompose_yzy_hadamard_general_case() {
+        let h = hadamard_matrix();
+        let angles = SingleQubitDecomposer::decompose_yzy(&h).unwrap();
+        assert!(angles.gate_count() > 0);
+    }
+
+    #[test]
+    fn test_decompose_u3_discards_global_phase() {
+        let h = hadamard_matrix();
+        let angles = SingleQubitDecomposer::decompose_u3(&h).unwrap();
+        assert_eq!(angles.alpha, 0.0);
+    }
+
+    #[test]
+    fn test_decompose_via_all_bases_dispatch() {
+        // Exercise decompose_to_angles' match arms for every EulerBasis variant
+        let h = hadamard_matrix();
+        for basis in [
+            EulerBasis::ZYZ,
+            EulerBasis::ZXZ,
+            EulerBasis::XYX,
+            EulerBasis::YZY,
+            EulerBasis::U3,
+            EulerBasis::HT,
+        ] {
+            let decomposer = SingleQubitDecomposer::new(basis);
+            assert!(decomposer.decompose_to_angles(&h).is_ok());
+        }
+    }
+
+    #[derive(Debug)]
+    struct MockGate {
+        name: String,
+        n_qubits: usize,
+        matrix: Option<Vec<Complex64>>,
+    }
+
+    impl simq_core::Gate for MockGate {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn num_qubits(&self) -> usize {
+            self.n_qubits
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            self.matrix.clone()
+        }
+    }
+
+    fn matrix2_to_flat(m: &Matrix2) -> Vec<Complex64> {
+        vec![m[0][0], m[0][1], m[1][0], m[1][1]]
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_non_single_qubit() {
+        let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+        let config = DecompositionConfig::default();
+        let gate = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+            matrix: None,
+        };
+        assert!(decomposer.decompose(&gate, &config).is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_missing_matrix() {
+        let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+        let config = DecompositionConfig::default();
+        let gate = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        };
+        assert!(decomposer.decompose(&gate, &config).is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_invalid_matrix_size() {
+        let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+        let config = DecompositionConfig::default();
+        let gate = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(vec![ONE]),
+        };
+        assert!(decomposer.decompose(&gate, &config).is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_succeeds_with_optimization() {
+        let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
+        let config = DecompositionConfig {
+            optimization_level: 1,
+            ..Default::default()
+        };
+        let gate = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(matrix2_to_flat(&hadamard_matrix())),
+        };
+        let result = decomposer.decompose(&gate, &config).unwrap();
+        assert!(result.metadata.optimized);
+        assert_eq!(result.gate_count, 3);
+    }
+
+    #[test]
+    fn test_normalize_angle_negative_wraparound() {
+        let result = normalize_angle(-3.5 * PI);
+        assert!((-PI..=PI).contains(&result));
     }
 }

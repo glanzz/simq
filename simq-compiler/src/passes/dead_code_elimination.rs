@@ -9,29 +9,9 @@
 //! and removing gates on dead qubits.
 
 use crate::passes::OptimizationPass;
-use simq_core::{Circuit, QubitId, Result};
+use simq_core::{Circuit, Result};
 use std::collections::HashSet;
 
-/// Dead code elimination optimization pass
-///
-/// Removes gates that don't contribute to the final circuit output.
-///
-/// # Algorithm
-/// 1. Mark all qubits as "live" by default (conservative approach)
-/// 2. Scan circuit backwards to find which qubits are actually used
-/// 3. Remove gates that only operate on dead qubits
-/// 4. Remove self-inverse gate pairs (e.g., X-X, H-H, CNOT-CNOT)
-///
-/// # Example
-/// ```ignore
-/// use simq_compiler::passes::DeadCodeElimination;
-/// use simq_core::Circuit;
-///
-/// let pass = DeadCodeElimination::new();
-/// let mut circuit = Circuit::new(3);
-/// // ... add gates ...
-/// pass.apply(&mut circuit)?;
-/// ```
 #[derive(Debug, Clone)]
 pub struct DeadCodeElimination {
     /// Remove self-inverse gate pairs (e.g., X-X → identity)
@@ -186,6 +166,7 @@ impl OptimizationPass for DeadCodeElimination {
 mod tests {
     use super::*;
     use simq_core::gate::Gate;
+    use simq_core::QubitId;
     use std::sync::Arc;
 
     // Mock gate for testing
@@ -220,7 +201,9 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(id_gate, &[QubitId::new(1)]).unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
@@ -244,8 +227,12 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
         assert_eq!(circuit.len(), 3);
@@ -266,7 +253,9 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -312,12 +301,39 @@ mod tests {
             num_qubits: 2,
         });
 
-        circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-        circuit.add_gate(cnot, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(cnot, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
 
         assert_eq!(circuit.len(), 2);
 
         let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0);
+    }
+
+    #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for DeadCodeElimination` (lines 123-124), which
+        // delegates to `Self::new()`.
+        let default_pass = DeadCodeElimination::default();
+        let new_pass = DeadCodeElimination::new();
+
+        // Both should behave identically: same settings enabled.
+        assert_eq!(default_pass.remove_inverse_pairs, new_pass.remove_inverse_pairs);
+        assert_eq!(default_pass.remove_identity, new_pass.remove_identity);
+
+        let mut circuit = Circuit::new(1);
+        let id_gate = Arc::new(MockGate {
+            name: "I".to_string(),
+            num_qubits: 1,
+        });
+        circuit.add_gate(id_gate, &[QubitId::new(0)]).unwrap();
+
+        let modified = default_pass.apply(&mut circuit).unwrap();
         assert!(modified);
         assert_eq!(circuit.len(), 0);
     }
@@ -333,7 +349,9 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
         assert_eq!(circuit.len(), 2);

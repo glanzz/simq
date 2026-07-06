@@ -10,7 +10,6 @@
 
 use crate::dense_state::DenseState;
 use crate::error::Result;
-use crate::state_vector::StateVector;
 use num_complex::Complex64;
 use std::fmt;
 use std::sync::Arc;
@@ -257,7 +256,8 @@ impl CowState {
         qubit2: usize,
     ) -> Result<CowStats> {
         let copied = self.make_unique()?;
-        self.state_mut()?.apply_two_qubit_gate(matrix, qubit1, qubit2)?;
+        self.state_mut()?
+            .apply_two_qubit_gate(matrix, qubit1, qubit2)?;
         Ok(CowStats { copied })
     }
 
@@ -415,11 +415,7 @@ impl fmt::Display for CowState {
             "CowState({} qubits, {} refs, {})",
             self.num_qubits(),
             self.ref_count(),
-            if self.is_shared() {
-                "shared"
-            } else {
-                "unique"
-            }
+            if self.is_shared() { "shared" } else { "unique" }
         )
     }
 }
@@ -670,5 +666,141 @@ mod tests {
 
         drop(state3);
         assert_eq!(state1.ref_count(), 1);
+    }
+
+    // ---- New coverage tests ----
+
+    #[test]
+    fn test_apply_two_qubit_gate_shared_triggers_copy() {
+        // shared CowState, apply 4×4 identity, stats.copied should be true
+        let state1 = CowState::new(2).unwrap();
+        let mut state2 = state1.clone();
+        assert!(state2.is_shared());
+
+        let zero = Complex64::new(0.0, 0.0);
+        let one = Complex64::new(1.0, 0.0);
+        let identity4: [[Complex64; 4]; 4] = [
+            [one, zero, zero, zero],
+            [zero, one, zero, zero],
+            [zero, zero, one, zero],
+            [zero, zero, zero, one],
+        ];
+
+        let stats = state2.apply_two_qubit_gate(&identity4, 0, 1).unwrap();
+        assert!(stats.copied, "should have triggered copy since state was shared");
+        assert!(state2.is_unique());
+
+        // State should be unchanged (identity gate)
+        assert_eq!(state2.amplitudes()[0], Complex64::new(1.0, 0.0));
+        assert_eq!(state2.amplitudes()[1], Complex64::new(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_display_contains_qubits() {
+        let state = CowState::new(3).unwrap();
+        let s = format!("{}", state);
+        assert!(s.contains("qubits"), "Display should contain 'qubits', got: {s}");
+    }
+
+    #[test]
+    fn test_debug_contains_cow_state() {
+        let state = CowState::new(3).unwrap();
+        let s = format!("{:?}", state);
+        assert!(s.contains("CowState"), "Debug should contain 'CowState', got: {s}");
+    }
+
+    #[test]
+    fn test_get_all_probabilities_zero_state() {
+        let state = CowState::new(2).unwrap(); // |00⟩
+        let probs = state.get_all_probabilities();
+        assert_eq!(probs.len(), 4);
+        assert_relative_eq!(probs[0], 1.0, epsilon = 1e-12);
+        for val in &probs[1..] {
+            assert_relative_eq!(*val, 0.0, epsilon = 1e-12);
+        }
+    }
+
+    #[test]
+    fn test_get_probability_non_zero_basis_state() {
+        let state = CowState::new(2).unwrap(); // |00⟩
+        let p = state.get_probability(1).unwrap();
+        assert_relative_eq!(p, 0.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_inner_product_different_states() {
+        let state1 = CowState::new(2).unwrap(); // |00⟩
+        let h = 1.0 / 2.0_f64.sqrt();
+        let amps = vec![
+            Complex64::new(h, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let state2 = CowState::from_amplitudes(2, &amps).unwrap();
+        let inner = state1.inner_product(&state2).unwrap();
+        // <00|state2> = h
+        assert_relative_eq!(inner.re, h, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_fidelity_different_states_less_than_one() {
+        let state1 = CowState::new(2).unwrap(); // |00⟩
+        let h = 1.0 / 2.0_f64.sqrt();
+        let amps = vec![
+            Complex64::new(h, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let state2 = CowState::from_amplitudes(2, &amps).unwrap();
+        let fidelity = state1.fidelity(&state2).unwrap();
+        assert!(fidelity < 1.0, "fidelity of different states should be < 1.0, got {fidelity}");
+        assert!(fidelity >= 0.0);
+    }
+
+    #[test]
+    fn test_memory_stats_multiple_refs() {
+        let state1 = CowState::new(3).unwrap();
+        let _state2 = state1.clone();
+        let _state3 = state1.clone();
+
+        let stats = state1.memory_stats();
+        assert_eq!(stats.total_refs, 3);
+        assert!(stats.overhead_per_ref > 0);
+        assert!(stats.shared_memory > 0);
+    }
+
+    #[test]
+    fn test_is_normalized_on_fresh_state() {
+        let state = CowState::new(4).unwrap();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_apply_single_qubit_gate_unique_no_copy() {
+        // unique state — no copy on mutation
+        let mut state = CowState::new(2).unwrap();
+        assert!(state.is_unique());
+
+        let h = 1.0 / 2.0_f64.sqrt();
+        let hadamard = [
+            [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
+            [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
+        ];
+
+        let stats = state.apply_single_qubit_gate(&hadamard, 0).unwrap();
+        assert!(!stats.copied, "should NOT have copied since state was already unique");
+    }
+
+    #[test]
+    fn test_memory_stats_display() {
+        let state = CowState::new(3).unwrap();
+        let stats = state.memory_stats();
+        let s = format!("{}", stats);
+        assert!(s.starts_with("MemoryStats("));
+        assert!(s.contains(&format!("shared: {} bytes", stats.shared_memory)));
+        assert!(s.contains(&format!("refs: {}", stats.total_refs)));
+        assert!(s.contains(&format!("overhead: {} bytes total", stats.total_overhead)));
     }
 }

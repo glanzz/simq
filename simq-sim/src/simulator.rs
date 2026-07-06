@@ -52,11 +52,6 @@ impl Simulator {
         Self { config }
     }
 
-    /// Create a simulator with default configuration
-    pub fn default() -> Self {
-        Self::new(SimulatorConfig::default())
-    }
-
     /// Get the simulator configuration
     pub fn config(&self) -> &SimulatorConfig {
         &self.config
@@ -88,10 +83,8 @@ impl Simulator {
         let total_start = Instant::now();
 
         // Validate circuit
-        if circuit.len() == 0 {
-            return Err(SimulatorError::InvalidCircuit(
-                "Empty circuit".to_string(),
-            ));
+        if circuit.is_empty() {
+            return Err(SimulatorError::InvalidCircuit("Empty circuit".to_string()));
         }
 
         // Check qubit count
@@ -132,19 +125,22 @@ impl Simulator {
             s.initialization_time = init_time;
         }
 
-
         // 3. Execute circuit using execution engine
         let gate_start = Instant::now();
         {
-            use crate::execution_engine::{ExecutionEngine, ExecutionConfig};
-            let mut exec_config = ExecutionConfig::default();
-            exec_config.parallel_threshold = self.config.parallel_threshold;
-            exec_config.use_gpu = self.config.use_gpu;
+            use crate::execution_engine::{ExecutionConfig, ExecutionEngine};
+            let exec_config = ExecutionConfig {
+                parallel_threshold: self.config.parallel_threshold,
+                use_gpu: self.config.use_gpu,
+                ..Default::default()
+            };
             let mut engine = ExecutionEngine::new(exec_config);
-            engine.execute(&compiled_circuit, &mut state)
-                .map_err(|e| SimulatorError::ExecutionFailed {
-                    message: format!("Execution engine failed: {:?}", e),
-                })?;
+            engine.execute(&compiled_circuit, &mut state).map_err(|e| {
+                SimulatorError::GateApplicationFailed {
+                    gate_index: 0, // Unknown index
+                    reason: format!("Execution engine failed: {:?}", e),
+                }
+            })?;
         }
         let gate_time = gate_start.elapsed();
 
@@ -203,6 +199,12 @@ impl Simulator {
             let max_amplitudes = self.config.memory_limit / 16;
             (max_amplitudes as f64).log2().floor() as usize
         }
+    }
+}
+
+impl Default for Simulator {
+    fn default() -> Self {
+        Self::new(SimulatorConfig::default())
     }
 }
 
@@ -295,11 +297,61 @@ mod tests {
     #[test]
     fn test_max_qubits_estimation() {
         let sim = Simulator::new(
-            SimulatorConfig::default().with_memory_limit(1024 * 1024) // 1 MB
+            SimulatorConfig::default().with_memory_limit(1024 * 1024), // 1 MB
         );
 
         let max_qubits = sim.estimate_max_qubits();
         // 1 MB / 16 bytes = 65536 amplitudes = 2^16, so 16 qubits
         assert_eq!(max_qubits, 16);
+    }
+
+    #[test]
+    fn test_too_many_qubits_error() {
+        // Set a small memory limit to cap max qubits
+        let sim = Simulator::new(
+            SimulatorConfig::default().with_memory_limit(16), // only 1 amplitude → max 0 qubits
+        );
+
+        // Even a 1-qubit circuit with a gate should hit the qubit limit
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliX), &[QubitId::new(0)])
+            .unwrap();
+
+        let result = sim.run(&circuit);
+        assert!(matches!(result, Err(crate::error::SimulatorError::TooManyQubits { .. })));
+    }
+
+    #[test]
+    fn test_execution_failure_maps_to_gate_application_failed() {
+        use simq_core::gate::Gate;
+
+        // A gate with no matrix representation will cause execution to fail
+        #[derive(Debug)]
+        struct NoMatrixGate;
+        impl Gate for NoMatrixGate {
+            fn name(&self) -> &str {
+                "NoMatrix"
+            }
+            fn num_qubits(&self) -> usize {
+                1
+            }
+            fn matrix(&self) -> Option<Vec<num_complex::Complex64>> {
+                None
+            }
+        }
+
+        // Disable optimization so compilation doesn't catch the bad gate first
+        let sim = Simulator::new(SimulatorConfig::default().with_optimization(false));
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(NoMatrixGate), &[QubitId::new(0)])
+            .unwrap();
+
+        let result = sim.run(&circuit);
+        assert!(matches!(
+            result,
+            Err(crate::error::SimulatorError::GateApplicationFailed { .. })
+        ));
     }
 }

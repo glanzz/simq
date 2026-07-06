@@ -1,7 +1,7 @@
 //! Gate matrix utilities
 
-use num_complex::Complex64;
 use super::{Matrix2x2, Matrix4x4};
+use num_complex::Complex64;
 
 /// Gate matrix wrapper with metadata
 #[derive(Debug, Clone)]
@@ -69,6 +69,7 @@ fn is_diagonal_2x2(matrix: &Matrix2x2) -> bool {
 }
 
 /// Check if a 4x4 matrix is diagonal
+#[allow(clippy::needless_range_loop)]
 fn is_diagonal_4x4(matrix: &Matrix4x4) -> bool {
     for i in 0..4 {
         for j in 0..4 {
@@ -78,6 +79,60 @@ fn is_diagonal_4x4(matrix: &Matrix4x4) -> bool {
         }
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gate_matrix_single_diagonal() {
+        // Identity is diagonal
+        let identity = common::identity();
+        let gm = GateMatrix::single(identity);
+        assert!(gm.is_diagonal);
+        assert_eq!(gm.num_qubits(), 1);
+    }
+
+    #[test]
+    fn test_gate_matrix_single_non_diagonal() {
+        // Pauli X is not diagonal
+        let x = common::pauli_x();
+        let gm = GateMatrix::single(x);
+        assert!(!gm.is_diagonal);
+    }
+
+    #[test]
+    fn test_gate_matrix_two_non_diagonal() {
+        // CNOT-like matrix is not diagonal
+        let mut cnot: Matrix4x4 = [[Complex64::new(0.0, 0.0); 4]; 4];
+        cnot[0][0] = Complex64::new(1.0, 0.0);
+        cnot[1][1] = Complex64::new(1.0, 0.0);
+        cnot[2][3] = Complex64::new(1.0, 0.0); // off-diagonal element
+        cnot[3][2] = Complex64::new(1.0, 0.0);
+        let gm = GateMatrix::two(cnot);
+        assert!(!gm.is_diagonal); // triggers the return false branch in is_diagonal_4x4
+    }
+
+    #[test]
+    fn test_gate_matrix_diagonal_variant() {
+        let diag = GateMatrix::diagonal(vec![Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)]);
+        assert!(diag.is_diagonal);
+        assert_eq!(diag.num_qubits(), 1);
+    }
+
+    #[test]
+    fn test_gate_matrix_two_diagonal() {
+        // Diagonal 4x4 matrix
+        let mut mat: Matrix4x4 = [[Complex64::new(0.0, 0.0); 4]; 4];
+        mat[0][0] = Complex64::new(1.0, 0.0);
+        mat[1][1] = Complex64::new(1.0, 0.0);
+        mat[2][2] = Complex64::new(1.0, 0.0);
+        mat[3][3] = Complex64::new(-1.0, 0.0);
+        let gm = GateMatrix::two(mat);
+        assert!(gm.is_diagonal);
+        assert_eq!(gm.num_qubits(), 2);
+    }
 }
 
 /// Common gate matrices

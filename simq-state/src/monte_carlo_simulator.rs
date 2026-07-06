@@ -39,8 +39,8 @@
 use crate::dense_state::DenseState;
 use crate::error::{Result, StateError};
 use num_complex::Complex64;
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use simq_core::noise::{MonteCarloSampler, PauliOperation};
 
 /// Configuration for Monte Carlo simulation
@@ -191,7 +191,7 @@ impl MonteCarloSimulator {
             PauliOperation::Identity => {
                 // No-op
                 Ok(())
-            }
+            },
             PauliOperation::X => {
                 // Pauli X (bit flip)
                 let x_gate = [
@@ -199,7 +199,7 @@ impl MonteCarloSimulator {
                     [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
                 ];
                 self.state.apply_single_qubit_gate(&x_gate, qubit)
-            }
+            },
             PauliOperation::Y => {
                 // Pauli Y
                 let y_gate = [
@@ -207,7 +207,7 @@ impl MonteCarloSimulator {
                     [Complex64::new(0.0, 1.0), Complex64::new(0.0, 0.0)],
                 ];
                 self.state.apply_single_qubit_gate(&y_gate, qubit)
-            }
+            },
             PauliOperation::Z => {
                 // Pauli Z (phase flip)
                 let z_gate = [
@@ -215,16 +215,16 @@ impl MonteCarloSimulator {
                     [Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0)],
                 ];
                 self.state.apply_single_qubit_gate(&z_gate, qubit)
-            }
+            },
             PauliOperation::JumpToZero { sqrt_gamma: _ } => {
                 // For amplitude damping: project to |0⟩ and renormalize
                 // This is state-dependent, handled specially
                 self.apply_amplitude_damping_jump(qubit)
-            }
+            },
             PauliOperation::NoJump { sqrt_1_minus_gamma } => {
                 // For amplitude damping: apply decay to |1⟩ component
                 self.apply_amplitude_damping_no_jump(qubit, sqrt_1_minus_gamma)
-            }
+            },
         }
     }
 
@@ -237,12 +237,12 @@ impl MonteCarloSimulator {
         let mut norm_sq = 0.0;
 
         // Zero out |1⟩ components and accumulate norm
-        for i in 0..amplitudes.len() {
+        for (i, amp) in amplitudes.iter_mut().enumerate() {
             if (i & stride) != 0 {
                 // This is a |1⟩ component - zero it
-                amplitudes[i] = Complex64::new(0.0, 0.0);
+                *amp = Complex64::new(0.0, 0.0);
             } else {
-                norm_sq += amplitudes[i].norm_sqr();
+                norm_sq += amp.norm_sqr();
             }
         }
 
@@ -265,12 +265,12 @@ impl MonteCarloSimulator {
 
         let mut norm_sq = 0.0;
 
-        for i in 0..amplitudes.len() {
+        for (i, amp) in amplitudes.iter_mut().enumerate() {
             if (i & stride) != 0 {
                 // This is a |1⟩ component - scale it
-                amplitudes[i] *= factor;
+                *amp *= factor;
             }
-            norm_sq += amplitudes[i].norm_sqr();
+            norm_sq += amp.norm_sqr();
         }
 
         // Renormalize
@@ -413,5 +413,248 @@ mod tests {
         // Reset
         sim.reset_to_initial().unwrap();
         assert_eq!(sim.stats().gate_count, 0);
+    }
+
+    // ---- New coverage tests ----
+
+    #[test]
+    fn test_config_without_seed() {
+        // MonteCarloConfig::new() without with_seed — constructs from entropy
+        let config = MonteCarloConfig::new();
+        assert!(config.seed.is_none());
+        assert_eq!(config.trajectories, 1000);
+        // Simulator creation should succeed
+        let sim = MonteCarloSimulator::new(2, config).unwrap();
+        assert_eq!(sim.num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_config_with_shots_per_trajectory() {
+        let config = MonteCarloConfig::new().with_shots_per_trajectory(5);
+        assert_eq!(config.shots_per_trajectory, 5);
+    }
+
+    #[test]
+    fn test_apply_gate_wrong_qubit_count_returns_error() {
+        // Passing a 2-element qubits array to apply_gate (which only supports 1) → Err
+        let config = MonteCarloConfig::new().with_seed(42);
+        let mut sim = MonteCarloSimulator::new(2, config).unwrap();
+
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+
+        let result = sim.apply_gate(&h, &[0, 1]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::InvalidDimension { dimension } => assert_eq!(dimension, 2),
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_noise_ops_increments_each_call() {
+        let config = MonteCarloConfig::new().with_seed(99);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        let noise = DepolarizingMC::from_probability(0.1).unwrap();
+        sim.apply_stochastic_noise(&noise, 0).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+        sim.apply_stochastic_noise(&noise, 0).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 2);
+    }
+
+    #[test]
+    fn test_measure_all_returns_num_qubits_results() {
+        // Hadamard-prepared state: measure_all length == num_qubits
+        let config = MonteCarloConfig::new().with_seed(42);
+        let mut sim = MonteCarloSimulator::new(3, config).unwrap();
+
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+        sim.apply_gate(&h, &[0]).unwrap();
+        let results = sim.measure_all().unwrap();
+        assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn test_stats_trajectory_count() {
+        let config = MonteCarloConfig::new().with_seed(42).with_trajectories(500);
+        let sim = MonteCarloSimulator::new(2, config).unwrap();
+        let stats = sim.stats();
+        assert_eq!(stats.total_trajectories, 500);
+        assert_eq!(stats.current_trajectory, 0);
+    }
+
+    #[test]
+    fn test_reset_preserves_initial_state() {
+        // reset_to_initial restores state across multiple calls
+        let config = MonteCarloConfig::new().with_seed(42);
+        let mut sim = MonteCarloSimulator::new(2, config).unwrap();
+
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+        sim.apply_gate(&h, &[0]).unwrap();
+        sim.apply_gate(&h, &[1]).unwrap();
+        assert_eq!(sim.stats().gate_count, 2);
+
+        sim.reset_to_initial().unwrap();
+        assert_eq!(sim.stats().gate_count, 0);
+        assert_eq!(sim.stats().noise_ops_applied, 0);
+
+        // Second reset after no changes — still OK
+        sim.reset_to_initial().unwrap();
+        assert_eq!(sim.stats().gate_count, 0);
+    }
+
+    #[test]
+    fn test_amplitude_damping_mc_noise_increments_counter() {
+        use simq_core::noise::AmplitudeDampingMC;
+        let config = MonteCarloConfig::new().with_seed(7);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        let noise = AmplitudeDampingMC::from_gamma(0.1).unwrap();
+        sim.apply_stochastic_noise(&noise, 0).unwrap();
+        assert_eq!(sim.stats().noise_ops_applied, 1);
+    }
+
+    // ---- Deterministic branch coverage for apply_pauli_operation and
+    // amplitude-damping helpers. We call the private methods directly
+    // (accessible via `use super::*` in the same crate) to avoid relying on
+    // RNG draws landing in a specific sampler range. ----
+
+    #[test]
+    fn test_apply_pauli_operation_y_directly() {
+        // Forces PauliOperation::Y branch (lines applying the Y gate).
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        sim.apply_pauli_operation(PauliOperation::Y, 0).unwrap();
+
+        // Y|0> = i|1>, so amplitude at index 1 should have norm ~1 and index 0 ~0.
+        let amps = sim.state().amplitudes();
+        assert!(amps[0].norm() < 1e-10);
+        assert!((amps[1].norm() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_pauli_operation_z_directly() {
+        // Forces PauliOperation::Z branch (lines applying the Z gate).
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        // Put qubit in |1> first so Z has an observable effect on phase.
+        sim.apply_pauli_operation(PauliOperation::X, 0).unwrap();
+        sim.apply_pauli_operation(PauliOperation::Z, 0).unwrap();
+
+        let amps = sim.state().amplitudes();
+        // Z|1> = -|1>, so amplitude at index 1 should be -1 (real part).
+        assert!((amps[1].re - (-1.0)).abs() < 1e-10);
+        assert!(amps[0].norm() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_pauli_operation_nojump_directly() {
+        // Forces PauliOperation::NoJump branch, dispatching into
+        // apply_amplitude_damping_no_jump.
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        // Put the qubit into an equal superposition so both the |0> and |1>
+        // components are non-zero, exercising the scaling branch and the
+        // renormalization branch inside apply_amplitude_damping_no_jump.
+        let h = [
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+            [
+                Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0),
+                Complex64::new(-1.0 / 2.0_f64.sqrt(), 0.0),
+            ],
+        ];
+        sim.apply_gate(&h, &[0]).unwrap();
+
+        let factor = 0.5_f64;
+        sim.apply_pauli_operation(
+            PauliOperation::NoJump {
+                sqrt_1_minus_gamma: factor,
+            },
+            0,
+        )
+        .unwrap();
+
+        let amps = sim.state().amplitudes();
+        // After scaling |1> by 0.5 and renormalizing, |1> component should
+        // shrink relative to |0>, and the state should remain normalized.
+        let norm_sq: f64 = amps.iter().map(|a| a.norm_sqr()).sum();
+        assert!((norm_sq - 1.0).abs() < 1e-9);
+        assert!(amps[1].norm() < amps[0].norm());
+    }
+
+    #[test]
+    fn test_apply_amplitude_damping_no_jump_zero_norm_skips_renormalization() {
+        // If the resulting state has ~zero norm (e.g. factor=0 applied to a
+        // pure |1> state, and no |0> component exists), the norm_sq <= 1e-15
+        // branch must be taken, skipping renormalization without panicking
+        // (e.g. divide by zero).
+        let config = MonteCarloConfig::new().with_seed(1);
+        let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+
+        // Prepare |1> state via X gate.
+        sim.apply_pauli_operation(PauliOperation::X, 0).unwrap();
+
+        // factor = 0.0 zeroes out the only (|1>) component entirely, leaving
+        // norm_sq == 0, which must not trigger a division by zero.
+        sim.apply_amplitude_damping_no_jump(0, 0.0).unwrap();
+
+        let amps = sim.state().amplitudes();
+        assert!(amps[0].norm() < 1e-10);
+        assert!(amps[1].norm() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_stochastic_noise_depolarizing_y_branch_via_full_range() {
+        // Exercise the full apply_stochastic_noise -> apply_pauli_operation
+        // dispatch path (not just the direct helper call) for the Y branch,
+        // using error_prob=1.0 so Identity is never sampled, and scanning a
+        // few seeds to find one landing in the Y third of the range.
+        let noise = DepolarizingMC::from_probability(1.0).unwrap();
+        let mut found_y = false;
+        for seed in 0..50u64 {
+            let config = MonteCarloConfig::new().with_seed(seed);
+            let mut sim = MonteCarloSimulator::new(1, config).unwrap();
+            sim.apply_stochastic_noise(&noise, 0).unwrap();
+            let amps = sim.state().amplitudes();
+            // Y|0> = i|1>: amplitude at index 1 is purely imaginary with norm 1.
+            if amps[1].norm() > 1e-9 && amps[1].re.abs() < 1e-9 && amps[1].im.abs() > 1e-9 {
+                found_y = true;
+                break;
+            }
+        }
+        assert!(found_y, "expected at least one seed to sample the Y branch");
     }
 }

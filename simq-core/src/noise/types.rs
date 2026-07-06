@@ -280,4 +280,114 @@ mod tests {
         let model = NoiseModel::new();
         assert!(!model.has_noise());
     }
+
+    /// A minimal noise channel with no Kraus operators, used to exercise
+    /// the empty-operators early-return branch of `verify_completeness`.
+    #[derive(Debug)]
+    struct EmptyChannel;
+
+    impl NoiseChannel for EmptyChannel {
+        fn kraus_operators(&self) -> Vec<KrausOperator> {
+            Vec::new()
+        }
+
+        fn num_qubits(&self) -> usize {
+            1
+        }
+
+        fn name(&self) -> &str {
+            "empty"
+        }
+    }
+
+    /// A channel whose single Kraus operator does NOT satisfy the
+    /// completeness relation (K†K != I), used to exercise the tolerance
+    /// failure branch of `verify_completeness`.
+    #[derive(Debug)]
+    struct IncompleteChannel;
+
+    impl NoiseChannel for IncompleteChannel {
+        fn kraus_operators(&self) -> Vec<KrausOperator> {
+            // A single operator equal to 0.5 * I. Then K†K = 0.25 * I != I,
+            // so completeness should fail.
+            vec![KrausOperator::new(
+                vec![
+                    Complex64::new(0.5, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(0.5, 0.0),
+                ],
+                2,
+            )
+            .unwrap()]
+        }
+
+        fn num_qubits(&self) -> usize {
+            1
+        }
+
+        fn name(&self) -> &str {
+            "incomplete"
+        }
+    }
+
+    #[test]
+    fn test_verify_completeness_empty_operators() {
+        let channel = EmptyChannel;
+        assert!(!channel.verify_completeness(1e-10));
+    }
+
+    #[test]
+    fn test_verify_completeness_fails_outside_tolerance() {
+        let channel = IncompleteChannel;
+        assert!(!channel.verify_completeness(1e-10));
+    }
+
+    #[test]
+    fn test_noise_model_with_gate_noise() {
+        let channel = DummyChannel;
+        let model = NoiseModel::with_gate_noise(channel);
+
+        assert!(model.gate_noise.is_some());
+        assert!(model.readout_noise.is_none());
+        assert!(model.idle_noise.is_none());
+        assert!(model.has_noise());
+    }
+
+    #[test]
+    fn test_noise_model_default() {
+        let model: NoiseModel = Default::default();
+        assert!(!model.has_noise());
+        assert!(model.gate_noise.is_none());
+        assert!(model.readout_noise.is_none());
+        assert!(model.idle_noise.is_none());
+    }
+
+    /// A trivial channel used to test the `NoiseModel` constructors that
+    /// take `impl NoiseChannel + 'static`.
+    #[derive(Debug)]
+    struct DummyChannel;
+
+    impl NoiseChannel for DummyChannel {
+        fn kraus_operators(&self) -> Vec<KrausOperator> {
+            vec![KrausOperator::new(
+                vec![
+                    Complex64::new(1.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(1.0, 0.0),
+                ],
+                2,
+            )
+            .unwrap()]
+        }
+
+        fn num_qubits(&self) -> usize {
+            1
+        }
+
+        fn name(&self) -> &str {
+            "dummy"
+        }
+    }
 }

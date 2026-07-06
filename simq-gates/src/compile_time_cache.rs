@@ -6,11 +6,16 @@
 //!
 //! # Architecture
 //!
-//! The caching system operates at multiple levels:
+//! 1. **Exact Angle Cache** (`CommonAngles`): Pre-computed matrices for specific
+//!    angles (e.g., π/4, π/2), looked up with zero cost.
+//! 2. **Const Generic Cache**: Type-level caching using const generics.
 //!
-//! 1. **Exact Angle Cache**: Pre-computed matrices for specific angles (e.g., π/4, π/2)
-//! 2. **Range Cache**: Evenly-spaced matrices for a range (useful for gradient descent)
-//! 3. **Const Generic Cache**: Type-level caching using const generics
+//! `VQEAngles` previously also carried a grid-based "range cache" for angles
+//! produced during gradient-descent optimization. That grid used an irrational
+//! step size, so a caller's floating-point angle essentially never landed on a
+//! grid entry exactly — every lookup silently fell through to runtime
+//! computation anyway. The grid has been removed; `VQEAngles::{rx,ry,rz}_cached`
+//! now compute the matrix directly.
 //!
 //! # Example
 //!
@@ -20,22 +25,19 @@
 //! // Zero-cost access to common angle
 //! let matrix = CommonAngles::rx_pi_over_2();
 //!
-//! // Cache lookup with fallback to computation
+//! // Direct computation for arbitrary angles
 //! let matrix2 = VQEAngles::rx_cached(0.1);
 //! ```
 //!
 //! # Performance
 //!
 //! - **Exact matches**: 0 ns (compile-time constant)
-//! - **Range cache lookups**: ~2-5 ns (array index + bounds check)
-//! - **Cache misses**: Falls back to standard computation (~20-50 ns)
+//! - **Everything else**: falls back to standard computation (~20-50 ns)
 //!
 //! # Memory Usage
 //!
 //! Each cached 2x2 complex matrix requires 64 bytes:
 //! - 4 Complex64 values × 16 bytes each = 64 bytes
-//!
-//! Range caches with N entries use: 64N bytes
 
 use num_complex::Complex64;
 use std::f64::consts::PI;
@@ -55,8 +57,8 @@ impl CommonAngles {
 
     /// RX(π/4) - 45° rotation around X-axis
     pub const RX_PI_OVER_4: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.9238795325112867;  // cos(π/8)
-        const SIN: f64 = 0.3826834323650898;  // sin(π/8)
+        const COS: f64 = 0.9238795325112867; // cos(π/8)
+        const SIN: f64 = 0.3826834323650898; // sin(π/8)
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -70,8 +72,8 @@ impl CommonAngles {
 
     /// RX(π/2) - 90° rotation around X-axis
     pub const RX_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476;  // cos(π/4) = 1/√2
-        const SIN: f64 = 0.7071067811865476;  // sin(π/4) = 1/√2
+        const COS: f64 = std::f64::consts::FRAC_1_SQRT_2; // cos(π/4) = 1/√2
+        const SIN: f64 = std::f64::consts::FRAC_1_SQRT_2; // sin(π/4) = 1/√2
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -85,8 +87,8 @@ impl CommonAngles {
 
     /// RX(π) - 180° rotation around X-axis (equivalent to -iX)
     pub const RX_PI: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.0;  // cos(π/2)
-        const SIN: f64 = 1.0;  // sin(π/2)
+        const COS: f64 = 0.0; // cos(π/2)
+        const SIN: f64 = 1.0; // sin(π/2)
         [
             [Complex64::new(COS, 0.0), Complex64::new(0.0, -SIN)],
             [Complex64::new(0.0, -SIN), Complex64::new(COS, 0.0)],
@@ -102,8 +104,8 @@ impl CommonAngles {
 
     /// RY(π/4) - 45° rotation around Y-axis
     pub const RY_PI_OVER_4: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.9238795325112867;  // cos(π/8)
-        const SIN: f64 = 0.3826834323650898;  // sin(π/8)
+        const COS: f64 = 0.9238795325112867; // cos(π/8)
+        const SIN: f64 = 0.3826834323650898; // sin(π/8)
         [
             [Complex64::new(COS, 0.0), Complex64::new(-SIN, 0.0)],
             [Complex64::new(SIN, 0.0), Complex64::new(COS, 0.0)],
@@ -117,8 +119,8 @@ impl CommonAngles {
 
     /// RY(π/2) - 90° rotation around Y-axis
     pub const RY_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476;  // 1/√2
-        const SIN: f64 = 0.7071067811865476;  // 1/√2
+        const COS: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
+        const SIN: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
         [
             [Complex64::new(COS, 0.0), Complex64::new(-SIN, 0.0)],
             [Complex64::new(SIN, 0.0), Complex64::new(COS, 0.0)],
@@ -149,8 +151,8 @@ impl CommonAngles {
 
     /// RZ(π/4) - 45° phase rotation
     pub const RZ_PI_OVER_4: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.9238795325112867;  // cos(π/8)
-        const SIN: f64 = 0.3826834323650898;  // sin(π/8)
+        const COS: f64 = 0.9238795325112867; // cos(π/8)
+        const SIN: f64 = 0.3826834323650898; // sin(π/8)
         [
             [Complex64::new(COS, -SIN), Complex64::new(0.0, 0.0)],
             [Complex64::new(0.0, 0.0), Complex64::new(COS, SIN)],
@@ -164,8 +166,8 @@ impl CommonAngles {
 
     /// RZ(π/2) - 90° phase rotation (equivalent to S gate up to global phase)
     pub const RZ_PI_OVER_2: [[Complex64; 2]; 2] = {
-        const COS: f64 = 0.7071067811865476;  // 1/√2
-        const SIN: f64 = 0.7071067811865476;  // 1/√2
+        const COS: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
+        const SIN: f64 = std::f64::consts::FRAC_1_SQRT_2; // 1/√2
         [
             [Complex64::new(COS, -SIN), Complex64::new(0.0, 0.0)],
             [Complex64::new(0.0, 0.0), Complex64::new(COS, SIN)],
@@ -251,161 +253,42 @@ impl CommonAngles {
 // VQE/QAOA Optimized Cache
 // ============================================================================
 
-/// Cache optimized for Variational Quantum Eigensolver (VQE) and QAOA algorithms
+/// Angle-range marker for the VQE/QAOA gradient-descent optimization window
 ///
-/// Pre-computed matrices for angles from 0 to π/4 with fine granularity.
-/// This range covers most parameter updates during gradient descent.
+/// This previously carried a grid of pre-computed matrices spaced at
+/// `(π/4)/255` intervals, intended to serve as a fast path for angles
+/// produced during gradient descent. Because that step is irrational
+/// relative to the arbitrary floating-point angles an optimizer produces,
+/// an exact-match lookup against the grid essentially never hit — every
+/// call fell through to runtime trig computation anyway, after paying for
+/// the index arithmetic and carrying 48 KiB of matrices that were never
+/// returned. The grid has been removed; `*_cached` now simply computes the
+/// matrix directly. `MAX_ANGLE` is kept as the documented range boundary
+/// used by callers (e.g. `EnhancedUniversalCache`) to decide when to try
+/// this path before falling further back to build-time-generated ranges.
 pub struct VQEAngles;
 
 impl VQEAngles {
-    /// Number of cached angles (higher = better accuracy, more memory)
-    pub const NUM_ENTRIES: usize = 256;
-
-    /// Maximum cached angle (π/4 covers typical optimization ranges)
+    /// Upper bound of the angle range this type represents (π/4 covers
+    /// typical single-step optimization updates).
     pub const MAX_ANGLE: f64 = PI / 4.0;
 
-    /// Step size between cached angles
-    pub const STEP: f64 = Self::MAX_ANGLE / (Self::NUM_ENTRIES - 1) as f64;
-
-    /// Pre-computed RX matrices for VQE angles
-    const RX_CACHE: [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] = Self::gen_rx_cache();
-
-    /// Pre-computed RY matrices for VQE angles
-    const RY_CACHE: [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] = Self::gen_ry_cache();
-
-    /// Pre-computed RZ matrices for VQE angles
-    const RZ_CACHE: [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] = Self::gen_rz_cache();
-
-    /// Generate RX cache at compile time
-    const fn gen_rx_cache() -> [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] {
-        let mut cache = [[[Complex64::new(0.0, 0.0); 2]; 2]; Self::NUM_ENTRIES];
-        let mut i = 0;
-        while i < Self::NUM_ENTRIES {
-            let theta = i as f64 * Self::STEP;
-            let half_theta = theta / 2.0;
-
-            // Const approximation of cos and sin (using Taylor series for compile-time)
-            // For better accuracy, we use pre-computed values at runtime
-            let cos_val = Self::const_cos(half_theta);
-            let sin_val = Self::const_sin(half_theta);
-
-            cache[i] = [
-                [Complex64::new(cos_val, 0.0), Complex64::new(0.0, -sin_val)],
-                [Complex64::new(0.0, -sin_val), Complex64::new(cos_val, 0.0)],
-            ];
-            i += 1;
-        }
-        cache
-    }
-
-    /// Generate RY cache at compile time
-    const fn gen_ry_cache() -> [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] {
-        let mut cache = [[[Complex64::new(0.0, 0.0); 2]; 2]; Self::NUM_ENTRIES];
-        let mut i = 0;
-        while i < Self::NUM_ENTRIES {
-            let theta = i as f64 * Self::STEP;
-            let half_theta = theta / 2.0;
-
-            let cos_val = Self::const_cos(half_theta);
-            let sin_val = Self::const_sin(half_theta);
-
-            cache[i] = [
-                [Complex64::new(cos_val, 0.0), Complex64::new(-sin_val, 0.0)],
-                [Complex64::new(sin_val, 0.0), Complex64::new(cos_val, 0.0)],
-            ];
-            i += 1;
-        }
-        cache
-    }
-
-    /// Generate RZ cache at compile time
-    const fn gen_rz_cache() -> [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] {
-        let mut cache = [[[Complex64::new(0.0, 0.0); 2]; 2]; Self::NUM_ENTRIES];
-        let mut i = 0;
-        while i < Self::NUM_ENTRIES {
-            let theta = i as f64 * Self::STEP;
-            let half_theta = theta / 2.0;
-
-            let cos_val = Self::const_cos(half_theta);
-            let sin_val = Self::const_sin(half_theta);
-
-            cache[i] = [
-                [Complex64::new(cos_val, -sin_val), Complex64::new(0.0, 0.0)],
-                [Complex64::new(0.0, 0.0), Complex64::new(cos_val, sin_val)],
-            ];
-            i += 1;
-        }
-        cache
-    }
-
-    /// Const-compatible cosine approximation (Taylor series)
-    /// Accurate for small angles (0 to π/4)
-    const fn const_cos(x: f64) -> f64 {
-        // Taylor series: cos(x) ≈ 1 - x²/2! + x⁴/4! - x⁶/6!
-        let x2 = x * x;
-        let x4 = x2 * x2;
-        let x6 = x4 * x2;
-        1.0 - x2 / 2.0 + x4 / 24.0 - x6 / 720.0
-    }
-
-    /// Const-compatible sine approximation (Taylor series)
-    /// Accurate for small angles (0 to π/4)
-    const fn const_sin(x: f64) -> f64 {
-        // Taylor series: sin(x) ≈ x - x³/3! + x⁵/5! - x⁷/7!
-        let x2 = x * x;
-        let x3 = x * x2;
-        let x5 = x3 * x2;
-        let x7 = x5 * x2;
-        x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0
-    }
-
-    /// Lookup RX matrix with nearest neighbor
+    /// Compute the RX matrix for the given angle.
     #[inline]
     pub fn rx_cached(theta: f64) -> [[Complex64; 2]; 2] {
-        let abs_theta = theta.abs();
-
-        if abs_theta <= Self::MAX_ANGLE {
-            let index = (abs_theta / Self::STEP).round() as usize;
-            let index = index.min(Self::NUM_ENTRIES - 1);
-            Self::RX_CACHE[index]
-        } else {
-            // Fallback to runtime computation
-            crate::matrices::rotation_x(theta)
-        }
+        crate::matrices::rotation_x(theta)
     }
 
-    /// Lookup RY matrix with nearest neighbor
+    /// Compute the RY matrix for the given angle.
     #[inline]
     pub fn ry_cached(theta: f64) -> [[Complex64; 2]; 2] {
-        let abs_theta = theta.abs();
-
-        if abs_theta <= Self::MAX_ANGLE {
-            let index = (abs_theta / Self::STEP).round() as usize;
-            let index = index.min(Self::NUM_ENTRIES - 1);
-            Self::RY_CACHE[index]
-        } else {
-            crate::matrices::rotation_y(theta)
-        }
+        crate::matrices::rotation_y(theta)
     }
 
-    /// Lookup RZ matrix with nearest neighbor
+    /// Compute the RZ matrix for the given angle.
     #[inline]
     pub fn rz_cached(theta: f64) -> [[Complex64; 2]; 2] {
-        let abs_theta = theta.abs();
-
-        if abs_theta <= Self::MAX_ANGLE {
-            let index = (abs_theta / Self::STEP).round() as usize;
-            let index = index.min(Self::NUM_ENTRIES - 1);
-            Self::RZ_CACHE[index]
-        } else {
-            crate::matrices::rotation_z(theta)
-        }
-    }
-
-    /// Get cache memory usage in bytes
-    #[inline]
-    pub const fn memory_bytes() -> usize {
-        std::mem::size_of::<[[Complex64; 2]; 2]>() * Self::NUM_ENTRIES * 3
+        crate::matrices::rotation_z(theta)
     }
 }
 
@@ -509,10 +392,9 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                // VQE cache uses Taylor series approximation in const fn,
-                // so use more tolerant epsilon (still very accurate for small angles)
-                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-3);
-                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-3);
+                // rx_cached now computes directly, so it must match exactly.
+                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-12);
+                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-12);
             }
         }
     }
@@ -534,7 +416,7 @@ mod tests {
     #[test]
     fn test_vqe_cache_fallback() {
         // Beyond range, should fallback to computation
-        let theta = PI;  // Beyond MAX_ANGLE
+        let theta = PI; // Beyond MAX_ANGLE
         let cached = VQEAngles::rx_cached(theta);
         let computed = crate::matrices::rotation_x(theta);
 
@@ -572,9 +454,335 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_usage() {
-        let bytes = VQEAngles::memory_bytes();
-        // 256 entries × 3 caches (RX, RY, RZ) × 64 bytes per matrix
-        assert_eq!(bytes, 256 * 3 * 64);
+    fn test_vqe_cache_entries_match_runtime_trig() {
+        // rx_cached/ry_cached/rz_cached now compute directly (no grid), so
+        // they must agree with runtime trig everywhere within the range.
+        for i in 0..256 {
+            let theta = i as f64 * (VQEAngles::MAX_ANGLE / 255.0);
+            let rx = VQEAngles::rx_cached(theta);
+            let rx_exact = crate::matrices::rotation_x(theta);
+            let ry = VQEAngles::ry_cached(theta);
+            let ry_exact = crate::matrices::rotation_y(theta);
+            let rz = VQEAngles::rz_cached(theta);
+            let rz_exact = crate::matrices::rotation_z(theta);
+            for r in 0..2 {
+                for c in 0..2 {
+                    assert!(
+                        (rx[r][c] - rx_exact[r][c]).norm() < 1e-12,
+                        "RX entry {i} (theta = {theta}) deviates from exact trig"
+                    );
+                    assert!(
+                        (ry[r][c] - ry_exact[r][c]).norm() < 1e-12,
+                        "RY entry {i} (theta = {theta}) deviates from exact trig"
+                    );
+                    assert!(
+                        (rz[r][c] - rz_exact[r][c]).norm() < 1e-12,
+                        "RZ entry {i} (theta = {theta}) deviates from exact trig"
+                    );
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Additional CommonAngles tests
+    // =========================================================================
+
+    #[test]
+    fn test_common_angles_all_rx() {
+        let rx_pi_4 = CommonAngles::rx_pi_over_4();
+        let rx_pi_2 = CommonAngles::rx_pi_over_2();
+        let rx_pi_val = CommonAngles::rx_pi();
+
+        // All should be non-trivial (not all zeros)
+        let sum_pi4: f64 = rx_pi_4.iter().flatten().map(|c| c.norm_sqr()).sum();
+        assert!(sum_pi4 > 0.0);
+        let sum_pi2: f64 = rx_pi_2.iter().flatten().map(|c| c.norm_sqr()).sum();
+        assert!(sum_pi2 > 0.0);
+        let sum_pi: f64 = rx_pi_val.iter().flatten().map(|c| c.norm_sqr()).sum();
+        assert!(sum_pi > 0.0);
+
+        // Check against computed values
+        let computed_pi4 = crate::matrices::rotation_x(PI / 4.0);
+        let computed_pi2 = crate::matrices::rotation_x(PI / 2.0);
+        let computed_pi = crate::matrices::rotation_x(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(rx_pi_4[i][j].re, computed_pi4[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rx_pi_2[i][j].re, computed_pi2[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rx_pi_val[i][j].re, computed_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_common_angles_all_ry() {
+        let ry_pi4 = CommonAngles::ry_pi_over_4();
+        let ry_pi2 = CommonAngles::ry_pi_over_2();
+        let ry_pi_val = CommonAngles::ry_pi();
+
+        let computed_pi4 = crate::matrices::rotation_y(PI / 4.0);
+        let computed_pi2 = crate::matrices::rotation_y(PI / 2.0);
+        let computed_pi = crate::matrices::rotation_y(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(ry_pi4[i][j].re, computed_pi4[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(ry_pi2[i][j].re, computed_pi2[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(ry_pi_val[i][j].re, computed_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_common_angles_all_rz() {
+        let rz_pi4 = CommonAngles::rz_pi_over_4();
+        let rz_pi2 = CommonAngles::rz_pi_over_2();
+        let rz_pi_val = CommonAngles::rz_pi();
+
+        let computed_pi4 = crate::matrices::rotation_z(PI / 4.0);
+        let computed_pi2 = crate::matrices::rotation_z(PI / 2.0);
+        let computed_pi = crate::matrices::rotation_z(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(rz_pi4[i][j].re, computed_pi4[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rz_pi2[i][j].re, computed_pi2[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(rz_pi_val[i][j].re, computed_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rx_lookup_all_branches() {
+        // PI/4 branch
+        assert!(CommonAngles::rx_lookup(PI / 4.0).is_some());
+        // PI/2 branch
+        assert!(CommonAngles::rx_lookup(PI / 2.0).is_some());
+        // PI branch
+        assert!(CommonAngles::rx_lookup(PI).is_some());
+        // 0.0 branch (identity)
+        assert!(CommonAngles::rx_lookup(0.0).is_some());
+        // None branch
+        assert!(CommonAngles::rx_lookup(1.0).is_none());
+        assert!(CommonAngles::rx_lookup(0.123).is_none());
+    }
+
+    #[test]
+    fn test_ry_lookup_all_branches() {
+        assert!(CommonAngles::ry_lookup(PI / 4.0).is_some());
+        assert!(CommonAngles::ry_lookup(PI / 2.0).is_some());
+        assert!(CommonAngles::ry_lookup(PI).is_some());
+        assert!(CommonAngles::ry_lookup(0.0).is_some());
+        assert!(CommonAngles::ry_lookup(1.0).is_none());
+    }
+
+    #[test]
+    fn test_rz_lookup_all_branches() {
+        assert!(CommonAngles::rz_lookup(PI / 4.0).is_some());
+        assert!(CommonAngles::rz_lookup(PI / 2.0).is_some());
+        assert!(CommonAngles::rz_lookup(PI).is_some());
+        assert!(CommonAngles::rz_lookup(0.0).is_some());
+        assert!(CommonAngles::rz_lookup(1.0).is_none());
+    }
+
+    // =========================================================================
+    // VQEAngles additional tests
+    // =========================================================================
+
+    #[test]
+    fn test_vqe_angles_rx_cached_in_range() {
+        let m0 = VQEAngles::rx_cached(0.0);
+        let computed0 = crate::matrices::rotation_x(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m0[i][j].re, computed0[i][j].re, epsilon = 1e-10);
+            }
+        }
+
+        let m1 = VQEAngles::rx_cached(0.1);
+        let computed1 = crate::matrices::rotation_x(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m1[i][j].re, computed1[i][j].re, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_rx_cached_out_of_range() {
+        // PI is beyond MAX_ANGLE, falls back to runtime computation
+        let cached = VQEAngles::rx_cached(PI);
+        let computed = crate::matrices::rotation_x(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_rx_cached_negative() {
+        // Negative angles should work (negate off-diagonal)
+        let pos = VQEAngles::rx_cached(0.1);
+        let neg = VQEAngles::rx_cached(-0.1);
+        // cos(-θ/2) = cos(θ/2), so diagonal should match
+        assert_relative_eq!(pos[0][0].re, neg[0][0].re, epsilon = 1e-12);
+        let computed_neg = crate::matrices::rotation_x(-0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(neg[i][j].re, computed_neg[i][j].re, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_ry_cached() {
+        // In-range
+        let m = VQEAngles::ry_cached(0.0);
+        let computed = crate::matrices::rotation_y(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m[i][j].re, computed[i][j].re, epsilon = 1e-10);
+            }
+        }
+        // Negative in-range
+        let m_neg = VQEAngles::ry_cached(-0.1);
+        let c_neg = crate::matrices::rotation_y(-0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 1e-12);
+            }
+        }
+        // Out of range
+        let m_pi = VQEAngles::ry_cached(PI);
+        let c_pi = crate::matrices::rotation_y(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_pi[i][j].re, c_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_vqe_angles_rz_cached() {
+        // In-range: theta=0
+        let m = VQEAngles::rz_cached(0.0);
+        let computed = crate::matrices::rotation_z(0.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m[i][j].re, computed[i][j].re, epsilon = 1e-10);
+            }
+        }
+        // Negative in-range
+        let m_neg = VQEAngles::rz_cached(-0.1);
+        let c_neg = crate::matrices::rotation_z(-0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 1e-12);
+            }
+        }
+        // Out of range (fallback)
+        let m_pi = VQEAngles::rz_cached(PI);
+        let c_pi = crate::matrices::rotation_z(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m_pi[i][j].re, c_pi[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    // =========================================================================
+    // UniversalCache additional tests
+    // =========================================================================
+
+    #[test]
+    fn test_universal_cache_rx() {
+        // Level 1: PI/4 is a common angle
+        let m = UniversalCache::rx(PI / 4.0);
+        let expected = *CommonAngles::rx_pi_over_4();
+        assert_eq!(m, expected);
+
+        // Level 1: 0.0 is also a common angle (identity)
+        let m0 = UniversalCache::rx(0.0);
+        assert_eq!(m0, crate::matrices::IDENTITY);
+
+        // Level 2: VQE range hit
+        let m2 = UniversalCache::rx(0.1);
+        let c2 = crate::matrices::rotation_x(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m2[i][j].re, c2[i][j].re, epsilon = 0.01);
+            }
+        }
+
+        // Level 3: fallback to runtime
+        let m3 = UniversalCache::rx(PI); // PI is a common angle
+        let c3 = crate::matrices::rotation_x(PI);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m3[i][j].re, c3[i][j].re, epsilon = 1e-10);
+            }
+        }
+
+        // Runtime fallback for non-common, out-of-range angle
+        let m4 = UniversalCache::rx(2.5);
+        let c4 = crate::matrices::rotation_x(2.5);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m4[i][j].re, c4[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_universal_cache_ry() {
+        // PI/2 is common angle
+        let m = UniversalCache::ry(PI / 2.0);
+        let expected = *CommonAngles::ry_pi_over_2();
+        assert_eq!(m, expected);
+
+        // VQE range
+        let m2 = UniversalCache::ry(0.1);
+        let c2 = crate::matrices::rotation_y(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m2[i][j].re, c2[i][j].re, epsilon = 0.01);
+            }
+        }
+
+        // Out of range
+        let m3 = UniversalCache::ry(2.0);
+        let c3 = crate::matrices::rotation_y(2.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m3[i][j].re, c3[i][j].re, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn test_universal_cache_rz() {
+        // PI/4 is common angle
+        let m = UniversalCache::rz(PI / 4.0);
+        let expected = *CommonAngles::rz_pi_over_4();
+        assert_eq!(m, expected);
+
+        // VQE range
+        let m2 = UniversalCache::rz(0.1);
+        let c2 = crate::matrices::rotation_z(0.1);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m2[i][j].re, c2[i][j].re, epsilon = 0.01);
+            }
+        }
+
+        // Out of range
+        let m3 = UniversalCache::rz(2.0);
+        let c3 = crate::matrices::rotation_z(2.0);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert_relative_eq!(m3[i][j].re, c3[i][j].re, epsilon = 1e-10);
+            }
+        }
     }
 }

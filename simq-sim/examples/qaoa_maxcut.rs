@@ -5,10 +5,12 @@
 //!
 //! Run with: cargo run --example qaoa_maxcut
 
+use simq_core::{Circuit, QubitId};
+use simq_gates::standard::{CNot, Hadamard, RotationX, RotationZ};
+use simq_sim::gradient::{AdamConfig, AdamOptimizer, QAOAConfig, QAOAOptimizer};
 use simq_sim::Simulator;
-use simq_sim::gradient::{QAOAOptimizer, QAOAConfig, AdamOptimizer, AdamConfig};
-use simq_core::{Circuit, Gate};
-use simq_state::observable::PauliObservable;
+use simq_state::observable::{PauliObservable, PauliString};
+use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("QAOA: MaxCut Problem\n");
@@ -18,15 +20,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Edges: (0,1), (1,2), (0,2)
     // Goal: Maximize the number of edges between different partitions
     let num_qubits = 3;
-    let simulator = Simulator::new(num_qubits);
+    let simulator = Simulator::new(Default::default());
 
     // MaxCut Hamiltonian: H_C = -0.5 * sum_{(i,j) in E} (I - Z_i Z_j)
     // For triangle: H_C = -0.5 * ((I - Z0Z1) + (I - Z1Z2) + (I - Z0Z2))
     // We'll use the cost observable: Z0Z1 + Z1Z2 + Z0Z2 (minimize to solve MaxCut)
     let observable = {
-        let mut obs = PauliObservable::from_pauli_string("ZZI", 0.5)?; // Z0Z1
-        obs = obs.add(&PauliObservable::from_pauli_string("IZZ", 0.5)?)?; // Z1Z2
-        obs.add(&PauliObservable::from_pauli_string("ZIZ", 0.5)?)?  // Z0Z2
+        let mut obs = PauliObservable::from_pauli_string(PauliString::from_str("ZZI")?, 0.5); // Z0Z1
+        obs.add_term(PauliString::from_str("IZZ")?, 0.5); // Z1Z2
+        obs.add_term(PauliString::from_str("ZIZ")?, 0.5); // Z0Z2
+        obs
     };
 
     // QAOA circuit builder
@@ -39,7 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Initial state: uniform superposition
         for i in 0..num_qubits {
-            circuit.add_gate(Gate::H(i));
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(i)])
+                .unwrap();
         }
 
         // QAOA layers
@@ -52,23 +57,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // RZZ(theta) = exp(-i * theta/2 * Z_i Z_j)
 
             // Edge (0,1)
-            circuit.add_gate(Gate::CNOT(0, 1));
-            circuit.add_gate(Gate::RZ(1, 2.0 * gamma));
-            circuit.add_gate(Gate::CNOT(0, 1));
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma)), &[QubitId::new(1)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+                .unwrap();
 
             // Edge (1,2)
-            circuit.add_gate(Gate::CNOT(1, 2));
-            circuit.add_gate(Gate::RZ(2, 2.0 * gamma));
-            circuit.add_gate(Gate::CNOT(1, 2));
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(1), QubitId::new(2)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma)), &[QubitId::new(2)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(1), QubitId::new(2)])
+                .unwrap();
 
             // Edge (0,2)
-            circuit.add_gate(Gate::CNOT(0, 2));
-            circuit.add_gate(Gate::RZ(2, 2.0 * gamma));
-            circuit.add_gate(Gate::CNOT(0, 2));
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(2)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationZ::new(2.0 * gamma)), &[QubitId::new(2)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(2)])
+                .unwrap();
 
             // Mixer Hamiltonian: exp(-i * beta * sum_i X_i)
             for i in 0..num_qubits {
-                circuit.add_gate(Gate::RX(i, 2.0 * beta));
+                circuit
+                    .add_gate(Arc::new(RotationX::new(2.0 * beta)), &[QubitId::new(i)])
+                    .unwrap();
             }
         }
 
@@ -107,17 +132,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Status:          {:?}", result.status);
     println!("\nOptimal parameters:");
     for layer in 0..num_layers {
-        println!("  Layer {}: gamma = {:.6}, beta = {:.6}",
+        println!(
+            "  Layer {}: gamma = {:.6}, beta = {:.6}",
             layer + 1,
             result.parameters[2 * layer],
-            result.parameters[2 * layer + 1]);
+            result.parameters[2 * layer + 1]
+        );
     }
 
     // Interpret result
     let final_circuit = circuit_builder(&result.parameters);
     let final_result = simulator.run(&final_circuit)?;
     println!("\nTop measurement outcomes (probability > 5%):");
-    let amplitudes = final_result.state_vector();
+    let amplitudes = final_result.state.to_dense_vec();
     let mut probs: Vec<(usize, f64)> = amplitudes
         .iter()
         .enumerate()
@@ -129,14 +156,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if *prob > 0.05 {
             let bitstring = format!("{:0width$b}", state, width = num_qubits);
             // Calculate cut size
-            let bits: Vec<u8> = bitstring.chars().map(|c| c.to_digit(2).unwrap() as u8).collect();
+            let bits: Vec<u8> = bitstring
+                .chars()
+                .map(|c| c.to_digit(2).unwrap() as u8)
+                .collect();
             let mut cut_size = 0;
             // Edge (0,1)
-            if bits[0] != bits[1] { cut_size += 1; }
+            if bits[0] != bits[1] {
+                cut_size += 1;
+            }
             // Edge (1,2)
-            if bits[1] != bits[2] { cut_size += 1; }
+            if bits[1] != bits[2] {
+                cut_size += 1;
+            }
             // Edge (0,2)
-            if bits[0] != bits[2] { cut_size += 1; }
+            if bits[0] != bits[2] {
+                cut_size += 1;
+            }
 
             println!("  |{}⟩: {:.1}% (cut size: {})", bitstring, prob * 100.0, cut_size);
         }
@@ -149,7 +185,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config_layerwise.layer_wise = true;
 
     let mut optimizer_layerwise = QAOAOptimizer::new(circuit_builder, config_layerwise);
-    let result_layerwise = optimizer_layerwise.optimize(&simulator, &observable, &initial_params)?;
+    let result_layerwise =
+        optimizer_layerwise.optimize(&simulator, &observable, &initial_params)?;
 
     println!("Initial cost:    {:.8}", initial_params[0]);
     println!("Final cost:      {:.8}", result_layerwise.energy);
@@ -158,10 +195,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Status:          {:?}", result_layerwise.status);
     println!("\nOptimal parameters:");
     for layer in 0..num_layers {
-        println!("  Layer {}: gamma = {:.6}, beta = {:.6}",
+        println!(
+            "  Layer {}: gamma = {:.6}, beta = {:.6}",
             layer + 1,
             result_layerwise.parameters[2 * layer],
-            result_layerwise.parameters[2 * layer + 1]);
+            result_layerwise.parameters[2 * layer + 1]
+        );
     }
 
     println!("\n\nMethod 3: QAOA with Adam optimizer\n");
@@ -189,12 +228,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:-<70}", "");
     println!("{:25} {:>15} {:>10} {:>12}", "Method", "Final Cost", "Iterations", "Time (ms)");
     println!("{:-<70}", "");
-    println!("{:25} {:>15.8} {:>10} {:>12}",
-        "Simultaneous", result.energy, result.num_iterations, result.total_time.as_millis());
-    println!("{:25} {:>15.8} {:>10} {:>12}",
-        "Layer-wise", result_layerwise.energy, result_layerwise.num_iterations, result_layerwise.total_time.as_millis());
-    println!("{:25} {:>15.8} {:>10} {:>12}",
-        "Adam", adam_result.energy, adam_result.num_iterations, adam_result.total_time.as_millis());
+    println!(
+        "{:25} {:>15.8} {:>10} {:>12}",
+        "Simultaneous",
+        result.energy,
+        result.num_iterations,
+        result.total_time.as_millis()
+    );
+    println!(
+        "{:25} {:>15.8} {:>10} {:>12}",
+        "Layer-wise",
+        result_layerwise.energy,
+        result_layerwise.num_iterations,
+        result_layerwise.total_time.as_millis()
+    );
+    println!(
+        "{:25} {:>15.8} {:>10} {:>12}",
+        "Adam",
+        adam_result.energy,
+        adam_result.num_iterations,
+        adam_result.total_time.as_millis()
+    );
 
     println!("\n✓ QAOA optimization complete!");
     println!("\nNote: For this MaxCut problem, the optimal solution cuts 2 edges.");

@@ -51,10 +51,7 @@ fn _simq(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Add version information
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("__author__", "SimQ Contributors")?;
-    m.add(
-        "__doc__",
-        "High-performance quantum computing SDK with Python bindings",
-    )?;
+    m.add("__doc__", "High-performance quantum computing SDK with Python bindings")?;
 
     // Register core types
     core::register(_py, m)?;

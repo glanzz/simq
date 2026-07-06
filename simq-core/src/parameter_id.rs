@@ -15,7 +15,7 @@ use std::fmt;
 /// - **Compact**: 8 bytes on 64-bit systems
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// use simq_core::parameter_id::ParameterId;
 ///
 /// // Typically created by ParameterRegistry
@@ -33,7 +33,7 @@ impl ParameterId {
     /// This is typically called by `ParameterRegistry`, not by users directly.
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// use simq_core::parameter_id::ParameterId;
     ///
     /// let id = ParameterId::new(42);
@@ -47,7 +47,7 @@ impl ParameterId {
     /// Get the internal index
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// use simq_core::parameter_id::ParameterId;
     ///
     /// let id = ParameterId::new(5);

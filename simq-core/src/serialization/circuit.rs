@@ -109,5 +109,28 @@ mod tests {
         let circuit = SerializedCircuit::with_metadata(2, vec![], metadata.clone());
         assert_eq!(circuit.metadata, Some(metadata));
     }
-}
 
+    #[test]
+    fn test_check_version_compatible() {
+        let circuit = SerializedCircuit::new(1, vec![]);
+        // Freshly created circuits use the current format version, so this
+        // should always be compatible.
+        assert!(circuit.check_version().is_ok());
+    }
+
+    #[test]
+    fn test_check_version_future_mismatch() {
+        let mut circuit = SerializedCircuit::new(1, vec![]);
+        circuit.version = crate::serialization::CIRCUIT_FORMAT_VERSION + 1;
+
+        let result = circuit.check_version();
+        assert!(result.is_err());
+        match result {
+            Err(crate::QuantumError::VersionMismatch { expected, actual }) => {
+                assert_eq!(expected, crate::serialization::CIRCUIT_FORMAT_VERSION);
+                assert_eq!(actual, crate::serialization::CIRCUIT_FORMAT_VERSION + 1);
+            },
+            _ => panic!("Expected VersionMismatch error"),
+        }
+    }
+}

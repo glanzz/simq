@@ -47,78 +47,72 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq)]
 pub enum CustomGateError {
     /// Matrix is not unitary (U†U ≠ I)
-    NotUnitary {
-        max_deviation: f64,
-        tolerance: f64,
-    },
+    NotUnitary { max_deviation: f64, tolerance: f64 },
     /// Matrix dimensions are invalid
-    InvalidDimensions {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidDimensions { expected: usize, actual: usize },
     /// Matrix size is not a power of 2
-    InvalidSize {
-        size: usize,
-    },
+    InvalidSize { size: usize },
     /// Matrix contains NaN or infinite values
     InvalidValues,
     /// Gate name is empty or invalid
     InvalidName,
     /// Determinant is not approximately 1
-    InvalidDeterminant {
-        determinant_norm: f64,
-    },
+    InvalidDeterminant { determinant_norm: f64 },
     /// Matrix is not hermitian (when required)
-    NotHermitian {
-        max_deviation: f64,
-    },
+    NotHermitian { max_deviation: f64 },
 }
 
 impl fmt::Display for CustomGateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CustomGateError::NotUnitary { max_deviation, tolerance } => {
+            CustomGateError::NotUnitary {
+                max_deviation,
+                tolerance,
+            } => {
                 write!(
                     f,
                     "Matrix is not unitary: max deviation {:.2e} exceeds tolerance {:.2e}. \
                     Ensure U†U = I where U† is the conjugate transpose.",
                     max_deviation, tolerance
                 )
-            }
+            },
             CustomGateError::InvalidDimensions { expected, actual } => {
                 write!(
                     f,
                     "Invalid matrix dimensions: expected {}×{} ({} elements), got {} elements",
-                    expected, expected, expected * expected, actual
+                    expected,
+                    expected,
+                    expected * expected,
+                    actual
                 )
-            }
+            },
             CustomGateError::InvalidSize { size } => {
                 write!(
                     f,
                     "Matrix size {} is not valid. Size must be 2^n × 2^n for n-qubit gates (e.g., 2, 4, 8, 16, ...)",
                     size
                 )
-            }
+            },
             CustomGateError::InvalidValues => {
                 write!(f, "Matrix contains NaN or infinite values")
-            }
+            },
             CustomGateError::InvalidName => {
                 write!(f, "Gate name cannot be empty")
-            }
+            },
             CustomGateError::InvalidDeterminant { determinant_norm } => {
                 write!(
                     f,
                     "Invalid determinant: |det(U)| = {:.6} (expected 1.0 for unitary matrices)",
                     determinant_norm
                 )
-            }
+            },
             CustomGateError::NotHermitian { max_deviation } => {
                 write!(
                     f,
                     "Matrix is not hermitian: max deviation {:.2e}. Hermitian matrices satisfy A = A†",
                     max_deviation
                 )
-            }
+            },
         }
     }
 }
@@ -263,12 +257,7 @@ impl CustomGate {
             }
         }
 
-        CustomGate::new(
-            format!("C{}", self.name),
-            new_num_qubits,
-            controlled_matrix,
-            1e-10,
-        )
+        CustomGate::new(format!("C{}", self.name), new_num_qubits, controlled_matrix, 1e-10)
     }
 
     /// Get the adjoint (Hermitian conjugate) of this gate
@@ -276,13 +265,8 @@ impl CustomGate {
         let adjoint_matrix = crate::matrix_ops::matrix_adjoint(&self.matrix);
 
         // Adjoint of unitary is also unitary, so this should not fail
-        CustomGate::new(
-            format!("{}†", self.name),
-            self.num_qubits,
-            adjoint_matrix,
-            1e-10,
-        )
-        .expect("Adjoint of unitary gate should be unitary")
+        CustomGate::new(format!("{}†", self.name), self.num_qubits, adjoint_matrix, 1e-10)
+            .expect("Adjoint of unitary gate should be unitary")
     }
 
     /// Compose this gate with another gate
@@ -333,7 +317,11 @@ impl Gate for CustomGate {
                 "Custom {}-qubit gate '{}'{}",
                 self.num_qubits,
                 self.name,
-                if self.is_hermitian { " (Hermitian)" } else { "" }
+                if self.is_hermitian {
+                    " (Hermitian)"
+                } else {
+                    ""
+                }
             )
         }
     }
@@ -453,18 +441,14 @@ impl CustomGateBuilder {
     /// - Matrix validation fails
     /// - Hermitian requirement not met (if required)
     pub fn build(self) -> Result<CustomGate, CustomGateError> {
-        let num_qubits = self.num_qubits.ok_or_else(|| {
-            CustomGateError::InvalidDimensions {
-                expected: 0,
-                actual: 0,
-            }
+        let num_qubits = self.num_qubits.ok_or(CustomGateError::InvalidDimensions {
+            expected: 0,
+            actual: 0,
         })?;
 
-        let matrix = self.matrix.ok_or_else(|| {
-            CustomGateError::InvalidDimensions {
-                expected: 0,
-                actual: 0,
-            }
+        let matrix = self.matrix.ok_or(CustomGateError::InvalidDimensions {
+            expected: 0,
+            actual: 0,
         })?;
 
         let mut gate = CustomGate::new(self.name, num_qubits, matrix, self.tolerance)?;
@@ -519,11 +503,14 @@ impl CustomGateBuilder {
 /// gate.set_parameters(vec![PI / 4.0]).unwrap();
 /// let matrix = gate.matrix_vec().to_vec();
 /// ```
+/// Type alias for matrix generation function
+pub type MatrixFn = Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>;
+
 pub struct ParametricCustomGate {
     name: String,
     num_qubits: usize,
     parameter_names: Vec<String>,
-    matrix_fn: Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>,
+    matrix_fn: MatrixFn,
     current_matrix: Vec<Complex64>,
     tolerance: f64,
     is_hermitian: bool,
@@ -555,7 +542,7 @@ impl ParametricCustomGate {
         name: impl Into<String>,
         num_qubits: usize,
         parameter_names: Vec<String>,
-        matrix_fn: Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>,
+        matrix_fn: MatrixFn,
         initial_params: Vec<f64>,
         tolerance: f64,
     ) -> Result<Self, CustomGateError> {
@@ -633,7 +620,7 @@ pub struct ParametricCustomGateBuilder {
     name: String,
     num_qubits: usize,
     parameter_names: Vec<String>,
-    matrix_fn: Option<Arc<dyn Fn(&[f64]) -> Vec<Complex64> + Send + Sync>>,
+    matrix_fn: Option<MatrixFn>,
     initial_params: Vec<f64>,
     tolerance: f64,
 }
@@ -838,7 +825,7 @@ pub mod validation {
                 // For larger matrices, use numerical methods or skip
                 // For now, return 1.0 as we already checked unitarity
                 Complex64::new(1.0, 0.0)
-            }
+            },
         }
     }
 
@@ -956,10 +943,7 @@ mod tests {
 
         let result = CustomGate::new("Invalid", 1, matrix, 1e-10);
         assert!(result.is_err());
-        assert!(matches!(
-            result,
-            Err(CustomGateError::InvalidDimensions { .. })
-        ));
+        assert!(matches!(result, Err(CustomGateError::InvalidDimensions { .. })));
     }
 
     #[test]
@@ -1027,7 +1011,9 @@ mod tests {
 
         // S · S† = I
         let identity = s_gate.compose(&s_dag).unwrap();
-        let fidelity = identity.fidelity(&crate::matrix_ops::identity_matrix(2)).unwrap();
+        let fidelity = identity
+            .fidelity(&crate::matrix_ops::identity_matrix(2))
+            .unwrap();
         assert_relative_eq!(fidelity, 1.0, epsilon = 1e-10);
     }
 
@@ -1058,7 +1044,9 @@ mod tests {
 
         // X · X = I
         let x_squared = x_gate.compose(&x_gate).unwrap();
-        let fidelity = x_squared.fidelity(&crate::matrix_ops::identity_matrix(2)).unwrap();
+        let fidelity = x_squared
+            .fidelity(&crate::matrix_ops::identity_matrix(2))
+            .unwrap();
         assert_relative_eq!(fidelity, 1.0, epsilon = 1e-10);
     }
 
@@ -1103,5 +1091,150 @@ mod tests {
 
         let result = check_completeness_relation(&[identity], 1e-10);
         assert!(result.is_ok());
+    }
+
+    // --- Coverage for lines 308-309, 323, 329-330 ---
+
+    #[test]
+    fn test_is_hermitian_returns_false_for_non_hermitian() {
+        // S gate [[1,0],[0,i]] is unitary but NOT hermitian → line 309 returns false
+        let gate = CustomGateBuilder::new("S")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+            ])
+            .build()
+            .unwrap();
+        // line 308-309: is_hermitian() → self.is_hermitian (false)
+        assert!(!gate.is_hermitian());
+    }
+
+    #[test]
+    fn test_description_non_hermitian_has_no_suffix() {
+        // When is_hermitian is false the else branch on line 323 ("") is taken.
+        let gate = CustomGateBuilder::new("SGate")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+            ])
+            .build()
+            .unwrap();
+        let desc = gate.description();
+        assert!(!desc.contains("Hermitian"), "desc was: {desc}");
+    }
+
+    #[test]
+    fn test_matrix_trait_returns_some() {
+        // Lines 329-330: Gate::matrix() returns Some(self.matrix.clone())
+        let gate = CustomGateBuilder::new("X")
+            .matrix_2x2([
+                [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            ])
+            .build()
+            .unwrap();
+        // This calls the Gate trait impl matrix() at line 329-330
+        let m = <CustomGate as simq_core::gate::Gate>::matrix(&gate);
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().len(), 4);
+    }
+
+    // --- Coverage for lines 422-424 (builder tolerance) ---
+
+    #[test]
+    fn test_builder_tolerance_sets_field() {
+        // Lines 422-424: builder.tolerance(t)
+        let gate = CustomGateBuilder::new("X")
+            .matrix_2x2([
+                [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            ])
+            .tolerance(1e-6)
+            .build()
+            .unwrap();
+        assert!(gate.is_unitary());
+    }
+
+    // --- Coverage for lines 550-552 (ParametricCustomGate param count mismatch) ---
+
+    #[test]
+    fn test_parametric_gate_param_count_mismatch() {
+        // Lines 550-552: parameter_names.len() != initial_params.len() → Err
+        use num_complex::Complex64;
+        let result = ParametricCustomGate::new(
+            "RX",
+            1,
+            vec!["theta".to_string()],
+            Arc::new(|params: &[f64]| {
+                let c = params[0].cos();
+                let s = params[0].sin();
+                vec![
+                    Complex64::new(c, 0.0),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(c, 0.0),
+                ]
+            }),
+            vec![], // wrong count: 0 instead of 1
+            1e-10,
+        );
+        assert!(matches!(result, Err(CustomGateError::InvalidDimensions { .. })));
+    }
+
+    // --- Coverage for lines 608-609, 629-635, 640-641, 644-645 ---
+
+    #[test]
+    fn test_parametric_gate_is_hermitian_method() {
+        // Lines 608-609: ParametricCustomGate::is_hermitian()
+        use std::f64::consts::PI;
+        let gate = ParametricCustomGate::new(
+            "RX",
+            1,
+            vec!["theta".to_string()],
+            Arc::new(|params: &[f64]| {
+                let c = params[0].cos();
+                let s = params[0].sin();
+                vec![
+                    Complex64::new(c, 0.0),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(c, 0.0),
+                ]
+            }),
+            vec![PI / 2.0],
+            1e-10,
+        )
+        .unwrap();
+        // RX(π/2) is not hermitian (complex entries)
+        let _ = gate.is_hermitian();
+    }
+
+    #[test]
+    fn test_parametric_gate_builder_debug_and_build() {
+        // Lines 629-635: Debug for ParametricCustomGateBuilder
+        // Lines 640-641: ParametricCustomGateBuilder::new
+        // Lines 644-645: name/num_qubits fields
+        let builder = ParametricCustomGateBuilder::new("MyGate", 1);
+        let debug_str = format!("{:?}", builder);
+        assert!(debug_str.contains("MyGate"));
+
+        // Build from the builder to also cover build path
+        use std::f64::consts::PI;
+        let gate = ParametricCustomGateBuilder::new("RX", 1)
+            .with_parameters(vec!["theta"])
+            .with_matrix_fn(Box::new(|params: &[f64]| {
+                let c = params[0].cos();
+                let s = params[0].sin();
+                vec![
+                    Complex64::new(c, 0.0),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(0.0, -s),
+                    Complex64::new(c, 0.0),
+                ]
+            }))
+            .with_initial_params(vec![PI / 4.0])
+            .build()
+            .unwrap();
+        assert_eq!(gate.parameter_names(), &["theta"]);
     }
 }

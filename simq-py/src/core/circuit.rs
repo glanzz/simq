@@ -1,9 +1,9 @@
 //! Circuit and CircuitBuilder bindings for Python
 
+use parking_lot::Mutex;
 use pyo3::prelude::*;
 use simq_core::{Circuit as RustCircuit, DynamicCircuitBuilder};
 use simq_gates::*;
-use parking_lot::Mutex;
 use std::sync::Arc;
 
 use crate::core::error::IntoPyErr;
@@ -89,11 +89,6 @@ impl PyCircuit {
     pub(crate) fn inner(&self) -> &RustCircuit {
         &self.inner
     }
-
-    /// Create PyCircuit from Rust circuit (internal use)
-    pub(crate) fn from_rust(circuit: Arc<RustCircuit>) -> Self {
-        Self { inner: circuit }
-    }
 }
 
 /// Python wrapper for CircuitBuilder
@@ -155,7 +150,9 @@ impl PyCircuitBuilder {
         builder
             .apply_gate(Arc::new(Hadamard), &[qubit])
             .map(|_| ())
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply Pauli-X (NOT) gate
@@ -169,7 +166,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(PauliX), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply Pauli-Y gate
@@ -183,7 +182,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(PauliY), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply Pauli-Z gate
@@ -197,7 +198,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(PauliZ), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply S gate (Phase gate, √Z)
@@ -211,7 +214,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(SGate), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply T gate (π/8 gate)
@@ -225,7 +230,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(TGate), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply CNOT (Controlled-NOT) gate
@@ -240,7 +247,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(CNot), &[control, target])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply CZ (Controlled-Z) gate
@@ -255,7 +264,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(CZ), &[control, target])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply SWAP gate
@@ -270,7 +281,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(Swap), &[qubit1, qubit2])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply rotation around X-axis
@@ -285,7 +298,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(RotationX::new(theta)), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply rotation around Y-axis
@@ -300,7 +315,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(RotationY::new(theta)), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Apply rotation around Z-axis
@@ -315,7 +332,9 @@ impl PyCircuitBuilder {
         let mut builder = self.inner.lock();
         builder
             .apply_gate(Arc::new(RotationZ::new(theta)), &[qubit])
-            .map(|_| ()).map(|_| ()).map_err(|e| e.into_pyerr())
+            .map(|_| ())
+            .map(|_| ())
+            .map_err(|e| e.into_pyerr())
     }
 
     /// Build the final circuit

@@ -52,7 +52,9 @@ fn demo_throughput() {
     println!("Shots: {}", shots);
 
     let start = Instant::now();
-    let result = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+    let result = measurement
+        .sample(&state, shots, &mut || rng.next())
+        .unwrap();
     let elapsed = start.elapsed();
 
     let throughput = shots as f64 / elapsed.as_secs_f64();
@@ -83,7 +85,9 @@ fn demo_scaling_with_shots() {
         let mut rng = SimpleRng::new(42);
 
         let start = Instant::now();
-        let _ = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+        let _ = measurement
+            .sample(&state, shots, &mut || rng.next())
+            .unwrap();
         let elapsed = start.elapsed();
 
         let throughput = shots as f64 / elapsed.as_secs_f64() / 1_000_000.0;
@@ -118,7 +122,9 @@ fn demo_scaling_with_qubits() {
         let mut rng = SimpleRng::new(42);
 
         let start = Instant::now();
-        let _ = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+        let _ = measurement
+            .sample(&state, shots, &mut || rng.next())
+            .unwrap();
         let elapsed = start.elapsed();
 
         let throughput = shots as f64 / elapsed.as_secs_f64() / 1_000_000.0;
@@ -142,14 +148,14 @@ fn demo_statistical_accuracy() {
 
     // Create a 3-qubit state with known probabilities
     let amplitudes = vec![
-        Complex64::new(0.5, 0.0),   // |000⟩: P = 0.25
-        Complex64::new(0.5, 0.0),   // |001⟩: P = 0.25
-        Complex64::new(0.5, 0.0),   // |010⟩: P = 0.25
-        Complex64::new(0.5, 0.0),   // |011⟩: P = 0.25
-        Complex64::new(0.0, 0.0),   // |100⟩: P = 0.00
-        Complex64::new(0.0, 0.0),   // |101⟩: P = 0.00
-        Complex64::new(0.0, 0.0),   // |110⟩: P = 0.00
-        Complex64::new(0.0, 0.0),   // |111⟩: P = 0.00
+        Complex64::new(0.5, 0.0), // |000⟩: P = 0.25
+        Complex64::new(0.5, 0.0), // |001⟩: P = 0.25
+        Complex64::new(0.5, 0.0), // |010⟩: P = 0.25
+        Complex64::new(0.5, 0.0), // |011⟩: P = 0.25
+        Complex64::new(0.0, 0.0), // |100⟩: P = 0.00
+        Complex64::new(0.0, 0.0), // |101⟩: P = 0.00
+        Complex64::new(0.0, 0.0), // |110⟩: P = 0.00
+        Complex64::new(0.0, 0.0), // |111⟩: P = 0.00
     ];
 
     let state = DenseState::from_amplitudes(3, &amplitudes).unwrap();
@@ -159,7 +165,9 @@ fn demo_statistical_accuracy() {
     println!("Expected: Each outcome has 25% probability\n");
 
     let mut rng = SimpleRng::new(42);
-    let result = measurement.sample(&state, 100000, &mut || rng.next()).unwrap();
+    let result = measurement
+        .sample(&state, 100000, &mut || rng.next())
+        .unwrap();
 
     println!("Results from 100,000 shots:");
     println!("{:>8} {:>8} {:>12} {:>10}", "Outcome", "Count", "Frequency", "Error");
@@ -202,7 +210,9 @@ fn demo_vs_individual_measurements() {
     let mut rng = SimpleRng::new(42);
 
     let start = Instant::now();
-    let _ = measurement.sample(&state, shots, &mut || rng.next()).unwrap();
+    let _ = measurement
+        .sample(&state, shots, &mut || rng.next())
+        .unwrap();
     let batch_time = start.elapsed();
 
     println!("Batch sampling (alias method):");
@@ -215,7 +225,9 @@ fn demo_vs_individual_measurements() {
     let start = Instant::now();
     for _ in 0..shots {
         let mut state_copy = state.clone_state().unwrap();
-        let _ = measurement2.measure_once(&mut state_copy, &mut || rng2.next()).unwrap();
+        let _ = measurement2
+            .measure_once(&mut state_copy, &mut || rng2.next())
+            .unwrap();
     }
     let individual_time = start.elapsed();
 

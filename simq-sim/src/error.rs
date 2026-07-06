@@ -15,10 +15,7 @@ pub enum SimulatorError {
     InvalidCircuit(String),
 
     /// Memory limit exceeded
-    OutOfMemory {
-        requested: usize,
-        limit: usize,
-    },
+    OutOfMemory { requested: usize, limit: usize },
 
     /// Too many qubits for available memory
     TooManyQubits {
@@ -33,34 +30,22 @@ pub enum SimulatorError {
     StateInitializationFailed(String),
 
     /// Gate application failed
-    GateApplicationFailed {
-        gate_index: usize,
-        reason: String,
-    },
+    GateApplicationFailed { gate_index: usize, reason: String },
 
     /// Measurement failed
     MeasurementFailed(String),
 
     /// Invalid qubit index
-    InvalidQubit {
-        qubit: usize,
-        num_qubits: usize,
-    },
+    InvalidQubit { qubit: usize, num_qubits: usize },
 
     /// Execution failed
-    ExecutionFailed {
-        message: String,
-    },
+    ExecutionFailed { message: String },
 
     /// State error
-    StateError {
-        message: String,
-    },
+    StateError { message: String },
 
     /// Timeout error
-    Timeout {
-        message: String,
-    },
+    Timeout { message: String },
 
     /// Other error
     Other(String),
@@ -71,17 +56,13 @@ impl fmt::Display for SimulatorError {
         match self {
             SimulatorError::InvalidConfig(msg) => {
                 write!(f, "Invalid configuration: {}", msg)
-            }
+            },
             SimulatorError::InvalidCircuit(msg) => {
                 write!(f, "Invalid circuit: {}", msg)
-            }
+            },
             SimulatorError::OutOfMemory { requested, limit } => {
-                write!(
-                    f,
-                    "Out of memory: requested {} bytes, limit {} bytes",
-                    requested, limit
-                )
-            }
+                write!(f, "Out of memory: requested {} bytes, limit {} bytes", requested, limit)
+            },
             SimulatorError::TooManyQubits {
                 num_qubits,
                 max_qubits,
@@ -91,38 +72,31 @@ impl fmt::Display for SimulatorError {
                     "Too many qubits: circuit has {}, max supported is {}",
                     num_qubits, max_qubits
                 )
-            }
+            },
             SimulatorError::CompilationFailed(msg) => {
                 write!(f, "Compilation failed: {}", msg)
-            }
+            },
             SimulatorError::StateInitializationFailed(msg) => {
                 write!(f, "State initialization failed: {}", msg)
-            }
+            },
             SimulatorError::GateApplicationFailed { gate_index, reason } => {
                 write!(f, "Gate {} application failed: {}", gate_index, reason)
-            }
+            },
             SimulatorError::MeasurementFailed(msg) => {
                 write!(f, "Measurement failed: {}", msg)
-            }
-            SimulatorError::InvalidQubit {
-                qubit,
-                num_qubits,
-            } => {
-                write!(
-                    f,
-                    "Invalid qubit index {}: circuit has {} qubits",
-                    qubit, num_qubits
-                )
-            }
+            },
+            SimulatorError::InvalidQubit { qubit, num_qubits } => {
+                write!(f, "Invalid qubit index {}: circuit has {} qubits", qubit, num_qubits)
+            },
             SimulatorError::ExecutionFailed { message } => {
                 write!(f, "Execution failed: {}", message)
-            }
+            },
             SimulatorError::StateError { message } => {
                 write!(f, "State error: {}", message)
-            }
+            },
             SimulatorError::Timeout { message } => {
                 write!(f, "Timeout: {}", message)
-            }
+            },
             SimulatorError::Other(msg) => write!(f, "{}", msg),
         }
     }
@@ -139,5 +113,181 @@ impl From<simq_core::QuantumError> for SimulatorError {
 impl From<simq_state::error::StateError> for SimulatorError {
     fn from(err: simq_state::error::StateError) -> Self {
         SimulatorError::StateInitializationFailed(err.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_invalid_config_display() {
+        let e = SimulatorError::InvalidConfig("bad param".to_string());
+        let msg = e.to_string();
+        assert!(msg.contains("Invalid configuration"));
+        assert!(msg.contains("bad param"));
+    }
+
+    #[test]
+    fn test_invalid_circuit_display() {
+        let e = SimulatorError::InvalidCircuit("missing qubits".to_string());
+        let msg = e.to_string();
+        assert!(msg.contains("Invalid circuit"));
+        assert!(msg.contains("missing qubits"));
+    }
+
+    #[test]
+    fn test_out_of_memory_display() {
+        let e = SimulatorError::OutOfMemory {
+            requested: 1024,
+            limit: 512,
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Out of memory"));
+        assert!(msg.contains("1024"));
+        assert!(msg.contains("512"));
+    }
+
+    #[test]
+    fn test_too_many_qubits_display() {
+        let e = SimulatorError::TooManyQubits {
+            num_qubits: 100,
+            max_qubits: 30,
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Too many qubits"));
+        assert!(msg.contains("100"));
+        assert!(msg.contains("30"));
+    }
+
+    #[test]
+    fn test_compilation_failed_display() {
+        let e = SimulatorError::CompilationFailed("linker error".to_string());
+        let msg = e.to_string();
+        assert!(msg.contains("Compilation failed"));
+        assert!(msg.contains("linker error"));
+    }
+
+    #[test]
+    fn test_state_initialization_failed_display() {
+        let e = SimulatorError::StateInitializationFailed("alloc failed".to_string());
+        let msg = e.to_string();
+        assert!(msg.contains("State initialization failed"));
+        assert!(msg.contains("alloc failed"));
+    }
+
+    #[test]
+    fn test_gate_application_failed_display() {
+        let e = SimulatorError::GateApplicationFailed {
+            gate_index: 3,
+            reason: "unitary check failed".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Gate 3"));
+        assert!(msg.contains("unitary check failed"));
+    }
+
+    #[test]
+    fn test_measurement_failed_display() {
+        let e = SimulatorError::MeasurementFailed("no state".to_string());
+        let msg = e.to_string();
+        assert!(msg.contains("Measurement failed"));
+        assert!(msg.contains("no state"));
+    }
+
+    #[test]
+    fn test_invalid_qubit_display() {
+        let e = SimulatorError::InvalidQubit {
+            qubit: 5,
+            num_qubits: 3,
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Invalid qubit index 5"));
+        assert!(msg.contains("3 qubits"));
+    }
+
+    #[test]
+    fn test_other_display() {
+        let e = SimulatorError::Other("generic error".to_string());
+        let msg = e.to_string();
+        assert!(msg.contains("generic error"));
+    }
+
+    #[test]
+    fn test_execution_failed_display() {
+        let e = SimulatorError::ExecutionFailed {
+            message: "kernel panic".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Execution failed"));
+        assert!(msg.contains("kernel panic"));
+    }
+
+    #[test]
+    fn test_state_error_display() {
+        let e = SimulatorError::StateError {
+            message: "corrupted amplitudes".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("State error"));
+        assert!(msg.contains("corrupted amplitudes"));
+    }
+
+    #[test]
+    fn test_timeout_display() {
+        let e = SimulatorError::Timeout {
+            message: "deadline exceeded".to_string(),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("Timeout"));
+        assert!(msg.contains("deadline exceeded"));
+    }
+
+    #[test]
+    fn test_error_is_std_error() {
+        let e = SimulatorError::Other("test".to_string());
+        // Can be used as a std::error::Error
+        let _: &dyn std::error::Error = &e;
+    }
+
+    #[test]
+    fn test_error_clone() {
+        let e = SimulatorError::InvalidConfig("x".to_string());
+        let e2 = e.clone();
+        assert!(e2.to_string().contains("x"));
+    }
+
+    #[test]
+    fn test_error_debug() {
+        let e = SimulatorError::TooManyQubits {
+            num_qubits: 10,
+            max_qubits: 5,
+        };
+        let dbg = format!("{:?}", e);
+        assert!(dbg.contains("TooManyQubits"));
+    }
+
+    #[test]
+    fn test_from_quantum_error() {
+        let qe = simq_core::QuantumError::EmptyCircuit;
+        let e: SimulatorError = qe.into();
+        match e {
+            SimulatorError::InvalidCircuit(msg) => {
+                assert!(msg.contains("at least one qubit"));
+            },
+            other => panic!("expected InvalidCircuit, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_state_error() {
+        let se = simq_state::error::StateError::InvalidDimension { dimension: 3 };
+        let e: SimulatorError = se.into();
+        match e {
+            SimulatorError::StateInitializationFailed(msg) => {
+                assert!(msg.contains("Invalid state dimension"));
+            },
+            other => panic!("expected StateInitializationFailed, got {:?}", other),
+        }
     }
 }

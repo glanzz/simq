@@ -370,7 +370,9 @@ impl SparseState {
                 let contribution_1 = gate_matrix[1] * amp; // |1⟩ ← |0⟩ (top-right)
 
                 if contribution_0.norm_sqr() > 1e-14 {
-                    *new_amplitudes.entry(basis_idx).or_insert(Complex64::new(0.0, 0.0)) += contribution_0;
+                    *new_amplitudes
+                        .entry(basis_idx)
+                        .or_insert(Complex64::new(0.0, 0.0)) += contribution_0;
                 }
                 if contribution_1.norm_sqr() > 1e-14 {
                     *new_amplitudes
@@ -388,7 +390,9 @@ impl SparseState {
                         .or_insert(Complex64::new(0.0, 0.0)) += contribution_0;
                 }
                 if contribution_1.norm_sqr() > 1e-14 {
-                    *new_amplitudes.entry(basis_idx).or_insert(Complex64::new(0.0, 0.0)) += contribution_1;
+                    *new_amplitudes
+                        .entry(basis_idx)
+                        .or_insert(Complex64::new(0.0, 0.0)) += contribution_1;
                 }
             }
         }
@@ -418,7 +422,11 @@ impl SparseState {
     ) -> Result<()> {
         if qubit0 >= self.num_qubits || qubit1 >= self.num_qubits {
             return Err(StateError::InvalidQubitIndex {
-                index: if qubit0 >= self.num_qubits { qubit0 } else { qubit1 },
+                index: if qubit0 >= self.num_qubits {
+                    qubit0
+                } else {
+                    qubit1
+                },
                 num_qubits: self.num_qubits,
             });
         }
@@ -665,18 +673,18 @@ impl SparseState {
                 // Check if traced-out qubits match
                 let mut traced_match = true;
                 for q in 0..self.num_qubits {
-                    if !qubits_to_keep.contains(&q) {
-                        if ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
-                            traced_match = false;
-                            break;
-                        }
+                    if !qubits_to_keep.contains(&q) && ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1)
+                    {
+                        traced_match = false;
+                        break;
                     }
                 }
 
                 if traced_match {
                     // Contribution: ⟨bra|ket⟩ = amp_bra* × amp_ket
                     let matrix_element = amp_bra.conj() * amp_ket;
-                    rho[(reduced_i as usize) * reduced_dim + (reduced_j as usize)] += matrix_element;
+                    rho[(reduced_i as usize) * reduced_dim + (reduced_j as usize)] +=
+                        matrix_element;
                 }
             }
         }
@@ -961,7 +969,7 @@ mod tests {
 
         // Should get maximally mixed on two qubits with correlations
         // The reduced state should have diagonal: [0.5, 0, 0, 0.5] in basis |00⟩, |01⟩, |10⟩, |11⟩
-        assert!((rho[0].re - 0.5).abs() < 1e-10);  // |00⟩⟨00|
+        assert!((rho[0].re - 0.5).abs() < 1e-10); // |00⟩⟨00|
         assert!((rho[15].re - 0.5).abs() < 1e-10); // |11⟩⟨11|
         assert!((rho[5].norm() - 0.0).abs() < 1e-10); // |01⟩⟨01|
         assert!((rho[10].norm() - 0.0).abs() < 1e-10); // |10⟩⟨10|
@@ -1003,5 +1011,273 @@ mod tests {
         let state = SparseState::new(2).unwrap();
         let result = state.partial_trace(&[5]);
         assert!(result.is_err());
+    }
+
+    // ---- New coverage tests ----
+
+    #[test]
+    fn test_new_too_many_qubits_returns_error() {
+        let result = SparseState::new(31);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::InvalidDimension { .. } => {},
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_dense_amplitudes_wrong_length_returns_error() {
+        // Provide 3 amplitudes for num_qubits=2 (expects 4)
+        let amps = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let result = SparseState::from_dense_amplitudes(2, &amps);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::DimensionMismatch { expected, actual } => {
+                assert_eq!(expected, 4);
+                assert_eq!(actual, 3);
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_dense_amplitudes_too_many_qubits_returns_error() {
+        let amps = vec![Complex64::new(1.0, 0.0); 4];
+        let result = SparseState::from_dense_amplitudes(31, &amps);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_basis_state_out_of_range_returns_error() {
+        // basis_idx = 8 > max_basis_idx for 3 qubits (max=7)
+        let result = SparseState::from_basis_state(3, 8);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::InvalidQubitIndex { index, num_qubits } => {
+                assert_eq!(index, 8);
+                assert_eq!(num_qubits, 3);
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_basis_state_too_many_qubits_returns_error() {
+        let result = SparseState::from_basis_state(31, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_normalize_empty_state_returns_error() {
+        let mut state = SparseState::new(2).unwrap();
+        // Clear all amplitudes to simulate zero norm
+        state.amplitudes_mut().clear();
+        state.update_density();
+        let result = state.normalize();
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::NotNormalized { norm } => {
+                assert!(norm < 1e-14);
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_normalize_already_normalized_noop() {
+        let state = SparseState::new(2).unwrap(); // |00⟩, norm=1.0
+        let amp_before = state.get_amplitude(0);
+        let mut state = state;
+        state.normalize().unwrap();
+        // Amplitude should be unchanged
+        let amp_after = state.get_amplitude(0);
+        assert!((amp_before.re - amp_after.re).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_set_amplitude_near_zero_removes_entry() {
+        let mut state = SparseState::new(2).unwrap();
+        // Set amplitude to a nearly-zero value (norm_sqr < 1e-14)
+        state.set_amplitude(0, Complex64::new(1e-8, 0.0)); // norm_sqr = 1e-16 < 1e-14
+                                                           // The entry should be removed
+        assert_eq!(state.get_amplitude(0), Complex64::new(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_amplitudes_read_accessor() {
+        let state = SparseState::new(3).unwrap();
+        let amps = state.amplitudes();
+        assert_eq!(amps.len(), 1);
+        assert!(amps.contains_key(&0));
+    }
+
+    #[test]
+    fn test_amplitudes_mut_bulk_modify() {
+        let mut state = SparseState::new(2).unwrap();
+        {
+            let amps = state.amplitudes_mut();
+            amps.insert(1, Complex64::new(0.5, 0.0));
+            amps.insert(2, Complex64::new(0.5, 0.0));
+        }
+        state.update_density();
+        assert_eq!(state.num_amplitudes(), 3);
+    }
+
+    #[test]
+    fn test_apply_single_qubit_gate_invalid_qubit_returns_error() {
+        let mut state = SparseState::new(2).unwrap();
+        let identity = [
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+        ];
+        // qubit=2 >= num_qubits=2
+        let result = state.apply_single_qubit_gate(&identity, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_qubit0_out_of_range_error() {
+        let mut state = SparseState::new(2).unwrap();
+        let identity16 = [Complex64::new(0.0, 0.0); 16];
+        let result = state.apply_two_qubit_gate(&identity16, 5, 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_qubit1_out_of_range_error() {
+        let mut state = SparseState::new(2).unwrap();
+        let identity16 = [Complex64::new(0.0, 0.0); 16];
+        let result = state.apply_two_qubit_gate(&identity16, 0, 5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_same_qubit_error() {
+        let mut state = SparseState::new(2).unwrap();
+        let identity16 = [Complex64::new(0.0, 0.0); 16];
+        let result = state.apply_two_qubit_gate(&identity16, 1, 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_measure_and_collapse_outcome_greater_than_one_error() {
+        let mut state = SparseState::new(2).unwrap();
+        let result = state.measure_and_collapse(0, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_measure_and_collapse_zero_probability_outcome_error() {
+        // |00⟩ state: qubit 0 is |0⟩, so outcome=1 has zero probability
+        let mut state = SparseState::new(2).unwrap();
+        let result = state.measure_and_collapse(0, 1);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::NotNormalized { norm } => {
+                assert!(norm < 1e-14);
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_measure_probability_invalid_qubit_error() {
+        let state = SparseState::new(2).unwrap();
+        let result = state.measure_probability(5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_expectation_basis_out_of_range_error() {
+        let state = SparseState::new(2).unwrap();
+        // max_basis_idx = 3 for 2 qubits
+        let result = state.expectation_basis(4);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_display_contains_sparse_state() {
+        let state = SparseState::new(3).unwrap();
+        let s = format!("{}", state);
+        assert!(s.contains("SparseState"), "Display should contain 'SparseState', got: {s}");
+    }
+
+    #[test]
+    fn test_debug_contains_sparse_state() {
+        let state = SparseState::new(3).unwrap();
+        let s = format!("{:?}", state);
+        assert!(s.contains("SparseState"), "Debug should contain 'SparseState', got: {s}");
+    }
+
+    #[test]
+    fn test_density_threshold_accessor() {
+        let mut state = SparseState::new(3).unwrap();
+        assert!((state.density_threshold() - DEFAULT_DENSITY_THRESHOLD).abs() < 1e-6);
+        state.set_density_threshold(0.25);
+        assert!((state.density_threshold() - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_is_normalized_fresh_state() {
+        let state = SparseState::new(3).unwrap();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_is_normalized_unnormalized_state() {
+        let mut state = SparseState::new(2).unwrap();
+        // Add a second amplitude without normalizing → norm > 1
+        state.set_amplitude(1, Complex64::new(1.0, 0.0));
+        assert!(!state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_measure_and_collapse_invalid_qubit_error() {
+        let mut state = SparseState::new(2).unwrap();
+        // qubit=5 >= num_qubits=2
+        let result = state.measure_and_collapse(5, 0);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            StateError::InvalidQubitIndex { index, num_qubits } => {
+                assert_eq!(index, 5);
+                assert_eq!(num_qubits, 2);
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_apply_single_qubit_gate_from_bit_one_basis_state() {
+        // Start from |01⟩ (qubit 0 = 1) so the gate application exercises the
+        // `bit == 1` branch (bottom row of the 2x2 matrix) inside
+        // apply_single_qubit_gate, not just the `bit == 0` branch.
+        let mut state = SparseState::from_basis_state(2, 1).unwrap();
+
+        // Hadamard: 1/sqrt(2) * [[1, 1], [1, -1]]
+        let h = std::f64::consts::FRAC_1_SQRT_2;
+        let h_gate = [
+            Complex64::new(h, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(h, 0.0),
+            Complex64::new(-h, 0.0),
+        ];
+
+        state.apply_single_qubit_gate(&h_gate, 0).unwrap();
+
+        // H|1> = (|0> - |1>)/sqrt(2), so basis states 0b00 and 0b01 should
+        // each have amplitude magnitude 1/sqrt(2), and the |01> amplitude
+        // should be negative (bottom-right element applied to bit==1).
+        let amp0 = state.get_amplitude(0);
+        let amp1 = state.get_amplitude(1);
+        assert!((amp0.norm_sqr() - 0.5).abs() < 1e-6);
+        assert!((amp1.norm_sqr() - 0.5).abs() < 1e-6);
+        assert!(amp0.re > 0.0);
+        assert!(amp1.re < 0.0);
     }
 }

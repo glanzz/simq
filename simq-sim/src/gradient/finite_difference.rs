@@ -3,14 +3,14 @@
 //! Provides gradient computation using finite differences as a fallback when
 //! the parameter shift rule is not applicable.
 
-use rayon::prelude::*;
-use std::time::Instant;
-use simq_core::Circuit;
-use simq_state::AdaptiveState;
-use simq_state::observable::PauliObservable;
-use crate::Simulator;
+use super::{GradientMethod, GradientResult};
 use crate::error::Result;
-use super::{GradientResult, GradientMethod};
+use crate::Simulator;
+use rayon::prelude::*;
+use simq_core::Circuit;
+use simq_state::observable::PauliObservable;
+use simq_state::AdaptiveState;
+use std::time::Instant;
 
 /// Finite difference method
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,11 +84,11 @@ where
         FiniteDifferenceMethod::Forward | FiniteDifferenceMethod::Backward => {
             let circuit = circuit_builder(params);
             Some(evaluate_expectation(simulator, &circuit, observable)?)
-        }
+        },
         FiniteDifferenceMethod::Central => None,
     };
 
-    let num_evals_per_param = match config.method {
+    let _num_evals_per_param = match config.method {
         FiniteDifferenceMethod::Forward | FiniteDifferenceMethod::Backward => 1,
         FiniteDifferenceMethod::Central => 2,
     };
@@ -129,7 +129,7 @@ where
     let total_evaluations = match config.method {
         FiniteDifferenceMethod::Forward | FiniteDifferenceMethod::Backward => {
             1 + n_params // Base + one per parameter
-        }
+        },
         FiniteDifferenceMethod::Central => n_params * 2, // Two per parameter
     };
 
@@ -142,6 +142,7 @@ where
 }
 
 /// Compute finite difference gradient for a single parameter
+#[allow(clippy::too_many_arguments)]
 fn compute_single_param_fd<F>(
     simulator: &Simulator,
     circuit_builder: &F,
@@ -165,7 +166,7 @@ where
             let exp_base = base_expectation.unwrap();
 
             Ok((exp_plus - exp_base) / epsilon)
-        }
+        },
         FiniteDifferenceMethod::Backward => {
             let mut params_minus = params.to_vec();
             params_minus[param_index] -= epsilon;
@@ -175,7 +176,7 @@ where
             let exp_base = base_expectation.unwrap();
 
             Ok((exp_base - exp_minus) / epsilon)
-        }
+        },
         FiniteDifferenceMethod::Central => {
             let mut params_plus = params.to_vec();
             let mut params_minus = params.to_vec();
@@ -189,7 +190,7 @@ where
             let exp_minus = evaluate_expectation(simulator, &circuit_minus, observable)?;
 
             Ok((exp_plus - exp_minus) / (2.0 * epsilon))
-        }
+        },
     }
 }
 
@@ -202,14 +203,12 @@ fn evaluate_expectation(
     let result = simulator.run(circuit)?;
 
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -233,10 +232,11 @@ pub fn auto_epsilon(params: &[f64], base_epsilon: f64) -> Vec<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SimulatorConfig;
     use simq_core::QubitId;
     use simq_gates::standard::{Hadamard, RotationY};
+    use simq_state::observable::PauliString;
     use std::sync::Arc;
-    use crate::SimulatorConfig;
 
     #[test]
     fn test_finite_difference_central() {
@@ -244,12 +244,17 @@ mod tests {
 
         let circuit_builder = |params: &[f64]| {
             let mut circuit = Circuit::new(1);
-            circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-            circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
 
         let config = FiniteDifferenceConfig {
@@ -264,7 +269,8 @@ mod tests {
             &observable,
             &params,
             &config,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.gradients.len(), 1);
         assert_eq!(result.num_evaluations, 2); // Central: 2 evaluations
@@ -276,11 +282,14 @@ mod tests {
 
         let circuit_builder = |params: &[f64]| {
             let mut circuit = Circuit::new(1);
-            circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
         let params = vec![0.5];
 
         let config = FiniteDifferenceConfig {
@@ -295,7 +304,8 @@ mod tests {
             &observable,
             &params,
             &config,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.gradients.len(), 1);
         assert_eq!(result.num_evaluations, 2); // Forward: base + 1
@@ -309,5 +319,131 @@ mod tests {
         assert_eq!(epsilons[0], 1e-7); // Small param: use base
         assert_eq!(epsilons[1], 1e-7); // Magnitude 1: use base
         assert_eq!(epsilons[2], 1e-6); // Large param: scale epsilon
+    }
+
+    /// Line 206 / Backward method: test the Backward finite difference
+    #[test]
+    fn test_finite_difference_backward() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let params = vec![0.5];
+        let config = FiniteDifferenceConfig {
+            method: FiniteDifferenceMethod::Backward,
+            epsilon: 1e-5,
+            parallel: false,
+        };
+        let result = compute_gradient_finite_difference(
+            &simulator,
+            circuit_builder,
+            &observable,
+            &params,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(result.gradients.len(), 1);
+        assert!(result.gradients[0].is_finite());
+        // Backward: 1 base + 1 per param = 2
+        assert_eq!(result.num_evaluations, 2);
+    }
+
+    /// Backward method with parallel=true
+    #[test]
+    fn test_finite_difference_backward_parallel() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let params = vec![0.5];
+        let config = FiniteDifferenceConfig {
+            method: FiniteDifferenceMethod::Backward,
+            epsilon: 1e-5,
+            parallel: true,
+        };
+        let result = compute_gradient_finite_difference(
+            &simulator,
+            circuit_builder,
+            &observable,
+            &params,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(result.gradients.len(), 1);
+        assert!(result.gradients[0].is_finite());
+    }
+
+    /// Forward method with parallel=true (covers parallel forward path)
+    #[test]
+    fn test_finite_difference_forward_parallel() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let params = vec![0.5];
+        let config = FiniteDifferenceConfig {
+            method: FiniteDifferenceMethod::Forward,
+            epsilon: 1e-5,
+            parallel: true,
+        };
+        let result = compute_gradient_finite_difference(
+            &simulator,
+            circuit_builder,
+            &observable,
+            &params,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(result.gradients.len(), 1);
+        assert!(result.gradients[0].is_finite());
+    }
+
+    /// Zero params with each method type (covers empty gradient paths)
+    #[test]
+    fn test_finite_difference_zero_params() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |_: &[f64]| Circuit::new(1);
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+
+        for method in [
+            FiniteDifferenceMethod::Forward,
+            FiniteDifferenceMethod::Backward,
+            FiniteDifferenceMethod::Central,
+        ] {
+            let config = FiniteDifferenceConfig {
+                method,
+                epsilon: 1e-5,
+                parallel: false,
+            };
+            let result = compute_gradient_finite_difference(
+                &simulator,
+                circuit_builder,
+                &observable,
+                &[],
+                &config,
+            )
+            .unwrap();
+            assert!(result.gradients.is_empty());
+            assert_eq!(result.num_evaluations, 0);
+        }
     }
 }

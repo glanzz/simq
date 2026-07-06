@@ -4,7 +4,7 @@
 //! and inserting SWAP gates to handle limited connectivity constraints.
 
 use crate::{BackendError, ConnectivityGraph, QubitMapping, Result};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 /// Router for handling qubit connectivity constraints
 ///
@@ -41,15 +41,15 @@ impl Router {
             RoutingStrategy::Identity => {
                 // Simple identity mapping: L0→P0, L1→P1, ...
                 Ok(QubitMapping::identity(num_logical_qubits))
-            }
+            },
             RoutingStrategy::HighestDegree => {
                 // Map to physical qubits with highest degree (most connections)
                 self.highest_degree_mapping(num_logical_qubits, connectivity)
-            }
+            },
             RoutingStrategy::Subgraph => {
                 // Find densely connected subgraph
                 self.subgraph_mapping(num_logical_qubits, connectivity)
-            }
+            },
         }
     }
 
@@ -108,7 +108,7 @@ impl Router {
         let mut qubit_degrees: Vec<_> = (0..connectivity.num_qubits())
             .map(|q| (q, connectivity.degree(q)))
             .collect();
-        qubit_degrees.sort_by(|a, b| b.1.cmp(&a.1));
+        qubit_degrees.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Map logical qubits to highest degree physical qubits
         let mapping: Vec<_> = qubit_degrees
@@ -192,7 +192,7 @@ impl Router {
 }
 
 /// Routing strategy for initial qubit mapping
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RoutingStrategy {
     /// Identity mapping (L0→P0, L1→P1, ...)
     Identity,
@@ -201,13 +201,8 @@ pub enum RoutingStrategy {
     HighestDegree,
 
     /// Find densely connected subgraph
+    #[default]
     Subgraph,
-}
-
-impl Default for RoutingStrategy {
-    fn default() -> Self {
-        RoutingStrategy::Subgraph
-    }
 }
 
 /// Represents a SWAP gate insertion
@@ -247,9 +242,11 @@ impl SwapGate {
 /// Reference: https://arxiv.org/abs/1809.02573
 pub struct SabreRouter {
     /// Lookahead window size
+    #[allow(dead_code)]
     lookahead: usize,
 
     /// Decay factor for heuristic
+    #[allow(dead_code)]
     decay: f64,
 }
 
@@ -279,6 +276,7 @@ impl SabreRouter {
     }
 
     /// Calculate SABRE heuristic score for a SWAP
+    #[allow(dead_code)]
     fn heuristic_score(
         &self,
         _swap: &SwapGate,
@@ -376,9 +374,7 @@ mod tests {
 
         // Qubit 2 has highest degree (3 connections: 1, 3, 4)
         // Should be included in mapping
-        let physical_qubits: Vec<_> = (0..3)
-            .filter_map(|l| mapping.get_physical(l))
-            .collect();
+        let physical_qubits: Vec<_> = (0..3).filter_map(|l| mapping.get_physical(l)).collect();
 
         assert!(physical_qubits.contains(&2)); // Highest degree qubit
         assert_eq!(physical_qubits.len(), 3);
@@ -462,9 +458,7 @@ mod tests {
         let mapping = router.initial_mapping(4, &connectivity).unwrap();
 
         // Should map to a connected subgraph
-        let physical_qubits: Vec<_> = (0..4)
-            .filter_map(|l| mapping.get_physical(l))
-            .collect();
+        let physical_qubits: Vec<_> = (0..4).filter_map(|l| mapping.get_physical(l)).collect();
 
         assert_eq!(physical_qubits.len(), 4);
 
@@ -480,5 +474,78 @@ mod tests {
 
         // At least some qubits should be connected
         assert!(connected_count > 0);
+    }
+
+    // Tests for previously uncovered lines
+
+    #[test]
+    fn test_find_swap_chain_no_path() {
+        // Covers lines 83-85: no path between physical qubits
+        // Create a disconnected graph where qubits 0 and 1 have no path between them
+        let mut connectivity = ConnectivityGraph::new(4, false);
+        // Only connect 0-1 and 2-3, leaving 1 and 2 disconnected
+        connectivity.add_edge(0, 1);
+        connectivity.add_edge(2, 3);
+
+        let router = Router::new(RoutingStrategy::Identity);
+        let mapping = crate::QubitMapping::identity(4);
+
+        // Try to find swap chain between q0 and q2 (no path: 0-1 and 2-3 are separate components)
+        let result = router.find_swap_chain(&connectivity, &mapping, 0, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_initial_mapping_too_many_qubits() {
+        // Covers line 33-37: more logical qubits than physical
+        let router = Router::new(RoutingStrategy::Identity);
+        let connectivity = ConnectivityGraph::linear_chain(3);
+
+        // Try to map 5 logical qubits to a 3-qubit graph
+        let result = router.initial_mapping(5, &connectivity);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            crate::BackendError::CapabilityExceeded(msg) => {
+                assert!(msg.contains("5"));
+            },
+            other => panic!("Expected CapabilityExceeded, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_subgraph_mapping_fill_remaining() {
+        // Covers lines 179-182, 185: subgraph_mapping fallback when not enough connected qubits
+        // Use a graph with a star topology - center + leaves
+        // With sparse connectivity, we might need to fill remaining qubits
+        let mut connectivity = ConnectivityGraph::new(6, false);
+        connectivity.add_edge(0, 1); // Only one edge
+                                     // Now map 5 qubits to this 6-node graph with only 1 edge
+                                     // The subgraph algorithm will find {0, 1} connected, then must fill from {2,3,4,5}
+        let router = Router::new(RoutingStrategy::Subgraph);
+        let mapping = router.initial_mapping(5, &connectivity).unwrap();
+
+        let physical_qubits: Vec<_> = (0..5).filter_map(|l| mapping.get_physical(l)).collect();
+        assert_eq!(physical_qubits.len(), 5);
+        // All physical qubits should be unique
+        let mut unique = physical_qubits.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), 5);
+    }
+
+    #[test]
+    fn test_routing_stats_gate_overhead_zero_gates() {
+        // Covers line 280: gate_overhead with 0 original gates
+        let stats = RoutingStats::new(3, vec![0, 1, 2]);
+        assert_eq!(stats.gate_overhead(0), 0.0);
+    }
+
+    #[test]
+    fn test_sabre_router_route() {
+        // Covers line 288: SabreRouter::route returns empty vec
+        let router = SabreRouter::default();
+        let connectivity = ConnectivityGraph::linear_chain(4);
+        let swaps = router.route(4, &connectivity).unwrap();
+        assert!(swaps.is_empty());
     }
 }

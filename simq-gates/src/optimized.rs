@@ -263,16 +263,8 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_opt[i][j].re,
-                    matrix_ref[i][j].re,
-                    epsilon = 1e-6
-                );
-                assert_relative_eq!(
-                    matrix_opt[i][j].im,
-                    matrix_ref[i][j].im,
-                    epsilon = 1e-6
-                );
+                assert_relative_eq!(matrix_opt[i][j].re, matrix_ref[i][j].re, epsilon = 1e-6);
+                assert_relative_eq!(matrix_opt[i][j].im, matrix_ref[i][j].im, epsilon = 1e-6);
             }
         }
     }
@@ -288,16 +280,8 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_opt[i][j].re,
-                    matrix_ref[i][j].re,
-                    epsilon = 1e-10
-                );
-                assert_relative_eq!(
-                    matrix_opt[i][j].im,
-                    matrix_ref[i][j].im,
-                    epsilon = 1e-10
-                );
+                assert_relative_eq!(matrix_opt[i][j].re, matrix_ref[i][j].re, epsilon = 1e-10);
+                assert_relative_eq!(matrix_opt[i][j].im, matrix_ref[i][j].im, epsilon = 1e-10);
             }
         }
     }
@@ -313,16 +297,8 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(
-                    matrix_opt[i][j].re,
-                    matrix_ref[i][j].re,
-                    epsilon = 1e-6
-                );
-                assert_relative_eq!(
-                    matrix_opt[i][j].im,
-                    matrix_ref[i][j].im,
-                    epsilon = 1e-6
-                );
+                assert_relative_eq!(matrix_opt[i][j].re, matrix_ref[i][j].re, epsilon = 1e-6);
+                assert_relative_eq!(matrix_opt[i][j].im, matrix_ref[i][j].im, epsilon = 1e-6);
             }
         }
     }
@@ -346,5 +322,54 @@ mod tests {
 
         // Compact table should use less than 10 KB
         assert!(stats.memory_bytes < 10 * 1024);
+    }
+
+    #[test]
+    fn test_create_high_precision_table() {
+        let table = create_high_precision_table();
+        let stats = table.stats();
+        assert!(stats.num_entries >= 2048);
+    }
+
+    #[test]
+    fn test_gate_trait_rx() {
+        let table = create_global_lookup_table();
+        let gate = OptimizedRotationX::new(0.5, &table);
+        assert_eq!(gate.name(), "RX");
+        assert_eq!(gate.num_qubits(), 1);
+        assert_eq!(gate.angle(), 0.5);
+        assert!(gate.description().contains("RX"));
+        assert!(gate.is_unitary());
+        assert!(!gate.is_hermitian());
+        let mat = gate.matrix().unwrap();
+        assert_eq!(mat.len(), 4);
+    }
+
+    #[test]
+    fn test_gate_trait_ry() {
+        let table = create_global_lookup_table();
+        let gate = OptimizedRotationY::new(0.3, &table);
+        assert_eq!(gate.name(), "RY");
+        assert_eq!(gate.num_qubits(), 1);
+        assert_eq!(gate.angle(), 0.3);
+        assert!(gate.description().contains("RY"));
+        assert!(gate.is_unitary());
+        assert!(!gate.is_hermitian());
+        let mat = gate.matrix().unwrap();
+        assert_eq!(mat.len(), 4);
+    }
+
+    #[test]
+    fn test_gate_trait_rz() {
+        let table = create_global_lookup_table();
+        let gate = OptimizedRotationZ::new(0.7, &table);
+        assert_eq!(gate.name(), "RZ");
+        assert_eq!(gate.num_qubits(), 1);
+        assert_eq!(gate.angle(), 0.7);
+        assert!(gate.description().contains("RZ"));
+        assert!(gate.is_unitary());
+        assert!(!gate.is_hermitian());
+        let mat = gate.matrix().unwrap();
+        assert_eq!(mat.len(), 4);
     }
 }

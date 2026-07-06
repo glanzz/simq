@@ -57,50 +57,38 @@ pub fn apply_cnot_striped(
     num_qubits: usize,
 ) {
     let dimension = 1usize << num_qubits;
+    let mask_control = 1usize << control;
+    let mask_target = 1usize << target;
 
-    // Order qubits so control < target for consistent iteration
-    let (q_low, q_high, is_control_low) = if control < target {
-        (control, target, true)
+    let (q_low, q_high) = if control < target {
+        (control, target)
     } else {
-        (target, control, false)
+        (target, control)
     };
 
     let stride_low = 1usize << q_low;
     let stride_high = 1usize << q_high;
-    let block_high = stride_high * 2;
-    let block_low = stride_low * 2;
+    let block_low = stride_low << 1;
+    let block_high = stride_high << 1;
 
-    let mut base = 0usize;
-    while base < dimension {
+    // Enumerate all indices where both q_low and q_high bits are 0
+    let mut hi = 0usize;
+    while hi < dimension {
         let mut mid = 0usize;
         while mid < stride_high {
-            let block_base = base + mid;
-
-            for k in 0..stride_low {
-                let idx1 = block_base + k;
-                let idx2 = idx1 + stride_low;
-
-                // Determine which basis state we're in
-                let bit_low = (idx1 >> q_low) & 1;
-                let bit_high = (idx1 >> q_high) & 1;
-
-                // Apply CNOT only when control bit is 1
-                let apply_gate = if is_control_low {
-                    bit_low == 1
-                } else {
-                    bit_high == 1
-                };
-
-                if apply_gate {
-                    // Swap the two amplitudes (corresponds to flipping the target)
-                    state.swap(idx1, idx2);
-                }
+            let mut lo = 0usize;
+            while lo < stride_low {
+                let base = hi + mid + lo;
+                // base has bits q_low=0 and q_high=0
+                // Set control bit to 1, then swap target=0 and target=1 states
+                let idx_ctrl1_tgt0 = base | mask_control;
+                let idx_ctrl1_tgt1 = idx_ctrl1_tgt0 | mask_target;
+                state.swap(idx_ctrl1_tgt0, idx_ctrl1_tgt1);
+                lo += 1;
             }
-
             mid += block_low;
         }
-
-        base += block_high;
+        hi += block_high;
     }
 }
 
@@ -114,21 +102,16 @@ pub fn apply_cnot_striped(
 ///
 /// This is much faster than 4×4 matrix multiplication.
 /// Only one amplitude needs modification per 4-block.
-pub fn apply_cz_scalar(
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-    num_qubits: usize,
-) {
+pub fn apply_cz_scalar(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
     let dimension = 1usize << num_qubits;
     let mask1 = 1usize << qubit1;
     let mask2 = 1usize << qubit2;
     let mask_both = mask1 | mask2;
 
     // Only the |11⟩ state gets a phase shift (multiply by -1)
-    for i in 0..dimension {
+    for (i, amp) in state.iter_mut().enumerate().take(dimension) {
         if (i & mask_both) == mask_both {
-            state[i] = -state[i];
+            *amp = -*amp;
         }
     }
 }
@@ -136,15 +119,9 @@ pub fn apply_cz_scalar(
 /// Apply a CZ gate using nested loops for cache locality
 ///
 /// Uses stride-based iteration to access the |11⟩ state efficiently.
-pub fn apply_cz_striped(
-    state: &mut [Complex64],
-    qubit1: usize,
-    qubit2: usize,
-    num_qubits: usize,
-) {
+pub fn apply_cz_striped(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
     let dimension = 1usize << num_qubits;
 
-    // Order qubits for consistent iteration
     let (q_low, q_high) = if qubit1 < qubit2 {
         (qubit1, qubit2)
     } else {
@@ -153,31 +130,22 @@ pub fn apply_cz_striped(
 
     let stride_low = 1usize << q_low;
     let stride_high = 1usize << q_high;
-    let block_high = stride_high * 2;
-    let block_low = stride_low * 2;
+    let block_low = stride_low << 1;
+    let block_high = stride_high << 1;
 
-    // Phase shift for |11⟩ state (both qubits set to 1)
-    let phase = Complex64::new(-1.0, 0.0);
-
-    let mut base = 0usize;
-    while base < dimension {
+    let mut hi = 0usize;
+    while hi < dimension {
         let mut mid = 0usize;
         while mid < stride_high {
-            let block_base = base + mid;
-
-            // The |11⟩ state is at idx1 + stride_low when both low and high
-            // qubit bits are 1, which happens in the second half of each block
-            let idx_11 = block_base + stride_low + stride_high;
-
-            // Apply phase to the |11⟩ state
-            if idx_11 < dimension {
-                state[idx_11] *= phase;
+            let mut lo = 0usize;
+            while lo < stride_low {
+                let idx = hi + mid + lo + stride_low + stride_high;
+                state[idx] = -state[idx];
+                lo += 1;
             }
-
             mid += block_low;
         }
-
-        base += block_high;
+        hi += block_high;
     }
 }
 
@@ -353,10 +321,10 @@ mod tests {
         // Basis ordering: |00⟩ at idx 0, |01⟩ at idx 1, |10⟩ at idx 2, |11⟩ at idx 3
         // (Qubit 0 is least significant bit)
         let mut state = vec![
-            Complex64::new(0.7071067811865476, 0.0), // |00⟩: q0=0, q1=0
-            Complex64::new(0.0, 0.0),                // |01⟩: q0=1, q1=0
-            Complex64::new(0.7071067811865476, 0.0), // |10⟩: q0=0, q1=1
-            Complex64::new(0.0, 0.0),                // |11⟩: q0=1, q1=1
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0), // |00⟩: q0=0, q1=0
+            Complex64::new(0.0, 0.0),                             // |01⟩: q0=1, q1=0
+            Complex64::new(std::f64::consts::FRAC_1_SQRT_2, 0.0), // |10⟩: q0=0, q1=1
+            Complex64::new(0.0, 0.0),                             // |11⟩: q0=1, q1=1
         ];
 
         // CNOT with control=1, target=0 (control is q1, target is q0)
@@ -368,10 +336,10 @@ mod tests {
         apply_cnot_scalar(&mut state, 1, 0, 2);
 
         // After CNOT with control=1, target=0: (|00⟩ + |11⟩)/√2
-        assert_relative_eq!(state[0].re, 0.7071067811865476, epsilon = 1e-10);
+        assert_relative_eq!(state[0].re, std::f64::consts::FRAC_1_SQRT_2, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[2].re, 0.0, epsilon = 1e-10);
-        assert_relative_eq!(state[3].re, 0.7071067811865476, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, std::f64::consts::FRAC_1_SQRT_2, epsilon = 1e-10);
     }
 
     #[test]
@@ -469,10 +437,10 @@ mod tests {
         // Basis: |00⟩ = 0, |01⟩ = 1, |10⟩ = 2, |11⟩ = 3 (q0 is LSB)
         // Start with |10⟩ state (control qubit q1 = 1)
         let mut state = vec![
-            Complex64::new(0.0, 0.0),  // |00⟩
-            Complex64::new(0.0, 0.0),  // |01⟩
-            Complex64::new(1.0, 0.0),  // |10⟩ (q1=1, q0=0)
-            Complex64::new(0.0, 0.0),  // |11⟩
+            Complex64::new(0.0, 0.0), // |00⟩
+            Complex64::new(0.0, 0.0), // |01⟩
+            Complex64::new(1.0, 0.0), // |10⟩ (q1=1, q0=0)
+            Complex64::new(0.0, 0.0), // |11⟩
         ];
 
         // Apply CRX(π/2) with control=1 (q1), target=0 (q0)
@@ -482,7 +450,7 @@ mod tests {
         // Result: |1⟩ ⊗ (|0⟩ - i|1⟩)/√2 = (|10⟩ - i|11⟩)/√2
         apply_crx(&mut state, 1, 0, std::f64::consts::PI / 2.0, 2);
 
-        let inv_sqrt2 = 0.7071067811865476;
+        let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
         assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[2].re, inv_sqrt2, epsilon = 1e-10);
@@ -515,7 +483,7 @@ mod tests {
     #[test]
     fn test_crz_gate() {
         // Test controlled-RZ gate (diagonal gate, only affects phases)
-        let inv_sqrt2 = 0.7071067811865476;
+        let inv_sqrt2 = std::f64::consts::FRAC_1_SQRT_2;
         let mut state = vec![
             Complex64::new(inv_sqrt2, 0.0), // |00⟩
             Complex64::new(inv_sqrt2, 0.0), // |01⟩

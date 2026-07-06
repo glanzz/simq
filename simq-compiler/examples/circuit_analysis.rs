@@ -13,7 +13,7 @@
 
 use simq_compiler::{CircuitAnalysis, ResourceEstimate};
 use simq_core::{Circuit, QubitId};
-use simq_gates::{Hadamard, PauliX, CNot, RotationZ};
+use simq_gates::{CNot, Hadamard, PauliX, RotationZ};
 use std::sync::Arc;
 
 fn main() {
@@ -50,8 +50,12 @@ fn main() {
 fn create_bell_state_circuit() -> Circuit {
     let mut circuit = Circuit::new(2);
 
-    circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
-    circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)]).unwrap();
+    circuit
+        .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+        .unwrap();
+    circuit
+        .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+        .unwrap();
 
     circuit
 }
@@ -62,30 +66,32 @@ fn create_qaoa_style_circuit(num_qubits: usize, num_layers: usize) -> Circuit {
 
     // Initial Hadamard layer
     for i in 0..num_qubits {
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(i)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(i)])
+            .unwrap();
     }
 
     // Alternating layers
     for _ in 0..num_layers {
         // Problem layer (RZ gates)
         for i in 0..num_qubits {
-            circuit.add_gate(
-                Arc::new(RotationZ::new(0.5)),
-                &[QubitId::new(i)]
-            ).unwrap();
+            circuit
+                .add_gate(Arc::new(RotationZ::new(0.5)), &[QubitId::new(i)])
+                .unwrap();
         }
 
         // Entangling layer (CNOT ladder)
-        for i in 0..num_qubits-1 {
-            circuit.add_gate(
-                Arc::new(CNot),
-                &[QubitId::new(i), QubitId::new(i + 1)]
-            ).unwrap();
+        for i in 0..num_qubits - 1 {
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(i), QubitId::new(i + 1)])
+                .unwrap();
         }
 
         // Mixer layer (X rotations)
         for i in 0..num_qubits {
-            circuit.add_gate(Arc::new(PauliX), &[QubitId::new(i)]).unwrap();
+            circuit
+                .add_gate(Arc::new(PauliX), &[QubitId::new(i)])
+                .unwrap();
         }
     }
 
@@ -99,9 +105,13 @@ fn create_deep_circuit(num_qubits: usize, depth: usize) -> Circuit {
     for layer in 0..depth {
         for i in 0..num_qubits {
             if layer % 2 == 0 {
-                circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(i)]).unwrap();
+                circuit
+                    .add_gate(Arc::new(Hadamard), &[QubitId::new(i)])
+                    .unwrap();
             } else {
-                circuit.add_gate(Arc::new(PauliX), &[QubitId::new(i)]).unwrap();
+                circuit
+                    .add_gate(Arc::new(PauliX), &[QubitId::new(i)])
+                    .unwrap();
             }
         }
     }
@@ -118,8 +128,10 @@ fn analyze_circuit(circuit: &Circuit) {
 
             // Additional insights
             println!("Additional Insights:");
-            println!("  Gate efficiency: {:.1}%",
-                (analysis.parallelism_factor() / analysis.statistics.total_gates as f64) * 100.0);
+            println!(
+                "  Gate efficiency: {:.1}%",
+                (analysis.parallelism_factor() / analysis.statistics.total_gates as f64) * 100.0
+            );
 
             if analysis.statistics.two_qubit_fraction() > 0.3 {
                 println!("  ⚠️  High two-qubit gate fraction (expensive on hardware)");
@@ -131,10 +143,10 @@ fn analyze_circuit(circuit: &Circuit) {
             } else {
                 println!("  ✓ Circuit fits comfortably in memory");
             }
-        }
+        },
         Err(e) => {
             eprintln!("Error analyzing circuit: {}", e);
-        }
+        },
     }
 }
 

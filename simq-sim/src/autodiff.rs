@@ -27,7 +27,10 @@ impl DifferentiableParameter {
 
 /// Example: Compute gradients for expectation value via reverse-mode AD
 /// This is a stub illustrating the API; actual implementation would require circuit graph traversal.
-pub fn compute_gradients_ad(params: &[DifferentiableParameter], expectation_fn: impl Fn(&[f64]) -> f64) -> Vec<f64> {
+pub fn compute_gradients_ad(
+    params: &[DifferentiableParameter],
+    expectation_fn: impl Fn(&[f64]) -> f64,
+) -> Vec<f64> {
     // Forward pass: compute output
     let param_values: Vec<f64> = params.iter().map(|p| p.value).collect();
     let output = expectation_fn(&param_values);

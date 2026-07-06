@@ -27,10 +27,7 @@ fn main() {
     println!("   Error: {:.2e}", result.norm_error);
     println!();
 
-    let bad_amplitudes = vec![
-        Complex64::new(2.0, 0.0),
-        Complex64::new(1.0, 0.0),
-    ];
+    let bad_amplitudes = vec![Complex64::new(2.0, 0.0), Complex64::new(1.0, 0.0)];
 
     let result = validate_normalization(&bad_amplitudes, DEFAULT_NORM_TOLERANCE);
     println!("   Bad state: {}", result);
@@ -43,19 +40,20 @@ fn main() {
     // Example 2: Auto-normalization
     println!("2. Automatic Normalization:");
 
-    let mut amplitudes = vec![
-        Complex64::new(3.0, 0.0),
-        Complex64::new(4.0, 0.0),
-    ];
+    let mut amplitudes = vec![Complex64::new(3.0, 0.0), Complex64::new(4.0, 0.0)];
 
-    println!("   Before: norm = {:.6}",
-             amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>().sqrt());
+    println!(
+        "   Before: norm = {:.6}",
+        amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>().sqrt()
+    );
 
     let normalized = auto_normalize(&mut amplitudes, DEFAULT_NORM_TOLERANCE);
     println!("   Normalization applied: {}", normalized);
 
-    println!("   After: norm = {:.10}",
-             amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>().sqrt());
+    println!(
+        "   After: norm = {:.10}",
+        amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>().sqrt()
+    );
     println!("   Amplitudes: {:?}", amplitudes);
     println!();
 
@@ -83,24 +81,21 @@ fn main() {
         [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
         [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
     ];
-    println!("   Hadamard gate is unitary: {}",
-             validate_unitary_2x2(&hadamard, 1e-10));
+    println!("   Hadamard gate is unitary: {}", validate_unitary_2x2(&hadamard, 1e-10));
 
     // Pauli-X gate
     let pauli_x = [
         [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
         [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
     ];
-    println!("   Pauli-X gate is unitary: {}",
-             validate_unitary_2x2(&pauli_x, 1e-10));
+    println!("   Pauli-X gate is unitary: {}", validate_unitary_2x2(&pauli_x, 1e-10));
 
     // Non-unitary matrix
     let non_unitary = [
         [Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0)],
         [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
     ];
-    println!("   Non-unitary matrix: {}",
-             validate_unitary_2x2(&non_unitary, 1e-10));
+    println!("   Non-unitary matrix: {}", validate_unitary_2x2(&non_unitary, 1e-10));
     println!();
 
     // Example 5: Checking for NaN/infinity
@@ -186,7 +181,9 @@ fn main() {
 
     // Simulate a long circuit with many gates
     for gate_num in 0..100 {
-        long_state.apply_single_qubit_gate(&hadamard, gate_num % 5).unwrap();
+        long_state
+            .apply_single_qubit_gate(&hadamard, gate_num % 5)
+            .unwrap();
         long_tracker.record(long_state.norm());
     }
 

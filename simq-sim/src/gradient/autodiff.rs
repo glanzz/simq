@@ -9,8 +9,8 @@
 //!
 //! We implement both forward-mode and reverse-mode AD using dual numbers.
 
-use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt;
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 /// Dual number for forward-mode automatic differentiation
 ///
@@ -63,18 +63,12 @@ impl Dual {
 
     /// Compute sin(x)
     pub fn sin(self) -> Self {
-        Self::new(
-            self.value.sin(),
-            self.value.cos() * self.derivative,
-        )
+        Self::new(self.value.sin(), self.value.cos() * self.derivative)
     }
 
     /// Compute cos(x)
     pub fn cos(self) -> Self {
-        Self::new(
-            self.value.cos(),
-            -self.value.sin() * self.derivative,
-        )
+        Self::new(self.value.cos(), -self.value.sin() * self.derivative)
     }
 
     /// Compute exp(x)
@@ -85,27 +79,18 @@ impl Dual {
 
     /// Compute ln(x)
     pub fn ln(self) -> Self {
-        Self::new(
-            self.value.ln(),
-            self.derivative / self.value,
-        )
+        Self::new(self.value.ln(), self.derivative / self.value)
     }
 
     /// Compute x^n
     pub fn powi(self, n: i32) -> Self {
-        Self::new(
-            self.value.powi(n),
-            (n as f64) * self.value.powi(n - 1) * self.derivative,
-        )
+        Self::new(self.value.powi(n), (n as f64) * self.value.powi(n - 1) * self.derivative)
     }
 
     /// Compute sqrt(x)
     pub fn sqrt(self) -> Self {
         let sqrt_val = self.value.sqrt();
-        Self::new(
-            sqrt_val,
-            self.derivative / (2.0 * sqrt_val),
-        )
+        Self::new(sqrt_val, self.derivative / (2.0 * sqrt_val))
     }
 
     /// Compute abs(x)
@@ -124,10 +109,7 @@ impl Add for Dual {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Self::new(
-            self.value + other.value,
-            self.derivative + other.derivative,
-        )
+        Self::new(self.value + other.value, self.derivative + other.derivative)
     }
 }
 
@@ -143,10 +125,7 @@ impl Sub for Dual {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Self::new(
-            self.value - other.value,
-            self.derivative - other.derivative,
-        )
+        Self::new(self.value - other.value, self.derivative - other.derivative)
     }
 }
 
@@ -284,12 +263,29 @@ pub struct ReverseTape {
 
 #[derive(Debug, Clone)]
 enum Operation {
-    Input { index: usize },
-    Add { lhs: usize, rhs: usize },
-    Mul { lhs: usize, rhs: usize },
-    Sin { arg: usize },
-    Cos { arg: usize },
-    Exp { arg: usize },
+    #[allow(dead_code)]
+    Input {
+        index: usize,
+    },
+    Add {
+        lhs: usize,
+        rhs: usize,
+    },
+    Mul {
+        lhs: usize,
+        rhs: usize,
+    },
+    Sin {
+        arg: usize,
+    },
+    #[allow(dead_code)]
+    Cos {
+        arg: usize,
+    },
+    #[allow(dead_code)]
+    Exp {
+        arg: usize,
+    },
 }
 
 impl ReverseTape {
@@ -341,6 +337,26 @@ impl ReverseTape {
         index
     }
 
+    /// Cosine of a tape variable
+    pub fn cos(&mut self, arg: usize) -> usize {
+        let index = self.values.len();
+        let value = self.values[arg].cos();
+        self.values.push(value);
+        self.adjoints.push(0.0);
+        self.operations.push(Operation::Cos { arg });
+        index
+    }
+
+    /// Exponential of a tape variable
+    pub fn exp(&mut self, arg: usize) -> usize {
+        let index = self.values.len();
+        let value = self.values[arg].exp();
+        self.values.push(value);
+        self.adjoints.push(0.0);
+        self.operations.push(Operation::Exp { arg });
+        index
+    }
+
     /// Compute gradients using reverse-mode AD
     ///
     /// # Arguments
@@ -365,29 +381,29 @@ impl ReverseTape {
             match *op {
                 Operation::Input { .. } => {
                     // Nothing to do for inputs
-                }
+                },
                 Operation::Add { lhs, rhs } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[lhs] += adj;
                     self.adjoints[rhs] += adj;
-                }
+                },
                 Operation::Mul { lhs, rhs } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[lhs] += adj * self.values[rhs];
                     self.adjoints[rhs] += adj * self.values[lhs];
-                }
+                },
                 Operation::Sin { arg } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[arg] += adj * self.values[arg].cos();
-                }
+                },
                 Operation::Cos { arg } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[arg] -= adj * self.values[arg].sin();
-                }
+                },
                 Operation::Exp { arg } => {
                     let adj = self.adjoints[self.values.len() - 1];
                     self.adjoints[arg] += adj * self.values[arg].exp();
-                }
+                },
             }
         }
 
@@ -477,9 +493,7 @@ mod tests {
     #[test]
     fn test_gradient_forward() {
         // f(x, y) = x² + xy + y²
-        let f = |vars: &[Dual]| {
-            vars[0] * vars[0] + vars[0] * vars[1] + vars[1] * vars[1]
-        };
+        let f = |vars: &[Dual]| vars[0] * vars[0] + vars[0] * vars[1] + vars[1] * vars[1];
 
         let x = vec![2.0, 3.0];
         let grad = gradient_forward(f, &x);
@@ -493,9 +507,7 @@ mod tests {
     #[test]
     fn test_gradient_forward_complex() {
         // f(x, y, z) = sin(x) * exp(y) + z²
-        let f = |vars: &[Dual]| {
-            vars[0].sin() * vars[1].exp() + vars[2] * vars[2]
-        };
+        let f = |vars: &[Dual]| vars[0].sin() * vars[1].exp() + vars[2] * vars[2];
 
         let x = vec![1.0, 0.0, 2.0];
         let grad = gradient_forward(f, &x);
@@ -533,5 +545,175 @@ mod tests {
 
         assert_eq!(y.value(), 8.0);
         assert_eq!(y.derivative(), 12.0); // 3 * 2² = 12
+    }
+
+    #[test]
+    fn test_dual_new_direct() {
+        let d = Dual::new(3.0, 2.0);
+        assert_eq!(d.value(), 3.0);
+        assert_eq!(d.derivative(), 2.0);
+    }
+
+    #[test]
+    fn test_dual_constant() {
+        let d = Dual::constant(5.0);
+        assert_eq!(d.value(), 5.0);
+        assert_eq!(d.derivative(), 0.0);
+    }
+
+    #[test]
+    fn test_dual_cos() {
+        let x = Dual::variable(0.0);
+        let y = x.cos();
+        assert!((y.value() - 1.0).abs() < 1e-10);
+        assert!((y.derivative() - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_dual_sqrt() {
+        let x = Dual::variable(4.0);
+        let y = x.sqrt();
+        assert!((y.value() - 2.0).abs() < 1e-10);
+        assert!((y.derivative() - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_dual_abs_positive() {
+        let x = Dual::variable(3.0);
+        let y = x.abs();
+        assert_eq!(y.value(), 3.0);
+        assert_eq!(y.derivative(), 1.0);
+    }
+
+    #[test]
+    fn test_dual_abs_negative() {
+        let x = Dual::new(-3.0, 1.0);
+        let y = x.abs();
+        assert_eq!(y.value(), 3.0);
+        assert_eq!(y.derivative(), -1.0);
+    }
+
+    #[test]
+    fn test_dual_add_f64() {
+        let x = Dual::variable(3.0);
+        let y = x + 2.0;
+        assert_eq!(y.value(), 5.0);
+        assert_eq!(y.derivative(), 1.0);
+    }
+
+    #[test]
+    fn test_dual_sub_dual() {
+        let x = Dual::variable(5.0);
+        let y = Dual::constant(3.0);
+        let z = x - y;
+        assert_eq!(z.value(), 2.0);
+        assert_eq!(z.derivative(), 1.0);
+    }
+
+    #[test]
+    fn test_dual_sub_f64() {
+        let x = Dual::variable(5.0);
+        let y = x - 2.0;
+        assert_eq!(y.value(), 3.0);
+        assert_eq!(y.derivative(), 1.0);
+    }
+
+    #[test]
+    fn test_dual_mul_f64() {
+        let x = Dual::variable(3.0);
+        let y = x * 4.0;
+        assert_eq!(y.value(), 12.0);
+        assert_eq!(y.derivative(), 4.0);
+    }
+
+    #[test]
+    fn test_dual_div_dual() {
+        let x = Dual::variable(6.0);
+        let y = Dual::constant(2.0);
+        let z = x / y;
+        assert_eq!(z.value(), 3.0);
+        assert!((z.derivative() - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_dual_div_f64() {
+        let x = Dual::variable(6.0);
+        let y = x / 2.0;
+        assert_eq!(y.value(), 3.0);
+        assert_eq!(y.derivative(), 0.5);
+    }
+
+    #[test]
+    fn test_dual_neg() {
+        let x = Dual::variable(3.0);
+        let y = -x;
+        assert_eq!(y.value(), -3.0);
+        assert_eq!(y.derivative(), -1.0);
+    }
+
+    #[test]
+    fn test_dual_add_dual() {
+        let x = Dual::variable(2.0);
+        let y = Dual::constant(3.0);
+        let z = x + y;
+        assert_eq!(z.value(), 5.0);
+        assert_eq!(z.derivative(), 1.0);
+    }
+
+    #[test]
+    fn test_dual_display() {
+        let x = Dual::new(3.0, 2.0);
+        let s = format!("{}", x);
+        assert!(s.contains('3'));
+        assert!(s.contains('2'));
+        assert!(s.contains('ε'));
+    }
+
+    #[test]
+    fn test_reverse_tape_gradient_simple() {
+        let mut tape = ReverseTape::new();
+        let x = tape.input(2.0);
+        let y = tape.input(3.0);
+        let xy = tape.mul(x, y);
+        let sx = tape.sin(x);
+        let output = tape.add(xy, sx);
+        let grad = tape.gradient(output, 2);
+        // df/dy = x = 2
+        assert!((grad[1] - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_reverse_tape_default() {
+        let tape = ReverseTape::default();
+        let _ = tape;
+    }
+
+    #[test]
+    fn test_reverse_tape_gradient_cos_and_exp() {
+        // f(x) = cos(x) + exp(x)
+        let mut tape = ReverseTape::new();
+        let x = tape.input(0.5);
+        let cos_x = tape.cos(x);
+        let exp_x = tape.exp(x);
+        let output = tape.add(cos_x, exp_x);
+        let grad = tape.gradient(output, 1);
+
+        // df/dx = -sin(x) + exp(x)
+        let expected = -(0.5f64).sin() + (0.5f64).exp();
+        assert!((grad[0] - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_hybrid_ad_creation_and_split() {
+        let hybrid = HybridAD::new(3, 2);
+        assert_eq!(hybrid.num_quantum_params, 3);
+        assert_eq!(hybrid.num_classical_params, 2);
+
+        let params = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let (quantum, classical) = hybrid.split_params(&params);
+        assert_eq!(quantum.len(), 3);
+        assert_eq!(classical.len(), 2);
+        assert_eq!(quantum, &[1.0, 2.0, 3.0]);
+        assert_eq!(classical, &[4.0, 5.0]);
     }
 }

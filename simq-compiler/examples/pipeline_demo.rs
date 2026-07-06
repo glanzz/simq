@@ -2,10 +2,10 @@
 //!
 //! This example shows different ways to create and use optimization pipelines.
 
+use num_complex::Complex64;
 use simq_compiler::{create_compiler, OptimizationLevel, PipelineBuilder};
 use simq_core::{gate::Gate, Circuit, QubitId};
 use std::sync::Arc;
-use num_complex::Complex64;
 
 // Simple gate implementation for demo
 #[derive(Debug)]
@@ -111,11 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Custom pipeline: {} gates → {} gates", circuit.len(), custom_circuit.len());
     println!("Statistics:");
     for stat in &result.pass_stats {
-        println!("  - {}: {} applications, {}μs",
-            stat.pass_name,
-            stat.applications,
-            stat.time_us
-        );
+        println!("  - {}: {} applications, {}μs", stat.pass_name, stat.applications, stat.time_us);
     }
 
     // Example 3: High-performance configuration

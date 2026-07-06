@@ -100,7 +100,8 @@ impl CircuitCharacteristics {
 
             for op in circuit.operations() {
                 let qubits = op.qubits();
-                let current_depth = qubits.iter()
+                let current_depth = qubits
+                    .iter()
                     .map(|q| *qubit_depths.get(q).unwrap_or(&0))
                     .max()
                     .unwrap_or(0);
@@ -125,7 +126,7 @@ impl CircuitCharacteristics {
             match op.num_qubits() {
                 1 => single_qubit += 1,
                 2 => two_qubit += 1,
-                _ => {}
+                _ => {},
             }
         }
 
@@ -193,10 +194,7 @@ impl CircuitCharacteristics {
     }
 
     fn same_rotation_axis(name1: &str, name2: &str) -> bool {
-        matches!(
-            (name1, name2),
-            ("RX", "RX") | ("RY", "RY") | ("RZ", "RZ")
-        )
+        matches!((name1, name2), ("RX", "RX") | ("RY", "RY") | ("RZ", "RZ"))
     }
 
     /// Estimate density of fuseable gate sequences
@@ -215,9 +213,7 @@ impl CircuitCharacteristics {
             let op2 = operations[i + 1];
 
             // Check if consecutive gates on same qubit (potential fusion)
-            if op1.num_qubits() == 1
-                && op2.num_qubits() == 1
-                && op1.qubits()[0] == op2.qubits()[0]
+            if op1.num_qubits() == 1 && op2.num_qubits() == 1 && op1.qubits()[0] == op2.qubits()[0]
             {
                 fuseable_sequences += 1;
             }
@@ -348,7 +344,10 @@ pub enum CircuitSize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use simq_core::gate::Gate as GateTrait;
     use simq_core::Circuit;
+    use simq_gates::standard::{CNot, Hadamard, PauliX, PauliY, PauliZ, RotationX, RotationZ};
+    use std::sync::Arc;
 
     #[test]
     fn test_empty_circuit() {
@@ -372,5 +371,164 @@ mod tests {
         let circuit = Circuit::new(3);
         let chars = CircuitCharacteristics::analyze(&circuit);
         assert_eq!(chars.suggest_iterations(), 3);
+    }
+
+    /// Covers the single-gate circuit path: total_gates < 2 short-circuit
+    /// (lines 141-142, 205-206, 230-231, 261-262) plus the `_ =>` arm in
+    /// `count_gate_types` (line 129) via a three-qubit CNOT-like gate is not
+    /// applicable here, so we cover 129 separately below.
+    #[test]
+    fn test_single_gate_circuit_zero_densities() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.gate_count, 1);
+        // With only one gate, all "adjacent pair" densities must be 0.0
+        assert_eq!(chars.commutation_density, 0.0);
+        assert_eq!(chars.fusion_density, 0.0);
+        assert_eq!(chars.template_density, 0.0);
+        assert_eq!(chars.dead_code_density, 0.0);
+    }
+
+    /// Covers the `_ => {}` arm (line 129) in `count_gate_types` for gates
+    /// acting on more than two qubits (e.g. a 3-qubit Toffoli-style gate).
+    #[derive(Debug)]
+    struct ThreeQubitMockGate;
+
+    impl GateTrait for ThreeQubitMockGate {
+        fn name(&self) -> &str {
+            "CCX"
+        }
+        fn num_qubits(&self) -> usize {
+            3
+        }
+    }
+
+    #[test]
+    fn test_count_gate_types_ignores_multi_qubit_gates() {
+        let mut circuit = Circuit::new(3);
+        circuit
+            .add_gate(
+                Arc::new(ThreeQubitMockGate) as Arc<dyn GateTrait>,
+                &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        // single_to_two_qubit_ratio uses (single_qubit as f64) when two_qubit == 0
+        // Only the Hadamard counts as single-qubit; the 3-qubit gate is ignored.
+        assert_eq!(chars.single_to_two_qubit_ratio, 1.0);
+    }
+
+    /// Covers the diagonal-gates-commute branch (line 181) in `might_commute`.
+    #[test]
+    fn test_diagonal_gates_commute() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(RotationZ::new(0.5)) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        // Z and RZ are both diagonal and act on the same qubit -> should commute
+        assert_eq!(chars.commutation_density, 1.0);
+    }
+
+    /// Covers the same-rotation-axis-commutes branch (line 186) in `might_commute`.
+    #[test]
+    fn test_same_axis_rotations_commute() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(RotationX::new(0.3)) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(RotationX::new(0.7)) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        // RX, RX share the same rotation axis -> should commute
+        assert_eq!(chars.commutation_density, 1.0);
+    }
+
+    /// Sanity check that non-commuting, non-diagonal, non-same-axis gates on
+    /// the same qubit are correctly identified as not commuting (covers the
+    /// `false` fallthrough at the end of `might_commute`).
+    #[test]
+    fn test_non_commuting_gates() {
+        let mut circuit = Circuit::new(1);
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.commutation_density, 0.0);
+    }
+
+    /// Covers `suggest_iterations` returning 10 for large circuits (line 317)
+    /// and `size_category` Medium/Large/VeryLarge branches (lines 325-330).
+    fn build_circuit_with_gate_count(n: usize) -> Circuit {
+        let mut circuit = Circuit::new(1);
+        let h = Arc::new(Hadamard) as Arc<dyn GateTrait>;
+        for _ in 0..n {
+            circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
+        }
+        circuit
+    }
+
+    #[test]
+    fn test_suggest_iterations_large_circuit() {
+        let circuit = build_circuit_with_gate_count(600);
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.gate_count, 600);
+        assert_eq!(chars.suggest_iterations(), 10);
+    }
+
+    #[test]
+    fn test_size_category_medium() {
+        let circuit = build_circuit_with_gate_count(100);
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.size_category(), CircuitSize::Medium);
+    }
+
+    #[test]
+    fn test_size_category_large() {
+        let circuit = build_circuit_with_gate_count(500);
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.size_category(), CircuitSize::Large);
+    }
+
+    #[test]
+    fn test_size_category_very_large() {
+        let circuit = build_circuit_with_gate_count(1000);
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.size_category(), CircuitSize::VeryLarge);
+    }
+
+    /// Sanity check for a two-qubit gate, exercising the `two_qubit += 1` arm
+    /// in `count_gate_types` and the `two_qubit > 0` branch of the ratio calc
+    /// (already covered by other tests indirectly, but explicit here).
+    #[test]
+    fn test_two_qubit_gate_ratio() {
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn GateTrait>, &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(CNot) as Arc<dyn GateTrait>, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        let chars = CircuitCharacteristics::analyze(&circuit);
+        assert_eq!(chars.single_to_two_qubit_ratio, 1.0);
     }
 }

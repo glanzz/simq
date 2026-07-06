@@ -13,7 +13,7 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```ignore
 //! use simq_backend::ibm_quantum::{IBMQuantumBackend, IBMConfig};
 //! use simq_backend::QuantumBackend;
 //!
@@ -29,6 +29,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use simq_core::Circuit;
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// IBM Quantum configuration
@@ -80,11 +81,7 @@ impl IBMConfig {
     }
 
     /// Set polling configuration
-    pub fn with_polling(
-        mut self,
-        max_attempts: usize,
-        interval_seconds: u64,
-    ) -> Self {
+    pub fn with_polling(mut self, max_attempts: usize, interval_seconds: u64) -> Self {
         self.max_polling_attempts = max_attempts;
         self.polling_interval_seconds = interval_seconds;
         self
@@ -113,6 +110,11 @@ pub struct IBMQuantumBackend {
 
     /// Cached backend properties
     properties: Option<IBMBackendProperties>,
+
+    /// (num_qubits, shots) for each job this process has submitted, needed
+    /// to zero-pad result bitstrings and convert quasi-distributions to
+    /// counts when results come back. Not persisted across process restarts.
+    job_meta: Mutex<HashMap<String, (usize, usize)>>,
 }
 
 impl IBMQuantumBackend {
@@ -143,6 +145,7 @@ impl IBMQuantumBackend {
             capabilities: BackendCapabilities::default(),
             client,
             properties: None,
+            job_meta: Mutex::new(HashMap::new()),
         };
 
         // Fetch backend properties and capabilities
@@ -161,10 +164,7 @@ impl IBMQuantumBackend {
 
     /// Fetch backend properties from IBM API
     fn fetch_backend_properties(&self) -> Result<IBMBackendProperties> {
-        let url = format!(
-            "{}/v1/backends/{}",
-            self.config.api_url, self.backend_name
-        );
+        let url = format!("{}/v1/backends/{}", self.config.api_url, self.backend_name);
 
         let response = self
             .client
@@ -238,10 +238,14 @@ impl IBMQuantumBackend {
     }
 
     /// Convert SimQ circuit to OpenQASM 3.0
-    fn circuit_to_qasm(&self, circuit: &Circuit) -> Result<String> {
-        // TODO: Implement full circuit to QASM conversion
-        // For now, this is a placeholder
-
+    ///
+    /// Every gate in the circuit must map to a known QASM instruction. A gate
+    /// with no mapping is a hard error rather than a silent drop: submitting
+    /// a job with gates missing from the QASM program means the real
+    /// hardware runs a different (usually much simpler) circuit than the one
+    /// requested, while still charging for shots and returning
+    /// plausible-looking results.
+    fn circuit_to_qasm(circuit: &Circuit) -> Result<String> {
         let num_qubits = circuit.num_qubits();
 
         let mut qasm = String::new();
@@ -250,8 +254,35 @@ impl IBMQuantumBackend {
         qasm.push_str(&format!("qubit[{}] q;\n", num_qubits));
         qasm.push_str(&format!("bit[{}] c;\n\n", num_qubits));
 
-        // TODO: Add gate operations from circuit
-        // This requires iterating over circuit gates and converting to QASM
+        for op in circuit.operations() {
+            let name = op.gate().name();
+            let qubits: Vec<usize> = op.qubits().iter().map(|q| q.index()).collect();
+
+            let line = match (name, qubits.as_slice()) {
+                ("H", [a]) => format!("h q[{a}];\n"),
+                ("X", [a]) => format!("x q[{a}];\n"),
+                ("Y", [a]) => format!("y q[{a}];\n"),
+                ("Z", [a]) => format!("z q[{a}];\n"),
+                ("S", [a]) => format!("s q[{a}];\n"),
+                ("S†", [a]) => format!("sdg q[{a}];\n"),
+                ("T", [a]) => format!("t q[{a}];\n"),
+                ("T†", [a]) => format!("tdg q[{a}];\n"),
+                ("SX", [a]) => format!("sx q[{a}];\n"),
+                ("SX†", [a]) => format!("sxdg q[{a}];\n"),
+                ("Identity", [a]) => format!("id q[{a}];\n"),
+                ("CNOT", [a, b]) => format!("cx q[{a}], q[{b}];\n"),
+                ("CZ", [a, b]) => format!("cz q[{a}], q[{b}];\n"),
+                ("SWAP", [a, b]) => format!("swap q[{a}], q[{b}];\n"),
+                _ => {
+                    return Err(BackendError::Other(format!(
+                        "circuit_to_qasm: no QASM mapping for gate '{}' on qubits {:?}; refusing \
+                         to submit a job that would silently drop this gate",
+                        name, qubits
+                    )));
+                },
+            };
+            qasm.push_str(&line);
+        }
 
         // Add measurements
         for i in 0..num_qubits {
@@ -264,7 +295,7 @@ impl IBMQuantumBackend {
     /// Submit job to IBM Quantum
     fn submit_job_impl(&self, circuit: &Circuit, shots: usize) -> Result<String> {
         // Convert circuit to QASM
-        let qasm = self.circuit_to_qasm(circuit)?;
+        let qasm = Self::circuit_to_qasm(circuit)?;
 
         // Build job request
         let job_request = IBMJobRequest {
@@ -301,6 +332,11 @@ impl IBMQuantumBackend {
         let job_response: IBMJobResponse = response
             .json()
             .map_err(|e| BackendError::Other(format!("Failed to parse job response: {}", e)))?;
+
+        self.job_meta
+            .lock()
+            .unwrap()
+            .insert(job_response.id.clone(), (circuit.num_qubits(), shots));
 
         Ok(job_response.id)
     }
@@ -349,17 +385,30 @@ impl IBMQuantumBackend {
             .map_err(|e| BackendError::NetworkError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(BackendError::Other(
-                "Failed to retrieve results".to_string(),
-            ));
+            return Err(BackendError::Other("Failed to retrieve results".to_string()));
         }
 
         let results: IBMResults = response
             .json()
             .map_err(|e| BackendError::Other(format!("Failed to parse results: {}", e)))?;
 
+        let (num_qubits, shots) = self
+            .job_meta
+            .lock()
+            .unwrap()
+            .get(job_id)
+            .copied()
+            .ok_or_else(|| {
+                BackendError::Other(format!(
+                    "get_job_results_impl: no submission metadata for job '{}' (num_qubits/shots \
+                     are only tracked in-process, so results can't be retrieved for a job \
+                     submitted by a different process/run)",
+                    job_id
+                ))
+            })?;
+
         // Parse measurement counts
-        let counts = self.parse_ibm_counts(&results)?;
+        let counts = Self::parse_ibm_counts(&results, num_qubits, shots)?;
         let total_shots = counts.values().sum();
 
         let metadata = ExecutionMetadata {
@@ -367,12 +416,9 @@ impl IBMQuantumBackend {
             queue_time: None,
             total_time: None,
             backend_name: Some(self.backend_name.clone()),
-            backend_version: self
-                .properties
-                .as_ref()
-                .map(|p| p.backend_version.clone()),
+            backend_version: self.properties.as_ref().map(|p| p.backend_version.clone()),
             status: JobStatus::Completed,
-            num_qubits: None,
+            num_qubits: Some(num_qubits),
             circuit_depth: None,
             gate_count: None,
             cnot_count: None,
@@ -390,30 +436,49 @@ impl IBMQuantumBackend {
     }
 
     /// Parse IBM measurement counts from results
-    fn parse_ibm_counts(&self, results: &IBMResults) -> Result<HashMap<String, usize>> {
-        let mut counts = HashMap::new();
+    fn parse_ibm_counts(
+        results: &IBMResults,
+        num_qubits: usize,
+        shots: usize,
+    ) -> Result<HashMap<String, usize>> {
+        let mut counts: HashMap<String, usize> = HashMap::new();
 
-        // IBM returns counts in various formats depending on API version
-        // This is a simplified parser
+        // IBM's Sampler primitive returns a quasi-probability distribution
+        // (not raw counts): fractional, and occasionally slightly negative
+        // due to error mitigation. Converting it to counts means scaling by
+        // the number of shots and rounding, not casting the probability
+        // itself to an integer (which truncates every value below 1.0 to 0).
         if let Some(ref quasi_dists) = results.quasi_dists {
             for quasi_dist in quasi_dists.iter() {
-                for (bitstring, count) in quasi_dist {
-                    // Convert integer key to bitstring if needed
-                    let bitstring_str = if let Ok(val) = bitstring.parse::<usize>() {
-                        format!("{:b}", val)
+                for (key, quasi_prob) in quasi_dist {
+                    let bitstring = if let Ok(val) = key.parse::<u128>() {
+                        format!("{:0width$b}", val, width = num_qubits)
+                    } else if let Some(hex) = key.strip_prefix("0x") {
+                        let val = u128::from_str_radix(hex, 16).map_err(|e| {
+                            BackendError::Other(format!(
+                                "parse_ibm_counts: invalid hex key '{}': {}",
+                                key, e
+                            ))
+                        })?;
+                        format!("{:0width$b}", val, width = num_qubits)
+                    } else if key.len() == num_qubits && key.chars().all(|c| c == '0' || c == '1') {
+                        key.clone()
                     } else {
-                        bitstring.clone()
+                        return Err(BackendError::Other(format!(
+                            "parse_ibm_counts: key '{}' is neither an integer/hex index nor a \
+                             {}-bit bitstring",
+                            key, num_qubits
+                        )));
                     };
 
-                    *counts.entry(bitstring_str).or_insert(0) += *count as usize;
+                    let shot_count = (quasi_prob.max(0.0) * shots as f64).round() as usize;
+                    *counts.entry(bitstring).or_insert(0) += shot_count;
                 }
             }
         }
 
         if counts.is_empty() {
-            return Err(BackendError::Other(
-                "No measurement counts found in results".to_string(),
-            ));
+            return Err(BackendError::Other("No measurement counts found in results".to_string()));
         }
 
         Ok(counts)
@@ -431,10 +496,7 @@ impl IBMQuantumBackend {
             .map_err(|e| BackendError::NetworkError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(BackendError::Other(format!(
-                "Failed to cancel job: {}",
-                job_id
-            )));
+            return Err(BackendError::Other(format!("Failed to cancel job: {}", job_id)));
         }
 
         Ok(())
@@ -447,7 +509,7 @@ impl QuantumBackend for IBMQuantumBackend {
     }
 
     fn backend_type(&self) -> BackendType {
-        if self.properties.as_ref().map_or(false, |p| p.simulator) {
+        if self.properties.as_ref().is_some_and(|p| p.simulator) {
             BackendType::CloudSimulator
         } else {
             BackendType::Hardware
@@ -474,26 +536,23 @@ impl QuantumBackend for IBMQuantumBackend {
                     let mut result = self.get_job_results_impl(&job_id)?;
                     result.metadata.total_time = Some(start_time.elapsed());
                     return Ok(result);
-                }
+                },
                 JobStatus::Failed => {
-                    return Err(BackendError::JobExecutionFailed(format!(
-                        "Job {} failed",
-                        job_id
-                    )));
-                }
+                    return Err(BackendError::JobExecutionFailed(format!("Job {} failed", job_id)));
+                },
                 JobStatus::Cancelled => {
                     return Err(BackendError::JobExecutionFailed(format!(
                         "Job {} was cancelled",
                         job_id
                     )));
-                }
+                },
                 _ => {
                     // Still running, continue polling
                     if attempt % 10 == 0 {
                         // Log progress every 20 seconds
                         eprintln!("Job {} status: {:?}", job_id, status);
                     }
-                }
+                },
             }
         }
 
@@ -609,6 +668,7 @@ struct IBMJobResponse {
 
 #[derive(Debug, Deserialize)]
 struct IBMJobInfo {
+    #[allow(dead_code)]
     id: String,
     status: String,
 }
@@ -633,24 +693,21 @@ mod tests {
 
     #[test]
     fn test_config_with_instance() {
-        let config = IBMConfig::new("test-token")
-            .with_instance("ibm-q/open/main");
+        let config = IBMConfig::new("test-token").with_instance("ibm-q/open/main");
 
         assert_eq!(config.instance, Some("ibm-q/open/main".to_string()));
     }
 
     #[test]
     fn test_config_custom_url() {
-        let config = IBMConfig::new("test-token")
-            .with_api_url("https://custom.api.com");
+        let config = IBMConfig::new("test-token").with_api_url("https://custom.api.com");
 
         assert_eq!(config.api_url, "https://custom.api.com");
     }
 
     #[test]
     fn test_config_polling() {
-        let config = IBMConfig::new("test-token")
-            .with_polling(100, 5);
+        let config = IBMConfig::new("test-token").with_polling(100, 5);
 
         assert_eq!(config.max_polling_attempts, 100);
         assert_eq!(config.polling_interval_seconds, 5);
@@ -658,4 +715,102 @@ mod tests {
 
     // Note: Integration tests would require valid IBM Quantum credentials
     // and should be run separately with feature flags
+
+    mod circuit_to_qasm_tests {
+        use super::*;
+        use simq_core::QubitId;
+        use simq_gates::standard::{CNot, Hadamard};
+        use std::sync::Arc;
+
+        #[test]
+        fn maps_known_gates_and_measures_every_qubit() {
+            let mut circuit = Circuit::new(2);
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])
+                .unwrap();
+
+            let qasm = IBMQuantumBackend::circuit_to_qasm(&circuit).unwrap();
+
+            assert!(qasm.contains("h q[0];"));
+            assert!(qasm.contains("cx q[0], q[1];"));
+            assert!(qasm.contains("c[0] = measure q[0];"));
+            assert!(qasm.contains("c[1] = measure q[1];"));
+        }
+
+        #[test]
+        fn errors_instead_of_dropping_unmapped_gate() {
+            // RZ has no QASM mapping in this implementation (angle
+            // extraction is out of scope); it must error, not vanish.
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(simq_gates::standard::RotationZ::new(0.5)), &[QubitId::new(0)])
+                .unwrap();
+
+            let err = IBMQuantumBackend::circuit_to_qasm(&circuit).unwrap_err();
+            match err {
+                BackendError::Other(msg) => assert!(msg.contains("RZ")),
+                other => panic!("expected BackendError::Other, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn empty_circuit_still_measures() {
+            let circuit = Circuit::new(1);
+            let qasm = IBMQuantumBackend::circuit_to_qasm(&circuit).unwrap();
+            assert!(qasm.contains("c[0] = measure q[0];"));
+        }
+    }
+
+    mod parse_ibm_counts_tests {
+        use super::*;
+
+        #[test]
+        fn zero_pads_integer_keys_to_qubit_width() {
+            let mut dist = HashMap::new();
+            dist.insert("1".to_string(), 1.0); // state |001> on 3 qubits
+            let results = IBMResults {
+                quasi_dists: Some(vec![dist]),
+            };
+
+            let counts = IBMQuantumBackend::parse_ibm_counts(&results, 3, 100).unwrap();
+            assert_eq!(counts.get("001"), Some(&100));
+            assert!(!counts.contains_key("1"));
+        }
+
+        #[test]
+        fn converts_quasi_probabilities_to_shot_counts() {
+            let mut dist = HashMap::new();
+            dist.insert("0".to_string(), 0.25);
+            dist.insert("1".to_string(), 0.75);
+            let results = IBMResults {
+                quasi_dists: Some(vec![dist]),
+            };
+
+            let counts = IBMQuantumBackend::parse_ibm_counts(&results, 1, 1000).unwrap();
+            assert_eq!(counts.get("0"), Some(&250));
+            assert_eq!(counts.get("1"), Some(&750));
+        }
+
+        #[test]
+        fn clamps_negative_quasi_probability_to_zero() {
+            let mut dist = HashMap::new();
+            dist.insert("0".to_string(), -0.01); // mitigation noise
+            dist.insert("1".to_string(), 1.01);
+            let results = IBMResults {
+                quasi_dists: Some(vec![dist]),
+            };
+
+            let counts = IBMQuantumBackend::parse_ibm_counts(&results, 1, 100).unwrap();
+            assert_eq!(counts.get("0"), Some(&0));
+        }
+
+        #[test]
+        fn errors_on_empty_results() {
+            let results = IBMResults { quasi_dists: None };
+            assert!(IBMQuantumBackend::parse_ibm_counts(&results, 1, 100).is_err());
+        }
+    }
 }

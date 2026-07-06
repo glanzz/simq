@@ -37,31 +37,25 @@
 //! ```
 
 pub mod config;
-pub mod simulator;
-pub mod gpu;
-pub mod result;
 pub mod error;
 pub mod execution_engine;
+pub mod gpu;
+pub mod result;
+pub mod simulator;
 pub mod statistics;
 
-pub mod vqe_qaoa_helpers;
 pub mod gradient;
 pub mod qaoa;
+pub mod vqe_qaoa_helpers;
 
 mod autodiff;
 
-pub use vqe_qaoa_helpers::{
-	qaoa_circuit,
-	vqe_hardware_efficient_ansatz,
-};
+pub use vqe_qaoa_helpers::{qaoa_circuit, vqe_hardware_efficient_ansatz};
 
 pub use config::SimulatorConfig;
+pub use error::{Result, SimulatorError};
+pub use result::{MeasurementCounts, SimulationResult};
 pub use simulator::Simulator;
-pub use result::{SimulationResult, MeasurementCounts};
-pub use error::{SimulatorError, Result};
 pub use statistics::ExecutionStatistics;
 
-pub use autodiff::{
-    DifferentiableParameter,
-    compute_gradients_ad,
-};
+pub use autodiff::{compute_gradients_ad, DifferentiableParameter};

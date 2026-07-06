@@ -46,16 +46,16 @@
 //! - Amy, Maslov, Mosca, "Polynomial-time T-depth optimization of Clifford+T circuits" (2014)
 //! - Solovay-Kitaev theorem for universal approximation
 
-use crate::decomposition::{Decomposer, DecompositionConfig, DecompositionResult, DecompositionMetadata};
-use crate::matrix_computation::{Matrix2, is_unitary_2x2};
+use crate::decomposition::{
+    Decomposer, DecompositionConfig, DecompositionMetadata, DecompositionResult,
+};
+use crate::matrix_computation::{is_unitary_2x2, Matrix2};
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
-use std::sync::Arc;
+use simq_core::{Gate, QuantumError, Result};
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 const EPSILON: f64 = 1e-10;
-const ZERO: Complex64 = Complex64::new(0.0, 0.0);
-const ONE: Complex64 = Complex64::new(1.0, 0.0);
 
 /// Configuration for Clifford+T synthesis
 #[derive(Debug, Clone)]
@@ -104,26 +104,49 @@ impl CliffordTDecomposer {
 
     /// Decompose a rotation around Z-axis into Clifford+T gates
     ///
-    /// Rz(θ) can be approximated using a sequence of H, S, and T gates.
-    ///
-    /// For exact angles that are multiples of π/4:
+    /// Succeeds only for angles that are multiples of π/4 (within
+    /// `config.epsilon`), which decompose exactly:
     /// - Rz(π/4) = T
     /// - Rz(π/2) = S
     /// - Rz(π) = Z = S²
     ///
-    /// For other angles, uses gridsynth-like approximation.
-    pub fn decompose_rz(&self, angle: f64) -> Vec<CliffordTGate> {
+    /// # Errors
+    ///
+    /// Returns an error for any other angle: exact Clifford+T synthesis of
+    /// arbitrary rotations (gridsynth) is not implemented, and silently
+    /// substituting the nearest π/4 multiple would change the circuit's
+    /// semantics (angle error up to π/8). Callers that explicitly want that
+    /// approximation should use [`decompose_rz_approx`](Self::decompose_rz_approx),
+    /// which reports the incurred angle error.
+    pub fn decompose_rz(&self, angle: f64) -> Result<Vec<CliffordTGate>> {
         // Normalize angle to [0, 2π)
         let normalized_angle = angle.rem_euclid(2.0 * PI);
 
-        // Check for exact multiples of π/8
+        // Check for exact multiples of π/4
         let k = (normalized_angle / (PI / 4.0)).round();
         if (normalized_angle - k * PI / 4.0).abs() < self.config.epsilon {
-            return self.exact_rz_pi_over_4(k as i32);
+            return Ok(self.exact_rz_pi_over_4(k as i32));
         }
 
-        // For arbitrary angles, use approximation
-        self.approximate_rz(normalized_angle)
+        Err(QuantumError::ValidationError(format!(
+            "Rz({angle}) is not a multiple of π/4 (within epsilon = {}); exact Clifford+T \
+             synthesis of arbitrary angles is not implemented. Use decompose_rz_approx() to \
+             explicitly opt into nearest-π/4 approximation with a reported angle error.",
+            self.config.epsilon
+        )))
+    }
+
+    /// Approximate Rz(θ) by the nearest multiple of π/4
+    ///
+    /// This is an explicit opt-in to lossy decomposition. Returns the gate
+    /// sequence together with the signed angle error θ_normalized − k·π/4
+    /// actually incurred (up to ±π/8), so callers can decide whether the
+    /// approximation is acceptable.
+    pub fn decompose_rz_approx(&self, angle: f64) -> (Vec<CliffordTGate>, f64) {
+        let normalized_angle = angle.rem_euclid(2.0 * PI);
+        let k = (normalized_angle / (PI / 4.0)).round();
+        let angle_error = normalized_angle - k * PI / 4.0;
+        (self.exact_rz_pi_over_4(k as i32), angle_error)
     }
 
     /// Exact decomposition for Rz(k·π/4) where k is an integer
@@ -132,7 +155,7 @@ impl CliffordTDecomposer {
         let k = k.rem_euclid(8);
 
         match k {
-            0 => vec![],  // Identity
+            0 => vec![], // Identity
             1 => vec![CliffordTGate::T],
             2 => vec![CliffordTGate::S],
             3 => vec![CliffordTGate::T, CliffordTGate::S],
@@ -144,31 +167,13 @@ impl CliffordTDecomposer {
         }
     }
 
-    /// Approximate Rz(θ) for arbitrary angle θ
-    ///
-    /// Uses a simplified gridsynth-like algorithm. The full implementation would
-    /// involve solving Diophantine equations over Z[ω] where ω = e^(iπ/4).
-    fn approximate_rz(&self, angle: f64) -> Vec<CliffordTGate> {
-        // Simple approximation: find closest π/8 multiple
-        let k = (angle / (PI / 4.0)).round() as i32;
-        self.exact_rz_pi_over_4(k)
-
-        // TODO: Implement full gridsynth algorithm:
-        // 1. Represent target angle as point on unit circle
-        // 2. Use continued fraction expansion to find approximation in Z[ω]
-        // 3. Convert to gate sequence
-        // 4. Optimize T-count
-    }
-
     /// Decompose arbitrary single-qubit unitary into Clifford+T gates
     ///
     /// Uses the decomposition: U = Rz(α)Ry(β)Rz(γ)
     /// Then approximates each Ry and Rz using Clifford+T gates.
     pub fn decompose_single_qubit(&self, matrix: &Matrix2) -> Result<Vec<CliffordTGate>> {
         if !is_unitary_2x2(matrix) {
-            return Err(QuantumError::ValidationError(
-                "Matrix is not unitary".to_string()
-            ));
+            return Err(QuantumError::ValidationError("Matrix is not unitary".to_string()));
         }
 
         // Extract Euler angles (ZYZ decomposition)
@@ -193,17 +198,17 @@ impl CliffordTDecomposer {
         let mut gates = Vec::new();
 
         // Decompose first Rz(alpha)
-        gates.extend(self.decompose_rz(alpha));
+        gates.extend(self.decompose_rz(alpha)?);
 
         // Decompose Ry(gamma) = H Rz(gamma) H
         if gamma.abs() > EPSILON {
             gates.push(CliffordTGate::H);
-            gates.extend(self.decompose_rz(gamma));
+            gates.extend(self.decompose_rz(gamma)?);
             gates.push(CliffordTGate::H);
         }
 
         // Decompose last Rz(delta)
-        gates.extend(self.decompose_rz(delta));
+        gates.extend(self.decompose_rz(delta)?);
 
         Ok(gates)
     }
@@ -231,7 +236,8 @@ impl CliffordTDecomposer {
 
     /// Count T gates in a gate sequence
     pub fn count_t_gates(gates: &[CliffordTGate]) -> usize {
-        gates.iter()
+        gates
+            .iter()
             .filter(|g| matches!(g, CliffordTGate::T | CliffordTGate::TDagger))
             .count()
     }
@@ -248,10 +254,10 @@ impl CliffordTDecomposer {
                         depth += 1;
                         in_t_layer = true;
                     }
-                }
+                },
                 _ => {
                     in_t_layer = false;
-                }
+                },
             }
         }
 
@@ -270,32 +276,32 @@ impl CliffordTDecomposer {
         for gate in gates {
             match (optimized.last(), gate) {
                 // T† T = I (cancel)
-                (Some(&CliffordTGate::TDagger), CliffordTGate::T) |
-                (Some(&CliffordTGate::T), CliffordTGate::TDagger) => {
+                (Some(&CliffordTGate::TDagger), CliffordTGate::T)
+                | (Some(&CliffordTGate::T), CliffordTGate::TDagger) => {
                     optimized.pop();
-                }
+                },
 
                 // S† S = I (cancel)
-                (Some(&CliffordTGate::SDagger), CliffordTGate::S) |
-                (Some(&CliffordTGate::S), CliffordTGate::SDagger) => {
+                (Some(&CliffordTGate::SDagger), CliffordTGate::S)
+                | (Some(&CliffordTGate::S), CliffordTGate::SDagger) => {
                     optimized.pop();
-                }
+                },
 
                 // HH = I (cancel)
                 (Some(&CliffordTGate::H), CliffordTGate::H) => {
                     optimized.pop();
-                }
+                },
 
                 // SS = Z
                 (Some(&CliffordTGate::S), CliffordTGate::S) => {
                     optimized.pop();
                     optimized.push(CliffordTGate::Z);
-                }
+                },
 
                 // Otherwise, add gate
                 _ => {
                     optimized.push(*gate);
-                }
+                },
             }
         }
 
@@ -310,10 +316,14 @@ impl Default for CliffordTDecomposer {
 }
 
 impl Decomposer for CliffordTDecomposer {
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult> {
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult> {
         if gate.num_qubits() != 1 {
             return Err(QuantumError::ValidationError(
-                "Clifford+T decomposition currently supports single-qubit gates only".to_string()
+                "Clifford+T decomposition currently supports single-qubit gates only".to_string(),
             ));
         }
 
@@ -456,15 +466,15 @@ mod tests {
         let decomposer = CliffordTDecomposer::new();
 
         // Rz(π/4) = T
-        let gates = decomposer.decompose_rz(PI / 4.0);
+        let gates = decomposer.decompose_rz(PI / 4.0).unwrap();
         assert_eq!(gates, vec![CliffordTGate::T]);
 
         // Rz(π/2) = S
-        let gates = decomposer.decompose_rz(PI / 2.0);
+        let gates = decomposer.decompose_rz(PI / 2.0).unwrap();
         assert_eq!(gates, vec![CliffordTGate::S]);
 
         // Rz(π) = Z
-        let gates = decomposer.decompose_rz(PI);
+        let gates = decomposer.decompose_rz(PI).unwrap();
         assert_eq!(gates, vec![CliffordTGate::Z]);
     }
 
@@ -485,9 +495,9 @@ mod tests {
     fn test_t_depth() {
         let gates = vec![
             CliffordTGate::T,
-            CliffordTGate::T,  // Same layer
-            CliffordTGate::H,  // Clifford
-            CliffordTGate::T,  // New layer
+            CliffordTGate::T, // Same layer
+            CliffordTGate::H, // Clifford
+            CliffordTGate::T, // New layer
         ];
 
         assert_eq!(CliffordTDecomposer::count_t_depth(&gates), 2);
@@ -499,9 +509,9 @@ mod tests {
 
         let gates = vec![
             CliffordTGate::T,
-            CliffordTGate::TDagger,  // Should cancel
+            CliffordTGate::TDagger, // Should cancel
             CliffordTGate::H,
-            CliffordTGate::H,  // Should cancel
+            CliffordTGate::H, // Should cancel
         ];
 
         let optimized = decomposer.optimize_t_count(&gates);
@@ -522,5 +532,264 @@ mod tests {
         assert!(CliffordTGate::TDagger.is_t_gate());
         assert!(!CliffordTGate::H.is_t_gate());
         assert!(!CliffordTGate::S.is_t_gate());
+    }
+
+    #[derive(Debug)]
+    struct MockGate {
+        name: String,
+        n_qubits: usize,
+        matrix: Option<Vec<Complex64>>,
+    }
+
+    impl Gate for MockGate {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn num_qubits(&self) -> usize {
+            self.n_qubits
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            self.matrix.clone()
+        }
+    }
+
+    fn matrix2_to_flat(m: &Matrix2) -> Vec<Complex64> {
+        vec![m[0][0], m[0][1], m[1][0], m[1][1]]
+    }
+
+    fn identity_matrix2() -> Matrix2 {
+        [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ]
+    }
+
+    fn hadamard_matrix2() -> Matrix2 {
+        let f = std::f64::consts::FRAC_1_SQRT_2;
+        [
+            [Complex64::new(f, 0.0), Complex64::new(f, 0.0)],
+            [Complex64::new(f, 0.0), Complex64::new(-f, 0.0)],
+        ]
+    }
+
+    #[test]
+    fn test_exact_rz_pi_over_4_all_residues() {
+        let decomposer = CliffordTDecomposer::new();
+
+        // k=0 => identity (empty vec)
+        assert_eq!(decomposer.exact_rz_pi_over_4(0), vec![]);
+        // k=1 => T
+        assert_eq!(decomposer.exact_rz_pi_over_4(1), vec![CliffordTGate::T]);
+        // k=2 => S
+        assert_eq!(decomposer.exact_rz_pi_over_4(2), vec![CliffordTGate::S]);
+        // k=3 => T, S
+        assert_eq!(decomposer.exact_rz_pi_over_4(3), vec![CliffordTGate::T, CliffordTGate::S]);
+        // k=4 => Z
+        assert_eq!(decomposer.exact_rz_pi_over_4(4), vec![CliffordTGate::Z]);
+        // k=5 => TDagger
+        assert_eq!(decomposer.exact_rz_pi_over_4(5), vec![CliffordTGate::TDagger]);
+        // k=6 => SDagger
+        assert_eq!(decomposer.exact_rz_pi_over_4(6), vec![CliffordTGate::SDagger]);
+        // k=7 => TDagger, SDagger
+        assert_eq!(
+            decomposer.exact_rz_pi_over_4(7),
+            vec![CliffordTGate::TDagger, CliffordTGate::SDagger]
+        );
+
+        // Negative k wraps around via rem_euclid: -1 -> 7
+        assert_eq!(
+            decomposer.exact_rz_pi_over_4(-1),
+            vec![CliffordTGate::TDagger, CliffordTGate::SDagger]
+        );
+
+        // k=8 wraps to 0
+        assert_eq!(decomposer.exact_rz_pi_over_4(8), vec![]);
+    }
+
+    #[test]
+    fn test_decompose_rz_arbitrary_angle_errors() {
+        let decomposer = CliffordTDecomposer::new();
+        // An angle that is not a k*pi/4 multiple within epsilon must be
+        // rejected rather than silently snapped to the nearest multiple.
+        let angle = PI / 4.0 + 0.2;
+        assert!(decomposer.decompose_rz(angle).is_err());
+    }
+
+    #[test]
+    fn test_decompose_rz_approx_reports_error() {
+        let decomposer = CliffordTDecomposer::new();
+        let angle = PI / 4.0 + 0.2;
+        let (gates, angle_error) = decomposer.decompose_rz_approx(angle);
+        // Snaps to the nearest pi/4 multiple...
+        let k = (angle / (PI / 4.0)).round() as i32;
+        assert_eq!(gates, decomposer.exact_rz_pi_over_4(k));
+        // ...and reports exactly how far off that is.
+        assert!((angle_error - 0.2).abs() < 1e-12, "angle_error = {angle_error}");
+
+        // Exact angles report zero error
+        let (gates_exact, err_exact) = decomposer.decompose_rz_approx(PI / 2.0);
+        assert_eq!(gates_exact, vec![CliffordTGate::S]);
+        assert!(err_exact.abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_decompose_single_qubit_identity_gamma_near_zero() {
+        // Identity matrix triggers the gamma.abs() < EPSILON branch inside decompose_single_qubit
+        let decomposer = CliffordTDecomposer::new();
+        let id = identity_matrix2();
+        let result = decomposer.decompose_single_qubit(&id);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_decompose_single_qubit_non_unitary_errors() {
+        let decomposer = CliffordTDecomposer::new();
+        let not_unitary: Matrix2 = [
+            [Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let result = decomposer.decompose_single_qubit(&not_unitary);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_solovay_kitaev_base_case_and_recursive_fallback() {
+        let decomposer = CliffordTDecomposer::new();
+        let h = hadamard_matrix2();
+
+        // depth == 0 -> base case (direct decomposition)
+        let base = decomposer.solovay_kitaev(&h, 0).unwrap();
+        assert!(!base.is_empty());
+
+        // depth > 0 -> recursive case, currently falls back to direct decomposition
+        let recursive = decomposer.solovay_kitaev(&h, 3).unwrap();
+        assert!(!recursive.is_empty());
+    }
+
+    #[test]
+    fn test_optimize_t_count_s_dagger_s_and_ss_cancellation() {
+        let decomposer = CliffordTDecomposer::new();
+
+        // S† S should cancel (and its symmetric S S† case)
+        let gates = vec![CliffordTGate::SDagger, CliffordTGate::S];
+        assert!(decomposer.optimize_t_count(&gates).is_empty());
+
+        let gates2 = vec![CliffordTGate::S, CliffordTGate::SDagger];
+        assert!(decomposer.optimize_t_count(&gates2).is_empty());
+
+        // S S should become Z
+        let gates3 = vec![CliffordTGate::S, CliffordTGate::S];
+        assert_eq!(decomposer.optimize_t_count(&gates3), vec![CliffordTGate::Z]);
+
+        // A gate with no matching optimization rule (default arm) should just be appended
+        let gates4 = vec![CliffordTGate::X, CliffordTGate::Y];
+        assert_eq!(decomposer.optimize_t_count(&gates4), vec![CliffordTGate::X, CliffordTGate::Y]);
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_non_single_qubit_gate() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig::default();
+        let two_qubit_gate = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+            matrix: None,
+        };
+        let result = decomposer.decompose(&two_qubit_gate, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_gate_without_matrix() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig::default();
+        let gate_no_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        };
+        let result = decomposer.decompose(&gate_no_matrix, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_rejects_invalid_matrix_size() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig::default();
+        let gate_bad_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(vec![Complex64::new(1.0, 0.0)]),
+        };
+        let result = decomposer.decompose(&gate_bad_matrix, &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decomposer_trait_succeeds_and_optimizes() {
+        let decomposer = CliffordTDecomposer::new();
+        let config = DecompositionConfig {
+            optimization_level: 1,
+            ..Default::default()
+        };
+
+        let gate = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(matrix2_to_flat(&hadamard_matrix2())),
+        };
+        let result = decomposer.decompose(&gate, &config).unwrap();
+        assert!(result.metadata.optimized);
+        assert!(result.metadata.strategy.contains("Clifford+T"));
+        assert_eq!(result.two_qubit_count, 0);
+    }
+
+    #[test]
+    fn test_decomposer_trait_can_decompose_name_and_estimate_cost() {
+        let decomposer = CliffordTDecomposer::new();
+        assert_eq!(decomposer.name(), "CliffordT");
+
+        let single_with_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(matrix2_to_flat(&hadamard_matrix2())),
+        };
+        assert!(decomposer.can_decompose(&single_with_matrix));
+        assert_eq!(decomposer.estimate_cost(&single_with_matrix), Some(7));
+
+        let single_without_matrix = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        };
+        assert!(!decomposer.can_decompose(&single_without_matrix));
+
+        let two_qubit = MockGate {
+            name: "CNOT".to_string(),
+            n_qubits: 2,
+            matrix: None,
+        };
+        assert!(!decomposer.can_decompose(&two_qubit));
+        assert_eq!(decomposer.estimate_cost(&two_qubit), None);
+    }
+
+    #[test]
+    fn test_clifford_t_gate_name_all_variants() {
+        let expected = [
+            (CliffordTGate::H, "H"),
+            (CliffordTGate::S, "S"),
+            (CliffordTGate::SDagger, "S†"),
+            (CliffordTGate::T, "T"),
+            (CliffordTGate::TDagger, "T†"),
+            (CliffordTGate::X, "X"),
+            (CliffordTGate::Y, "Y"),
+            (CliffordTGate::Z, "Z"),
+            (CliffordTGate::I, "I"),
+            (CliffordTGate::CNOT, "CNOT"),
+        ];
+
+        for (gate, name) in expected {
+            assert_eq!(gate.name(), name, "unexpected name for {:?}", gate);
+        }
     }
 }

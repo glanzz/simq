@@ -82,7 +82,7 @@ fn main() -> Result<()> {
                     println!("  - {}", warning.format());
                 }
             }
-        }
+        },
         Err(e) => println!("✗ DAG validation failed: {}", e),
     }
     println!();
@@ -94,7 +94,7 @@ fn main() -> Result<()> {
         Ok(depth) => {
             println!("Circuit depth: {} (considering parallelism)", depth);
             println!("Sequential depth: {} (number of operations)", circuit.operations().count());
-        }
+        },
         Err(e) => println!("Failed to compute depth: {}", e),
     }
     println!();
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
             for (i, layer) in analysis.layers.iter().enumerate() {
                 println!("  Layer {}: {} operations", i, layer.len());
             }
-        }
+        },
         Err(e) => println!("Failed to analyze parallelism: {}", e),
     }
     println!();
@@ -134,7 +134,7 @@ fn main() -> Result<()> {
             println!("  Depth: {} (all gates can run in parallel)", analysis.num_layers());
             println!("  Parallelism factor: {:.2}", analysis.parallelism_factor);
             println!("  Max parallelism: {} operations", analysis.max_parallelism);
-        }
+        },
         Err(e) => println!("Failed to analyze: {}", e),
     }
     println!();
@@ -158,7 +158,7 @@ fn main() -> Result<()> {
             println!("  Depth: {} (all gates are sequential)", analysis.num_layers());
             println!("  Parallelism factor: {:.2}", analysis.parallelism_factor);
             println!("  Max parallelism: {} operations", analysis.max_parallelism);
-        }
+        },
         Err(e) => println!("Failed to analyze: {}", e),
     }
     println!();
@@ -177,4 +177,3 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-

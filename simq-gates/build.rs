@@ -86,12 +86,7 @@ fn generate_vqe_angles(f: &mut File) {
     .unwrap();
 
     writeln!(f, "\n    /// Pre-computed RX matrices for VQE").unwrap();
-    writeln!(
-        f,
-        "    pub const RX_VQE: [[[Complex64; 2]; 2]; {}] = [",
-        steps
-    )
-    .unwrap();
+    writeln!(f, "    pub const RX_VQE: [[[Complex64; 2]; 2]; {}] = [", steps).unwrap();
 
     for i in 0..steps {
         let angle = max_angle * (i as f64) / ((steps - 1) as f64);
@@ -131,20 +126,10 @@ fn generate_qaoa_angles(f: &mut File) {
     .unwrap();
 
     writeln!(f, "\n    /// Angle step size").unwrap();
-    writeln!(
-        f,
-        "    pub const ANGLE_STEP: f64 = {};",
-        max_angle / ((steps - 1) as f64)
-    )
-    .unwrap();
+    writeln!(f, "    pub const ANGLE_STEP: f64 = {};", max_angle / ((steps - 1) as f64)).unwrap();
 
     writeln!(f, "\n    /// Pre-computed RX matrices for QAOA mixer").unwrap();
-    writeln!(
-        f,
-        "    pub const RX_MIXER: [[[Complex64; 2]; 2]; {}] = [",
-        steps
-    )
-    .unwrap();
+    writeln!(f, "    pub const RX_MIXER: [[[Complex64; 2]; 2]; {}] = [", steps).unwrap();
 
     for i in 0..steps {
         let angle = max_angle * (i as f64) / ((steps - 1) as f64);
@@ -157,12 +142,7 @@ fn generate_qaoa_angles(f: &mut File) {
     writeln!(f, "\n    ];").unwrap();
 
     writeln!(f, "\n    /// Pre-computed RZ matrices for QAOA cost").unwrap();
-    writeln!(
-        f,
-        "    pub const RZ_COST: [[[Complex64; 2]; 2]; {}] = [",
-        steps
-    )
-    .unwrap();
+    writeln!(f, "    pub const RZ_COST: [[[Complex64; 2]; 2]; {}] = [", steps).unwrap();
 
     for i in 0..steps {
         let angle = max_angle * (i as f64) / ((steps - 1) as f64);
@@ -239,12 +219,7 @@ fn generate_rotation_matrix(f: &mut File, gate: &str, name: &str, angle: f64) {
     let re11 = format_f64(matrix[1][1].re);
     let im11 = format_f64(matrix[1][1].im);
 
-    writeln!(
-        f,
-        "    pub const {}_{}: [[Complex64; 2]; 2] = [",
-        gate, name
-    )
-    .unwrap();
+    writeln!(f, "    pub const {}_{}: [[Complex64; 2]; 2] = [", gate, name).unwrap();
     writeln!(f, "        [").unwrap();
     writeln!(f, "            Complex64::new({}, {}),", re00, im00).unwrap();
     writeln!(f, "            Complex64::new({}, {}),", re01, im01).unwrap();

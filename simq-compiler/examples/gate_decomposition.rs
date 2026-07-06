@@ -7,13 +7,11 @@
 //! Run with: cargo run --package simq-compiler --example gate_decomposition
 
 use simq_compiler::decomposition::{
-    BasisGateSet,
-    DecompositionConfig,
-    Decomposer,
-    single_qubit::{SingleQubitDecomposer, EulerBasis, EulerAngles},
-    two_qubit::{TwoQubitDecomposer, EntanglementGate},
-    multi_qubit::MultiQubitDecomposer,
     clifford_t::{CliffordTDecomposer, GridSynthConfig},
+    multi_qubit::MultiQubitDecomposer,
+    single_qubit::{EulerAngles, EulerBasis, SingleQubitDecomposer},
+    two_qubit::{EntanglementGate, TwoQubitDecomposer},
+    BasisGateSet, Decomposer, DecompositionConfig,
 };
 use std::f64::consts::PI;
 
@@ -53,19 +51,21 @@ fn single_qubit_example() {
     // Example: Hadamard gate angles
     println!("  Example: Hadamard gate");
     let angles = EulerAngles::new(0.0, 0.0, PI / 2.0, PI);
-    println!("    α = {:.4}, β = {:.4}, γ = {:.4}, δ = {:.4}",
-             angles.alpha, angles.beta, angles.gamma, angles.delta);
+    println!(
+        "    α = {:.4}, β = {:.4}, γ = {:.4}, δ = {:.4}",
+        angles.alpha, angles.beta, angles.gamma, angles.delta
+    );
     println!("    Gate count: {}\n", angles.gate_count());
 
     // ZXZ decomposition
     println!("ZXZ Decomposition (Rz-Rx-Rz):");
-    let zxz_decomposer = SingleQubitDecomposer::new(EulerBasis::ZXZ);
+    let _zxz_decomposer = SingleQubitDecomposer::new(EulerBasis::ZXZ);
     println!("  - Useful when X rotations are cheaper than Y rotations");
     println!("  - Common in some superconducting qubit architectures\n");
 
     // U3 decomposition (IBM)
     println!("U3 Decomposition (IBM Quantum):");
-    let u3_decomposer = SingleQubitDecomposer::new(EulerBasis::U3);
+    let _u3_decomposer = SingleQubitDecomposer::new(EulerBasis::U3);
     println!("  - IBM's native single-qubit gate");
     println!("  - U3(θ, φ, λ) = Rz(φ) Ry(θ) Rz(λ)");
     println!("  - Discards global phase\n");
@@ -172,15 +172,15 @@ fn clifford_t_example() {
     // Exact rotations
     println!("Exact Rz Rotations:");
     println!("  - Rz(π/4) = T");
-    let rz_pi4 = decomposer.decompose_rz(PI / 4.0);
+    let rz_pi4 = decomposer.decompose_rz(PI / 4.0).unwrap();
     println!("    Gates: {:?}", rz_pi4);
 
     println!("  - Rz(π/2) = S");
-    let rz_pi2 = decomposer.decompose_rz(PI / 2.0);
+    let rz_pi2 = decomposer.decompose_rz(PI / 2.0).unwrap();
     println!("    Gates: {:?}", rz_pi2);
 
     println!("  - Rz(π) = Z = S²");
-    let rz_pi = decomposer.decompose_rz(PI);
+    let rz_pi = decomposer.decompose_rz(PI).unwrap();
     println!("    Gates: {:?}\n", rz_pi);
 
     // T-count optimization

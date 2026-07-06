@@ -80,21 +80,21 @@
 //! - Ross & Selinger, "Optimal ancilla-free Clifford+T approximation" (2016)
 
 pub mod basis;
+pub mod clifford_t;
+pub mod multi_qubit;
 pub mod single_qubit;
 pub mod two_qubit;
-pub mod multi_qubit;
-pub mod clifford_t;
 
 use num_complex::Complex64;
-use simq_core::{Gate, Result, QuantumError};
+use simq_core::{Gate, QuantumError, Result};
 use std::sync::Arc;
 
 // Re-export main types
-pub use basis::{BasisGateSet, BasisGate};
-pub use single_qubit::{SingleQubitDecomposer, EulerBasis};
-pub use two_qubit::{TwoQubitDecomposer, EntanglementGate};
-pub use multi_qubit::MultiQubitDecomposer;
+pub use basis::{BasisGate, BasisGateSet};
 pub use clifford_t::{CliffordTDecomposer, GridSynthConfig};
+pub use multi_qubit::MultiQubitDecomposer;
+pub use single_qubit::{EulerBasis, SingleQubitDecomposer};
+pub use two_qubit::{EntanglementGate, TwoQubitDecomposer};
 
 // ============================================================================
 // Configuration
@@ -197,7 +197,11 @@ pub struct DecompositionMetadata {
 /// Trait for gate decomposition strategies
 pub trait Decomposer: Send + Sync {
     /// Decompose a gate into a sequence of basis gates
-    fn decompose(&self, gate: &dyn Gate, config: &DecompositionConfig) -> Result<DecompositionResult>;
+    fn decompose(
+        &self,
+        gate: &dyn Gate,
+        config: &DecompositionConfig,
+    ) -> Result<DecompositionResult>;
 
     /// Check if this decomposer can handle the given gate
     fn can_decompose(&self, gate: &dyn Gate) -> bool;
@@ -206,7 +210,7 @@ pub trait Decomposer: Send + Sync {
     fn name(&self) -> &str;
 
     /// Estimate the cost of decomposition (gate count)
-    fn estimate_cost(&self, gate: &dyn Gate) -> Option<usize> {
+    fn estimate_cost(&self, _gate: &dyn Gate) -> Option<usize> {
         None
     }
 }
@@ -234,21 +238,22 @@ impl UniversalDecomposer {
             1 => {
                 let decomposer = SingleQubitDecomposer::new(EulerBasis::ZYZ);
                 decomposer.decompose(gate, &self.config)
-            }
+            },
             2 => {
                 let decomposer = TwoQubitDecomposer::new(EntanglementGate::CNOT);
                 decomposer.decompose(gate, &self.config)
-            }
+            },
             _ => {
                 let decomposer = MultiQubitDecomposer::new();
                 decomposer.decompose(gate, &self.config)
-            }
+            },
         }
     }
 
     /// Decompose a sequence of gates
     pub fn decompose_gates(&self, gates: &[Arc<dyn Gate>]) -> Result<Vec<DecompositionResult>> {
-        gates.iter()
+        gates
+            .iter()
             .map(|g| self.decompose_gate(g.as_ref()))
             .collect()
     }
@@ -290,9 +295,10 @@ pub fn validate_decomposition(
     let fidelity = compute_fidelity(original, decomposed)?;
 
     if fidelity < threshold {
-        return Err(QuantumError::ValidationError(
-            format!("Decomposition fidelity {} below threshold {}", fidelity, threshold)
-        ));
+        return Err(QuantumError::ValidationError(format!(
+            "Decomposition fidelity {} below threshold {}",
+            fidelity, threshold
+        )));
     }
 
     Ok(fidelity)
@@ -330,5 +336,182 @@ mod tests {
 
         let fidelity = compute_fidelity(&m1, &m2).unwrap();
         assert!((fidelity - 1.0).abs() < 1e-10);
+    }
+
+    #[derive(Debug)]
+    struct MockGate {
+        name: String,
+        n_qubits: usize,
+        matrix: Option<Vec<Complex64>>,
+    }
+
+    impl Gate for MockGate {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn num_qubits(&self) -> usize {
+            self.n_qubits
+        }
+        fn matrix(&self) -> Option<Vec<Complex64>> {
+            self.matrix.clone()
+        }
+    }
+
+    #[test]
+    fn test_decomposer_default_estimate_cost_returns_none() {
+        // A minimal Decomposer impl that only overrides the required methods,
+        // exercising the trait's default estimate_cost() implementation.
+        struct DummyDecomposer;
+        impl Decomposer for DummyDecomposer {
+            fn decompose(
+                &self,
+                _gate: &dyn Gate,
+                _config: &DecompositionConfig,
+            ) -> Result<DecompositionResult> {
+                unimplemented!()
+            }
+            fn can_decompose(&self, _gate: &dyn Gate) -> bool {
+                true
+            }
+            fn name(&self) -> &str {
+                "Dummy"
+            }
+        }
+
+        let dummy = DummyDecomposer;
+        let gate = MockGate {
+            name: "X".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        };
+        assert_eq!(dummy.estimate_cost(&gate), None);
+    }
+
+    #[test]
+    fn test_universal_decomposer_dispatches_single_qubit() {
+        let config = DecompositionConfig::default();
+        let decomposer = UniversalDecomposer::new(config);
+        let gate = MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: Some(vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ]),
+        };
+        let result = decomposer.decompose_gate(&gate).unwrap();
+        assert_eq!(result.gate_count, 3);
+    }
+
+    #[test]
+    fn test_universal_decomposer_dispatches_two_qubit() {
+        let config = DecompositionConfig::default();
+        let decomposer = UniversalDecomposer::new(config);
+        let mut matrix = vec![Complex64::new(0.0, 0.0); 16];
+        for i in 0..4 {
+            matrix[i * 4 + i] = Complex64::new(1.0, 0.0);
+        }
+        let gate = MockGate {
+            name: "CZ".to_string(),
+            n_qubits: 2,
+            matrix: Some(matrix),
+        };
+        let result = decomposer.decompose_gate(&gate).unwrap();
+        assert_eq!(result.two_qubit_count, 3);
+    }
+
+    #[test]
+    fn test_universal_decomposer_dispatches_multi_qubit() {
+        let config = DecompositionConfig::default();
+        let decomposer = UniversalDecomposer::new(config);
+        let gate = MockGate {
+            name: "Toffoli".to_string(),
+            n_qubits: 3,
+            matrix: None,
+        };
+        let result = decomposer.decompose_gate(&gate).unwrap();
+        assert!(result.gate_count > 0);
+    }
+
+    #[test]
+    fn test_compute_fidelity_rejects_dimension_mismatch() {
+        let m1 = vec![vec![Complex64::new(1.0, 0.0)]];
+        let m2 = vec![
+            vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        assert!(compute_fidelity(&m1, &m2).is_err());
+    }
+
+    #[test]
+    fn test_compute_fidelity_rejects_empty_matrices() {
+        let m1: Vec<Vec<Complex64>> = vec![];
+        let m2: Vec<Vec<Complex64>> = vec![];
+        assert!(compute_fidelity(&m1, &m2).is_err());
+    }
+
+    #[test]
+    fn test_compute_fidelity_rejects_ragged_rows() {
+        // Outer dims match (2), but row 0 of u is shorter than needed, tripping
+        // the `j >= u[i].len()` guard inside the nested loop.
+        let m1 = vec![
+            vec![Complex64::new(1.0, 0.0)],
+            vec![Complex64::new(1.0, 0.0)],
+        ];
+        let m2 = vec![
+            vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        assert!(compute_fidelity(&m1, &m2).is_err());
+    }
+
+    #[test]
+    fn test_validate_decomposition_passes_above_threshold() {
+        let m1 = vec![
+            vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let m2 = m1.clone();
+        let fidelity = validate_decomposition(&m1, &m2, 0.99).unwrap();
+        assert!(fidelity >= 0.99);
+    }
+
+    #[test]
+    fn test_validate_decomposition_fails_below_threshold() {
+        let m1 = vec![
+            vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let m2 = vec![
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        let result = validate_decomposition(&m1, &m2, 0.9999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_optimize_gate_sequence_level_zero_returns_unchanged() {
+        let gates: Vec<Arc<dyn Gate>> = vec![Arc::new(MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        })];
+        let result = optimize_gate_sequence(gates.clone(), 0);
+        assert_eq!(result.len(), gates.len());
+    }
+
+    #[test]
+    fn test_optimize_gate_sequence_nonzero_level_currently_noop() {
+        let gates: Vec<Arc<dyn Gate>> = vec![Arc::new(MockGate {
+            name: "H".to_string(),
+            n_qubits: 1,
+            matrix: None,
+        })];
+        // TODO in production code: optimization not yet implemented, gates pass through unchanged
+        let result = optimize_gate_sequence(gates.clone(), 2);
+        assert_eq!(result.len(), gates.len());
     }
 }

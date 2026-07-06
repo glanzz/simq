@@ -260,43 +260,19 @@ impl BasisGateSet {
     /// Get the gates in this basis set
     pub fn gates(&self) -> Vec<BasisGate> {
         match self {
-            BasisGateSet::IBM => vec![
-                BasisGate::U1,
-                BasisGate::U2,
-                BasisGate::U3,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::IBM => vec![BasisGate::U1, BasisGate::U2, BasisGate::U3, BasisGate::CNOT],
 
-            BasisGateSet::IBMQiskit => vec![
-                BasisGate::RZ,
-                BasisGate::SX,
-                BasisGate::X,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::IBMQiskit => {
+                vec![BasisGate::RZ, BasisGate::SX, BasisGate::X, BasisGate::CNOT]
+            },
 
-            BasisGateSet::Google => vec![
-                BasisGate::PhasedXZ,
-                BasisGate::SqrtISWAP,
-                BasisGate::SYC,
-            ],
+            BasisGateSet::Google => vec![BasisGate::PhasedXZ, BasisGate::SqrtISWAP, BasisGate::SYC],
 
-            BasisGateSet::GoogleCirq => vec![
-                BasisGate::PhasedXZ,
-                BasisGate::FSIM,
-                BasisGate::CZ,
-            ],
+            BasisGateSet::GoogleCirq => vec![BasisGate::PhasedXZ, BasisGate::FSIM, BasisGate::CZ],
 
-            BasisGateSet::IonQ => vec![
-                BasisGate::GPI,
-                BasisGate::GPI2,
-                BasisGate::MS,
-            ],
+            BasisGateSet::IonQ => vec![BasisGate::GPI, BasisGate::GPI2, BasisGate::MS],
 
-            BasisGateSet::Rigetti => vec![
-                BasisGate::RZ,
-                BasisGate::RX,
-                BasisGate::CZ,
-            ],
+            BasisGateSet::Rigetti => vec![BasisGate::RZ, BasisGate::RX, BasisGate::CZ],
 
             BasisGateSet::Braket => vec![
                 BasisGate::RX,
@@ -306,25 +282,15 @@ impl BasisGateSet {
                 BasisGate::CZ,
             ],
 
-            BasisGateSet::CliffordT | BasisGateSet::StrictCliffordT => vec![
-                BasisGate::H,
-                BasisGate::S,
-                BasisGate::T,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::CliffordT | BasisGateSet::StrictCliffordT => {
+                vec![BasisGate::H, BasisGate::S, BasisGate::T, BasisGate::CNOT]
+            },
 
-            BasisGateSet::Universal => vec![
-                BasisGate::H,
-                BasisGate::T,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::Universal => vec![BasisGate::H, BasisGate::T, BasisGate::CNOT],
 
-            BasisGateSet::Rotation => vec![
-                BasisGate::RX,
-                BasisGate::RY,
-                BasisGate::RZ,
-                BasisGate::CNOT,
-            ],
+            BasisGateSet::Rotation => {
+                vec![BasisGate::RX, BasisGate::RY, BasisGate::RZ, BasisGate::CNOT]
+            },
 
             BasisGateSet::Pauli => vec![
                 BasisGate::X,
@@ -335,7 +301,7 @@ impl BasisGateSet {
                 BasisGate::CNOT,
             ],
 
-            BasisGateSet::All => vec![],  // All gates allowed
+            BasisGateSet::All => vec![], // All gates allowed
 
             BasisGateSet::Custom(custom) => {
                 let mut gates = Vec::new();
@@ -343,7 +309,7 @@ impl BasisGateSet {
                 gates.extend(custom.two_qubit.iter().copied());
                 gates.extend(custom.multi_qubit.iter().copied());
                 gates
-            }
+            },
         }
     }
 
@@ -364,17 +330,34 @@ impl BasisGateSet {
     pub fn single_qubit_gates(&self) -> Vec<BasisGate> {
         self.gates()
             .into_iter()
-            .filter(|g| matches!(
-                g,
-                BasisGate::I | BasisGate::X | BasisGate::Y | BasisGate::Z |
-                BasisGate::H | BasisGate::S | BasisGate::SDagger |
-                BasisGate::T | BasisGate::TDagger |
-                BasisGate::SX | BasisGate::SXDagger |
-                BasisGate::SY | BasisGate::SYDagger |
-                BasisGate::RX | BasisGate::RY | BasisGate::RZ |
-                BasisGate::Phase | BasisGate::U1 | BasisGate::U2 | BasisGate::U3 |
-                BasisGate::PhasedXZ | BasisGate::GPI | BasisGate::GPI2
-            ))
+            .filter(|g| {
+                matches!(
+                    g,
+                    BasisGate::I
+                        | BasisGate::X
+                        | BasisGate::Y
+                        | BasisGate::Z
+                        | BasisGate::H
+                        | BasisGate::S
+                        | BasisGate::SDagger
+                        | BasisGate::T
+                        | BasisGate::TDagger
+                        | BasisGate::SX
+                        | BasisGate::SXDagger
+                        | BasisGate::SY
+                        | BasisGate::SYDagger
+                        | BasisGate::RX
+                        | BasisGate::RY
+                        | BasisGate::RZ
+                        | BasisGate::Phase
+                        | BasisGate::U1
+                        | BasisGate::U2
+                        | BasisGate::U3
+                        | BasisGate::PhasedXZ
+                        | BasisGate::GPI
+                        | BasisGate::GPI2
+                )
+            })
             .collect()
     }
 
@@ -382,14 +365,25 @@ impl BasisGateSet {
     pub fn two_qubit_gates(&self) -> Vec<BasisGate> {
         self.gates()
             .into_iter()
-            .filter(|g| matches!(
-                g,
-                BasisGate::CNOT | BasisGate::CY | BasisGate::CZ |
-                BasisGate::CPhase | BasisGate::SWAP | BasisGate::ISWAP |
-                BasisGate::SqrtISWAP | BasisGate::FSIM | BasisGate::SYC |
-                BasisGate::MS | BasisGate::RXX | BasisGate::RYY | BasisGate::RZZ |
-                BasisGate::ECR
-            ))
+            .filter(|g| {
+                matches!(
+                    g,
+                    BasisGate::CNOT
+                        | BasisGate::CY
+                        | BasisGate::CZ
+                        | BasisGate::CPhase
+                        | BasisGate::SWAP
+                        | BasisGate::ISWAP
+                        | BasisGate::SqrtISWAP
+                        | BasisGate::FSIM
+                        | BasisGate::SYC
+                        | BasisGate::MS
+                        | BasisGate::RXX
+                        | BasisGate::RYY
+                        | BasisGate::RZZ
+                        | BasisGate::ECR
+                )
+            })
             .collect()
     }
 
@@ -410,7 +404,7 @@ impl BasisGateSet {
             BasisGateSet::Custom(custom) => {
                 // Return first two-qubit gate
                 custom.two_qubit.iter().next().copied()
-            }
+            },
         }
     }
 
@@ -459,26 +453,50 @@ impl BasisGate {
     pub fn num_qubits(&self) -> usize {
         match self {
             // Single-qubit
-            BasisGate::I | BasisGate::X | BasisGate::Y | BasisGate::Z |
-            BasisGate::H | BasisGate::S | BasisGate::SDagger |
-            BasisGate::T | BasisGate::TDagger |
-            BasisGate::SX | BasisGate::SXDagger |
-            BasisGate::SY | BasisGate::SYDagger |
-            BasisGate::RX | BasisGate::RY | BasisGate::RZ |
-            BasisGate::Phase | BasisGate::U1 | BasisGate::U2 | BasisGate::U3 |
-            BasisGate::PhasedXZ | BasisGate::GPI | BasisGate::GPI2 => 1,
+            BasisGate::I
+            | BasisGate::X
+            | BasisGate::Y
+            | BasisGate::Z
+            | BasisGate::H
+            | BasisGate::S
+            | BasisGate::SDagger
+            | BasisGate::T
+            | BasisGate::TDagger
+            | BasisGate::SX
+            | BasisGate::SXDagger
+            | BasisGate::SY
+            | BasisGate::SYDagger
+            | BasisGate::RX
+            | BasisGate::RY
+            | BasisGate::RZ
+            | BasisGate::Phase
+            | BasisGate::U1
+            | BasisGate::U2
+            | BasisGate::U3
+            | BasisGate::PhasedXZ
+            | BasisGate::GPI
+            | BasisGate::GPI2 => 1,
 
             // Two-qubit
-            BasisGate::CNOT | BasisGate::CY | BasisGate::CZ |
-            BasisGate::CPhase | BasisGate::SWAP | BasisGate::ISWAP |
-            BasisGate::SqrtISWAP | BasisGate::FSIM | BasisGate::SYC |
-            BasisGate::MS | BasisGate::RXX | BasisGate::RYY | BasisGate::RZZ |
-            BasisGate::ECR => 2,
+            BasisGate::CNOT
+            | BasisGate::CY
+            | BasisGate::CZ
+            | BasisGate::CPhase
+            | BasisGate::SWAP
+            | BasisGate::ISWAP
+            | BasisGate::SqrtISWAP
+            | BasisGate::FSIM
+            | BasisGate::SYC
+            | BasisGate::MS
+            | BasisGate::RXX
+            | BasisGate::RYY
+            | BasisGate::RZZ
+            | BasisGate::ECR => 2,
 
             // Multi-qubit
             BasisGate::Toffoli => 3,
             BasisGate::Fredkin => 3,
-            BasisGate::MCX | BasisGate::MCZ => 2,  // Minimum, can be more
+            BasisGate::MCX | BasisGate::MCZ => 2, // Minimum, can be more
         }
     }
 
@@ -486,10 +504,21 @@ impl BasisGate {
     pub fn is_parameterized(&self) -> bool {
         matches!(
             self,
-            BasisGate::RX | BasisGate::RY | BasisGate::RZ |
-            BasisGate::Phase | BasisGate::U1 | BasisGate::U2 | BasisGate::U3 |
-            BasisGate::CPhase | BasisGate::RXX | BasisGate::RYY | BasisGate::RZZ |
-            BasisGate::PhasedXZ | BasisGate::FSIM | BasisGate::GPI | BasisGate::GPI2
+            BasisGate::RX
+                | BasisGate::RY
+                | BasisGate::RZ
+                | BasisGate::Phase
+                | BasisGate::U1
+                | BasisGate::U2
+                | BasisGate::U3
+                | BasisGate::CPhase
+                | BasisGate::RXX
+                | BasisGate::RYY
+                | BasisGate::RZZ
+                | BasisGate::PhasedXZ
+                | BasisGate::FSIM
+                | BasisGate::GPI
+                | BasisGate::GPI2
         )
     }
 
@@ -497,10 +526,19 @@ impl BasisGate {
     pub fn is_clifford(&self) -> bool {
         matches!(
             self,
-            BasisGate::I | BasisGate::X | BasisGate::Y | BasisGate::Z |
-            BasisGate::H | BasisGate::S | BasisGate::SDagger |
-            BasisGate::SX | BasisGate::SXDagger |
-            BasisGate::CNOT | BasisGate::CY | BasisGate::CZ | BasisGate::SWAP
+            BasisGate::I
+                | BasisGate::X
+                | BasisGate::Y
+                | BasisGate::Z
+                | BasisGate::H
+                | BasisGate::S
+                | BasisGate::SDagger
+                | BasisGate::SX
+                | BasisGate::SXDagger
+                | BasisGate::CNOT
+                | BasisGate::CY
+                | BasisGate::CZ
+                | BasisGate::SWAP
         )
     }
 
@@ -612,5 +650,161 @@ mod tests {
     fn test_discrete_basis() {
         assert!(BasisGateSet::CliffordT.is_discrete());
         assert!(!BasisGateSet::IBM.is_discrete());
+    }
+
+    #[test]
+    fn test_custom_basis_add_multi_qubit_and_default() {
+        // Covers CustomBasis::add_multi_qubit and Default::default (which calls new())
+        let mut custom = CustomBasis::default();
+        assert!(!custom.contains(&BasisGate::Toffoli));
+        custom.add_multi_qubit(BasisGate::Toffoli);
+        assert!(custom.contains(&BasisGate::Toffoli));
+
+        let basis = BasisGateSet::Custom(custom);
+        assert!(basis.contains(BasisGate::Toffoli));
+    }
+
+    #[test]
+    fn test_gates_rigetti_braket_universal_rotation_pauli_all() {
+        assert_eq!(
+            BasisGateSet::Rigetti.gates(),
+            vec![BasisGate::RZ, BasisGate::RX, BasisGate::CZ]
+        );
+
+        assert_eq!(
+            BasisGateSet::Braket.gates(),
+            vec![
+                BasisGate::RX,
+                BasisGate::RY,
+                BasisGate::RZ,
+                BasisGate::CNOT,
+                BasisGate::CZ,
+            ]
+        );
+
+        assert_eq!(
+            BasisGateSet::Universal.gates(),
+            vec![BasisGate::H, BasisGate::T, BasisGate::CNOT]
+        );
+
+        assert_eq!(
+            BasisGateSet::Rotation.gates(),
+            vec![BasisGate::RX, BasisGate::RY, BasisGate::RZ, BasisGate::CNOT]
+        );
+
+        assert_eq!(
+            BasisGateSet::Pauli.gates(),
+            vec![
+                BasisGate::X,
+                BasisGate::Y,
+                BasisGate::Z,
+                BasisGate::H,
+                BasisGate::S,
+                BasisGate::CNOT,
+            ]
+        );
+
+        // All gates -> empty list (no decomposition needed), but contains() is still true
+        assert!(BasisGateSet::All.gates().is_empty());
+        assert!(BasisGateSet::All.contains(BasisGate::Toffoli));
+    }
+
+    #[test]
+    fn test_entangling_gate_remaining_variants() {
+        assert_eq!(BasisGateSet::Braket.entangling_gate(), Some(BasisGate::CNOT));
+        assert_eq!(BasisGateSet::StrictCliffordT.entangling_gate(), Some(BasisGate::CNOT));
+        assert_eq!(BasisGateSet::Universal.entangling_gate(), Some(BasisGate::CNOT));
+        assert_eq!(BasisGateSet::Rotation.entangling_gate(), Some(BasisGate::CNOT));
+        assert_eq!(BasisGateSet::Pauli.entangling_gate(), Some(BasisGate::CNOT));
+        assert_eq!(BasisGateSet::All.entangling_gate(), None);
+
+        // Custom with no two-qubit gates returns None
+        let empty_custom = CustomBasis::new();
+        assert_eq!(BasisGateSet::Custom(empty_custom).entangling_gate(), None);
+
+        // Custom with a two-qubit gate returns Some(that gate)
+        let mut custom = CustomBasis::new();
+        custom.add_two_qubit(BasisGate::CZ);
+        assert_eq!(BasisGateSet::Custom(custom).entangling_gate(), Some(BasisGate::CZ));
+    }
+
+    #[test]
+    fn test_description_all_variants() {
+        assert_eq!(BasisGateSet::IBM.description(), "IBM Quantum (U1, U2, U3, CNOT)");
+        assert_eq!(BasisGateSet::IBMQiskit.description(), "IBM Qiskit (RZ, SX, X, CNOT)");
+        assert_eq!(BasisGateSet::Google.description(), "Google Sycamore (PhasedXZ, √iSWAP, SYC)");
+        assert_eq!(BasisGateSet::GoogleCirq.description(), "Google Cirq (PhasedXZ, FSIM, CZ)");
+        assert_eq!(BasisGateSet::IonQ.description(), "IonQ Trapped Ion (GPI, GPI2, MS)");
+        assert_eq!(BasisGateSet::Rigetti.description(), "Rigetti (RZ, RX, CZ)");
+        assert_eq!(BasisGateSet::Braket.description(), "Amazon Braket (Rx, Ry, Rz, CNOT, CZ)");
+        assert_eq!(BasisGateSet::CliffordT.description(), "Clifford+T (H, S, T, CNOT)");
+        assert_eq!(
+            BasisGateSet::StrictCliffordT.description(),
+            "Strict Clifford+T (exact synthesis)"
+        );
+        assert_eq!(BasisGateSet::Universal.description(), "Universal (H, T, CNOT)");
+        assert_eq!(BasisGateSet::Rotation.description(), "Rotation basis (RX, RY, RZ, CNOT)");
+        assert_eq!(BasisGateSet::Pauli.description(), "Pauli basis (X, Y, Z, H, S, CNOT)");
+        assert_eq!(BasisGateSet::All.description(), "All gates (no decomposition)");
+
+        let custom = CustomBasis::new();
+        assert_eq!(BasisGateSet::Custom(custom).description(), "Custom basis");
+    }
+
+    #[test]
+    fn test_mcx_mcz_num_qubits() {
+        assert_eq!(BasisGate::MCX.num_qubits(), 2);
+        assert_eq!(BasisGate::MCZ.num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_basis_gate_name_all_variants() {
+        let expected = [
+            (BasisGate::I, "I"),
+            (BasisGate::X, "X"),
+            (BasisGate::Y, "Y"),
+            (BasisGate::Z, "Z"),
+            (BasisGate::H, "H"),
+            (BasisGate::S, "S"),
+            (BasisGate::SDagger, "S†"),
+            (BasisGate::T, "T"),
+            (BasisGate::TDagger, "T†"),
+            (BasisGate::SX, "SX"),
+            (BasisGate::SXDagger, "SX†"),
+            (BasisGate::SY, "SY"),
+            (BasisGate::SYDagger, "SY†"),
+            (BasisGate::RX, "RX"),
+            (BasisGate::RY, "RY"),
+            (BasisGate::RZ, "RZ"),
+            (BasisGate::Phase, "P"),
+            (BasisGate::U1, "U1"),
+            (BasisGate::U2, "U2"),
+            (BasisGate::U3, "U3"),
+            (BasisGate::PhasedXZ, "PhasedXZ"),
+            (BasisGate::GPI, "GPI"),
+            (BasisGate::GPI2, "GPI2"),
+            (BasisGate::CNOT, "CNOT"),
+            (BasisGate::CY, "CY"),
+            (BasisGate::CZ, "CZ"),
+            (BasisGate::CPhase, "CPhase"),
+            (BasisGate::SWAP, "SWAP"),
+            (BasisGate::ISWAP, "iSWAP"),
+            (BasisGate::SqrtISWAP, "√iSWAP"),
+            (BasisGate::FSIM, "FSIM"),
+            (BasisGate::SYC, "SYC"),
+            (BasisGate::MS, "MS"),
+            (BasisGate::RXX, "RXX"),
+            (BasisGate::RYY, "RYY"),
+            (BasisGate::RZZ, "RZZ"),
+            (BasisGate::ECR, "ECR"),
+            (BasisGate::Toffoli, "Toffoli"),
+            (BasisGate::Fredkin, "Fredkin"),
+            (BasisGate::MCX, "MCX"),
+            (BasisGate::MCZ, "MCZ"),
+        ];
+
+        for (gate, name) in expected {
+            assert_eq!(gate.name(), name, "unexpected name for {:?}", gate);
+        }
     }
 }

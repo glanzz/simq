@@ -67,7 +67,13 @@ impl Pauli {
     pub fn eigenvalue(self, basis_state: bool) -> f64 {
         match self {
             Pauli::I => 1.0,
-            Pauli::Z => if basis_state { -1.0 } else { 1.0 },
+            Pauli::Z => {
+                if basis_state {
+                    -1.0
+                } else {
+                    1.0
+                }
+            },
             _ => panic!("eigenvalue only valid for diagonal Paulis"),
         }
     }
@@ -104,7 +110,26 @@ impl PauliString {
     /// let pauli = PauliString::from_str("XXYZ").unwrap();
     /// assert_eq!(pauli.num_qubits(), 4);
     /// ```
+    /// Create a new Pauli string from a string representation
+    ///
+    /// # Example
+    /// ```
+    /// use simq_state::PauliString;
+    /// use std::str::FromStr;
+    ///
+    /// let pauli = PauliString::from_str("XXYZ").unwrap();
+    /// assert_eq!(pauli.num_qubits(), 4);
+    /// ```
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
+        s.parse()
+    }
+}
+
+impl std::str::FromStr for PauliString {
+    type Err = StateError;
+
+    fn from_str(s: &str) -> Result<Self> {
         let paulis: Result<Vec<_>> = s.chars().map(Pauli::from_char).collect();
         Ok(Self {
             paulis: paulis?,
@@ -112,7 +137,9 @@ impl PauliString {
             phase: 0,
         })
     }
+}
 
+impl PauliString {
     /// Create a Pauli string from a vector of Paulis
     pub fn from_paulis(paulis: Vec<Pauli>) -> Self {
         Self {
@@ -188,7 +215,6 @@ impl PauliString {
     /// Compute expectation value for diagonal Pauli string (fast path)
     fn expectation_value_diagonal(&self, state: &DenseState) -> Result<f64> {
         let amplitudes = state.amplitudes();
-        let num_qubits = state.num_qubits();
 
         let mut expectation = 0.0;
 
@@ -260,27 +286,27 @@ impl PauliString {
             match pauli {
                 Pauli::I => {
                     // Identity: no change
-                }
+                },
                 Pauli::X => {
                     // Flip bit
                     new_state ^= 1 << qubit;
-                }
+                },
                 Pauli::Y => {
                     // Flip bit with phase
                     new_state ^= 1 << qubit;
                     // Y|0⟩ = i|1⟩, Y|1⟩ = -i|0⟩
                     phase *= if bit == 0 {
-                        Complex64::new(0.0, 1.0)  // i
+                        Complex64::new(0.0, 1.0) // i
                     } else {
                         Complex64::new(0.0, -1.0) // -i
                     };
-                }
+                },
                 Pauli::Z => {
                     // Phase flip: |0⟩ → |0⟩, |1⟩ → -|1⟩
                     if bit == 1 {
                         phase *= Complex64::new(-1.0, 0.0);
                     }
-                }
+                },
             }
         }
 
@@ -561,5 +587,103 @@ mod tests {
         let obs = PauliObservable::single_z(3, 1);
         let expectation = obs.expectation_value(&state).unwrap();
         assert_relative_eq!(expectation, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_pauli_from_char_invalid() {
+        // An unrecognized character must return an error rather than panic.
+        let err = Pauli::from_char('Q').unwrap_err();
+        assert_eq!(err, StateError::InvalidDimension { dimension: 0 });
+    }
+
+    #[test]
+    fn test_pauli_eigenvalue_identity_and_display() {
+        // Pauli::I eigenvalue is always +1 regardless of basis state.
+        assert_relative_eq!(Pauli::I.eigenvalue(false), 1.0, epsilon = 1e-10);
+        assert_relative_eq!(Pauli::I.eigenvalue(true), 1.0, epsilon = 1e-10);
+
+        // Display impl for Pauli should match `to_char`.
+        assert_eq!(Pauli::I.to_string(), "I");
+        assert_eq!(Pauli::X.to_string(), "X");
+        assert_eq!(Pauli::Y.to_string(), "Y");
+        assert_eq!(Pauli::Z.to_string(), "Z");
+    }
+
+    #[test]
+    #[should_panic(expected = "eigenvalue only valid for diagonal Paulis")]
+    fn test_pauli_eigenvalue_panics_for_non_diagonal() {
+        // X and Y are not diagonal, so `eigenvalue` must panic for them.
+        let _ = Pauli::X.eigenvalue(false);
+    }
+
+    #[test]
+    fn test_expectation_value_dimension_mismatch() {
+        // Pauli string qubit count must match the state's qubit count.
+        let state = DenseState::new(2).unwrap();
+        let obs = PauliString::from_str("ZZZ").unwrap();
+
+        let err = obs.expectation_value(&state).unwrap_err();
+        assert_eq!(
+            err,
+            StateError::DimensionMismatch {
+                expected: 3,
+                actual: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn test_pauli_string_display_negative_coeff() {
+        // Display must prefix a '-' when coeff == -1, and concatenate the
+        // per-qubit Pauli characters.
+        let pauli = PauliString::from_paulis(vec![Pauli::X, Pauli::Y, Pauli::Z]).with_coeff(-1);
+        assert_eq!(pauli.to_string(), "-XYZ");
+
+        let positive = PauliString::from_paulis(vec![Pauli::I, Pauli::Z]);
+        assert_eq!(positive.to_string(), "IZ");
+    }
+
+    #[test]
+    fn test_pauli_observable_default_and_display() {
+        // Default::default() should produce an empty observable.
+        let obs = PauliObservable::default();
+        assert_eq!(obs.num_terms(), 0);
+        assert_eq!(obs.to_string(), "");
+
+        // Display with multiple terms joins them with " + " and formats the
+        // coefficient with 4 decimal places.
+        let mut obs = PauliObservable::new();
+        obs.add_term(PauliString::from_str("X").unwrap(), 0.5);
+        obs.add_term(PauliString::from_str("Z").unwrap(), 0.25);
+        assert_eq!(obs.to_string(), "0.5000·X + 0.2500·Z");
+    }
+
+    #[test]
+    fn test_apply_to_basis_state_z_in_general_path() {
+        // A mixed string like "ZX" is not diagonal, so expectation_value
+        // routes through expectation_value_general, which in turn exercises
+        // the Pauli::Z branch of apply_to_basis_state (phase flip on bit==1).
+        // Paulis are indexed left-to-right as qubit0, qubit1, ...: "ZX" means
+        // qubit0=Z, qubit1=X.
+        let zx = PauliString::from_str("ZX").unwrap();
+        assert!(!zx.is_diagonal());
+
+        // basis_state = 0b01 -> qubit0 (Z) bit=1 => phase -1, qubit1 (X) bit=0 => flips qubit1
+        let (new_state, phase) = zx.apply_to_basis_state(0b01);
+        assert_eq!(new_state, 0b11); // X flips qubit 1 bit
+        assert_relative_eq!(phase.re, -1.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, 0.0, epsilon = 1e-10);
+
+        // basis_state = 0b10 -> qubit0 (Z) bit=0 => no phase, qubit1 (X) bit=1 => flips qubit1
+        let (new_state, phase) = zx.apply_to_basis_state(0b10);
+        assert_eq!(new_state, 0b00); // X flips qubit 1 bit back to 0
+        assert_relative_eq!(phase.re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, 0.0, epsilon = 1e-10);
+
+        // Full expectation value computation on a basis state for a mixed
+        // string, ensuring expectation_value_general runs end-to-end.
+        let state = DenseState::new(2).unwrap();
+        let expectation = zx.expectation_value(&state).unwrap();
+        assert_relative_eq!(expectation, 0.0, epsilon = 1e-10);
     }
 }

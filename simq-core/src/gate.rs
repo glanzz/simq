@@ -300,4 +300,15 @@ mod tests {
         assert!(display.contains("q0"));
         assert!(display.contains("q1"));
     }
+
+    #[test]
+    fn test_default_matrix_is_none() {
+        // MockGate does not override `matrix()`, so this exercises the
+        // default trait method implementation which returns `None`.
+        let gate = MockGate {
+            name: "MOCK".to_string(),
+            num_qubits: 1,
+        };
+        assert_eq!(gate.matrix(), None);
+    }
 }

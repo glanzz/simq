@@ -41,9 +41,15 @@ fn create_parallel_circuit(num_qubits: usize) -> Circuit {
 
     // Each qubit gets gates that can execute in parallel
     for q in 0..num_qubits {
-        circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(q)]).unwrap();
-        circuit.add_gate(Arc::new(TGate), &[QubitId::new(q)]).unwrap();
-        circuit.add_gate(Arc::new(SGate), &[QubitId::new(q)]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard), &[QubitId::new(q)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(TGate), &[QubitId::new(q)])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(SGate), &[QubitId::new(q)])
+            .unwrap();
     }
 
     circuit
@@ -65,12 +71,11 @@ fn create_mixed_circuit(num_qubits: usize, depth: usize) -> Circuit {
         }
 
         // Two-qubit gates (creates dependencies)
-        for q in 0..num_qubits-1 {
+        for q in 0..num_qubits - 1 {
             if (layer + q) % 2 == 0 {
-                circuit.add_gate(
-                    Arc::new(CNot),
-                    &[QubitId::new(q), QubitId::new(q + 1)]
-                ).unwrap();
+                circuit
+                    .add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+                    .unwrap();
             }
         }
     }
@@ -131,19 +136,15 @@ fn bench_plan_generation_sequential(c: &mut Criterion) {
 
     for size in [10, 50, 100, 500, 1000] {
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &size,
-            |b, &size| {
-                let circuit = create_sequential_circuit(size);
-                let planner = ExecutionPlanner::new();
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            let circuit = create_sequential_circuit(size);
+            let planner = ExecutionPlanner::new();
 
-                b.iter(|| {
-                    let plan = planner.generate_plan(black_box(&circuit));
-                    black_box(plan);
-                });
-            },
-        );
+            b.iter(|| {
+                let plan = planner.generate_plan(black_box(&circuit));
+                black_box(plan);
+            });
+        });
     }
 
     group.finish();
@@ -203,20 +204,16 @@ fn bench_compilation_without_planning(c: &mut Criterion) {
 
     for size in [10, 50, 100, 500] {
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &size,
-            |b, &size| {
-                let circuit = create_redundant_circuit(size / 10, 5);
-                let compiler = create_compiler(OptimizationLevel::O2);
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            let circuit = create_redundant_circuit(size / 10, 5);
+            let compiler = create_compiler(OptimizationLevel::O2);
 
-                b.iter(|| {
-                    let mut test_circuit = circuit.clone();
-                    let result = compiler.compile(black_box(&mut test_circuit));
-                    black_box(&result);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut test_circuit = circuit.clone();
+                let result = compiler.compile(black_box(&mut test_circuit));
+                black_box(&result);
+            });
+        });
     }
 
     group.finish();
@@ -227,25 +224,21 @@ fn bench_compilation_with_planning(c: &mut Criterion) {
 
     for size in [10, 50, 100, 500] {
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &size,
-            |b, &size| {
-                let circuit = create_redundant_circuit(size / 10, 5);
-                let compiler = create_compiler(OptimizationLevel::O2);
-                let planner = ExecutionPlanner::new();
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            let circuit = create_redundant_circuit(size / 10, 5);
+            let compiler = create_compiler(OptimizationLevel::O2);
+            let planner = ExecutionPlanner::new();
 
-                b.iter(|| {
-                    let mut test_circuit = circuit.clone();
-                    let result = compiler.compile(black_box(&mut test_circuit));
-                    black_box(&result);
+            b.iter(|| {
+                let mut test_circuit = circuit.clone();
+                let result = compiler.compile(black_box(&mut test_circuit));
+                black_box(&result);
 
-                    // Generate execution plan after compilation
-                    let plan = planner.generate_plan(black_box(&test_circuit));
-                    black_box(plan);
-                });
-            },
-        );
+                // Generate execution plan after compilation
+                let plan = planner.generate_plan(black_box(&test_circuit));
+                black_box(plan);
+            });
+        });
     }
 
     group.finish();
@@ -258,16 +251,12 @@ fn bench_planning_overhead_percentage(c: &mut Criterion) {
         let circuit = create_redundant_circuit(size / 10, 5);
         let planner = ExecutionPlanner::new();
 
-        group.bench_with_input(
-            BenchmarkId::new("planning_only", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    let plan = planner.generate_plan(black_box(&circuit));
-                    black_box(plan);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("planning_only", size), &size, |b, _| {
+            b.iter(|| {
+                let plan = planner.generate_plan(black_box(&circuit));
+                black_box(plan);
+            });
+        });
     }
 
     group.finish();
@@ -356,22 +345,18 @@ fn bench_parallelization_metrics(c: &mut Criterion) {
     for size in [10, 50, 100, 500] {
         let circuit = create_mixed_circuit(size / 10, 10);
 
-        group.bench_with_input(
-            BenchmarkId::new("full_analysis", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    let plan = planner.generate_plan(black_box(&circuit));
+        group.bench_with_input(BenchmarkId::new("full_analysis", size), &size, |b, _| {
+            b.iter(|| {
+                let plan = planner.generate_plan(black_box(&circuit));
 
-                    // Compute all metrics
-                    let efficiency = plan.parallelization_efficiency();
-                    let avg_size = plan.average_layer_size();
-                    let bottleneck = plan.bottleneck_layer();
+                // Compute all metrics
+                let efficiency = plan.parallelization_efficiency();
+                let avg_size = plan.average_layer_size();
+                let bottleneck = plan.bottleneck_layer();
 
-                    black_box((efficiency, avg_size, bottleneck));
-                });
-            },
-        );
+                black_box((efficiency, avg_size, bottleneck));
+            });
+        });
     }
 
     group.finish();
@@ -387,19 +372,15 @@ fn bench_deep_circuits(c: &mut Criterion) {
         let total_gates = num_qubits * depth;
 
         group.throughput(Throughput::Elements(total_gates as u64));
-        group.bench_with_input(
-            BenchmarkId::new("depth", depth),
-            &depth,
-            |b, &depth| {
-                let circuit = create_deep_circuit(num_qubits, depth);
-                let planner = ExecutionPlanner::new();
+        group.bench_with_input(BenchmarkId::new("depth", depth), &depth, |b, &depth| {
+            let circuit = create_deep_circuit(num_qubits, depth);
+            let planner = ExecutionPlanner::new();
 
-                b.iter(|| {
-                    let plan = planner.generate_plan(black_box(&circuit));
-                    black_box(plan);
-                });
-            },
-        );
+            b.iter(|| {
+                let plan = planner.generate_plan(black_box(&circuit));
+                black_box(plan);
+            });
+        });
     }
 
     group.finish();
@@ -442,33 +423,29 @@ fn bench_full_workflow(c: &mut Criterion) {
     let mut group = c.benchmark_group("workflow/end_to_end");
 
     for size in [10, 50, 100] {
-        group.bench_with_input(
-            BenchmarkId::new("optimize_and_plan", size),
-            &size,
-            |b, &size| {
-                let original_circuit = create_redundant_circuit(size / 10, 5);
-                let compiler = create_compiler(OptimizationLevel::O2);
-                let planner = ExecutionPlanner::new();
+        group.bench_with_input(BenchmarkId::new("optimize_and_plan", size), &size, |b, &size| {
+            let original_circuit = create_redundant_circuit(size / 10, 5);
+            let compiler = create_compiler(OptimizationLevel::O2);
+            let planner = ExecutionPlanner::new();
 
-                b.iter(|| {
-                    // 1. Generate plan for original circuit
-                    let original_plan = planner.generate_plan(black_box(&original_circuit));
-                    black_box(&original_plan);
+            b.iter(|| {
+                // 1. Generate plan for original circuit
+                let original_plan = planner.generate_plan(black_box(&original_circuit));
+                black_box(&original_plan);
 
-                    // 2. Optimize circuit
-                    let mut optimized = original_circuit.clone();
-                    compiler.compile(black_box(&mut optimized)).unwrap();
+                // 2. Optimize circuit
+                let mut optimized = original_circuit.clone();
+                compiler.compile(black_box(&mut optimized)).unwrap();
 
-                    // 3. Generate plan for optimized circuit
-                    let optimized_plan = planner.generate_plan(black_box(&optimized));
-                    black_box(&optimized_plan);
+                // 3. Generate plan for optimized circuit
+                let optimized_plan = planner.generate_plan(black_box(&optimized));
+                black_box(&optimized_plan);
 
-                    // 4. Compare metrics
-                    let improvement = original_plan.total_time / optimized_plan.total_time;
-                    black_box(improvement);
-                });
-            },
-        );
+                // 4. Compare metrics
+                let improvement = original_plan.total_time / optimized_plan.total_time;
+                black_box(improvement);
+            });
+        });
     }
 
     group.finish();
@@ -499,14 +476,6 @@ criterion_group!(
     bench_custom_gate_timing,
 );
 
-criterion_group!(
-    workflows,
-    bench_full_workflow,
-);
+criterion_group!(workflows, bench_full_workflow,);
 
-criterion_main!(
-    execution_planning,
-    compilation_overhead,
-    advanced_features,
-    workflows,
-);
+criterion_main!(execution_planning, compilation_overhead, advanced_features, workflows,);

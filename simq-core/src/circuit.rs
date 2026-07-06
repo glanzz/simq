@@ -281,8 +281,10 @@ impl Circuit {
     /// ```
     pub fn validate_dag(&self) -> crate::Result<crate::ValidationReport> {
         use crate::validation::dag::DependencyGraph;
-        use crate::validation::rules::{ValidationRule, CycleDetectionRule, DependencyValidationRule, QubitUsageRule};
         use crate::validation::report::ValidationReport;
+        use crate::validation::rules::{
+            CycleDetectionRule, DependencyValidationRule, QubitUsageRule, ValidationRule,
+        };
 
         // Basic validation first
         self.validate()?;
@@ -408,7 +410,9 @@ impl Circuit {
             .iter()
             .map(|op| registry.serialize_gate_op(op))
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+            .map_err(|e| {
+                QuantumError::SerializationError(format!("Failed to serialize gate: {}", e))
+            })?;
 
         let serialized = SerializedCircuit {
             version: CIRCUIT_FORMAT_VERSION,
@@ -417,8 +421,9 @@ impl Circuit {
             metadata: None,
         };
 
-        bincode::serialize(&serialized)
-            .map_err(|e| QuantumError::SerializationError(format!("Binary serialization failed: {}", e)))
+        bincode::serialize(&serialized).map_err(|e| {
+            QuantumError::SerializationError(format!("Binary serialization failed: {}", e))
+        })
     }
 
     #[cfg(feature = "serialization")]
@@ -439,8 +444,9 @@ impl Circuit {
         use crate::serialization::gate::GateRegistry;
         use crate::serialization::StandardGateRegistry;
 
-        let serialized: SerializedCircuit = bincode::deserialize(bytes)
-            .map_err(|e| QuantumError::DeserializationError(format!("Binary deserialization failed: {}", e)))?;
+        let serialized: SerializedCircuit = bincode::deserialize(bytes).map_err(|e| {
+            QuantumError::DeserializationError(format!("Binary deserialization failed: {}", e))
+        })?;
 
         serialized.check_version()?;
 
@@ -448,8 +454,11 @@ impl Circuit {
         let mut circuit = Circuit::new(serialized.num_qubits);
 
         for op in serialized.operations {
-            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
-                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            let gate_op = registry
+                .create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| {
+                    QuantumError::DeserializationError(format!("Failed to create gate: {}", e))
+                })?;
             circuit.operations.push(gate_op);
         }
 
@@ -481,7 +490,9 @@ impl Circuit {
             .iter()
             .map(|op| registry.serialize_gate_op(op))
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+            .map_err(|e| {
+                QuantumError::SerializationError(format!("Failed to serialize gate: {}", e))
+            })?;
 
         let serialized = SerializedCircuit {
             version: CIRCUIT_FORMAT_VERSION,
@@ -490,8 +501,9 @@ impl Circuit {
             metadata: None,
         };
 
-        serde_json::to_string(&serialized)
-            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+        serde_json::to_string(&serialized).map_err(|e| {
+            QuantumError::SerializationError(format!("JSON serialization failed: {}", e))
+        })
     }
 
     #[cfg(feature = "serialization")]
@@ -510,7 +522,9 @@ impl Circuit {
             .iter()
             .map(|op| registry.serialize_gate_op(op))
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| QuantumError::SerializationError(format!("Failed to serialize gate: {}", e)))?;
+            .map_err(|e| {
+                QuantumError::SerializationError(format!("Failed to serialize gate: {}", e))
+            })?;
 
         let serialized = SerializedCircuit {
             version: CIRCUIT_FORMAT_VERSION,
@@ -519,8 +533,9 @@ impl Circuit {
             metadata: None,
         };
 
-        serde_json::to_string_pretty(&serialized)
-            .map_err(|e| QuantumError::SerializationError(format!("JSON serialization failed: {}", e)))
+        serde_json::to_string_pretty(&serialized).map_err(|e| {
+            QuantumError::SerializationError(format!("JSON serialization failed: {}", e))
+        })
     }
 
     #[cfg(feature = "serialization")]
@@ -541,8 +556,9 @@ impl Circuit {
         use crate::serialization::gate::GateRegistry;
         use crate::serialization::StandardGateRegistry;
 
-        let serialized: SerializedCircuit = serde_json::from_str(json)
-            .map_err(|e| QuantumError::DeserializationError(format!("JSON deserialization failed: {}", e)))?;
+        let serialized: SerializedCircuit = serde_json::from_str(json).map_err(|e| {
+            QuantumError::DeserializationError(format!("JSON deserialization failed: {}", e))
+        })?;
 
         serialized.check_version()?;
 
@@ -550,8 +566,11 @@ impl Circuit {
         let mut circuit = Circuit::new(serialized.num_qubits);
 
         for op in serialized.operations {
-            let gate_op = registry.create_gate_op(&op, serialized.num_qubits)
-                .map_err(|e| QuantumError::DeserializationError(format!("Failed to create gate: {}", e)))?;
+            let gate_op = registry
+                .create_gate_op(&op, serialized.num_qubits)
+                .map_err(|e| {
+                    QuantumError::DeserializationError(format!("Failed to create gate: {}", e))
+                })?;
             circuit.operations.push(gate_op);
         }
 
@@ -833,5 +852,245 @@ mod tests {
         // Gate on same qubit as first creates a dependency, depth becomes 2
         circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
         assert_eq!(circuit.depth(), 2);
+    }
+
+    // Tests for previously uncovered lines
+
+    #[test]
+    fn test_get_operation_mut() {
+        // Covers lines 125-126
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
+
+        let op = circuit.get_operation_mut(0);
+        assert!(op.is_some());
+
+        let no_op = circuit.get_operation_mut(99);
+        assert!(no_op.is_none());
+    }
+
+    #[test]
+    fn test_remove_operation() {
+        // Covers line 132 + "some" branch (and the None branch via out-of-bounds)
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "X".to_string(),
+            num_qubits: 1,
+        });
+        circuit.add_gate(gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(gate, &[QubitId::new(1)]).unwrap();
+        assert_eq!(circuit.len(), 2);
+
+        let removed = circuit.remove_operation(0);
+        assert!(removed.is_some());
+        assert_eq!(circuit.len(), 1);
+
+        // Out-of-bounds returns None
+        let none = circuit.remove_operation(99);
+        assert!(none.is_none());
+    }
+
+    #[test]
+    fn test_insert_operation_valid() {
+        // Covers lines 148, 160-161
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        circuit.add_gate(gate.clone(), &[QubitId::new(0)]).unwrap();
+
+        let new_op = GateOp::new(gate, &[QubitId::new(1)]).unwrap();
+        circuit.insert_operation(0, new_op).unwrap();
+        assert_eq!(circuit.len(), 2);
+    }
+
+    #[test]
+    fn test_insert_operation_out_of_bounds() {
+        // Covers lines 153-157
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let op = GateOp::new(gate, &[QubitId::new(0)]).unwrap();
+        let result = circuit.insert_operation(99, op);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            QuantumError::ValidationError(msg) => {
+                assert!(msg.contains("out of bounds") || msg.contains("99"));
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_insert_operation_invalid_qubit() {
+        // Covers line 148 (qubit validation in insert_operation)
+        let mut circuit = Circuit::new(2);
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let op = GateOp::new(gate, &[QubitId::new(5)]).unwrap();
+        let result = circuit.insert_operation(0, op);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_append_circuits() {
+        // Covers line 177: successful append
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let mut c1 = Circuit::new(2);
+        let mut c2 = Circuit::new(2);
+        c1.add_gate(gate.clone(), &[QubitId::new(0)]).unwrap();
+        c2.add_gate(gate, &[QubitId::new(1)]).unwrap();
+
+        c1.append(&c2).unwrap();
+        assert_eq!(c1.len(), 2);
+    }
+
+    #[test]
+    fn test_append_circuits_different_qubits() {
+        // Covers the error path in append (line 170-174)
+        let mut c1 = Circuit::new(2);
+        let c2 = Circuit::new(3);
+        let result = c1.append(&c2);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            QuantumError::ValidationError(msg) => {
+                assert!(msg.contains("Cannot append"));
+            },
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_two_qubit_gate_count_and_operations() {
+        // Covers lines 244, 255-257 (two_qubit_gate_count and two_qubit_operations)
+        let gate_1q = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let gate_2q = Arc::new(MockGate {
+            name: "CNOT".to_string(),
+            num_qubits: 2,
+        });
+        let mut circuit = Circuit::new(2);
+        circuit.add_gate(gate_1q, &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(gate_2q, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+
+        assert_eq!(circuit.two_qubit_gate_count(), 1);
+        let two_qubit_ops: Vec<_> = circuit.two_qubit_operations().collect();
+        assert_eq!(two_qubit_ops.len(), 1);
+        assert_eq!(two_qubit_ops[0].gate().name(), "CNOT");
+    }
+
+    #[test]
+    fn test_single_qubit_gate_count_and_operations() {
+        // Covers lines 309
+        let gate_1q = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let mut circuit = Circuit::new(2);
+        circuit
+            .add_gate(gate_1q.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit.add_gate(gate_1q, &[QubitId::new(1)]).unwrap();
+
+        assert_eq!(circuit.single_qubit_gate_count(), 2);
+        let single_ops: Vec<_> = circuit.single_qubit_operations().collect();
+        assert_eq!(single_ops.len(), 2);
+    }
+
+    #[test]
+    fn test_validate_dag_ok() {
+        // Covers lines 414, 425 path
+        let circuit = Circuit::new(2);
+        let result = circuit.validate_dag();
+        assert!(result.is_ok());
+        let report = result.unwrap();
+        assert!(report.is_valid());
+    }
+
+    #[test]
+    fn test_compute_depth() {
+        // Covers line 460: compute_depth
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let mut circuit = Circuit::new(2);
+        circuit.add_gate(gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(gate, &[QubitId::new(0)]).unwrap();
+
+        let depth = circuit.compute_depth().unwrap();
+        assert_eq!(depth, 2);
+    }
+
+    #[test]
+    fn test_is_acyclic() {
+        // Covers line 494: is_acyclic
+        let circuit = Circuit::new(2);
+        let result = circuit.is_acyclic();
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+    }
+
+    #[test]
+    fn test_analyze_parallelism() {
+        // Covers line 505: analyze_parallelism
+        let gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+        let mut circuit = Circuit::new(2);
+        circuit.add_gate(gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(gate, &[QubitId::new(1)]).unwrap();
+
+        let analysis = circuit.analyze_parallelism().unwrap();
+        assert!(analysis.parallelism_factor >= 1.0);
+    }
+
+    #[test]
+    fn test_to_dot() {
+        // Covers line 526: to_dot
+        let circuit = Circuit::new(2);
+        let dot = circuit.to_dot().unwrap();
+        assert!(dot.contains("digraph Circuit"));
+    }
+
+    #[test]
+    fn test_to_ascii() {
+        // Covers line 537, 572: to_ascii and to_ascii_with_config
+        let circuit = Circuit::new(2);
+        let ascii = circuit.to_ascii();
+        assert!(!ascii.is_empty());
+
+        let config = crate::ascii_renderer::AsciiConfig::default();
+        let ascii2 = circuit.to_ascii_with_config(&config);
+        assert!(!ascii2.is_empty());
+    }
+
+    #[test]
+    fn test_to_latex() {
+        // Covers lines 668-669: to_latex and to_latex_with_config
+        let circuit = Circuit::new(2);
+        let latex = circuit.to_latex();
+        assert!(!latex.is_empty());
+
+        let config = crate::latex_renderer::LatexConfig::default();
+        let latex2 = circuit.to_latex_with_config(&config);
+        assert!(!latex2.is_empty());
     }
 }

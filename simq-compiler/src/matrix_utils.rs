@@ -28,10 +28,7 @@ use num_complex::Complex64;
 /// // result is the identity matrix
 /// ```
 #[inline]
-pub fn multiply_2x2(
-    a: &[[Complex64; 2]; 2],
-    b: &[[Complex64; 2]; 2],
-) -> [[Complex64; 2]; 2] {
+pub fn multiply_2x2(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2]) -> [[Complex64; 2]; 2] {
     [
         [
             a[0][0] * b[0][0] + a[0][1] * b[1][0],
@@ -55,10 +52,7 @@ pub fn multiply_2x2(
 /// Vector of length 4 containing matrix elements in row-major order
 #[inline]
 pub fn matrix_to_vec(matrix: &[[Complex64; 2]; 2]) -> Vec<Complex64> {
-    vec![
-        matrix[0][0], matrix[0][1],
-        matrix[1][0], matrix[1][1],
-    ]
+    vec![matrix[0][0], matrix[0][1], matrix[1][0], matrix[1][1]]
 }
 
 /// Check if two matrices are approximately equal
@@ -73,11 +67,7 @@ pub fn matrix_to_vec(matrix: &[[Complex64; 2]; 2]) -> Vec<Complex64> {
 /// # Returns
 /// True if matrices are approximately equal
 #[inline]
-pub fn matrices_approx_eq(
-    a: &[[Complex64; 2]; 2],
-    b: &[[Complex64; 2]; 2],
-    epsilon: f64,
-) -> bool {
+pub fn matrices_approx_eq(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2], epsilon: f64) -> bool {
     for i in 0..2 {
         for j in 0..2 {
             let diff = (a[i][j] - b[i][j]).norm();
@@ -134,7 +124,7 @@ mod tests {
     const ZERO: Complex64 = Complex64::new(0.0, 0.0);
     const ONE: Complex64 = Complex64::new(1.0, 0.0);
     const I: Complex64 = Complex64::new(0.0, 1.0);
-    const INV_SQRT2: f64 = 0.7071067811865476;
+    const INV_SQRT2: f64 = std::f64::consts::FRAC_1_SQRT_2;
 
     #[test]
     fn test_multiply_identity() {

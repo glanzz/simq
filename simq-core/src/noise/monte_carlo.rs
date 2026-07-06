@@ -278,18 +278,10 @@ impl ReadoutErrorMC {
     pub fn apply_to_measurement(&self, measured_bit: bool, random_value: f64) -> bool {
         if measured_bit {
             // Measured 1, flip to 0 with probability p10
-            if random_value < self.p10 {
-                false
-            } else {
-                true
-            }
+            random_value >= self.p10
         } else {
             // Measured 0, flip to 1 with probability p01
-            if random_value < self.p01 {
-                true
-            } else {
-                false
-            }
+            random_value < self.p01
         }
     }
 
@@ -333,6 +325,17 @@ mod tests {
     }
 
     #[test]
+    fn test_depolarizing_mc_operation_out_of_range_falls_back_to_identity() {
+        let mc = DepolarizingMC::from_probability(0.1).unwrap();
+
+        // Index 4+ is not a valid sample outcome (only 0..=3 are produced by
+        // `sample`), but `get_operation` should gracefully fall back to
+        // Identity rather than panicking.
+        assert_eq!(mc.get_operation(4), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(100), PauliOperation::Identity);
+    }
+
+    #[test]
     fn test_amplitude_damping_mc() {
         let mc = AmplitudeDampingMC::from_gamma(0.1).unwrap();
 
@@ -344,16 +347,26 @@ mod tests {
         match mc.get_operation(0) {
             PauliOperation::NoJump { sqrt_1_minus_gamma } => {
                 assert!((sqrt_1_minus_gamma - (0.9_f64).sqrt()).abs() < 1e-10);
-            }
+            },
             _ => panic!("Expected NoJump"),
         }
 
         match mc.get_operation(1) {
             PauliOperation::JumpToZero { sqrt_gamma } => {
                 assert!((sqrt_gamma - (0.1_f64).sqrt()).abs() < 1e-10);
-            }
+            },
             _ => panic!("Expected JumpToZero"),
         }
+    }
+
+    #[test]
+    fn test_amplitude_damping_mc_operation_out_of_range_falls_back_to_identity() {
+        let mc = AmplitudeDampingMC::from_gamma(0.1).unwrap();
+
+        // Only indices 0 (no jump) and 1 (jump) are valid outcomes; anything
+        // else should fall back to Identity instead of panicking.
+        assert_eq!(mc.get_operation(2), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(42), PauliOperation::Identity);
     }
 
     #[test]
@@ -367,16 +380,28 @@ mod tests {
     }
 
     #[test]
+    fn test_phase_damping_mc_operations() {
+        let mc = PhaseDampingMC::from_lambda(0.2).unwrap();
+
+        assert_eq!(mc.get_operation(0), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(1), PauliOperation::Z);
+
+        // Out-of-range index should fall back to Identity rather than panic.
+        assert_eq!(mc.get_operation(2), PauliOperation::Identity);
+        assert_eq!(mc.get_operation(99), PauliOperation::Identity);
+    }
+
+    #[test]
     fn test_readout_error_mc() {
         let mc = ReadoutErrorMC::from_probabilities(0.02, 0.03).unwrap();
 
         // Measure 0, flip with p=0.02
-        assert_eq!(mc.apply_to_measurement(false, 0.01), true); // Flipped
-        assert_eq!(mc.apply_to_measurement(false, 0.03), false); // Not flipped
+        assert!(mc.apply_to_measurement(false, 0.01)); // Flipped
+        assert!(!mc.apply_to_measurement(false, 0.03)); // Not flipped
 
         // Measure 1, flip with p=0.03
-        assert_eq!(mc.apply_to_measurement(true, 0.02), false); // Flipped
-        assert_eq!(mc.apply_to_measurement(true, 0.04), true); // Not flipped
+        assert!(!mc.apply_to_measurement(true, 0.02)); // Flipped
+        assert!(mc.apply_to_measurement(true, 0.04)); // Not flipped
 
         assert_eq!(mc.probabilities(), (0.02, 0.03));
     }
@@ -387,5 +412,19 @@ mod tests {
         assert!(DepolarizingMC::from_probability(1.1).is_err());
         assert!(AmplitudeDampingMC::from_gamma(1.5).is_err());
         assert!(PhaseDampingMC::from_lambda(0.6).is_err());
+    }
+
+    #[test]
+    fn test_readout_error_mc_invalid_probabilities() {
+        let result = ReadoutErrorMC::from_probabilities(-0.1, 0.1);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e
+                .to_string()
+                .contains("Readout error probabilities must be in [0,1]"));
+        }
+
+        assert!(ReadoutErrorMC::from_probabilities(0.1, 1.1).is_err());
+        assert!(ReadoutErrorMC::from_probabilities(1.5, 1.5).is_err());
     }
 }

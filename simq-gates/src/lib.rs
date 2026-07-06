@@ -83,5 +83,8 @@ pub use matrix_ops::{
 };
 
 // Re-export custom gates
-pub use custom::{CustomGate, CustomGateBuilder, CustomGateError, ParametricCustomGate, ParametricCustomGateBuilder};
+pub use custom::{
+    CustomGate, CustomGateBuilder, CustomGateError, ParametricCustomGate,
+    ParametricCustomGateBuilder,
+};
 pub use gate_registry::GateRegistry;

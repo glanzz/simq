@@ -1,7 +1,7 @@
 //! Error types for execution engine
 
-use thiserror::Error;
 use simq_core::QubitId;
+use thiserror::Error;
 
 /// Result type for execution engine operations
 pub type Result<T> = std::result::Result<T, ExecutionError>;
@@ -19,42 +19,27 @@ pub enum ExecutionError {
 
     /// Invalid gate matrix
     #[error("Invalid gate matrix for {gate}: {reason}")]
-    InvalidGateMatrix {
-        gate: String,
-        reason: String,
-    },
+    InvalidGateMatrix { gate: String, reason: String },
 
     /// Qubit index out of bounds
     #[error("Qubit index {qubit:?} out of bounds (max: {max})")]
-    QubitOutOfBounds {
-        qubit: QubitId,
-        max: usize,
-    },
+    QubitOutOfBounds { qubit: QubitId, max: usize },
 
     /// State validation failed
     #[error("State validation failed: {reason}")]
-    ValidationFailed {
-        reason: String,
-    },
+    ValidationFailed { reason: String },
 
     /// Checkpoint error
     #[error("Checkpoint operation failed: {reason}")]
-    CheckpointFailed {
-        reason: String,
-    },
+    CheckpointFailed { reason: String },
 
     /// GPU execution error
     #[error("GPU execution failed: {reason}")]
-    GpuError {
-        reason: String,
-    },
+    GpuError { reason: String },
 
     /// Parallel execution error
     #[error("Parallel execution failed on layer {layer}: {reason}")]
-    ParallelExecutionFailed {
-        layer: usize,
-        reason: String,
-    },
+    ParallelExecutionFailed { layer: usize, reason: String },
 
     /// Resource exhaustion
     #[error("Resource exhausted: {resource} (limit: {limit}, requested: {requested})")]
@@ -70,9 +55,7 @@ pub enum ExecutionError {
 
     /// Execution halted by recovery policy
     #[error("Execution halted after {attempts} failed attempts")]
-    ExecutionHalted {
-        attempts: usize,
-    },
+    ExecutionHalted { attempts: usize },
 
     /// Timeout error
     #[error("Execution timeout after {elapsed:?} (limit: {limit:?})")]
@@ -104,14 +87,17 @@ impl ExecutionError {
     /// Get error severity level
     pub fn severity(&self) -> ErrorSeverity {
         match self {
-            ExecutionError::QubitOutOfBounds { .. }
-                | ExecutionError::InvalidGateMatrix { .. } => ErrorSeverity::Critical,
-            ExecutionError::ResourceExhausted { .. }
-                | ExecutionError::ExecutionTimeout { .. } => ErrorSeverity::High,
+            ExecutionError::QubitOutOfBounds { .. } | ExecutionError::InvalidGateMatrix { .. } => {
+                ErrorSeverity::Critical
+            },
+            ExecutionError::ResourceExhausted { .. } | ExecutionError::ExecutionTimeout { .. } => {
+                ErrorSeverity::High
+            },
             ExecutionError::GateApplicationFailed { .. }
-                | ExecutionError::ParallelExecutionFailed { .. } => ErrorSeverity::Medium,
-            ExecutionError::ValidationFailed { .. }
-                | ExecutionError::GpuError { .. } => ErrorSeverity::Low,
+            | ExecutionError::ParallelExecutionFailed { .. } => ErrorSeverity::Medium,
+            ExecutionError::ValidationFailed { .. } | ExecutionError::GpuError { .. } => {
+                ErrorSeverity::Low
+            },
             _ => ErrorSeverity::Medium,
         }
     }
@@ -124,4 +110,120 @@ pub enum ErrorSeverity {
     Medium,
     High,
     Critical,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use simq_core::QubitId;
+    use std::time::Duration;
+
+    #[test]
+    fn test_is_recoverable() {
+        let e = ExecutionError::GateApplicationFailed {
+            gate: "H".to_string(),
+            qubits: vec![QubitId::new(0)],
+            reason: "test".to_string(),
+        };
+        assert!(e.is_recoverable());
+
+        let e = ExecutionError::ParallelExecutionFailed {
+            layer: 0,
+            reason: "test".to_string(),
+        };
+        assert!(e.is_recoverable());
+
+        let e = ExecutionError::GpuError {
+            reason: "test".to_string(),
+        };
+        assert!(e.is_recoverable());
+
+        // Non-recoverable
+        let e = ExecutionError::InvalidGateMatrix {
+            gate: "H".to_string(),
+            reason: "bad".to_string(),
+        };
+        assert!(!e.is_recoverable());
+    }
+
+    #[test]
+    fn test_severity_critical() {
+        let e = ExecutionError::QubitOutOfBounds {
+            qubit: QubitId::new(5),
+            max: 2,
+        };
+        assert_eq!(e.severity(), ErrorSeverity::Critical);
+
+        let e = ExecutionError::InvalidGateMatrix {
+            gate: "H".to_string(),
+            reason: "bad".to_string(),
+        };
+        assert_eq!(e.severity(), ErrorSeverity::Critical);
+    }
+
+    #[test]
+    fn test_severity_high() {
+        let e = ExecutionError::ResourceExhausted {
+            resource: "memory".to_string(),
+            limit: 100,
+            requested: 200,
+        };
+        assert_eq!(e.severity(), ErrorSeverity::High);
+
+        let e = ExecutionError::ExecutionTimeout {
+            elapsed: Duration::from_secs(10),
+            limit: Duration::from_secs(5),
+        };
+        assert_eq!(e.severity(), ErrorSeverity::High);
+    }
+
+    #[test]
+    fn test_severity_medium() {
+        let e = ExecutionError::GateApplicationFailed {
+            gate: "H".to_string(),
+            qubits: vec![QubitId::new(0)],
+            reason: "test".to_string(),
+        };
+        assert_eq!(e.severity(), ErrorSeverity::Medium);
+
+        let e = ExecutionError::ParallelExecutionFailed {
+            layer: 0,
+            reason: "test".to_string(),
+        };
+        assert_eq!(e.severity(), ErrorSeverity::Medium);
+
+        // Fallback branch (e.g., ExecutionHalted)
+        let e = ExecutionError::ExecutionHalted { attempts: 3 };
+        assert_eq!(e.severity(), ErrorSeverity::Medium);
+    }
+
+    #[test]
+    fn test_severity_low() {
+        let e = ExecutionError::ValidationFailed {
+            reason: "bad norm".to_string(),
+        };
+        assert_eq!(e.severity(), ErrorSeverity::Low);
+
+        let e = ExecutionError::GpuError {
+            reason: "no gpu".to_string(),
+        };
+        assert_eq!(e.severity(), ErrorSeverity::Low);
+    }
+
+    #[test]
+    fn test_display_impl() {
+        let e = ExecutionError::CheckpointFailed {
+            reason: "io error".to_string(),
+        };
+        let s = format!("{}", e);
+        assert!(s.contains("Checkpoint"));
+
+        let e = ExecutionError::CircuitError("bad circuit".to_string());
+        let s = format!("{}", e);
+        assert!(s.contains("bad circuit"));
+
+        let e = ExecutionError::Internal("internal".to_string());
+        let s = format!("{}", e);
+        assert!(s.contains("internal"));
+    }
 }

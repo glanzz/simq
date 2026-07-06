@@ -11,22 +11,17 @@ use crate::passes::{
 use std::sync::Arc;
 
 /// Optimization level presets
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptimizationLevel {
     /// No optimization
     O0,
     /// Basic optimization (dead code elimination only)
     O1,
     /// Standard optimization (dead code + fusion + templates)
+    #[default]
     O2,
     /// Aggressive optimization (all passes with commutation)
     O3,
-}
-
-impl Default for OptimizationLevel {
-    fn default() -> Self {
-        Self::O2
-    }
 }
 
 /// Create a compiler with the specified optimization level
@@ -155,7 +150,9 @@ impl PipelineBuilder {
 
     /// Add advanced template matching pass (recommended over basic template substitution)
     pub fn with_advanced_template_matching(mut self) -> Self {
-        self.builder = self.builder.add_pass(Arc::new(AdvancedTemplateMatching::new()));
+        self.builder = self
+            .builder
+            .add_pass(Arc::new(AdvancedTemplateMatching::new()));
         self
     }
 
@@ -265,5 +262,36 @@ mod tests {
             .build();
 
         assert_eq!(compiler.num_passes(), 4);
+    }
+
+    #[test]
+    fn test_pipeline_builder_min_benefit_score() {
+        // Exercises PipelineBuilder::min_benefit_score (lines 172-174), which
+        // forwards to the inner CompilerBuilder.
+        let compiler = PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .min_benefit_score(0.95)
+            .build();
+
+        let mut circuit = Circuit::new(2);
+        let x = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(x, &[QubitId::new(0)]).unwrap();
+
+        // DeadCodeElimination has a benefit_score of 0.9, which is below
+        // this threshold of 0.95, so it should be filtered out and not
+        // modify the circuit.
+        let result = compiler.compile(&mut circuit).unwrap();
+        assert!(!result.modified);
+        assert_eq!(circuit.len(), 2);
+    }
+
+    #[test]
+    fn test_pipeline_builder_default() {
+        // Exercises the Default impl for PipelineBuilder (lines 184-185).
+        let compiler = PipelineBuilder::default().build();
+        assert_eq!(compiler.num_passes(), 0);
     }
 }

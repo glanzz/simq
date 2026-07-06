@@ -21,41 +21,25 @@ fn create_benchmark_circuit(num_qubits: usize) -> Circuit {
         let qubit = QubitId::new(qubit_idx);
 
         // Start with some single-qubit gates
-        circuit
-            .add_gate(Arc::new(Hadamard), &[qubit])
-            .unwrap();
+        circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
         circuit
             .add_gate(Arc::new(RotationZ::new(0.5)), &[qubit])
             .unwrap();
-        circuit
-            .add_gate(Arc::new(Hadamard), &[qubit])
-            .unwrap();
+        circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
 
         // Some that can be fused
         circuit.add_gate(Arc::new(SGate), &[qubit]).unwrap();
         circuit.add_gate(Arc::new(TGate), &[qubit]).unwrap();
-        circuit
-            .add_gate(Arc::new(PauliX), &[qubit])
-            .unwrap();
+        circuit.add_gate(Arc::new(PauliX), &[qubit]).unwrap();
 
         // Self-inverse pair
-        circuit
-            .add_gate(Arc::new(PauliY), &[qubit])
-            .unwrap();
-        circuit
-            .add_gate(Arc::new(PauliY), &[qubit])
-            .unwrap();
+        circuit.add_gate(Arc::new(PauliY), &[qubit]).unwrap();
+        circuit.add_gate(Arc::new(PauliY), &[qubit]).unwrap();
 
         // Template pattern: H-Z-H
-        circuit
-            .add_gate(Arc::new(Hadamard), &[qubit])
-            .unwrap();
-        circuit
-            .add_gate(Arc::new(PauliZ), &[qubit])
-            .unwrap();
-        circuit
-            .add_gate(Arc::new(Hadamard), &[qubit])
-            .unwrap();
+        circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
+        circuit.add_gate(Arc::new(PauliZ), &[qubit]).unwrap();
+        circuit.add_gate(Arc::new(Hadamard), &[qubit]).unwrap();
 
         // Add entangling gates
         if qubit_idx + 1 < num_qubits {
@@ -69,11 +53,7 @@ fn create_benchmark_circuit(num_qubits: usize) -> Circuit {
     circuit
 }
 
-fn benchmark_optimization_level(
-    level: OptimizationLevel,
-    num_qubits: usize,
-    iterations: usize,
-) {
+fn benchmark_optimization_level(level: OptimizationLevel, num_qubits: usize, iterations: usize) {
     let level_name = match level {
         OptimizationLevel::O0 => "O0",
         OptimizationLevel::O1 => "O1",
@@ -85,7 +65,10 @@ fn benchmark_optimization_level(
     let original_circuit = create_benchmark_circuit(num_qubits);
     let original_gate_count = original_circuit.len();
 
-    println!("\n=== Benchmarking {} ({} qubits, {} iterations) ===", level_name, num_qubits, iterations);
+    println!(
+        "\n=== Benchmarking {} ({} qubits, {} iterations) ===",
+        level_name, num_qubits, iterations
+    );
     println!("Original circuit: {} gates", original_gate_count);
 
     let mut total_time = 0u128;
@@ -105,17 +88,21 @@ fn benchmark_optimization_level(
             // Print details for first iteration
             println!("\nFirst iteration details:");
             println!("  Optimized circuit: {} gates", final_gate_count);
-            println!("  Reduction: {} gates ({:.1}%)",
+            println!(
+                "  Reduction: {} gates ({:.1}%)",
                 original_gate_count - final_gate_count,
-                100.0 * (original_gate_count - final_gate_count) as f64 / original_gate_count as f64
+                100.0 * (original_gate_count - final_gate_count) as f64
+                    / original_gate_count as f64
             );
             println!("  Compilation time: {} µs", duration.as_micros());
             println!("  Modified: {}", result.modified);
             println!("\n  Pass statistics:");
             for stat in &result.pass_stats {
                 if stat.modified {
-                    println!("    - {}: {} µs (applied {} times)",
-                        stat.pass_name, stat.time_us, stat.applications);
+                    println!(
+                        "    - {}: {} µs (applied {} times)",
+                        stat.pass_name, stat.time_us, stat.applications
+                    );
                 }
             }
         }
@@ -168,7 +155,10 @@ fn measure_scalability() {
         println!("\n{} qubits ({} gates → {} gates):", num_qubits, original_gates, final_gates);
         println!("  Average time: {} µs", avg_time);
         println!("  Time per gate: {:.2} ns", (avg_time as f64 * 1000.0) / original_gates as f64);
-        println!("  Reduction: {:.1}%", 100.0 * (original_gates - final_gates) as f64 / original_gates as f64);
+        println!(
+            "  Reduction: {:.1}%",
+            100.0 * (original_gates - final_gates) as f64 / original_gates as f64
+        );
     }
 }
 

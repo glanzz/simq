@@ -141,14 +141,22 @@ impl std::fmt::Display for ExecutionPlan {
         writeln!(f, "  Circuit depth: {} layers", self.depth)?;
         writeln!(f, "  Total gates: {}", self.gate_count)?;
         writeln!(f, "  Parallelism factor: {:.2}", self.parallelism_factor)?;
-        writeln!(f, "  Parallelization efficiency: {:.1}%",
-            self.parallelization_efficiency() * 100.0)?;
+        writeln!(
+            f,
+            "  Parallelization efficiency: {:.1}%",
+            self.parallelization_efficiency() * 100.0
+        )?;
         writeln!(f, "  Estimated execution time: {:.2} units", self.total_time)?;
         writeln!(f, "  Critical path length: {}", self.critical_path_length)?;
         writeln!(f, "\nLayer breakdown:")?;
         for (i, layer) in self.layers.iter().enumerate() {
-            writeln!(f, "  Layer {}: {} gates, {:.2} time units",
-                i, layer.len(), layer.estimated_time)?;
+            writeln!(
+                f,
+                "  Layer {}: {} gates, {:.2} time units",
+                i,
+                layer.len(),
+                layer.estimated_time
+            )?;
         }
         Ok(())
     }
@@ -356,10 +364,11 @@ impl ExecutionPlanner {
 
             // Add newly ready gates
             for (idx, gate_deps) in deps.iter() {
-                if !scheduled.contains(idx) && !ready_queue.contains(idx) {
-                    if gate_deps.iter().all(|&dep| scheduled.contains(&dep)) {
-                        ready_queue.push(*idx);
-                    }
+                if !scheduled.contains(idx)
+                    && !ready_queue.contains(idx)
+                    && gate_deps.iter().all(|&dep| scheduled.contains(&dep))
+                {
+                    ready_queue.push(*idx);
                 }
             }
 
@@ -421,7 +430,9 @@ mod tests {
     fn test_simple_plan() {
         let mut circuit = Circuit::new(2);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(h.clone(), &[QubitId::new(1)]).unwrap();
 
@@ -438,7 +449,9 @@ mod tests {
     fn test_sequential_plan() {
         let mut circuit = Circuit::new(1);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
@@ -456,8 +469,12 @@ mod tests {
     fn test_mixed_parallelism() {
         let mut circuit = Circuit::new(3);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
-        let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        let cnot = Arc::new(MockGate {
+            name: "CNOT".to_string(),
+        });
 
         // Layer 1: H on all qubits (parallel)
         circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
@@ -465,7 +482,9 @@ mod tests {
         circuit.add_gate(h.clone(), &[QubitId::new(2)]).unwrap();
 
         // Layer 2: CNOT (sequential with layer 1)
-        circuit.add_gate(cnot, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(cnot, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
 
         let planner = ExecutionPlanner::new();
         let plan = planner.generate_plan(&circuit);
@@ -477,7 +496,9 @@ mod tests {
     #[test]
     fn test_parallelization_efficiency() {
         let mut circuit = Circuit::new(4);
-        let h = Arc::new(MockGate { name: "H".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
 
         // Perfect parallelization: all gates in one layer
         for i in 0..4 {
@@ -495,17 +516,140 @@ mod tests {
     fn test_resource_estimation() {
         let mut circuit = Circuit::new(5);
 
-        let h = Arc::new(MockGate { name: "H".to_string() });
-        let cnot = Arc::new(MockGate { name: "CNOT".to_string() });
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        let cnot = Arc::new(MockGate {
+            name: "CNOT".to_string(),
+        });
 
         circuit.add_gate(h, &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)]).unwrap();
-        circuit.add_gate(cnot, &[QubitId::new(2), QubitId::new(3)]).unwrap();
+        circuit
+            .add_gate(cnot.clone(), &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
+        circuit
+            .add_gate(cnot, &[QubitId::new(2), QubitId::new(3)])
+            .unwrap();
 
         let planner = ExecutionPlanner::new();
         let plan = planner.generate_plan(&circuit);
 
         assert_eq!(plan.resources.peak_qubits, 5);
         assert_eq!(plan.resources.two_qubit_gates, 2);
+    }
+
+    #[test]
+    fn test_parallelization_efficiency_zero_gates() {
+        // ExecutionPlan with no gates: gate_count=0, parallelization_efficiency returns 0.0
+        let plan = ExecutionPlan::new(vec![], 0);
+        assert_eq!(plan.parallelization_efficiency(), 0.0);
+    }
+
+    #[test]
+    fn test_parallelism_factor_zero_depth() {
+        // Empty plan: depth=0 → parallelism_factor=0.0 (line 86-88)
+        let plan = ExecutionPlan::new(vec![], 0);
+        assert_eq!(plan.parallelism_factor, 0.0);
+    }
+
+    #[test]
+    fn test_bottleneck_layer() {
+        let mut circuit = Circuit::new(2);
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(h.clone(), &[QubitId::new(1)]).unwrap();
+        // Second layer on same qubit
+        circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
+
+        let planner = ExecutionPlanner::new();
+        let plan = planner.generate_plan(&circuit);
+        // Should have 2 layers; layer 0 has 2 gates, layer 1 has 1
+        let bottleneck = plan.bottleneck_layer();
+        assert!(bottleneck.is_some());
+        assert_eq!(bottleneck.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_display_execution_plan() {
+        let mut circuit = Circuit::new(2);
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(h.clone(), &[QubitId::new(1)]).unwrap();
+
+        let planner = ExecutionPlanner::new();
+        let plan = planner.generate_plan(&circuit);
+        let s = format!("{}", plan);
+        assert!(s.contains("Execution Plan"));
+        assert!(s.contains("Layer 0"));
+    }
+
+    #[test]
+    fn test_generate_optimized_plan() {
+        let mut circuit = Circuit::new(2);
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(h.clone(), &[QubitId::new(0)]).unwrap();
+
+        let planner = ExecutionPlanner::new();
+        let plan = planner.generate_optimized_plan(&circuit);
+        assert_eq!(plan.gate_count, 2);
+        assert_eq!(plan.depth, 2); // Sequential on same qubit
+    }
+
+    #[test]
+    fn test_with_gate_times_and_set_gate_time() {
+        use std::collections::HashMap;
+        let mut times = HashMap::new();
+        times.insert("H".to_string(), 2.0);
+        let mut planner = ExecutionPlanner::with_gate_times(times);
+        planner.set_gate_time("X", 3.0);
+
+        let mut circuit = Circuit::new(1);
+        let h = Arc::new(MockGate {
+            name: "H".to_string(),
+        });
+        circuit.add_gate(h, &[QubitId::new(0)]).unwrap();
+
+        let plan = planner.generate_plan(&circuit);
+        assert_eq!(plan.layers[0].estimated_time, 2.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for previously uncovered lines
+    // -----------------------------------------------------------------------
+
+    /// Lines 55-56: Default impl for ExecutionLayer.
+    #[test]
+    fn test_execution_layer_default() {
+        let layer = ExecutionLayer::default();
+        assert_eq!(layer.len(), 0);
+        assert!(layer.is_empty());
+    }
+
+    /// Line 267: peak_memory = usize::MAX when peak_qubits >= 30.
+    #[test]
+    fn test_resource_requirements_large_qubits() {
+        // A circuit with 30 qubits → 2^30 is too large, so peak_memory = usize::MAX
+        let circuit = Circuit::new(30);
+        let planner = ExecutionPlanner::new();
+        let plan = planner.generate_plan(&circuit);
+        assert_eq!(plan.resources.peak_qubits, 30);
+        assert_eq!(plan.resources.peak_memory, usize::MAX);
+    }
+
+    /// Lines 385-386: Default impl for ExecutionPlanner.
+    #[test]
+    fn test_execution_planner_default() {
+        let planner = ExecutionPlanner::default();
+        // Just verify it can generate a plan for a simple circuit
+        let circuit = Circuit::new(1);
+        let plan = planner.generate_plan(&circuit);
+        assert_eq!(plan.gate_count, 0);
     }
 }

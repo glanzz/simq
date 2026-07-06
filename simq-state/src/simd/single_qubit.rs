@@ -331,7 +331,6 @@ pub fn apply_gate_parallel(
     num_qubits: usize,
 ) {
     let dimension = 1 << num_qubits;
-    let qubit_mask = 1 << qubit;
     let stride = 1 << qubit;
 
     // Extract matrix elements for better cache locality
@@ -342,13 +341,13 @@ pub fn apply_gate_parallel(
 
     // Determine chunk size for parallel execution
     // We want chunks that are cache-friendly and provide good load balancing
-    let num_pairs = dimension / 2;
+    let num_pairs: usize = dimension / 2;
     let num_threads = rayon::current_num_threads();
-    let pairs_per_thread = (num_pairs + num_threads - 1) / num_threads;
+    let pairs_per_thread = num_pairs.div_ceil(num_threads);
 
     // Create ranges for parallel processing
     // Each range processes a contiguous block of "low" indices
-    let ranges: Vec<_> = (0..num_threads)
+    let _ranges: Vec<_> = (0..num_threads)
         .map(|thread_id| {
             let start = thread_id * pairs_per_thread;
             let end = std::cmp::min(start + pairs_per_thread, num_pairs);
@@ -403,22 +402,20 @@ pub fn apply_gate_optimized(
 
     // For smaller states, use sequential SIMD
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    {
-        unsafe {
-            apply_gate_avx2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    unsafe {
+        apply_gate_avx2(state, matrix, qubit, num_qubits);
     }
 
-    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
-    {
-        unsafe {
-            apply_gate_sse2(state, matrix, qubit, num_qubits);
-        }
-        return;
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "avx2")
+    ))]
+    unsafe {
+        apply_gate_sse2(state, matrix, qubit, num_qubits);
     }
 
-    // Fallback to scalar
+    #[cfg(not(target_arch = "x86_64"))]
     apply_gate_scalar(state, matrix, qubit, num_qubits);
 }
 
@@ -430,8 +427,14 @@ mod tests {
     fn hadamard_matrix() -> [[Complex64; 2]; 2] {
         let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
         [
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-            [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
         ]
     }
 
@@ -581,5 +584,156 @@ mod tests {
         assert_relative_eq!(state[0].im, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
         assert_relative_eq!(state[1].im, inv_sqrt2, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_optimized_execution_triggers_parallel_branch() {
+        // num_qubits >= PARALLEL_THRESHOLD (16) must route apply_gate_optimized
+        // through the parallel-execution branch (not just the direct
+        // apply_gate_parallel call already exercised by test_parallel_hadamard).
+        let num_qubits = PARALLEL_THRESHOLD; // 16
+        let mut state_scalar = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_scalar[0] = Complex64::new(1.0, 0.0);
+
+        let mut state_optimized = state_scalar.clone();
+
+        let h = hadamard_matrix();
+
+        apply_gate_scalar(&mut state_scalar, &h, 0, num_qubits);
+        apply_gate_optimized(&mut state_optimized, &h, 0, num_qubits);
+
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_optimized[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_optimized[i].im, epsilon = 1e-10);
+        }
+    }
+
+    /// Tests for apply_gate_avx2 (large-stride path, stride >= 8 means qubit >= 3).
+    /// These directly call the unsafe AVX2 function on CPUs that support it.
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_large_stride_hadamard_matches_scalar() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // qubit=3 → stride=8, triggers the AVX2 large-stride branch.
+        let num_qubits = 5;
+        let mut state_scalar = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_scalar[0] = Complex64::new(1.0, 0.0);
+        let mut state_avx2 = state_scalar.clone();
+
+        let h = hadamard_matrix();
+        apply_gate_scalar(&mut state_scalar, &h, 3, num_qubits);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &h, 3, num_qubits);
+        }
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_avx2[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_avx2[i].im, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_large_stride_pauli_x_matches_scalar() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // qubit=4 → stride=16, exercises larger AVX2 stride with Pauli-X gate
+        let num_qubits = 6;
+        let x_gate = [
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        let mut state_scalar = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_scalar[0] = Complex64::new(1.0, 0.0);
+        let mut state_avx2 = state_scalar.clone();
+
+        apply_gate_scalar(&mut state_scalar, &x_gate, 4, num_qubits);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &x_gate, 4, num_qubits);
+        }
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_avx2[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_avx2[i].im, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_large_stride_phase_gate_matches_scalar() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // S-gate with complex amplitudes to exercise complex-multiplication SIMD path
+        let s_gate = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+        ];
+        let num_qubits = 5;
+        let inv_norm = (1.0_f64 / (1 << num_qubits) as f64).sqrt();
+        let mut state_scalar: Vec<Complex64> = (0..(1 << num_qubits))
+            .map(|i| {
+                Complex64::new(inv_norm * (i as f64 * 0.1).cos(), inv_norm * (i as f64 * 0.1).sin())
+            })
+            .collect();
+        let mut state_avx2 = state_scalar.clone();
+
+        // Apply on qubit 3 (stride=8, the large-stride AVX2 path)
+        apply_gate_scalar(&mut state_scalar, &s_gate, 3, num_qubits);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &s_gate, 3, num_qubits);
+        }
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_avx2[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_avx2[i].im, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_small_stride_falls_back_to_sse2() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // qubit=0 → stride=1 < 8 → AVX2 function falls back to SSE2 internally
+        let num_qubits = 3;
+        let mut state_scalar = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_scalar[0] = Complex64::new(1.0, 0.0);
+        let mut state_avx2 = state_scalar.clone();
+
+        let h = hadamard_matrix();
+        apply_gate_scalar(&mut state_scalar, &h, 0, num_qubits);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &h, 0, num_qubits);
+        }
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_avx2[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_avx2[i].im, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_multiple_amplitude_pairs() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // num_qubits=6, qubit=3 → stride=8, dimension=64: multiple pairs iterated
+        let num_qubits = 6;
+        let inv_sqrt = (1.0_f64 / (1 << num_qubits) as f64).sqrt();
+        // equal superposition state
+        let mut state_scalar = vec![Complex64::new(inv_sqrt, 0.0); 1 << num_qubits];
+        let mut state_avx2 = state_scalar.clone();
+
+        let h = hadamard_matrix();
+        apply_gate_scalar(&mut state_scalar, &h, 3, num_qubits);
+        unsafe {
+            apply_gate_avx2(&mut state_avx2, &h, 3, num_qubits);
+        }
+        for i in 0..state_scalar.len() {
+            assert_relative_eq!(state_scalar[i].re, state_avx2[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_scalar[i].im, state_avx2[i].im, epsilon = 1e-10);
+        }
     }
 }

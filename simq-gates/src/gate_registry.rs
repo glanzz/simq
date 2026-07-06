@@ -8,6 +8,7 @@
 //! ```rust
 //! use simq_gates::gate_registry::GateRegistry;
 //! use simq_gates::custom::CustomGateBuilder;
+//! use simq_core::gate::Gate;
 //! use num_complex::Complex64;
 //! use std::f64::consts::SQRT_2;
 //!
@@ -141,7 +142,7 @@ impl GateRegistry {
         }
 
         println!("Registered Custom Gates:");
-        println!("{:<20} {:<10} {:<12} {}", "Name", "Qubits", "Hermitian", "Description");
+        println!("{:<20} {:<10} {:<12} Description", "Name", "Qubits", "Hermitian");
         println!("{}", "-".repeat(70));
 
         for info in self.list_gates() {
@@ -192,8 +193,14 @@ mod tests {
         let inv_sqrt2 = 1.0 / SQRT_2;
         let gate = CustomGateBuilder::new("TestH")
             .matrix_2x2([
-                [Complex64::new(inv_sqrt2, 0.0), Complex64::new(inv_sqrt2, 0.0)],
-                [Complex64::new(inv_sqrt2, 0.0), Complex64::new(-inv_sqrt2, 0.0)],
+                [
+                    Complex64::new(inv_sqrt2, 0.0),
+                    Complex64::new(inv_sqrt2, 0.0),
+                ],
+                [
+                    Complex64::new(inv_sqrt2, 0.0),
+                    Complex64::new(-inv_sqrt2, 0.0),
+                ],
             ])
             .build()
             .unwrap();
@@ -262,5 +269,47 @@ mod tests {
         assert_eq!(registry.len(), 5);
         registry.clear();
         assert!(registry.is_empty());
+    }
+
+    // --- Coverage for lines 138-153: print_gates ---
+
+    #[test]
+    fn test_print_gates_empty_registry() {
+        // Lines 139-141: empty registry prints "Gate registry is empty"
+        let registry = GateRegistry::new();
+        // Just call it; it prints to stdout. We verify it doesn't panic.
+        registry.print_gates();
+    }
+
+    #[test]
+    fn test_print_gates_with_gates() {
+        // Lines 144-156: non-empty registry prints table
+        let mut registry = GateRegistry::new();
+
+        // Hermitian gate (Pauli-Z)
+        let z_gate = CustomGateBuilder::new("Z")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0)],
+            ])
+            .build()
+            .unwrap();
+        registry.register("pauli_z", z_gate);
+
+        // Non-hermitian gate (S)
+        let s_gate = CustomGateBuilder::new("S")
+            .matrix_2x2([
+                [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+                [Complex64::new(0.0, 0.0), Complex64::new(0.0, 1.0)],
+            ])
+            .build()
+            .unwrap();
+        registry.register("phase_s", s_gate);
+
+        // print_gates should not panic; it covers both Yes/No branches for is_hermitian
+        registry.print_gates();
+
+        let info = registry.list_gates();
+        assert_eq!(info.len(), 2);
     }
 }

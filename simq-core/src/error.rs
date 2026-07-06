@@ -56,7 +56,11 @@ pub enum QuantumError {
 
     /// Invalid dependency in circuit
     #[error("Invalid dependency from operation {from} to {to} via qubit {qubit}")]
-    InvalidDependency { from: usize, to: usize, qubit: usize },
+    InvalidDependency {
+        from: usize,
+        to: usize,
+        qubit: usize,
+    },
 
     /// Cannot compute topological order
     #[error("Cannot compute topological order: {reason}")]

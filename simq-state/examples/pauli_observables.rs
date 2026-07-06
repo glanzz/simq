@@ -101,8 +101,14 @@ fn example_bell_state() {
     let iz = PauliString::from_str("IZ").unwrap();
 
     println!("\nCorrelation measurements:");
-    println!("  ⟨ZZ⟩ = {:.4} (both qubits same Z eigenvalue)", zz.expectation_value(&bell_state).unwrap());
-    println!("  ⟨XX⟩ = {:.4} (maximally correlated)", xx.expectation_value(&bell_state).unwrap());
+    println!(
+        "  ⟨ZZ⟩ = {:.4} (both qubits same Z eigenvalue)",
+        zz.expectation_value(&bell_state).unwrap()
+    );
+    println!(
+        "  ⟨XX⟩ = {:.4} (maximally correlated)",
+        xx.expectation_value(&bell_state).unwrap()
+    );
     println!("  ⟨YY⟩ = {:.4}", yy.expectation_value(&bell_state).unwrap());
 
     println!("\nSingle qubit measurements:");
@@ -267,8 +273,5 @@ fn example_performance() {
     println!("\nMulti-term Hamiltonian ({} terms):", num_qubits - 1);
     println!("  Energy: {:.6}", energy);
     println!("  Time: {:?}", hamiltonian_time);
-    println!(
-        "  Time per term: {:?}",
-        hamiltonian_time / (num_qubits - 1) as u32
-    );
+    println!("  Time per term: {:?}", hamiltonian_time / (num_qubits - 1) as u32);
 }

@@ -1,8 +1,8 @@
+use num_complex::Complex64;
 use pyo3::prelude::*;
+use simq_core::Gate;
 use simq_gates::standard as gates;
 use std::sync::Arc;
-use simq_core::Gate;
-use num_complex::Complex64;
 
 /// Helper macro to define a Python class for a standard gate
 macro_rules! define_gate {
@@ -29,12 +29,14 @@ macro_rules! define_gate {
             fn num_qubits(&self) -> usize {
                 self.inner.num_qubits()
             }
-            
+
             fn matrix(&self) -> PyResult<Vec<Vec<Complex64>>> {
                 let flat_matrix = self.inner.matrix().ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err("Gate does not have a matrix representation")
+                    pyo3::exceptions::PyValueError::new_err(
+                        "Gate does not have a matrix representation",
+                    )
                 })?;
-                
+
                 let size = (flat_matrix.len() as f64).sqrt() as usize;
                 let mut result = Vec::with_capacity(size);
                 for i in 0..size {
@@ -86,7 +88,7 @@ pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTdg>()?;
     m.add_class::<PySX>()?;
     m.add_class::<PySXdg>()?;
-    
+
     m.add_class::<PyCNot>()?;
     m.add_class::<PyCZ>()?;
     // m.add_class::<PyCY>()?;
@@ -94,9 +96,9 @@ pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySwap>()?;
     m.add_class::<PyISwap>()?;
     m.add_class::<PyECR>()?;
-    
+
     m.add_class::<PyToffoli>()?;
     m.add_class::<PyFredkin>()?;
-    
+
     Ok(())
 }

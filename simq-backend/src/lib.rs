@@ -14,13 +14,13 @@
 //! switching between different execution targets while maintaining the same API.
 
 pub mod backend;
-pub mod capabilities;
-pub mod result;
-pub mod error;
-pub mod transpiler;
-pub mod routing;
-pub mod gate_decomposition;
 pub mod backend_selector;
+pub mod capabilities;
+pub mod error;
+pub mod gate_decomposition;
+pub mod result;
+pub mod routing;
+pub mod transpiler;
 
 #[cfg(feature = "local-simulator")]
 pub mod local_simulator;
@@ -28,22 +28,22 @@ pub mod local_simulator;
 #[cfg(feature = "ibm-quantum")]
 pub mod ibm_quantum;
 
-pub use backend::{QuantumBackend, BackendType};
+pub use backend::{BackendType, QuantumBackend};
+pub use backend_selector::{BackendFeature, BackendSelector, SelectionCriteria};
 pub use capabilities::{BackendCapabilities, ConnectivityGraph, GateSet};
-pub use result::{BackendResult, JobStatus, ExecutionMetadata};
 pub use error::{BackendError, Result};
-pub use transpiler::{
-    Transpiler, OptimizationLevel, TranspilationCost, DecompositionRule,
-    DecompositionRules, QubitMapping, SwapStrategy,
-};
-pub use routing::{Router, RoutingStrategy, SwapGate, SabreRouter, RoutingStats};
 pub use gate_decomposition::{
-    GateDecomposer, optimize_inverse_gates, optimize_merge_rotations, analyze_gate_distribution,
+    analyze_gate_distribution, optimize_inverse_gates, optimize_merge_rotations, GateDecomposer,
 };
-pub use backend_selector::{BackendSelector, SelectionCriteria, BackendFeature};
+pub use result::{BackendResult, ExecutionMetadata, JobStatus};
+pub use routing::{Router, RoutingStats, RoutingStrategy, SabreRouter, SwapGate};
+pub use transpiler::{
+    DecompositionRule, DecompositionRules, OptimizationLevel, QubitMapping, SwapStrategy,
+    TranspilationCost, Transpiler,
+};
 
 #[cfg(feature = "local-simulator")]
 pub use local_simulator::{LocalSimulatorBackend, LocalSimulatorConfig};
 
 #[cfg(feature = "ibm-quantum")]
-pub use ibm_quantum::{IBMQuantumBackend, IBMConfig};
+pub use ibm_quantum::{IBMConfig, IBMQuantumBackend};

@@ -9,19 +9,36 @@
 //! Template matching can significantly reduce circuit size and improve execution.
 
 use crate::passes::OptimizationPass;
-use simq_core::{Circuit, GateOp, QubitId, Result};
+use simq_core::{Circuit, Gate, GateOp, QubitId, Result};
+use simq_gates::standard::{PauliX, PauliY, PauliZ};
 use std::sync::Arc;
+
+/// Build a replacement gate instance from a template's replacement gate name.
+///
+/// Returns `None` for names with no known single-qubit constant-gate
+/// constructor; callers must treat that as "cannot substitute" rather than
+/// silently dropping the gate.
+fn replacement_gate(name: &str) -> Option<Arc<dyn Gate>> {
+    match name {
+        "X" => Some(Arc::new(PauliX)),
+        "Y" => Some(Arc::new(PauliY)),
+        "Z" => Some(Arc::new(PauliZ)),
+        _ => None,
+    }
+}
 
 /// A template pattern that can be matched and replaced
 #[derive(Debug, Clone)]
 struct Template {
     /// Name of this template
+    #[allow(dead_code)]
     name: String,
     /// Pattern to match (sequence of gate names)
     pattern: Vec<String>,
     /// Replacement gate sequence (if None, pattern is deleted)
     replacement: Option<Vec<String>>,
     /// Description of what this template optimizes
+    #[allow(dead_code)]
     description: String,
 }
 
@@ -89,34 +106,14 @@ impl TemplateSubstitution {
             Template::new(
                 "h-y-h",
                 vec!["H", "Y", "H"],
-                Some(vec!["Y"]),  // Y is unchanged by H conjugation  (with phase)
+                Some(vec!["Y"]), // Y is unchanged by H conjugation  (with phase)
                 "Hadamard conjugation of Y gives -Y (ignoring global phase)",
             ),
             // Self-inverse pairs (already handled by dead code elimination, but keeping for completeness)
-            Template::new(
-                "x-x",
-                vec!["X", "X"],
-                None::<Vec<&str>>,
-                "X is self-inverse",
-            ),
-            Template::new(
-                "y-y",
-                vec!["Y", "Y"],
-                None::<Vec<&str>>,
-                "Y is self-inverse",
-            ),
-            Template::new(
-                "z-z",
-                vec!["Z", "Z"],
-                None::<Vec<&str>>,
-                "Z is self-inverse",
-            ),
-            Template::new(
-                "h-h",
-                vec!["H", "H"],
-                None::<Vec<&str>>,
-                "Hadamard is self-inverse",
-            ),
+            Template::new("x-x", vec!["X", "X"], None::<Vec<&str>>, "X is self-inverse"),
+            Template::new("y-y", vec!["Y", "Y"], None::<Vec<&str>>, "Y is self-inverse"),
+            Template::new("z-z", vec!["Z", "Z"], None::<Vec<&str>>, "Z is self-inverse"),
+            Template::new("h-h", vec!["H", "H"], None::<Vec<&str>>, "Hadamard is self-inverse"),
             // S and S† patterns
             Template::new(
                 "s-s-s-s",
@@ -124,12 +121,7 @@ impl TemplateSubstitution {
                 None::<Vec<&str>>,
                 "Four S gates equal identity",
             ),
-            Template::new(
-                "s-s",
-                vec!["S", "S"],
-                Some(vec!["Z"]),
-                "Two S gates equal Z",
-            ),
+            Template::new("s-s", vec!["S", "S"], Some(vec!["Z"]), "Two S gates equal Z"),
             Template::new(
                 "t-t-t-t-t-t-t-t",
                 vec!["T", "T", "T", "T", "T", "T", "T", "T"],
@@ -193,27 +185,41 @@ impl TemplateSubstitution {
             let mut matched = false;
 
             for template in &sorted_templates {
-                if Self::matches_pattern(ops, i, &template.pattern) {
-                    // Found a match! Apply substitution
-                    let pattern_len = template.pattern.len();
-
-                    // Remove the matched pattern
-                    let removed: Vec<_> = ops.drain(i..i + pattern_len).collect();
-                    let qubit = removed[0].qubits()[0];
-
-                    // Insert replacement if any
-                    if let Some(ref replacement) = template.replacement {
-                        // For now, we'll just track that we need replacement gates
-                        // In a real implementation, we'd create proper gate instances
-                        // This is a simplified version that just removes patterns
-                        // TODO: Implement proper gate creation for replacements
-                        let _ = (qubit, replacement); // Suppress warnings for now
-                    }
-
-                    modified = true;
-                    matched = true;
-                    break; // Found a match, don't try other templates at this position
+                if !Self::matches_pattern(ops, i, &template.pattern) {
+                    continue;
                 }
+
+                // Resolve the replacement gates (if any) before touching the
+                // circuit. A template whose replacement names we can't build
+                // must never be applied: dropping a non-identity replacement
+                // silently would change the circuit's semantics.
+                let replacement_gates: Option<Vec<Arc<dyn Gate>>> = match &template.replacement {
+                    None => None,
+                    Some(names) => match names.iter().map(|n| replacement_gate(n)).collect() {
+                        Some(gates) => Some(gates),
+                        None => continue, // unresolvable replacement: skip this template
+                    },
+                };
+
+                // Found a match! Apply substitution
+                let pattern_len = template.pattern.len();
+
+                // Remove the matched pattern
+                let removed: Vec<_> = ops.drain(i..i + pattern_len).collect();
+                let qubit: QubitId = removed[0].qubits()[0];
+
+                // Insert replacement gates in place of the removed pattern
+                if let Some(gates) = replacement_gates {
+                    for (offset, gate) in gates.into_iter().enumerate() {
+                        let gate_op = GateOp::new(gate, &[qubit])
+                            .expect("single-qubit replacement gate is always valid");
+                        ops.insert(i + offset, gate_op);
+                    }
+                }
+
+                modified = true;
+                matched = true;
+                break; // Found a match, don't try other templates at this position
             }
 
             if !matched {
@@ -260,6 +266,7 @@ impl OptimizationPass for TemplateSubstitution {
 mod tests {
     use super::*;
     use simq_core::gate::Gate;
+    use simq_core::QubitId;
     use std::sync::Arc;
 
     // Mock gate for testing
@@ -279,6 +286,29 @@ mod tests {
     }
 
     #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for TemplateSubstitution` (lines 206-207),
+        // which delegates to `Self::new()`.
+        let default_pass = TemplateSubstitution::default();
+        let new_pass = TemplateSubstitution::new();
+        assert_eq!(default_pass.templates.len(), new_pass.templates.len());
+
+        // Sanity-check the default pass actually works.
+        let mut circuit = Circuit::new(1);
+        let x_gate = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
+
+        let modified = default_pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 0);
+    }
+
+    #[test]
     fn test_x_x_cancellation() {
         let pass = TemplateSubstitution::new();
         let mut circuit = Circuit::new(2);
@@ -287,7 +317,9 @@ mod tests {
             name: "X".to_string(),
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -306,7 +338,9 @@ mod tests {
             name: "H".to_string(),
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -325,16 +359,18 @@ mod tests {
             name: "S".to_string(),
         });
 
-        circuit.add_gate(s_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(s_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(s_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
 
         let modified = pass.apply(&mut circuit).unwrap();
         assert!(modified);
-        // S-S would be replaced with Z, but our simplified implementation just removes
-        // TODO: Update when proper replacement is implemented
-        assert!(circuit.len() <= 2);
+        // S-S is replaced with a real Z gate, not silently dropped.
+        assert_eq!(circuit.len(), 1);
+        assert_eq!(circuit.operations_slice()[0].gate().name(), "Z");
     }
 
     #[test]
@@ -346,7 +382,9 @@ mod tests {
             name: "X".to_string(),
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -376,5 +414,79 @@ mod tests {
         let modified = pass.apply(&mut circuit).unwrap();
         assert!(!modified); // X-Y doesn't match any template
         assert_eq!(circuit.len(), 2);
+    }
+
+    #[test]
+    fn test_h_z_h_replaced_with_x_not_dropped() {
+        // Regression test: H-Z-H must become a real X gate, not be silently
+        // deleted (which would leave the circuit's semantics as identity).
+        let pass = TemplateSubstitution::new();
+        let mut circuit = Circuit::new(1);
+
+        circuit
+            .add_gate(
+                Arc::new(MockGate {
+                    name: "H".to_string(),
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(
+                Arc::new(MockGate {
+                    name: "Z".to_string(),
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(
+                Arc::new(MockGate {
+                    name: "H".to_string(),
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 1);
+        assert_eq!(circuit.operations_slice()[0].gate().name(), "X");
+    }
+
+    #[test]
+    fn test_h_x_h_replaced_with_z_not_dropped() {
+        let pass = TemplateSubstitution::new();
+        let mut circuit = Circuit::new(1);
+
+        circuit
+            .add_gate(
+                Arc::new(MockGate {
+                    name: "H".to_string(),
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(
+                Arc::new(MockGate {
+                    name: "X".to_string(),
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+        circuit
+            .add_gate(
+                Arc::new(MockGate {
+                    name: "H".to_string(),
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap();
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 1);
+        assert_eq!(circuit.operations_slice()[0].gate().name(), "Z");
     }
 }

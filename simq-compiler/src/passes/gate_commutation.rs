@@ -102,19 +102,19 @@ impl GateCommutation {
             (1, 1) => {
                 // Single qubit gates on same qubit already handled above
                 false
-            }
+            },
             (1, 2) | (2, 1) => {
                 // Check if single-qubit gate commutes with two-qubit gate
                 Self::single_two_qubit_commute(gate1, gate2)
-            }
+            },
             (2, 2) => {
                 // Two-qubit gate commutation rules
                 Self::two_qubit_commute(gate1, gate2)
-            }
+            },
             _ => {
                 // Conservative: multi-qubit gates (3+) don't commute unless disjoint
                 false
-            }
+            },
         }
     }
 
@@ -164,7 +164,7 @@ impl GateCommutation {
             name,
             "Z" | "S" | "T" | "S†" | "T†"
             | "RZ" | "P" | "U1"  // Parameterized diagonal gates
-            | "Pauli-Z" | "CZ"   // Alternative names
+            | "Pauli-Z" | "CZ" // Alternative names
         )
     }
 
@@ -321,7 +321,7 @@ impl GateCommutation {
     /// Try to swap two adjacent gates if they commute
     ///
     /// Returns true if a swap was made
-    fn try_swap_gates(&self, ops: &mut Vec<GateOp>, i: usize) -> bool {
+    fn try_swap_gates(&self, ops: &mut [GateOp], i: usize) -> bool {
         if i + 1 >= ops.len() {
             return false;
         }
@@ -447,6 +447,53 @@ mod tests {
     }
 
     #[test]
+    fn test_with_prefer_forward_sets_flag() {
+        // Covers `with_prefer_forward` (lines 75-77).
+        let pass_true = GateCommutation::new().with_prefer_forward(true);
+        assert!(pass_true.prefer_forward);
+
+        let pass_false = GateCommutation::new().with_prefer_forward(false);
+        assert!(!pass_false.prefer_forward);
+    }
+
+    #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for GateCommutation` (lines 394-395), which
+        // delegates to `Self::new()`.
+        let default_pass = GateCommutation::default();
+        let new_pass = GateCommutation::new();
+        assert_eq!(default_pass.max_swaps, new_pass.max_swaps);
+        assert_eq!(default_pass.prefer_forward, new_pass.prefer_forward);
+    }
+
+    #[test]
+    fn test_three_qubit_gates_do_not_commute_when_overlapping() {
+        // Covers the catch-all `_ => false` arm (line 116) for gate pairs
+        // with 3+ qubits that overlap (not disjoint).
+        let gate1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "TOFFOLI".to_string(),
+                num_qubits: 3,
+            }),
+            &[QubitId::new(0), QubitId::new(1), QubitId::new(2)],
+        )
+        .unwrap();
+
+        let gate2 = GateOp::new(
+            Arc::new(MockGate {
+                name: "TOFFOLI".to_string(),
+                num_qubits: 3,
+            }),
+            &[QubitId::new(0), QubitId::new(1), QubitId::new(3)],
+        )
+        .unwrap();
+
+        // Shares qubits 0 and 1, so not disjoint; 3-qubit gates are
+        // conservatively assumed not to commute.
+        assert!(!GateCommutation::gates_commute(&gate1, &gate2));
+    }
+
+    #[test]
     fn test_gates_on_different_qubits_commute() {
         let gate1 = GateOp::new(
             Arc::new(MockGate {
@@ -531,8 +578,12 @@ mod tests {
 
         // Add: X(q0), H(q1), X(q1), H(q0)
         // Should reorder to group operations on same qubit
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
@@ -823,5 +874,457 @@ mod tests {
         .unwrap();
 
         assert!(GateCommutation::gates_commute(&rz, &p));
+    }
+
+    #[test]
+    fn test_u1_and_rz_gates_commute() {
+        // Covers `("U1", "RZ") | ("RZ", "U1") => true` and the `return true`
+        // at line 139 inside `same_qubit_commute` (reached only when the gate
+        // names differ but are considered the same rotation axis).
+        let u1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "U1".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        let rz = GateOp::new(
+            Arc::new(MockGate {
+                name: "RZ".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        assert!(GateCommutation::gates_commute(&u1, &rz));
+        assert!(GateCommutation::gates_commute(&rz, &u1));
+    }
+
+    #[test]
+    fn test_u1_and_p_gates_commute() {
+        // Covers `("U1", "P") | ("P", "U1") => true` (line 179).
+        let u1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "U1".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        let p = GateOp::new(
+            Arc::new(MockGate {
+                name: "P".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        assert!(GateCommutation::gates_commute(&u1, &p));
+        assert!(GateCommutation::gates_commute(&p, &u1));
+    }
+
+    #[test]
+    fn test_cz_commutes_with_cnot_sharing_control() {
+        // Covers the CZ/CNOT commutation branch (lines 215, 218-219, 224-227,
+        // 230-231): CZ(a,b) and CNOT(a,c) commute when b != c.
+        let cz = GateOp::new(
+            Arc::new(MockGate {
+                name: "CZ".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let cnot = GateOp::new(
+            Arc::new(MockGate {
+                name: "CNOT".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(2)],
+        )
+        .unwrap();
+
+        assert!(GateCommutation::gates_commute(&cz, &cnot));
+        // Also exercise the `name1 == "CNOT"` else-branch (line 221) by
+        // swapping argument order.
+        assert!(GateCommutation::gates_commute(&cnot, &cz));
+    }
+
+    #[test]
+    fn test_cz_commutes_with_cnot_sharing_control_as_second_qubit() {
+        // Covers the second overlap check (lines 233-234): CZ(a,b) and
+        // CNOT(c,a) commute when b != c, matched via cz_q1 == cnot_ctrl.
+        let cz = GateOp::new(
+            Arc::new(MockGate {
+                name: "CZ".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(1), QubitId::new(0)],
+        )
+        .unwrap();
+
+        let cnot = GateOp::new(
+            Arc::new(MockGate {
+                name: "CNOT".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(2)],
+        )
+        .unwrap();
+
+        assert!(GateCommutation::gates_commute(&cz, &cnot));
+    }
+
+    #[test]
+    fn test_cz_and_cnot_overlapping_target_do_not_commute() {
+        // Ensures the CZ/CNOT branch falls through to `false` (line 257) when
+        // neither overlap condition is satisfied.
+        let cz = GateOp::new(
+            Arc::new(MockGate {
+                name: "CZ".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let cnot = GateOp::new(
+            Arc::new(MockGate {
+                name: "CNOT".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(2), QubitId::new(1)],
+        )
+        .unwrap();
+
+        assert!(!GateCommutation::gates_commute(&cz, &cnot));
+    }
+
+    #[test]
+    fn test_swap_gates_sharing_a_qubit_do_not_commute() {
+        // Covers lines 239, 241-244: the SWAP/SWAP branch is entered, but the
+        // `is_disjoint` check fails, falling through to `false`.
+        let swap1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "SWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let swap2 = GateOp::new(
+            Arc::new(MockGate {
+                name: "SWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(1), QubitId::new(2)],
+        )
+        .unwrap();
+
+        assert!(!GateCommutation::gates_commute(&swap1, &swap2));
+    }
+
+    #[test]
+    fn test_iswap_gates_on_disjoint_qubits_commute() {
+        // Covers lines 249-253: iSWAP/iSWAP branch with disjoint qubits.
+        let iswap1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "iSWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let iswap2 = GateOp::new(
+            Arc::new(MockGate {
+                name: "iSWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(2), QubitId::new(3)],
+        )
+        .unwrap();
+
+        assert!(GateCommutation::gates_commute(&iswap1, &iswap2));
+    }
+
+    #[test]
+    fn test_iswap_gates_sharing_qubit_do_not_commute() {
+        // Ensures the iSWAP branch can also fall through to `false`.
+        let iswap1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "iSWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let iswap2 = GateOp::new(
+            Arc::new(MockGate {
+                name: "iSWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(1), QubitId::new(2)],
+        )
+        .unwrap();
+
+        assert!(!GateCommutation::gates_commute(&iswap1, &iswap2));
+    }
+
+    #[test]
+    fn test_unrelated_two_qubit_gates_do_not_commute() {
+        // Covers the final `false` (line 257) for two-qubit gate pairs that
+        // match none of the special-cased rules (e.g. two different unknown
+        // two-qubit gates sharing a qubit).
+        let gate1 = GateOp::new(
+            Arc::new(MockGate {
+                name: "CUSTOM2Q".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let gate2 = GateOp::new(
+            Arc::new(MockGate {
+                name: "CUSTOM2Q".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(1), QubitId::new(2)],
+        )
+        .unwrap();
+
+        assert!(!GateCommutation::gates_commute(&gate1, &gate2));
+    }
+
+    #[test]
+    fn test_single_two_qubit_commute_handles_argument_order() {
+        // Covers the else-branch at line 266 in `single_two_qubit_commute`,
+        // reached when `gate1` (the first argument) is the two-qubit gate
+        // and `gate2` is the single-qubit gate.
+        let cnot = GateOp::new(
+            Arc::new(MockGate {
+                name: "CNOT".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let x_gate = GateOp::new(
+            Arc::new(MockGate {
+                name: "X".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(1)],
+        )
+        .unwrap();
+
+        // gates_commute dispatches to single_two_qubit_commute(gate1, gate2)
+        // with gate1 = cnot (2-qubit) and gate2 = x_gate (1-qubit), which
+        // exercises the `else` branch that swaps them internally.
+        assert!(GateCommutation::gates_commute(&cnot, &x_gate));
+    }
+
+    #[test]
+    fn test_diagonal_gate_commutes_with_cnot_on_control() {
+        // Covers lines 292-295: a diagonal (but non-Z) gate commuting with
+        // CNOT when placed on the control qubit.
+        let s_gate = GateOp::new(
+            Arc::new(MockGate {
+                name: "S".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        let cnot = GateOp::new(
+            Arc::new(MockGate {
+                name: "CNOT".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        assert!(GateCommutation::gates_commute(&s_gate, &cnot));
+    }
+
+    #[test]
+    fn test_swap_does_not_commute_with_single_qubit_gate_on_shared_qubit() {
+        // Covers lines 311-316: SWAP explicitly returns false when paired
+        // with a single-qubit gate (since the disjoint case is already
+        // handled earlier in `gates_commute`).
+        let swap = GateOp::new(
+            Arc::new(MockGate {
+                name: "SWAP".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let x_gate = GateOp::new(
+            Arc::new(MockGate {
+                name: "X".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        assert!(!GateCommutation::gates_commute(&swap, &x_gate));
+    }
+
+    #[test]
+    fn test_single_qubit_gate_does_not_commute_with_unrelated_two_qubit_gate() {
+        // Covers the final `false` (line 318) in `single_two_qubit_commute`
+        // when the two-qubit gate is neither CNOT, CZ, nor SWAP.
+        let custom_2q = GateOp::new(
+            Arc::new(MockGate {
+                name: "CUSTOM2Q".to_string(),
+                num_qubits: 2,
+            }),
+            &[QubitId::new(0), QubitId::new(1)],
+        )
+        .unwrap();
+
+        let x_gate = GateOp::new(
+            Arc::new(MockGate {
+                name: "X".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap();
+
+        assert!(!GateCommutation::gates_commute(&custom_2q, &x_gate));
+    }
+
+    #[test]
+    fn test_try_swap_gates_at_end_of_slice_returns_false() {
+        // Covers line 326: `try_swap_gates` returns false when there is no
+        // next gate to swap with (i is the last index).
+        let pass = GateCommutation::new();
+        let mut ops = vec![GateOp::new(
+            Arc::new(MockGate {
+                name: "X".to_string(),
+                num_qubits: 1,
+            }),
+            &[QubitId::new(0)],
+        )
+        .unwrap()];
+
+        assert!(!pass.try_swap_gates(&mut ops, 0));
+    }
+
+    #[test]
+    fn test_try_swap_gates_non_commuting_returns_false() {
+        // Covers line 333: `try_swap_gates` returns false when the adjacent
+        // gates don't commute.
+        let pass = GateCommutation::new();
+        let mut ops = vec![
+            GateOp::new(
+                Arc::new(MockGate {
+                    name: "X".to_string(),
+                    num_qubits: 1,
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap(),
+            GateOp::new(
+                Arc::new(MockGate {
+                    name: "Z".to_string(),
+                    num_qubits: 1,
+                }),
+                &[QubitId::new(0)],
+            )
+            .unwrap(),
+        ];
+
+        assert!(!pass.try_swap_gates(&mut ops, 0));
+    }
+
+    #[test]
+    fn test_group_gates_by_qubit_stops_when_swap_limit_reached() {
+        // Covers lines 371-372: the inner bubble loop breaks out early once
+        // `swaps_made >= self.max_swaps`, even if more swaps would otherwise
+        // be attempted.
+        let pass = GateCommutation::new().with_max_swaps(1);
+        let mut circuit = Circuit::new(2);
+
+        let x_gate = Arc::new(MockGate {
+            name: "X".to_string(),
+            num_qubits: 1,
+        });
+        let h_gate = Arc::new(MockGate {
+            name: "H".to_string(),
+            num_qubits: 1,
+        });
+
+        // X(q0), H(q1), H(q1), X(q0) — after grouping there are multiple
+        // opportunities to swap gates on q0 toward each other, but max_swaps
+        // caps it at 1.
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(1)])
+            .unwrap();
+        circuit.add_gate(h_gate, &[QubitId::new(1)]).unwrap();
+        circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
+
+        assert_eq!(circuit.len(), 4);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        assert!(modified);
+        assert_eq!(circuit.len(), 4); // Same number of gates, just reordered
+    }
+
+    #[test]
+    fn test_group_gates_by_qubit_stops_bubbling_on_non_commuting_gate() {
+        // Covers line 375: the inner `while` loop's `else` branch breaks when
+        // a gate can't be swapped further because it doesn't commute with
+        // its neighbor.
+        let pass = GateCommutation::new();
+        let mut circuit = Circuit::new(2);
+
+        let x_gate = Arc::new(MockGate {
+            name: "X".to_string(),
+            num_qubits: 1,
+        });
+        let z_gate = Arc::new(MockGate {
+            name: "Z".to_string(),
+            num_qubits: 1,
+        });
+
+        // X(q0), Z(q0), X(q1), X(q0)
+        // The last X(q0) tries to bubble back toward the first X(q0), but Z
+        // (non-commuting with X) blocks it after one swap attempt.
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit.add_gate(z_gate, &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(1)])
+            .unwrap();
+        circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
+
+        assert_eq!(circuit.len(), 4);
+
+        let modified = pass.apply(&mut circuit).unwrap();
+        // The X(q1)/X(q0) at the end commute and get swapped, so it is still
+        // modified, but the Z gate blocks full bubbling to the front.
+        assert!(modified);
+        assert_eq!(circuit.len(), 4);
     }
 }

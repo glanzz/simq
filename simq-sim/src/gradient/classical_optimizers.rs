@@ -36,7 +36,7 @@
 use simq_core::Circuit;
 use simq_state::observable::PauliObservable;
 use simq_state::AdaptiveState;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use super::{ConvergenceStatus, OptimizationResult, OptimizationStep};
 
@@ -54,7 +54,7 @@ fn compute_expectation(
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -205,12 +205,7 @@ where
                 // First iteration: use steepest descent
                 gradient.iter().map(|&g| -g).collect()
             } else {
-                self.compute_lbfgs_direction(
-                    &gradient,
-                    &s_history,
-                    &y_history,
-                    &rho_history,
-                )
+                self.compute_lbfgs_direction(&gradient, &s_history, &y_history, &rho_history)
             };
 
             // Line search to find optimal step size
@@ -613,7 +608,8 @@ where
                 // Try expansion
                 let expanded = self.expand(&reflected, &centroid);
                 let expanded_circuit = (self.circuit_builder)(&expanded);
-                let expanded_energy = compute_expectation(simulator, &expanded_circuit, observable)?;
+                let expanded_energy =
+                    compute_expectation(simulator, &expanded_circuit, observable)?;
 
                 if expanded_energy < reflected_energy {
                     simplex[worst_idx] = expanded;
@@ -706,8 +702,8 @@ where
             }
         }
 
-        for i in 0..n {
-            centroid[i] /= indices.len() as f64;
+        for item in centroid.iter_mut().take(n) {
+            *item /= indices.len() as f64;
         }
 
         centroid
@@ -790,6 +786,30 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Simulator, SimulatorConfig};
+    use simq_core::{circuit::Circuit, QubitId};
+    use simq_gates::standard::RotationY;
+    use simq_state::observable::{PauliObservable, PauliString};
+    use std::sync::Arc;
+
+    fn q(i: usize) -> QubitId {
+        QubitId::new(i)
+    }
+
+    fn make_sim() -> Simulator {
+        Simulator::new(SimulatorConfig::default().with_optimization(false))
+    }
+
+    fn z_observable() -> PauliObservable {
+        PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0)
+    }
+
+    fn ry_circuit(params: &[f64]) -> Circuit {
+        let mut c = Circuit::new(1);
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+            .unwrap();
+        c
+    }
 
     #[test]
     fn test_lbfgs_config_default() {
@@ -805,5 +825,121 @@ mod tests {
         assert_eq!(config.max_iterations, 200);
         assert!(config.alpha > 0.0);
         assert!(config.gamma > 0.0);
+    }
+
+    /// Lines 52 (Dense branch), 417 (MaxIterations), 419 (FullyConverged):
+    /// run LBFGSOptimizer with very loose tolerance to trigger FullyConverged early
+    #[test]
+    fn test_lbfgs_optimizer_loose_convergence() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = LBFGSConfig {
+            max_iterations: 10,
+            tolerance: 100.0, // Very loose: will converge on first step
+            ..LBFGSConfig::default()
+        };
+        let mut optimizer = LBFGSOptimizer::new(ry_circuit, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        // Should converge very quickly due to loose tolerance
+        assert!(result.num_iterations <= 10);
+        // Verify history is populated (line 52 Dense branch exercised)
+        assert!(!optimizer.history().is_empty());
+    }
+
+    /// Line 421 (EnergyConverged) and 423 (GradientConverged): run LBFGS with
+    /// one-sided tight tolerances
+    #[test]
+    fn test_lbfgs_optimizer_energy_converged() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = LBFGSConfig {
+            max_iterations: 10,
+            tolerance: 10.0, // Loose for both — FullyConverged or EnergyConverged
+            ..LBFGSConfig::default()
+        };
+        let mut optimizer = LBFGSOptimizer::new(ry_circuit, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        assert!(result.num_iterations <= 10);
+    }
+
+    /// Line 417 (check_convergence MaxIterations branch via exact iteration count)
+    #[test]
+    fn test_lbfgs_optimizer_max_iterations_check_convergence() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = LBFGSConfig {
+            max_iterations: 3,
+            tolerance: 1e-20, // Very tight: won't converge
+            ..LBFGSConfig::default()
+        };
+        let mut optimizer = LBFGSOptimizer::new(ry_circuit, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        assert_eq!(result.status, ConvergenceStatus::MaxIterations);
+    }
+
+    /// LBFGSOptimizer history() and reset()
+    #[test]
+    fn test_lbfgs_history_and_reset() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = LBFGSConfig {
+            max_iterations: 2,
+            tolerance: 1e-20,
+            ..LBFGSConfig::default()
+        };
+        let mut optimizer = LBFGSOptimizer::new(ry_circuit, config);
+        optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        assert!(!optimizer.history().is_empty());
+        optimizer.reset();
+        assert!(optimizer.history().is_empty());
+    }
+
+    /// Lines 566-572 (Nelder-Mead FullyConverged), 661 (find best at max iterations)
+    #[test]
+    fn test_nelder_mead_converges() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = NelderMeadConfig {
+            max_iterations: 50,
+            tolerance: 100.0, // Very loose: simplex will converge quickly
+            ..NelderMeadConfig::default()
+        };
+        let mut optimizer = NelderMeadOptimizer::new(ry_circuit, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        assert!(result.num_iterations <= 50);
+    }
+
+    /// Line 661 (find best_idx after max iterations without convergence)
+    #[test]
+    fn test_nelder_mead_max_iterations() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = NelderMeadConfig {
+            max_iterations: 5,
+            tolerance: 1e-20, // Very tight: won't converge via simplex size
+            ..NelderMeadConfig::default()
+        };
+        let mut optimizer = NelderMeadOptimizer::new(ry_circuit, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        // Will reach max iterations and find best point (line 661)
+        assert_eq!(result.status, ConvergenceStatus::MaxIterations);
+        assert_eq!(result.num_iterations, 5);
+    }
+
+    /// Nelder-Mead history() and reset()
+    #[test]
+    fn test_nelder_mead_history_and_reset() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = NelderMeadConfig {
+            max_iterations: 3,
+            tolerance: 1e-20,
+            ..NelderMeadConfig::default()
+        };
+        let mut optimizer = NelderMeadOptimizer::new(ry_circuit, config);
+        optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        assert!(!optimizer.history().is_empty());
+        optimizer.reset();
+        assert!(optimizer.history().is_empty());
     }
 }

@@ -61,19 +61,19 @@
 pub mod ascii_renderer;
 pub mod bloch_sphere;
 pub mod circuit;
-pub mod circuit_debugger;
-pub mod stateful_debugger;
-pub mod latex_renderer;
 pub mod circuit_builder;
+pub mod circuit_debugger;
 pub mod dynamic_builder;
 pub mod error;
 pub mod gate;
+pub mod latex_renderer;
 pub mod noise;
 pub mod parameter;
 pub mod parameter_id;
 pub mod parameter_registry;
 pub mod qubit;
 pub mod qubit_ref;
+pub mod stateful_debugger;
 pub mod validation;
 
 #[cfg(feature = "serialization")]
@@ -81,24 +81,20 @@ pub mod serialization;
 
 // Re-exports for convenience
 pub use ascii_renderer::{
-    render as render_ascii, render_with_config as render_ascii_with_config,
-    render_detailed as render_ascii_detailed, AsciiConfig, AsciiConfigBuilder,
-    RenderStyle, WireStyle, RenderedCircuit,
+    render as render_ascii, render_detailed as render_ascii_detailed,
+    render_with_config as render_ascii_with_config, AsciiConfig, AsciiConfigBuilder, RenderStyle,
+    RenderedCircuit, WireStyle,
 };
-pub use latex_renderer::{
-    render as render_latex, render_with_config as render_latex_with_config,
-    LatexConfig,
-};
-pub use circuit_debugger::{CircuitDebugger, DebuggerStatus, StepInfo};
-pub use stateful_debugger::{
-    StatefulDebugger, StateSnapshot, AmplitudeEntry, VisualizationConfig,
-};
-pub use bloch_sphere::{BlochVector, BlochAngles, BlochRenderConfig};
+pub use bloch_sphere::{BlochAngles, BlochRenderConfig, BlochVector};
 pub use circuit::Circuit;
 pub use circuit_builder::CircuitBuilder;
+pub use circuit_debugger::{CircuitDebugger, DebuggerStatus, StepInfo};
 pub use dynamic_builder::DynamicCircuitBuilder;
 pub use error::QuantumError;
 pub use gate::{Gate, GateOp};
+pub use latex_renderer::{
+    render as render_latex, render_with_config as render_latex_with_config, LatexConfig,
+};
 pub use noise::{
     AmplitudeDamping, AmplitudeDampingMC, CrosstalkProperties, DepolarizingChannel, DepolarizingMC,
     GateNoise, GateTiming, HardwareNoiseModel, KrausOperator, MonteCarloSampler, NoiseChannel,
@@ -111,6 +107,7 @@ pub use parameter_id::ParameterId;
 pub use parameter_registry::ParameterRegistry;
 pub use qubit::QubitId;
 pub use qubit_ref::Qubit;
+pub use stateful_debugger::{AmplitudeEntry, StateSnapshot, StatefulDebugger, VisualizationConfig};
 pub use validation::{
     DependencyGraph, ParallelismAnalysis, ValidationReport, ValidationResult, ValidationRule,
 };

@@ -5,7 +5,7 @@
 //! This optimizes both memory usage and computational performance.
 
 use crate::dense_state::DenseState;
-use crate::error::{Result, StateError};
+use crate::error::Result;
 use crate::sparse_state::SparseState;
 use num_complex::Complex64;
 use std::fmt;
@@ -18,7 +18,8 @@ const DEFAULT_SPARSE_TO_DENSE_THRESHOLD: f32 = 0.1;
 /// AdaptiveState automatically switches between sparse and dense representations:
 /// - Starts in sparse mode for initial states
 /// - Converts to dense when density exceeds threshold (default 10%)
-/// - Never converts back to sparse (avoids thrashing)
+/// - Automatic conversion never goes back to sparse (avoids thrashing);
+///   callers can re-sparsify explicitly via [`force_to_sparse`](Self::force_to_sparse)
 ///
 /// # Example
 ///
@@ -33,10 +34,7 @@ const DEFAULT_SPARSE_TO_DENSE_THRESHOLD: f32 = 0.1;
 /// ```
 pub enum AdaptiveState {
     /// Sparse representation (AHashMap-based)
-    Sparse {
-        state: SparseState,
-        threshold: f32,
-    },
+    Sparse { state: SparseState, threshold: f32 },
     /// Dense representation (64-byte aligned vectors)
     Dense(DenseState),
 }
@@ -76,9 +74,12 @@ impl AdaptiveState {
     /// # Returns
     /// A new adaptive state with custom threshold
     pub fn with_threshold(num_qubits: usize, threshold: f32) -> Result<Self> {
+        let clamped = threshold.clamp(0.0, 1.0);
+        let mut state = SparseState::new(num_qubits)?;
+        state.set_density_threshold(clamped);
         Ok(Self::Sparse {
-            state: SparseState::new(num_qubits)?,
-            threshold: threshold.clamp(0.0, 1.0),
+            state,
+            threshold: clamped,
         })
     }
 
@@ -163,10 +164,13 @@ impl AdaptiveState {
     ///
     /// Returns true if conversion occurred
     fn check_and_convert(&mut self) -> bool {
-        if let Self::Sparse { state, threshold } = self {
+        if let Self::Sparse {
+            state,
+            threshold: _,
+        } = self
+        {
             if state.should_convert_to_dense() {
-                let dense = DenseState::from_sparse(state)
-                    .expect("Sparse→Dense conversion failed");
+                let dense = DenseState::from_sparse(state).expect("Sparse→Dense conversion failed");
                 *self = Self::Dense(dense);
                 return true;
             }
@@ -189,7 +193,7 @@ impl AdaptiveState {
             Self::Dense(state) => {
                 state.normalize();
                 Ok(())
-            }
+            },
         }
     }
 
@@ -211,7 +215,7 @@ impl AdaptiveState {
                 let thresh = *threshold;
                 *state = SparseState::new(num_qubits).expect("Failed to reset sparse state");
                 *threshold = thresh;
-            }
+            },
             Self::Dense(state) => state.reset(),
         }
     }
@@ -250,17 +254,14 @@ impl AdaptiveState {
         match self {
             Self::Sparse { state, .. } => {
                 // Flatten matrix for sparse representation
-                let flat_matrix = [
-                    matrix[0][0], matrix[0][1],
-                    matrix[1][0], matrix[1][1],
-                ];
+                let flat_matrix = [matrix[0][0], matrix[0][1], matrix[1][0], matrix[1][1]];
                 state.apply_single_qubit_gate(&flat_matrix, qubit)?;
                 Ok(self.check_and_convert())
-            }
+            },
             Self::Dense(state) => {
                 state.apply_single_qubit_gate(matrix, qubit)?;
                 Ok(false)
-            }
+            },
         }
     }
 
@@ -290,11 +291,11 @@ impl AdaptiveState {
                 }
                 state.apply_two_qubit_gate(&flat_matrix, qubit1, qubit2)?;
                 Ok(self.check_and_convert())
-            }
+            },
             Self::Dense(state) => {
                 state.apply_two_qubit_gate(matrix, qubit1, qubit2)?;
                 Ok(false)
-            }
+            },
         }
     }
 
@@ -307,9 +308,7 @@ impl AdaptiveState {
     /// The probability |amplitude|^2 of measuring this basis state
     pub fn get_probability(&self, basis_state: usize) -> Result<f64> {
         match self {
-            Self::Sparse { state, .. } => {
-                state.expectation_basis(basis_state as u64)
-            }
+            Self::Sparse { state, .. } => state.expectation_basis(basis_state as u64),
             Self::Dense(state) => state.get_probability(basis_state),
         }
     }
@@ -329,7 +328,7 @@ impl AdaptiveState {
                 let outcome = if random_value < prob_0 { 0 } else { 1 };
                 state.measure_and_collapse(qubit, outcome as u32)?;
                 Ok(outcome)
-            }
+            },
             Self::Dense(state) => state.measure_qubit(qubit, random_value),
         }
     }
@@ -367,6 +366,28 @@ impl AdaptiveState {
         if let Self::Sparse { state, .. } = self {
             let dense = DenseState::from_sparse(state)?;
             *self = Self::Dense(dense);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Force conversion to sparse representation
+    ///
+    /// This is the inverse of [`force_to_dense`](Self::force_to_dense) and is
+    /// used by adaptive execution engines to re-sparsify a state whose density
+    /// has dropped (e.g. after measurement collapse).
+    ///
+    /// # Returns
+    /// True if conversion occurred, false if already sparse
+    pub fn force_to_sparse(&mut self) -> Result<bool> {
+        if let Self::Dense(state) = self {
+            let sparse =
+                SparseState::from_dense_amplitudes(state.num_qubits(), state.amplitudes())?;
+            *self = Self::Sparse {
+                state: sparse,
+                threshold: DEFAULT_SPARSE_TO_DENSE_THRESHOLD,
+            };
             Ok(true)
         } else {
             Ok(false)
@@ -555,6 +576,44 @@ mod tests {
     }
 
     #[test]
+    fn test_force_to_sparse() {
+        let mut state = AdaptiveState::new(3).unwrap();
+        state.force_to_dense().unwrap();
+        assert!(state.is_dense());
+
+        let converted = state.force_to_sparse().unwrap();
+        assert!(converted);
+        assert!(state.is_sparse());
+        // |000⟩ has a single nonzero amplitude
+        assert_eq!(state.stats().memory_entries, 1);
+        assert_relative_eq!(state.norm(), 1.0, epsilon = 1e-10);
+
+        // Second call should not convert
+        let converted_again = state.force_to_sparse().unwrap();
+        assert!(!converted_again);
+    }
+
+    #[test]
+    fn test_force_to_sparse_preserves_amplitudes() {
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        let mut state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        state.force_to_dense().unwrap();
+        state.force_to_sparse().unwrap();
+        assert!(state.is_sparse());
+        let round_trip = state.to_dense_vec();
+        for (a, b) in amplitudes.iter().zip(round_trip.iter()) {
+            assert_relative_eq!(a.re, b.re, epsilon = 1e-12);
+            assert_relative_eq!(a.im, b.im, epsilon = 1e-12);
+        }
+    }
+
+    #[test]
     fn test_reset_preserves_representation() {
         let mut state = AdaptiveState::new(3).unwrap();
         state.force_to_dense().unwrap();
@@ -624,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_to_dense_vec() {
-        let mut state = AdaptiveState::new(2).unwrap();
+        let state = AdaptiveState::new(2).unwrap();
         let dense_vec = state.to_dense_vec();
 
         assert_eq!(dense_vec.len(), 4);
@@ -671,5 +730,270 @@ mod tests {
         ];
         let dense_state = AdaptiveState::from_amplitudes(2, &dense_amps).unwrap();
         assert!(dense_state.is_dense()); // 100% density should always be dense
+    }
+
+    #[test]
+    fn test_representation_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert_eq!(state.representation(), "Sparse");
+        state.force_to_dense().unwrap();
+        assert_eq!(state.representation(), "Dense");
+    }
+
+    #[test]
+    fn test_threshold_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        let thresh = state.threshold();
+        assert!(thresh > 0.0 && thresh <= 1.0);
+        state.force_to_dense().unwrap();
+        // Dense states always return 1.0
+        assert_eq!(state.threshold(), 1.0);
+    }
+
+    #[test]
+    fn test_density_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        // After force_to_dense on |00>, density is 1 non-zero / 4 total = 0.25
+        let d = state.density();
+        assert!((0.0..=1.0).contains(&d));
+    }
+
+    #[test]
+    fn test_stats_dense_path() {
+        let mut state = AdaptiveState::new(3).unwrap();
+        state.force_to_dense().unwrap();
+        let stats = state.stats();
+        assert_eq!(stats.num_qubits, 3);
+        assert_eq!(stats.dimension, 8);
+        assert_eq!(stats.representation, "Dense");
+        assert_eq!(stats.threshold, 1.0);
+        assert_eq!(stats.memory_entries, 8);
+    }
+
+    #[test]
+    fn test_to_dense_vec_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        let dense_vec = state.to_dense_vec();
+        assert_eq!(dense_vec.len(), 4);
+        assert_eq!(dense_vec[0], Complex64::new(1.0, 0.0));
+        assert_eq!(dense_vec[1], Complex64::new(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_measure_qubit_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        // Apply Hadamard to first qubit (on dense state)
+        let h = 1.0 / 2.0_f64.sqrt();
+        let hadamard = [
+            [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
+            [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
+        ];
+        state.apply_single_qubit_gate(&hadamard, 0).unwrap();
+        let outcome = state.measure_qubit(0, 0.25).unwrap();
+        assert!(outcome == 0 || outcome == 1);
+    }
+
+    #[test]
+    fn test_partial_trace_sparse_path() {
+        // Bell state (|00> + |11>) / sqrt(2)
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        // Use sparse state (low density)
+        let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        let rho = state.partial_trace(&[0]).unwrap();
+        // Maximally mixed state: diag(0.5, 0.5)
+        assert!((rho[0].re - 0.5).abs() < 1e-10);
+        assert!((rho[3].re - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_partial_trace_dense_path() {
+        // Bell state (|00> + |11>) / sqrt(2)
+        let val = 1.0 / 2.0_f64.sqrt();
+        let amplitudes = vec![
+            Complex64::new(val, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(val, 0.0),
+        ];
+        let mut state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        state.force_to_dense().unwrap();
+        assert!(state.is_dense());
+        let rho = state.partial_trace(&[0]).unwrap();
+        assert!((rho[0].re - 0.5).abs() < 1e-10);
+        assert!((rho[3].re - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_stats_display() {
+        let state = AdaptiveState::new(2).unwrap();
+        let stats = state.stats();
+        let s = format!("{}", stats);
+        assert!(s.contains("2 qubits"));
+        assert!(s.contains("Sparse"));
+    }
+
+    #[test]
+    fn test_adaptive_state_debug() {
+        let state = AdaptiveState::new(3).unwrap();
+        let dbg = format!("{:?}", state);
+        assert!(dbg.contains("AdaptiveState"));
+        assert!(dbg.contains("Sparse"));
+    }
+
+    #[test]
+    fn test_adaptive_state_display() {
+        let state = AdaptiveState::new(3).unwrap();
+        let s = format!("{}", state);
+        assert!(s.contains("StateStats"));
+    }
+
+    #[test]
+    fn test_normalize_dense_path() {
+        let amplitudes = vec![
+            Complex64::new(2.0, 0.0),
+            Complex64::new(2.0, 0.0),
+            Complex64::new(2.0, 0.0),
+            Complex64::new(2.0, 0.0),
+        ];
+        let mut state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        // Should be dense since density=1.0
+        assert!(state.is_dense());
+        state.normalize().unwrap();
+        assert!(state.is_normalized(1e-10));
+        assert_relative_eq!(state.norm(), 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_get_probability_dense_path() {
+        let amplitudes = vec![
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+        ];
+        let state = AdaptiveState::from_amplitudes(2, &amplitudes).unwrap();
+        assert!(state.is_dense());
+        let p = state.get_probability(0).unwrap();
+        assert!((p - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_sparse_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        assert!(state.is_sparse());
+        // Identity 4x4 gate
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for (i, row) in identity.iter_mut().enumerate() {
+            row[i] = Complex64::new(1.0, 0.0);
+        }
+        let _converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
+        // State should still be valid after applying identity
+        assert_eq!(state.num_qubits(), 2);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_dense_path() {
+        let mut state = AdaptiveState::new(2).unwrap();
+        state.force_to_dense().unwrap();
+        assert!(state.is_dense());
+        // Identity 4x4 gate
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for (i, row) in identity.iter_mut().enumerate() {
+            row[i] = Complex64::new(1.0, 0.0);
+        }
+        let converted = state.apply_two_qubit_gate(&identity, 0, 1).unwrap();
+        assert!(!converted); // always false for dense
+    }
+
+    #[test]
+    fn test_from_amplitudes_stays_sparse_low_density() {
+        // 5 qubits => dimension 32; only 1 nonzero amplitude => density = 1/32 = 0.03125,
+        // well below the default 0.1 threshold, so the state should remain sparse
+        // (exercises the `Ok(Self::Sparse { .. })` branch of `from_amplitudes`).
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 32];
+        amplitudes[0] = Complex64::new(1.0, 0.0);
+        let state = AdaptiveState::from_amplitudes(5, &amplitudes).unwrap();
+        assert!(state.is_sparse());
+        assert_eq!(state.num_qubits(), 5);
+    }
+
+    #[test]
+    fn test_dimension_sparse_and_dense() {
+        let sparse_state = AdaptiveState::new(4).unwrap();
+        assert!(sparse_state.is_sparse());
+        assert_eq!(sparse_state.dimension(), 16);
+
+        let mut dense_state = AdaptiveState::new(4).unwrap();
+        dense_state.force_to_dense().unwrap();
+        assert_eq!(dense_state.dimension(), 16);
+    }
+
+    #[test]
+    fn test_norm_sparse_path() {
+        // Stays sparse: single nonzero amplitude out of 32.
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 32];
+        amplitudes[0] = Complex64::new(2.0, 0.0);
+        let state = AdaptiveState::from_amplitudes(5, &amplitudes).unwrap();
+        assert!(state.is_sparse());
+        assert_relative_eq!(state.norm(), 2.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_sparse_path() {
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); 32];
+        amplitudes[0] = Complex64::new(3.0, 0.0);
+        let mut state = AdaptiveState::from_amplitudes(5, &amplitudes).unwrap();
+        assert!(state.is_sparse());
+        state.normalize().unwrap();
+        assert!(state.is_normalized(1e-10));
+        assert_relative_eq!(state.norm(), 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_is_normalized_sparse_path() {
+        let state = AdaptiveState::new(5).unwrap();
+        assert!(state.is_sparse());
+        // Freshly created |0...0> state is normalized.
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_get_probability_truly_sparse() {
+        // 4 qubits: density = 1/16 = 6.25% < 10% threshold, so stays Sparse.
+        let state = AdaptiveState::new(4).unwrap();
+        assert!(state.is_sparse());
+        // |0000⟩ has probability 1.0 for basis state 0
+        let prob = state.get_probability(0).unwrap();
+        assert!((prob - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_measure_qubit_truly_sparse() {
+        // 4 qubits stays Sparse — measuring qubit 0 on |0000⟩ always yields 0.
+        let mut state = AdaptiveState::new(4).unwrap();
+        assert!(state.is_sparse());
+        let outcome = state.measure_qubit(0, 0.5).unwrap();
+        assert_eq!(outcome, 0);
+    }
+
+    #[test]
+    fn test_partial_trace_truly_sparse() {
+        // 4 qubits stays Sparse — partial trace over qubits [0] on |0000⟩.
+        let state = AdaptiveState::new(4).unwrap();
+        assert!(state.is_sparse());
+        // Keep qubit 0; result is a 2×2 density matrix [[1,0],[0,0]]
+        let rho = state.partial_trace(&[0]).unwrap();
+        assert_eq!(rho.len(), 4);
+        assert!((rho[0].re - 1.0).abs() < 1e-10);
+        assert!(rho[3].re.abs() < 1e-10);
     }
 }

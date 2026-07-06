@@ -65,11 +65,6 @@ impl Compiler {
         }
     }
 
-    /// Create a compiler with default configuration
-    pub fn default() -> Self {
-        Self::new(CompilerConfig::default())
-    }
-
     /// Add an optimization pass to the compiler
     ///
     /// Passes are applied in the order they are added.
@@ -150,12 +145,14 @@ impl Compiler {
     ///
     /// This is useful for testing individual passes or applying
     /// specific optimizations without running the full pipeline.
-    pub fn run_pass(
-        &self,
-        pass: &dyn OptimizationPass,
-        circuit: &mut Circuit,
-    ) -> Result<bool> {
+    pub fn run_pass(&self, pass: &dyn OptimizationPass, circuit: &mut Circuit) -> Result<bool> {
         pass.apply(circuit)
+    }
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new(CompilerConfig::default())
     }
 }
 
@@ -263,10 +260,7 @@ mod tests {
         let mut circuit = Circuit::new(2);
         compiler.compile(&mut circuit).unwrap();
 
-        assert_eq!(
-            apply_count.load(std::sync::atomic::Ordering::SeqCst),
-            1
-        );
+        assert_eq!(apply_count.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -301,10 +295,7 @@ mod tests {
         compiler.compile(&mut circuit).unwrap();
 
         // Should stop after 4 iterations (3 with changes + 1 with no changes)
-        assert_eq!(
-            apply_count.load(std::sync::atomic::Ordering::SeqCst),
-            4
-        );
+        assert_eq!(apply_count.load(std::sync::atomic::Ordering::SeqCst), 4);
     }
 
     #[test]
@@ -325,6 +316,81 @@ mod tests {
         assert_eq!(compiler.num_passes(), 1);
         assert_eq!(compiler.config.max_iterations, 5);
         assert!(!compiler.config.enable_timing);
+    }
+
+    #[test]
+    fn test_compile_with_timing_disabled() {
+        // Exercises the `None` branch for pass_start when enable_timing is
+        // false (line 118), i.e. compile() runs without collecting timing.
+        let mut compiler = Compiler::new(CompilerConfig {
+            enable_timing: false,
+            ..Default::default()
+        });
+        let apply_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let pass = Arc::new(TestPass {
+            name: "no-timing".to_string(),
+            should_modify: false,
+            apply_count: apply_count.clone(),
+        });
+        compiler.add_pass(pass);
+
+        let mut circuit = Circuit::new(2);
+        let result = compiler.compile(&mut circuit).unwrap();
+
+        assert_eq!(apply_count.load(std::sync::atomic::Ordering::SeqCst), 1);
+        // No stats should have been recorded since timing was disabled.
+        assert!(result.pass_stats.is_empty());
+    }
+
+    #[test]
+    fn test_run_pass() {
+        // Exercises Compiler::run_pass (lines 148-149), which runs a single
+        // pass directly without going through the fixed-point loop.
+        let compiler = Compiler::default();
+        let apply_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let pass = TestPass {
+            name: "single".to_string(),
+            should_modify: true,
+            apply_count: apply_count.clone(),
+        };
+
+        let mut circuit = Circuit::new(2);
+        let modified = compiler.run_pass(&pass, &mut circuit).unwrap();
+
+        assert!(modified);
+        assert_eq!(apply_count.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_compiler_builder_config() {
+        // Exercises CompilerBuilder::config (lines 175-177), which replaces
+        // the whole config wholesale.
+        let custom_config = CompilerConfig {
+            max_iterations: 42,
+            enable_timing: false,
+            min_benefit_score: 0.5,
+        };
+
+        let compiler = CompilerBuilder::new().config(custom_config).build();
+
+        assert_eq!(compiler.config.max_iterations, 42);
+        assert!(!compiler.config.enable_timing);
+        assert_eq!(compiler.config.min_benefit_score, 0.5);
+    }
+
+    #[test]
+    fn test_compiler_builder_min_benefit_score() {
+        // Exercises CompilerBuilder::min_benefit_score (lines 193-195).
+        let compiler = CompilerBuilder::new().min_benefit_score(0.42).build();
+        assert_eq!(compiler.config.min_benefit_score, 0.42);
+    }
+
+    #[test]
+    fn test_compiler_builder_default() {
+        // Exercises the Default impl for CompilerBuilder (lines 213-214).
+        let compiler = CompilerBuilder::default().build();
+        assert_eq!(compiler.num_passes(), 0);
+        assert_eq!(compiler.config.max_iterations, CompilerConfig::default().max_iterations);
     }
 
     #[test]

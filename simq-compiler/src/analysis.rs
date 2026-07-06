@@ -160,7 +160,8 @@ impl ResourceEstimate {
         // Each sparse entry needs: 8 bytes (key) + 16 bytes (value) + overhead
         let sparse_entry_size = 32;
         let sparse_density = 0.01f64.max(1.0 / state_size as f64);
-        let sparse_memory_bytes_min = (state_size as f64 * sparse_density * sparse_entry_size as f64) as usize;
+        let sparse_memory_bytes_min =
+            (state_size as f64 * sparse_density * sparse_entry_size as f64) as usize;
 
         // Time estimates (very rough)
         let stats = GateStatistics::from_circuit(circuit)?;
@@ -175,7 +176,8 @@ impl ResourceEstimate {
 
         // Scale by state size (larger states take longer)
         let state_scale = (num_qubits as f64).exp2() / 1024.0; // normalize to 10 qubits
-        let estimated_time_us = (single_qubit_time + two_qubit_time + multi_qubit_time) * state_scale.max(1.0);
+        let estimated_time_us =
+            (single_qubit_time + two_qubit_time + multi_qubit_time) * state_scale.max(1.0);
 
         Ok(Self {
             dense_memory_bytes,
@@ -243,7 +245,11 @@ impl std::fmt::Display for ResourceEstimate {
         writeln!(f, "    Depth: {}", self.depth)?;
         writeln!(f, "  Memory requirements:")?;
         writeln!(f, "    Dense state: {}", Self::format_memory(self.dense_memory_bytes))?;
-        writeln!(f, "    Sparse state (min): {}", Self::format_memory(self.sparse_memory_bytes_min))?;
+        writeln!(
+            f,
+            "    Sparse state (min): {}",
+            Self::format_memory(self.sparse_memory_bytes_min)
+        )?;
         writeln!(f, "  Estimated execution time: {}", Self::format_time(self.estimated_time_us))?;
 
         // Memory feasibility check
@@ -322,7 +328,7 @@ impl std::fmt::Display for CircuitAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use simq_core::{Circuit, QubitId, gate::Gate};
+    use simq_core::{gate::Gate, Circuit, QubitId};
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -356,8 +362,12 @@ mod tests {
             num_qubits: 1,
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(cnot_gate, &[QubitId::new(0), QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(1)]).unwrap();
 
@@ -478,5 +488,102 @@ mod tests {
         assert_eq!(stats.single_qubit_gates, 0);
         assert_eq!(stats.two_qubit_gates, 0);
         assert_eq!(stats.gate_density(), 0.0);
+    }
+
+    #[test]
+    fn test_multi_qubit_gate_counted() {
+        // Exercises the `_ => multi_qubit_gates += 1` arm (line 46) via a
+        // gate with 3+ qubits.
+        let mut circuit = Circuit::new(3);
+        let toffoli = Arc::new(MockGate {
+            name: "TOFFOLI".to_string(),
+            num_qubits: 3,
+        });
+        circuit
+            .add_gate(toffoli, &[QubitId::new(0), QubitId::new(1), QubitId::new(2)])
+            .unwrap();
+
+        let stats = GateStatistics::from_circuit(&circuit).unwrap();
+        assert_eq!(stats.multi_qubit_gates, 1);
+        assert_eq!(stats.single_qubit_gates, 0);
+        assert_eq!(stats.two_qubit_gates, 0);
+    }
+
+    #[test]
+    fn test_gate_density_zero_qubits() {
+        // GateStatistics::gate_density() special-cases num_qubits == 0
+        // (line 79-80). A real Circuit can't have 0 qubits (it panics), so
+        // construct GateStatistics directly to hit this branch.
+        let stats = GateStatistics {
+            total_gates: 5,
+            gate_counts: HashMap::new(),
+            single_qubit_gates: 5,
+            two_qubit_gates: 0,
+            multi_qubit_gates: 0,
+            depth: 5,
+            num_qubits: 0,
+        };
+        assert_eq!(stats.gate_density(), 0.0);
+    }
+
+    #[test]
+    fn test_two_qubit_fraction_zero_gates() {
+        // Exercises the total_gates == 0 branch of two_qubit_fraction (line 89).
+        let stats = GateStatistics {
+            total_gates: 0,
+            gate_counts: HashMap::new(),
+            single_qubit_gates: 0,
+            two_qubit_gates: 0,
+            multi_qubit_gates: 0,
+            depth: 0,
+            num_qubits: 3,
+        };
+        assert_eq!(stats.two_qubit_fraction(), 0.0);
+    }
+
+    #[test]
+    fn test_fits_in_memory() {
+        // Exercises fits_in_memory (lines 193-194) both true and false paths.
+        let circuit = create_test_circuit();
+        let estimate = ResourceEstimate::from_circuit(&circuit).unwrap();
+
+        assert!(estimate.fits_in_memory(estimate.dense_memory_bytes));
+        assert!(estimate.fits_in_memory(estimate.dense_memory_bytes + 1));
+        assert!(!estimate.fits_in_memory(estimate.dense_memory_bytes - 1));
+    }
+
+    #[test]
+    fn test_resource_estimate_display_warns_over_32gb() {
+        // Exercises the Display "Warning: > 32GB" branch (line 258) by
+        // constructing a ResourceEstimate directly with a huge memory value,
+        // avoiding the need to actually allocate/analyze a 30+ qubit circuit.
+        let estimate = ResourceEstimate {
+            dense_memory_bytes: 33usize * 1024 * 1024 * 1024,
+            sparse_memory_bytes_min: 1024,
+            estimated_time_us: 100.0,
+            num_qubits: 35,
+            num_gates: 10,
+            depth: 10,
+        };
+
+        let output = format!("{}", estimate);
+        assert!(output.contains("Warning"));
+        assert!(output.contains("32GB"));
+    }
+
+    #[test]
+    fn test_max_parallelism_present_and_absent() {
+        // Exercises CircuitAnalysis::max_parallelism (lines 299-300, 302),
+        // both when parallelism info is available and when it's None.
+        let circuit = create_test_circuit();
+        let analysis = CircuitAnalysis::analyze(&circuit).unwrap();
+        assert!(analysis.max_parallelism() >= 1);
+
+        let analysis_no_parallelism = CircuitAnalysis {
+            statistics: analysis.statistics.clone(),
+            resources: analysis.resources.clone(),
+            parallelism: None,
+        };
+        assert_eq!(analysis_no_parallelism.max_parallelism(), 1);
     }
 }

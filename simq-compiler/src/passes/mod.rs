@@ -127,13 +127,83 @@ impl Default for OptimizationResult {
 
 // Pass implementations
 mod dead_code_elimination;
-mod gate_fusion;
 mod gate_commutation;
-mod template_substitution;
+mod gate_fusion;
 mod template_matching;
+mod template_substitution;
 
 pub use dead_code_elimination::DeadCodeElimination;
-pub use gate_fusion::GateFusion;
 pub use gate_commutation::GateCommutation;
-pub use template_substitution::TemplateSubstitution;
+pub use gate_fusion::GateFusion;
 pub use template_matching::AdvancedTemplateMatching;
+pub use template_substitution::TemplateSubstitution;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Minimal pass that only implements the required trait methods, relying
+    // on the default implementations for `description`, `iterative`, and
+    // `benefit_score` (lines 47-48, 55-56).
+    struct MinimalPass;
+
+    impl OptimizationPass for MinimalPass {
+        fn name(&self) -> &str {
+            "minimal-pass"
+        }
+
+        fn apply(&self, _circuit: &mut Circuit) -> Result<bool> {
+            Ok(false)
+        }
+    }
+
+    #[test]
+    fn test_optimization_pass_default_description_is_none() {
+        let pass = MinimalPass;
+        assert_eq!(pass.description(), None);
+    }
+
+    #[test]
+    fn test_optimization_pass_default_iterative_is_false() {
+        let pass = MinimalPass;
+        assert!(!pass.iterative());
+    }
+
+    #[test]
+    fn test_optimization_pass_default_benefit_score() {
+        let pass = MinimalPass;
+        assert_eq!(pass.benefit_score(), 0.5);
+    }
+
+    #[test]
+    fn test_optimization_result_default_matches_new() {
+        // Covers `impl Default for OptimizationResult` (lines 123-124), which
+        // delegates to `Self::new()`.
+        let default_result = OptimizationResult::default();
+        let new_result = OptimizationResult::new();
+
+        assert_eq!(default_result.modified, new_result.modified);
+        assert_eq!(default_result.pass_stats.len(), new_result.pass_stats.len());
+        assert_eq!(default_result.total_time_us, new_result.total_time_us);
+
+        assert!(!default_result.modified);
+        assert!(default_result.pass_stats.is_empty());
+        assert_eq!(default_result.total_time_us, 0);
+    }
+
+    #[test]
+    fn test_pass_statistics_new_and_add_pass_stats() {
+        let mut result = OptimizationResult::new();
+        let mut stats = PassStatistics::new("minimal-pass".to_string());
+        stats.applications = 1;
+        stats.time_us = 42;
+        stats.modified = true;
+
+        result.add_pass_stats(stats);
+
+        assert!(result.modified);
+        assert_eq!(result.total_time_us, 42);
+        assert_eq!(result.pass_stats.len(), 1);
+        assert_eq!(result.pass_stats[0].pass_name, "minimal-pass");
+    }
+}

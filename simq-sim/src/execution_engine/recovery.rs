@@ -1,26 +1,19 @@
 //! Error recovery policies
 
 /// Policy for error recovery during execution
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RecoveryPolicy {
     /// Stop execution on first error
+    #[default]
     Halt,
     /// Skip failed gate and continue
     Skip,
     /// Attempt to retry failed gate once
     RetryOnce,
     /// Retry with exponential backoff
-    RetryWithBackoff {
-        max_attempts: usize,
-    },
+    RetryWithBackoff { max_attempts: usize },
     /// Attempt fallback strategy (e.g., CPU if GPU fails)
     Fallback,
-}
-
-impl Default for RecoveryPolicy {
-    fn default() -> Self {
-        Self::Halt
-    }
 }
 
 impl RecoveryPolicy {

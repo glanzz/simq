@@ -3,8 +3,8 @@
 //! This example showcases how SimQ pre-computes common quantum gate matrices
 //! at compile time for optimal performance.
 
-use simq_gates::{matrices, standard::*, Hadamard, PauliX, CNot};
 use simq_core::gate::Gate;
+use simq_gates::{matrices, standard::*, CNot, Hadamard, PauliX};
 use std::f64::consts::PI;
 
 fn print_matrix_2x2(name: &str, matrix: &[[num_complex::Complex64; 2]; 2]) {

@@ -110,10 +110,10 @@ impl OptimizationPass for GateFusion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_complex::Complex64;
     use simq_core::gate::Gate;
     use simq_core::QubitId;
     use std::sync::Arc;
-    use num_complex::Complex64;
 
     // Mock gate for testing
     #[derive(Debug)]
@@ -156,6 +156,44 @@ mod tests {
     }
 
     #[test]
+    fn test_with_config_sets_custom_configuration() {
+        // Covers `with_config` (line 39).
+        let custom_config = FusionConfig {
+            min_fusion_size: 5,
+            ..FusionConfig::default()
+        };
+        let pass = GateFusion::with_config(custom_config.clone());
+        assert_eq!(pass.config.min_fusion_size, custom_config.min_fusion_size);
+    }
+
+    #[test]
+    fn test_with_max_fusion_size_sets_limit() {
+        // Covers `with_max_fusion_size` (lines 50-52).
+        let pass = GateFusion::new().with_max_fusion_size(Some(4));
+        assert_eq!(pass.config.max_fusion_size, Some(4));
+
+        let pass_none = GateFusion::new().with_max_fusion_size(None);
+        assert_eq!(pass_none.config.max_fusion_size, None);
+    }
+
+    #[test]
+    fn test_with_identity_epsilon_sets_threshold() {
+        // Covers `with_identity_epsilon` (lines 62-64).
+        let pass = GateFusion::new().with_identity_epsilon(1e-6);
+        assert_eq!(pass.config.identity_epsilon, 1e-6);
+    }
+
+    #[test]
+    fn test_default_trait_matches_new() {
+        // Covers `impl Default for GateFusion` (lines 69-70), which delegates
+        // to `Self::new()`.
+        let default_pass = GateFusion::default();
+        let new_pass = GateFusion::new();
+        assert_eq!(default_pass.config.min_fusion_size, new_pass.config.min_fusion_size);
+        assert_eq!(default_pass.config.max_fusion_size, new_pass.config.max_fusion_size);
+    }
+
+    #[test]
     fn test_fusion_reduces_gate_count() {
         let pass = GateFusion::new();
         let mut circuit = Circuit::new(2);
@@ -166,7 +204,9 @@ mod tests {
             matrix: Some(pauli_x_matrix()),
         });
 
-        circuit.add_gate(x_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(x_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(x_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -187,8 +227,12 @@ mod tests {
             matrix: Some(hadamard_matrix()),
         });
 
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(1)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(1)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(2)]).unwrap();
 
         assert_eq!(circuit.len(), 3);
@@ -210,7 +254,9 @@ mod tests {
         });
 
         // Add only 2 gates (less than min_size)
-        circuit.add_gate(h_gate.clone(), &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(h_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
         circuit.add_gate(h_gate, &[QubitId::new(0)]).unwrap();
 
         assert_eq!(circuit.len(), 2);
@@ -232,8 +278,12 @@ mod tests {
             matrix: None,
         });
 
-        circuit.add_gate(no_matrix_gate.clone(), &[QubitId::new(0)]).unwrap();
-        circuit.add_gate(no_matrix_gate, &[QubitId::new(0)]).unwrap();
+        circuit
+            .add_gate(no_matrix_gate.clone(), &[QubitId::new(0)])
+            .unwrap();
+        circuit
+            .add_gate(no_matrix_gate, &[QubitId::new(0)])
+            .unwrap();
 
         assert_eq!(circuit.len(), 2);
 

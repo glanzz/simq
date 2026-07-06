@@ -4,14 +4,14 @@
 //! production use cases including adaptive batching, distributed evaluation,
 //! and optimization-specific batch strategies.
 
-use rayon::prelude::*;
-use std::time::{Duration, Instant};
-use simq_core::Circuit;
-use simq_state::AdaptiveState;
-use simq_state::observable::PauliObservable;
-use crate::Simulator;
-use crate::error::Result;
 use super::batch::BatchResult;
+use crate::error::Result;
+use crate::Simulator;
+use rayon::prelude::*;
+use simq_core::Circuit;
+use simq_state::observable::PauliObservable;
+use simq_state::AdaptiveState;
+use std::time::{Duration, Instant};
 
 /// Configuration for advanced batch evaluation
 #[derive(Debug, Clone)]
@@ -110,17 +110,16 @@ impl AdaptiveBatchEvaluator {
             // Check timeout
             if let Some(timeout) = self.config.timeout {
                 if start_time.elapsed() > timeout {
-                    return Err(crate::error::SimulatorError::Timeout {
-                        message: format!(
-                            "Batch evaluation timeout after {} evaluations",
-                            processed
-                        ),
-                    });
+                    return Err(crate::error::SimulatorError::Other(format!(
+                        "Batch evaluation timeout after {} evaluations",
+                        processed
+                    )));
                 }
             }
 
             // Progress callback
-            if self.config.progress_frequency > 0 && processed % self.config.progress_frequency == 0 {
+            if self.config.progress_frequency > 0 && processed % self.config.progress_frequency == 0
+            {
                 eprintln!("Progress: {}/{} evaluations", processed, total_params);
             }
         }
@@ -162,10 +161,8 @@ impl AdaptiveBatchEvaluator {
             None => per_eval,
             Some(prev) => {
                 // Exponential moving average
-                Duration::from_secs_f64(
-                    0.7 * prev.as_secs_f64() + 0.3 * per_eval.as_secs_f64()
-                )
-            }
+                Duration::from_secs_f64(0.7 * prev.as_secs_f64() + 0.3 * per_eval.as_secs_f64())
+            },
         });
 
         self.successful_batch_sizes.push(batch_size);
@@ -186,14 +183,12 @@ fn evaluate_single(
     let result = simulator.run(circuit)?;
 
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -202,19 +197,16 @@ fn evaluate_single(
 /// Latin Hypercube Sampling for parameter space exploration
 ///
 /// More efficient than grid search for high-dimensional spaces.
-pub fn latin_hypercube_sampling(
-    param_ranges: &[(f64, f64)],
-    num_samples: usize,
-) -> Vec<Vec<f64>> {
-    use rand::Rng;
+pub fn latin_hypercube_sampling(param_ranges: &[(f64, f64)], num_samples: usize) -> Vec<Vec<f64>> {
     use rand::seq::SliceRandom;
+    use rand::Rng;
 
     let num_params = param_ranges.len();
     let mut rng = rand::thread_rng();
     let mut samples = Vec::with_capacity(num_samples);
 
     // Create permutations for each dimension
-    let mut permutations: Vec<Vec<usize>> = (0..num_params)
+    let permutations: Vec<Vec<usize>> = (0..num_params)
         .map(|_| {
             let mut perm: Vec<usize> = (0..num_samples).collect();
             perm.shuffle(&mut rng);
@@ -223,6 +215,7 @@ pub fn latin_hypercube_sampling(
         .collect();
 
     // Generate samples
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_samples {
         let mut sample = Vec::with_capacity(num_params);
 
@@ -260,13 +253,17 @@ impl ImportanceSampler {
     /// Create a new importance sampler
     pub fn new(centers: Vec<Vec<f64>>, weights: Vec<f64>, radius: f64) -> Self {
         assert_eq!(centers.len(), weights.len());
-        Self { centers, weights, radius }
+        Self {
+            centers,
+            weights,
+            radius,
+        }
     }
 
     /// Sample parameters from important regions
     pub fn sample(&self, num_samples: usize) -> Vec<Vec<f64>> {
-        use rand::Rng;
         use rand::distributions::WeightedIndex;
+        use rand::Rng;
 
         let mut rng = rand::thread_rng();
         let dist = WeightedIndex::new(&self.weights).unwrap();
@@ -301,7 +298,8 @@ pub fn line_search<F>(
     start_point: &[f64],
     direction: &[f64],
     step_sizes: &[f64],
-) -> Result<(f64, f64)> // (best_step, best_value)
+) -> Result<(f64, f64)>
+// (best_step, best_value)
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
 {
@@ -345,8 +343,10 @@ pub fn verify_gradients<F>(
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
 {
+    use super::finite_difference::{
+        compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod,
+    };
     use super::parameter_shift::{compute_gradient_parameter_shift, ParameterShiftConfig};
-    use super::finite_difference::{compute_gradient_finite_difference, FiniteDifferenceConfig, FiniteDifferenceMethod};
 
     // Compute using both methods in parallel
     let (ps_result, fd_result) = rayon::join(
@@ -415,6 +415,30 @@ pub struct GradientVerification {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Simulator, SimulatorConfig};
+    use simq_core::{circuit::Circuit, QubitId};
+    use simq_gates::standard::RotationY;
+    use simq_state::observable::{PauliObservable, PauliString};
+    use std::sync::Arc;
+
+    fn q(i: usize) -> QubitId {
+        QubitId::new(i)
+    }
+
+    fn make_sim() -> Simulator {
+        Simulator::new(SimulatorConfig::default().with_optimization(false))
+    }
+
+    fn z_observable() -> PauliObservable {
+        PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0)
+    }
+
+    fn ry_circuit(params: &[f64]) -> Circuit {
+        let mut c = Circuit::new(1);
+        c.add_gate(Arc::new(RotationY::new(params[0])), &[q(0)])
+            .unwrap();
+        c
+    }
 
     #[test]
     fn test_latin_hypercube_sampling() {
@@ -449,5 +473,110 @@ mod tests {
         let config = BatchConfig::default();
         assert_eq!(config.max_batch_size, 1000);
         assert!(config.adaptive_sizing);
+    }
+
+    #[test]
+    fn test_adaptive_evaluator_empty_params() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig::default();
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        let result = evaluator.evaluate(&sim, ry_circuit, &obs, &[]).unwrap();
+        assert_eq!(result.num_evaluations, 0);
+        assert!(result.values.is_empty());
+    }
+
+    #[test]
+    fn test_adaptive_evaluator_single_param() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig::default();
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        let param_sets = vec![vec![0.5]];
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
+        assert_eq!(result.num_evaluations, 1);
+        assert_eq!(result.values.len(), 1);
+        assert!(result.values[0].is_finite());
+    }
+
+    #[test]
+    fn test_adaptive_evaluator_multiple_params() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig {
+            adaptive_sizing: false,
+            ..BatchConfig::default()
+        };
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        let param_sets = vec![vec![0.0], vec![0.5], vec![1.0]];
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
+        assert_eq!(result.num_evaluations, 3);
+        assert_eq!(result.values.len(), 3);
+    }
+
+    #[test]
+    fn test_adaptive_evaluator_with_adaptive_sizing() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig {
+            adaptive_sizing: true,
+            max_batch_size: 2,
+            ..BatchConfig::default()
+        };
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        let param_sets = vec![vec![0.0], vec![0.5], vec![1.0], vec![1.5]];
+        // evaluate once to set avg_eval_time
+        evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets[..1])
+            .unwrap();
+        // Now evaluate again, adaptive sizing uses historical data
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
+        assert_eq!(result.num_evaluations, 4);
+    }
+
+    #[test]
+    fn test_line_search() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let start = vec![0.0];
+        let direction = vec![1.0];
+        let step_sizes = vec![0.0, 0.5, 1.0];
+        let (best_step, best_value) =
+            line_search(&sim, ry_circuit, &obs, &start, &direction, &step_sizes).unwrap();
+        assert!(step_sizes.contains(&best_step));
+        assert!(best_value.is_finite());
+    }
+
+    #[test]
+    fn test_verify_gradients() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let params = vec![0.5];
+        let result = verify_gradients(&sim, ry_circuit, &obs, &params).unwrap();
+        assert_eq!(result.parameter_shift.len(), 1);
+        assert_eq!(result.finite_difference.len(), 1);
+        assert!(result.max_difference.is_finite());
+        assert!(result.mean_difference.is_finite());
+        // Both methods should agree closely
+        assert!(result.max_difference < 1e-3);
+    }
+
+    #[test]
+    fn test_gradient_verification_struct() {
+        let gv = GradientVerification {
+            parameter_shift: vec![0.1, 0.2],
+            finite_difference: vec![0.1, 0.21],
+            max_difference: 0.01,
+            mean_difference: 0.005,
+            agrees: true,
+        };
+        assert!(gv.agrees);
+        assert_eq!(gv.parameter_shift.len(), 2);
     }
 }

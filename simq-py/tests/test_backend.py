@@ -45,7 +45,7 @@ def test_local_simulator_basic_execution():
     assert most_freq in ["00", "11"]
 
     # Verify backend info
-    assert backend.name() == "local_simulator"
+    assert backend.name() == "LocalSimulator"
     assert backend.max_qubits() == 30
     assert backend.is_available()
 
@@ -165,7 +165,7 @@ def test_backend_result_methods():
         assert abs(prob - expected_prob) < 0.001
 
     # Test metadata
-    assert result.backend_name == "local_simulator"
+    assert result.backend_name == "LocalSimulator"
     assert result.execution_time is None or result.execution_time >= 0
     assert result.total_time is None or result.total_time >= 0
     assert result.cost is None or result.cost == 0.0

@@ -1,8 +1,8 @@
+use num_complex::Complex64;
 use pyo3::prelude::*;
+use simq_core::Gate;
 use simq_gates::standard as gates;
 use std::sync::Arc;
-use simq_core::Gate;
-use num_complex::Complex64;
 
 /// Helper macro to define a Python class for a parameterized gate
 macro_rules! define_param_gate {
@@ -29,12 +29,14 @@ macro_rules! define_param_gate {
             fn num_qubits(&self) -> usize {
                 self.inner.num_qubits()
             }
-            
+
             fn matrix(&self) -> PyResult<Vec<Vec<Complex64>>> {
                 let flat_matrix = self.inner.matrix().ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err("Gate does not have a matrix representation")
+                    pyo3::exceptions::PyValueError::new_err(
+                        "Gate does not have a matrix representation",
+                    )
                 })?;
-                
+
                 let size = (flat_matrix.len() as f64).sqrt() as usize;
                 let mut result = Vec::with_capacity(size);
                 for i in 0..size {
@@ -79,12 +81,12 @@ impl PyU3 {
     fn num_qubits(&self) -> usize {
         self.inner.num_qubits()
     }
-    
+
     fn matrix(&self) -> PyResult<Vec<Vec<Complex64>>> {
         let flat_matrix = self.inner.matrix().ok_or_else(|| {
             pyo3::exceptions::PyValueError::new_err("Gate does not have a matrix representation")
         })?;
-        
+
         let size = (flat_matrix.len() as f64).sqrt() as usize;
         let mut result = Vec::with_capacity(size);
         for i in 0..size {
@@ -110,11 +112,11 @@ pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRZ>()?;
     m.add_class::<PyPhase>()?;
     m.add_class::<PyU3>()?;
-    
+
     m.add_class::<PyRXX>()?;
     m.add_class::<PyRYY>()?;
     m.add_class::<PyRZZ>()?;
     m.add_class::<PyCPhase>()?;
-    
+
     Ok(())
 }

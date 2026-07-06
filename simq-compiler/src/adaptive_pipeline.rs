@@ -6,9 +6,7 @@
 
 use crate::circuit_analysis_pass::CircuitCharacteristics;
 use crate::compiler::{Compiler, CompilerBuilder};
-use crate::passes::{
-    AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion,
-};
+use crate::passes::{AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion};
 use simq_core::Circuit;
 use std::sync::Arc;
 
@@ -162,7 +160,8 @@ impl MultiLevelOptimizer {
         let result_o1 = compiler_o1.compile(circuit).unwrap();
 
         if self.verbose {
-            println!("After O1: {} gates (removed: {})",
+            println!(
+                "After O1: {} gates (removed: {})",
                 circuit.len(),
                 original_size - circuit.len()
             );
@@ -178,16 +177,17 @@ impl MultiLevelOptimizer {
         let result_o2 = compiler_o2.compile(circuit).unwrap();
 
         if self.verbose {
-            println!("After O2: {} gates (removed: {})",
-                circuit.len(),
-                after_o1 - circuit.len()
-            );
+            println!("After O2: {} gates (removed: {})", circuit.len(), after_o1 - circuit.len());
         }
 
         // Level 3: Fine optimization (aggressive)
         // Only apply if circuit is small enough (to avoid long compilation times)
         let chars = CircuitCharacteristics::analyze(circuit);
-        if matches!(chars.size_category(), crate::circuit_analysis_pass::CircuitSize::Small | crate::circuit_analysis_pass::CircuitSize::Medium) {
+        if matches!(
+            chars.size_category(),
+            crate::circuit_analysis_pass::CircuitSize::Small
+                | crate::circuit_analysis_pass::CircuitSize::Medium
+        ) {
             if self.verbose {
                 println!("\n=== Level 3: Fine Optimization ===");
             }
@@ -197,7 +197,8 @@ impl MultiLevelOptimizer {
             let _result_o3 = compiler_o3.compile(circuit).unwrap();
 
             if self.verbose {
-                println!("After O3: {} gates (removed: {})",
+                println!(
+                    "After O3: {} gates (removed: {})",
                     circuit.len(),
                     after_o2 - circuit.len()
                 );
@@ -208,7 +209,8 @@ impl MultiLevelOptimizer {
 
         if self.verbose {
             println!("\n=== Summary ===");
-            println!("Total gates removed: {} ({:.1}%)",
+            println!(
+                "Total gates removed: {} ({:.1}%)",
                 original_size - circuit.len(),
                 (original_size - circuit.len()) as f64 / original_size as f64 * 100.0
             );
@@ -304,5 +306,84 @@ mod tests {
         assert!(adaptive.verbose);
 
         let _compiler = adaptive.create_for_circuit(&circuit);
+    }
+
+    #[test]
+    fn test_adaptive_compiler_default() {
+        // Exercises the Default impl (lines 112-113), which just forwards to new().
+        let adaptive = AdaptiveCompiler::default();
+        assert!(!adaptive.verbose);
+    }
+
+    #[test]
+    fn test_adaptive_compiler_verbose_all_passes_triggered() {
+        // Build a circuit large/varied enough that should_use_commutation,
+        // should_use_templates and should_use_fusion all return true, so that
+        // with verbose logging enabled we hit the println! branches for
+        // Gate Commutation (line 77), Advanced Template Matching (line 85),
+        // and Gate Fusion (line 93), in addition to Dead Code Elimination (line 69).
+        let mut circuit = Circuit::new(2);
+        let x = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+
+        // gate_count > 50 makes should_use_commutation true and
+        // gate_count > 20 makes should_use_templates true.
+        for _ in 0..60 {
+            circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
+        }
+
+        let adaptive = AdaptiveCompiler::new().with_verbose(true);
+        let compiler = adaptive.create_for_circuit(&circuit);
+
+        // Should have added at least the DCE pass plus others made beneficial
+        // by the characteristics of this larger circuit.
+        assert!(compiler.num_passes() >= 1);
+    }
+
+    #[test]
+    fn test_multi_level_optimizer_default() {
+        // Exercises the Default impl (lines 229-230).
+        let optimizer = MultiLevelOptimizer::default();
+        assert!(!optimizer.verbose);
+    }
+
+    #[test]
+    fn test_multi_level_optimizer_verbose_small_circuit_runs_level3() {
+        // A small circuit stays in the Small/Medium size category, so
+        // Level 3 (Fine Optimization) is entered (lines 186, 191-207) and,
+        // with verbose enabled, the corresponding println! branches execute.
+        let mut circuit = Circuit::new(2);
+        let x = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(x.clone(), &[QubitId::new(0)]).unwrap();
+        circuit.add_gate(x, &[QubitId::new(1)]).unwrap();
+
+        let optimizer = MultiLevelOptimizer::new().with_verbose(true);
+        let result = optimizer.optimize(&mut circuit);
+
+        // Sanity: optimization ran and produced a result (inverse X pair removed).
+        assert!(result.modified);
+    }
+
+    #[test]
+    fn test_multi_level_optimizer_large_circuit_skips_level3() {
+        // A circuit large enough to fall outside Small/Medium size categories
+        // (gate_count >= 1000) should skip Level 3 and hit the verbose
+        // "Skipping Level 3" branch (line 207) as well as the non-Small/Medium
+        // arm of the `matches!` at line 186-190.
+        let mut circuit = Circuit::new(4);
+        let x = Arc::new(MockGate {
+            name: "X".to_string(),
+        });
+        for i in 0..1000 {
+            circuit.add_gate(x.clone(), &[QubitId::new(i % 4)]).unwrap();
+        }
+
+        let optimizer = MultiLevelOptimizer::new().with_verbose(true);
+        let _result = optimizer.optimize(&mut circuit);
+        // No panic and it completes; Level 3 was skipped due to circuit size.
     }
 }

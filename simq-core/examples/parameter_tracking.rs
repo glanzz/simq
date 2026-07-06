@@ -30,12 +30,12 @@ fn example_vqe_parameters() {
 
     // Layer 1
     let theta_0_l1 = registry.add_named("theta_0_layer1", 0.1);
-    let theta_1_l1 = registry.add_named("theta_1_layer1", 0.2);
-    let theta_2_l1 = registry.add_named("theta_2_layer1", 0.3);
+    let _theta_1_l1 = registry.add_named("theta_1_layer1", 0.2);
+    let _theta_2_l1 = registry.add_named("theta_2_layer1", 0.3);
 
     // Layer 2
-    let theta_0_l2 = registry.add_named("theta_0_layer2", 0.4);
-    let theta_1_l2 = registry.add_named("theta_1_layer2", 0.5);
+    let _theta_0_l2 = registry.add_named("theta_0_layer2", 0.4);
+    let _theta_1_l2 = registry.add_named("theta_1_layer2", 0.5);
     let theta_2_l2 = registry.add_named("theta_2_layer2", 0.6);
 
     println!("  Created {} parameters", registry.len());
@@ -172,7 +172,7 @@ fn example_parameter_constraints() {
     let phase_id = registry.add(phase);
 
     println!("Parameters with bounds:");
-    for (id, param) in registry.iter() {
+    for (_id, param) in registry.iter() {
         if let Some((min, max)) = param.bounds() {
             println!(
                 "  {}: {:.3} ∈ [{:.3}, {:.3}]",

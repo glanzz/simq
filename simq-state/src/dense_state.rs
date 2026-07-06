@@ -5,7 +5,10 @@
 //! measurement, gate application, and state manipulation.
 
 use crate::error::{Result, StateError};
-use crate::simd::{apply_single_qubit_gate, apply_two_qubit_gate, apply_cnot, apply_cz, apply_controlled_u, apply_crx, apply_cry, apply_crz, apply_diagonal_gate};
+use crate::simd::{
+    apply_cnot, apply_controlled_u, apply_crx, apply_cry, apply_crz, apply_cz, apply_diagonal_gate,
+    apply_single_qubit_gate, apply_two_qubit_gate,
+};
 use crate::sparse_state::SparseState;
 use crate::state_vector::StateVector;
 use num_complex::Complex64;
@@ -220,12 +223,7 @@ impl DenseState {
             });
         }
 
-        apply_single_qubit_gate(
-            self.vector.amplitudes_mut(),
-            matrix,
-            qubit,
-            num_qubits,
-        );
+        apply_single_qubit_gate(self.vector.amplitudes_mut(), matrix, qubit, num_qubits);
 
         self.needs_normalization = false; // Unitary gates preserve norm
         Ok(())
@@ -268,11 +266,7 @@ impl DenseState {
     /// # Performance
     /// Approximately 2-3x faster than `apply_single_qubit_gate` for diagonal gates.
     /// Uses SIMD optimizations (AVX2/SSE2) when available.
-    pub fn apply_diagonal_gate(
-        &mut self,
-        diagonal: [Complex64; 2],
-        qubit: usize,
-    ) -> Result<()> {
+    pub fn apply_diagonal_gate(&mut self, diagonal: [Complex64; 2], qubit: usize) -> Result<()> {
         let num_qubits = self.num_qubits();
 
         if qubit >= num_qubits {
@@ -282,12 +276,7 @@ impl DenseState {
             });
         }
 
-        apply_diagonal_gate(
-            self.vector.amplitudes_mut(),
-            diagonal,
-            qubit,
-            num_qubits,
-        );
+        apply_diagonal_gate(self.vector.amplitudes_mut(), diagonal, qubit, num_qubits);
 
         self.needs_normalization = false; // Unitary gates preserve norm
         Ok(())
@@ -347,13 +336,7 @@ impl DenseState {
             });
         }
 
-        apply_two_qubit_gate(
-            self.vector.amplitudes_mut(),
-            matrix,
-            qubit1,
-            qubit2,
-            num_qubits,
-        );
+        apply_two_qubit_gate(self.vector.amplitudes_mut(), matrix, qubit1, qubit2, num_qubits);
 
         self.needs_normalization = false; // Unitary gates preserve norm
         Ok(())
@@ -489,13 +472,7 @@ impl DenseState {
             });
         }
 
-        apply_controlled_u(
-            self.vector.amplitudes_mut(),
-            control,
-            target,
-            u_matrix,
-            num_qubits,
-        );
+        apply_controlled_u(self.vector.amplitudes_mut(), control, target, u_matrix, num_qubits);
         self.needs_normalization = false;
         Ok(())
     }
@@ -534,13 +511,7 @@ impl DenseState {
             });
         }
 
-        apply_crx(
-            self.vector.amplitudes_mut(),
-            control,
-            target,
-            theta,
-            num_qubits,
-        );
+        apply_crx(self.vector.amplitudes_mut(), control, target, theta, num_qubits);
         self.needs_normalization = false;
         Ok(())
     }
@@ -579,13 +550,7 @@ impl DenseState {
             });
         }
 
-        apply_cry(
-            self.vector.amplitudes_mut(),
-            control,
-            target,
-            theta,
-            num_qubits,
-        );
+        apply_cry(self.vector.amplitudes_mut(), control, target, theta, num_qubits);
         self.needs_normalization = false;
         Ok(())
     }
@@ -624,16 +589,11 @@ impl DenseState {
             });
         }
 
-        apply_crz(
-            self.vector.amplitudes_mut(),
-            control,
-            target,
-            theta,
-            num_qubits,
-        );
+        apply_crz(self.vector.amplitudes_mut(), control, target, theta, num_qubits);
         self.needs_normalization = false;
         Ok(())
-    }    /// Get the probability of measuring a specific computational basis state
+    }
+    /// Get the probability of measuring a specific computational basis state
     ///
     /// # Arguments
     /// * `basis_state` - The basis state index (0 to 2^n - 1)
@@ -1036,8 +996,7 @@ impl DenseState {
 
             let reduced_i = extract_reduced_idx(idx_bra);
 
-            for idx_ket in 0..self.dimension() {
-                let amp_ket = amplitudes[idx_ket];
+            for (idx_ket, amp_ket) in amplitudes.iter().enumerate() {
                 if amp_ket.norm_sqr() < 1e-14 {
                     continue;
                 }
@@ -1047,11 +1006,10 @@ impl DenseState {
                 // Check if traced-out qubits match
                 let mut traced_match = true;
                 for q in 0..self.num_qubits() {
-                    if !qubits_to_keep.contains(&q) {
-                        if ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1) {
-                            traced_match = false;
-                            break;
-                        }
+                    if !qubits_to_keep.contains(&q) && ((idx_bra >> q) & 1) != ((idx_ket >> q) & 1)
+                    {
+                        traced_match = false;
+                        break;
                     }
                 }
 
@@ -1104,8 +1062,8 @@ mod tests {
         let amps = state.amplitudes();
 
         assert_eq!(amps[0], Complex64::new(1.0, 0.0));
-        for i in 1..amps.len() {
-            assert_eq!(amps[i], Complex64::new(0.0, 0.0));
+        for amp in amps.iter().skip(1) {
+            assert_eq!(*amp, Complex64::new(0.0, 0.0));
         }
     }
 
@@ -1159,10 +1117,7 @@ mod tests {
 
     #[test]
     fn test_get_probability() {
-        let amplitudes = vec![
-            Complex64::new(0.6, 0.0),
-            Complex64::new(0.8, 0.0),
-        ];
+        let amplitudes = vec![Complex64::new(0.6, 0.0), Complex64::new(0.8, 0.0)];
 
         let state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
 
@@ -1191,10 +1146,7 @@ mod tests {
     #[test]
     fn test_measure_qubit() {
         let h = 1.0 / 2.0_f64.sqrt();
-        let amplitudes = vec![
-            Complex64::new(h, 0.0),
-            Complex64::new(h, 0.0),
-        ];
+        let amplitudes = vec![Complex64::new(h, 0.0), Complex64::new(h, 0.0)];
 
         let mut state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
 
@@ -1219,10 +1171,7 @@ mod tests {
 
     #[test]
     fn test_expectation_value() {
-        let amplitudes = vec![
-            Complex64::new(0.6, 0.0),
-            Complex64::new(0.8, 0.0),
-        ];
+        let amplitudes = vec![Complex64::new(0.6, 0.0), Complex64::new(0.8, 0.0)];
         let state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
 
         // Z observable: diag([1, -1])
@@ -1281,10 +1230,7 @@ mod tests {
 
     #[test]
     fn test_normalize() {
-        let amplitudes = vec![
-            Complex64::new(1.0, 0.0),
-            Complex64::new(1.0, 0.0),
-        ];
+        let amplitudes = vec![Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)];
 
         let mut state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
         state.normalize();
@@ -1352,16 +1298,8 @@ mod tests {
         let dense = DenseState::from_sparse(&sparse1).unwrap();
         let sparse2 = dense.to_sparse().unwrap();
 
-        assert_relative_eq!(
-            sparse2.get_amplitude(0).re,
-            0.6,
-            epsilon = 1e-10
-        );
-        assert_relative_eq!(
-            sparse2.get_amplitude(1).re,
-            0.8,
-            epsilon = 1e-10
-        );
+        assert_relative_eq!(sparse2.get_amplitude(0).re, 0.6, epsilon = 1e-10);
+        assert_relative_eq!(sparse2.get_amplitude(1).re, 0.8, epsilon = 1e-10);
     }
 
     #[test]
@@ -1412,10 +1350,10 @@ mod tests {
         // Bell state (|00⟩ + |11⟩)/√2
         let val = 1.0 / 2.0_f64.sqrt();
         let amplitudes = vec![
-            Complex64::new(val, 0.0),  // |00⟩
-            Complex64::new(0.0, 0.0),  // |01⟩
-            Complex64::new(0.0, 0.0),  // |10⟩
-            Complex64::new(val, 0.0),  // |11⟩
+            Complex64::new(val, 0.0), // |00⟩
+            Complex64::new(0.0, 0.0), // |01⟩
+            Complex64::new(0.0, 0.0), // |10⟩
+            Complex64::new(val, 0.0), // |11⟩
         ];
         let state = DenseState::from_amplitudes(2, &amplitudes).unwrap();
 
@@ -1443,9 +1381,9 @@ mod tests {
         let rho = state.partial_trace(&[0, 1]).unwrap();
 
         // Should get correlations between qubits 0 and 1
-        assert_relative_eq!(rho[0].re, 0.5, epsilon = 1e-10);   // |00⟩⟨00|
-        assert_relative_eq!(rho[15].re, 0.5, epsilon = 1e-10);  // |11⟩⟨11|
-        assert_relative_eq!(rho[5].norm(), 0.0, epsilon = 1e-10);  // |01⟩⟨01|
+        assert_relative_eq!(rho[0].re, 0.5, epsilon = 1e-10); // |00⟩⟨00|
+        assert_relative_eq!(rho[15].re, 0.5, epsilon = 1e-10); // |11⟩⟨11|
+        assert_relative_eq!(rho[5].norm(), 0.0, epsilon = 1e-10); // |01⟩⟨01|
         assert_relative_eq!(rho[10].norm(), 0.0, epsilon = 1e-10); // |10⟩⟨10|
     }
 
@@ -1466,7 +1404,8 @@ mod tests {
         // Check ρ† = ρ
         assert_relative_eq!(rho[0].im, 0.0, epsilon = 1e-10); // Diagonal must be real
         assert_relative_eq!(rho[3].im, 0.0, epsilon = 1e-10);
-        assert_relative_eq!((rho[1] - rho[2].conj()).norm(), 0.0, epsilon = 1e-10); // Off-diagonal conjugate symmetry
+        assert_relative_eq!((rho[1] - rho[2].conj()).norm(), 0.0, epsilon = 1e-10);
+        // Off-diagonal conjugate symmetry
     }
 
     #[test]
@@ -1496,10 +1435,7 @@ mod tests {
     fn test_partial_trace_keep_all_qubits() {
         // Keeping all qubits should give density matrix of pure state
         let val = 1.0 / 2.0_f64.sqrt();
-        let amplitudes = vec![
-            Complex64::new(val, 0.0),
-            Complex64::new(val, 0.0),
-        ];
+        let amplitudes = vec![Complex64::new(val, 0.0), Complex64::new(val, 0.0)];
         let state = DenseState::from_amplitudes(1, &amplitudes).unwrap();
 
         let rho = state.partial_trace(&[0]).unwrap();
@@ -1644,7 +1580,10 @@ mod tests {
         let theta = std::f64::consts::PI / 4.0;
         let phase_matrix = [
             [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-            [Complex64::new(0.0, 0.0), Complex64::new(theta.cos(), theta.sin())],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(theta.cos(), theta.sin()),
+            ],
         ];
         state1.apply_single_qubit_gate(&phase_matrix, 1).unwrap();
 
@@ -1709,5 +1648,253 @@ mod tests {
         // Try to apply to invalid qubit
         let result = state.apply_diagonal_gate(z_diagonal, 2);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ensure_normalized_already_normalized() {
+        let mut state = DenseState::new(2).unwrap();
+        // Already normalized: ensure_normalized should be a no-op
+        assert!(state.is_normalized(1e-10));
+        state.ensure_normalized();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_ensure_normalized_after_amplitudes_mut() {
+        let mut state = DenseState::new(1).unwrap();
+        // Manually scale to 2.0 via amplitudes_mut (sets needs_normalization = true)
+        {
+            let amps = state.amplitudes_mut();
+            amps[0] = Complex64::new(2.0, 0.0);
+        }
+        // ensure_normalized should fix it
+        state.ensure_normalized();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_apply_crx_basic() {
+        // Apply CRX with control=0 in |0> state, so target should NOT be rotated
+        let mut state = DenseState::new(2).unwrap();
+        state.apply_crx(0, 1, std::f64::consts::PI).unwrap();
+        // |00> -> |00> (control is 0, so RX not applied)
+        assert_relative_eq!(state.amplitudes()[0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_crx_with_control_one() {
+        // Flip control qubit to |1> then apply CRX(pi)
+        let mut state = DenseState::new(2).unwrap();
+        // Flip qubit 0 to |1>
+        let x_gate = [
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        state.apply_single_qubit_gate(&x_gate, 0).unwrap();
+        // Now in |10>, apply CRX(pi) with control=0, target=1
+        state.apply_crx(0, 1, std::f64::consts::PI).unwrap();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_apply_crx_invalid_qubit() {
+        let mut state = DenseState::new(2).unwrap();
+        assert!(state.apply_crx(5, 1, 1.0).is_err());
+        assert!(state.apply_crx(0, 5, 1.0).is_err());
+        assert!(state.apply_crx(0, 0, 1.0).is_err()); // same qubit
+    }
+
+    #[test]
+    fn test_apply_cry_basic() {
+        let mut state = DenseState::new(2).unwrap();
+        state.apply_cry(0, 1, std::f64::consts::PI / 2.0).unwrap();
+        // Control is |0>, so nothing changes
+        assert_relative_eq!(state.amplitudes()[0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_cry_with_control_one() {
+        let mut state = DenseState::new(2).unwrap();
+        let x_gate = [
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        state.apply_single_qubit_gate(&x_gate, 0).unwrap();
+        state.apply_cry(0, 1, std::f64::consts::PI).unwrap();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_apply_cry_invalid_qubit() {
+        let mut state = DenseState::new(2).unwrap();
+        assert!(state.apply_cry(5, 1, 1.0).is_err());
+        assert!(state.apply_cry(0, 5, 1.0).is_err());
+        assert!(state.apply_cry(1, 1, 1.0).is_err()); // same qubit
+    }
+
+    #[test]
+    fn test_apply_crz_basic() {
+        let mut state = DenseState::new(2).unwrap();
+        state.apply_crz(0, 1, std::f64::consts::PI).unwrap();
+        // Control is |0>, so nothing changes
+        assert_relative_eq!(state.amplitudes()[0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_crz_with_control_one() {
+        let mut state = DenseState::new(2).unwrap();
+        let x_gate = [
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        state.apply_single_qubit_gate(&x_gate, 0).unwrap();
+        state.apply_crz(0, 1, std::f64::consts::PI).unwrap();
+        assert!(state.is_normalized(1e-10));
+    }
+
+    #[test]
+    fn test_apply_crz_invalid_qubit() {
+        let mut state = DenseState::new(2).unwrap();
+        assert!(state.apply_crz(5, 1, 1.0).is_err());
+        assert!(state.apply_crz(0, 5, 1.0).is_err());
+        assert!(state.apply_crz(1, 1, 1.0).is_err()); // same qubit
+    }
+
+    #[test]
+    fn test_apply_controlled_u_basic() {
+        let mut state = DenseState::new(2).unwrap();
+        // Identity as U matrix
+        let u_identity = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        state.apply_controlled_u(0, 1, &u_identity).unwrap();
+        // |00> unchanged
+        assert_relative_eq!(state.amplitudes()[0].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_controlled_u_with_x_gate() {
+        let mut state = DenseState::new(2).unwrap();
+        // First flip control qubit
+        let x_gate = [
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        state.apply_single_qubit_gate(&x_gate, 0).unwrap();
+        // Now apply controlled-X (CNOT) via apply_controlled_u
+        state.apply_controlled_u(0, 1, &x_gate).unwrap();
+        // |10> -> |11>
+        assert_relative_eq!(state.amplitudes()[3].re, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_controlled_u_invalid_qubit() {
+        let mut state = DenseState::new(2).unwrap();
+        let u = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        assert!(state.apply_controlled_u(5, 1, &u).is_err());
+        assert!(state.apply_controlled_u(0, 5, &u).is_err());
+        assert!(state.apply_controlled_u(0, 0, &u).is_err()); // same qubit
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_invalid_qubits() {
+        let mut state = DenseState::new(2).unwrap();
+        let identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        assert!(state.apply_two_qubit_gate(&identity, 5, 1).is_err());
+        assert!(state.apply_two_qubit_gate(&identity, 0, 5).is_err());
+        assert!(state.apply_two_qubit_gate(&identity, 0, 0).is_err()); // same qubit
+    }
+
+    #[test]
+    fn test_apply_cnot_invalid_qubits() {
+        let mut state = DenseState::new(2).unwrap();
+        assert!(state.apply_cnot(5, 1).is_err());
+        assert!(state.apply_cnot(0, 5).is_err());
+        assert!(state.apply_cnot(0, 0).is_err()); // same qubit
+    }
+
+    /// Regression test for issue #30: H(0) followed by CNOT(control=0,
+    /// target=1) must produce the Bell state (|00⟩ + |11⟩)/√2, not leave the
+    /// state as (|00⟩ + |01⟩)/√2.
+    #[test]
+    fn test_bell_state_via_hadamard_and_cnot() {
+        let h = 1.0 / 2.0_f64.sqrt();
+        let hadamard = [
+            [Complex64::new(h, 0.0), Complex64::new(h, 0.0)],
+            [Complex64::new(h, 0.0), Complex64::new(-h, 0.0)],
+        ];
+
+        let mut state = DenseState::new(2).unwrap();
+        state.apply_single_qubit_gate(&hadamard, 0).unwrap();
+        state.apply_cnot(0, 1).unwrap();
+
+        let amps = state.amplitudes();
+        assert_relative_eq!(amps[0].re, h, epsilon = 1e-10); // |00⟩
+        assert_relative_eq!(amps[3].re, h, epsilon = 1e-10); // |11⟩
+        assert!(amps[1].norm() < 1e-10, "|01⟩ amplitude must vanish");
+        assert!(amps[2].norm() < 1e-10, "|10⟩ amplitude must vanish");
+    }
+
+    #[test]
+    fn test_apply_cz_invalid_qubits() {
+        let mut state = DenseState::new(2).unwrap();
+        assert!(state.apply_cz(5, 1).is_err());
+        assert!(state.apply_cz(0, 5).is_err());
+        assert!(state.apply_cz(0, 0).is_err()); // same qubit
+    }
+
+    #[test]
+    fn test_get_probability_out_of_bounds() {
+        let state = DenseState::new(2).unwrap();
+        let result = state.get_probability(10);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_measure_qubit_invalid() {
+        let mut state = DenseState::new(2).unwrap();
+        let result = state.measure_qubit(5, 0.5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_expectation_value_dimension_mismatch() {
+        let state = DenseState::new(2).unwrap();
+        let observable = vec![1.0, -1.0]; // wrong dimension (should be 4)
+        let result = state.expectation_value(&observable);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_vector_accessor() {
+        let state = DenseState::new(3).unwrap();
+        let vector = state.vector();
+        assert_eq!(vector.amplitudes().len(), 8);
+        assert_eq!(vector.amplitudes()[0], Complex64::new(1.0, 0.0));
+    }
+
+    #[test]
+    fn test_measure_qubit_zero_probability_outcome_errors() {
+        // |0> has prob_zero == 1.0, so forcing outcome=1 (random_value >= 1.0)
+        // collapses onto a zero-amplitude branch, yielding a ~0 normalization
+        // factor and triggering the NotNormalized error branch.
+        let mut state = DenseState::new(1).unwrap();
+        let result = state.measure_qubit(0, 1.0);
+        assert!(matches!(result, Err(StateError::NotNormalized { .. })));
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let state = DenseState::new(2).unwrap();
+        let dbg = format!("{:?}", state);
+        assert!(dbg.contains("DenseState"));
+        assert!(dbg.contains("num_qubits"));
+        assert!(dbg.contains("dimension"));
+        assert!(dbg.contains("norm"));
+        assert!(dbg.contains("is_simd_aligned"));
     }
 }

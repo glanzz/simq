@@ -1,8 +1,8 @@
-use pyo3::prelude::*;
-use simq_gates::custom::CustomGate;
-use simq_core::Gate;
-use std::sync::Arc;
 use num_complex::Complex64;
+use pyo3::prelude::*;
+use simq_core::Gate;
+use simq_gates::custom::CustomGate;
+use std::sync::Arc;
 
 #[pyclass(name = "CustomGate")]
 #[derive(Clone)]
@@ -22,18 +22,22 @@ impl PyCustomGate {
         if rows != cols {
             return Err(pyo3::exceptions::PyValueError::new_err("Matrix must be square"));
         }
-        
+
         // Check if dimension is a power of 2
         if !rows.is_power_of_two() {
-            return Err(pyo3::exceptions::PyValueError::new_err("Matrix dimension must be a power of 2"));
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Matrix dimension must be a power of 2",
+            ));
         }
-        
+
         let num_qubits = rows.trailing_zeros() as usize;
 
         let mut data = Vec::with_capacity(rows * cols);
         for row in matrix {
             if row.len() != cols {
-                return Err(pyo3::exceptions::PyValueError::new_err("All rows must have the same length"));
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "All rows must have the same length",
+                ));
             }
             data.extend(row);
         }
@@ -53,11 +57,11 @@ impl PyCustomGate {
     fn num_qubits(&self) -> usize {
         self.inner.num_qubits()
     }
-    
+
     fn matrix(&self) -> PyResult<Vec<Vec<Complex64>>> {
         let data = self.inner.matrix_vec();
         let size = (data.len() as f64).sqrt() as usize;
-        
+
         let mut result = Vec::with_capacity(size);
         for i in 0..size {
             let mut row = Vec::with_capacity(size);

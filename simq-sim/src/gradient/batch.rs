@@ -4,12 +4,12 @@
 //! or multiple observables in parallel, which is critical for optimization
 //! algorithms like VQE and QAOA.
 
+use crate::error::Result;
+use crate::Simulator;
 use rayon::prelude::*;
 use simq_core::Circuit;
-use simq_state::AdaptiveState;
 use simq_state::observable::PauliObservable;
-use crate::Simulator;
-use crate::error::Result;
+use simq_state::AdaptiveState;
 
 /// Batch evaluation result
 #[derive(Debug, Clone)]
@@ -90,15 +90,13 @@ fn evaluate_single_expectation(
 
     // Convert to dense state for expectation value computation
     let expectation = match &result.state {
-        AdaptiveState::Dense(dense) => {
-            observable.expectation_value(dense)?
-        }
+        AdaptiveState::Dense(dense) => observable.expectation_value(dense)?,
         AdaptiveState::Sparse { state: sparse, .. } => {
             // Convert sparse to dense for expectation value
             use simq_state::DenseState;
             let dense = DenseState::from_sparse(sparse)?;
             observable.expectation_value(&dense)?
-        }
+        },
     };
 
     Ok(expectation)
@@ -123,17 +121,14 @@ where
     let expectation_values: Vec<f64> = observables
         .iter()
         .map(|observable| match &result.state {
-            AdaptiveState::Dense(dense) => {
-                observable.expectation_value(dense)
-            }
+            AdaptiveState::Dense(dense) => observable.expectation_value(dense),
             AdaptiveState::Sparse { state: sparse, .. } => {
                 use simq_state::DenseState;
                 let dense = DenseState::from_sparse(sparse)?;
                 observable.expectation_value(&dense)
-            }
+            },
         })
-        .collect::<std::result::Result<Vec<f64>, _>>()
-        .map_err(|e| crate::error::SimulatorError::StateError { message: format!("{:?}", e) })?;
+        .collect::<std::result::Result<Vec<f64>, simq_state::error::StateError>>()?;
 
     Ok(expectation_values)
 }
@@ -180,7 +175,7 @@ pub fn grid_search<F>(
     circuit_builder: F,
     observable: &PauliObservable,
     param_ranges: &[(f64, f64)], // (min, max) for each parameter
-    num_points: usize,            // Number of points per dimension
+    num_points: usize,           // Number of points per dimension
 ) -> Result<GridSearchResult>
 where
     F: Fn(&[f64]) -> Circuit + Send + Sync,
@@ -190,12 +185,8 @@ where
     generate_grid(param_ranges, num_points, &mut vec![], &mut param_grid);
 
     // Evaluate all grid points
-    let batch_result = evaluate_batch_expectation(
-        simulator,
-        circuit_builder,
-        observable,
-        &param_grid,
-    )?;
+    let batch_result =
+        evaluate_batch_expectation(simulator, circuit_builder, observable, &param_grid)?;
 
     // Find optimal point
     let (min_idx, &optimal_value) = batch_result
@@ -242,10 +233,11 @@ fn generate_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SimulatorConfig;
     use simq_core::QubitId;
     use simq_gates::standard::RotationY;
+    use simq_state::observable::PauliString;
     use std::sync::Arc;
-    use crate::SimulatorConfig;
 
     #[test]
     fn test_batch_evaluation() {
@@ -253,11 +245,14 @@ mod tests {
 
         let circuit_builder = |params: &[f64]| {
             let mut circuit = Circuit::new(1);
-            circuit.add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)]).unwrap();
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
             circuit
         };
 
-        let observable = PauliObservable::from_string("Z", &[0]).unwrap();
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
 
         let batch_params = vec![
             vec![0.0],
@@ -265,12 +260,9 @@ mod tests {
             vec![std::f64::consts::PI],
         ];
 
-        let result = evaluate_batch_expectation(
-            &simulator,
-            circuit_builder,
-            &observable,
-            &batch_params,
-        ).unwrap();
+        let result =
+            evaluate_batch_expectation(&simulator, circuit_builder, &observable, &batch_params)
+                .unwrap();
 
         assert_eq!(result.values.len(), 3);
         assert_eq!(result.num_evaluations, 3);
@@ -285,5 +277,79 @@ mod tests {
         assert_eq!(grid.len(), 9); // 3 × 3 grid
         assert_eq!(grid[0], vec![0.0, -1.0]);
         assert_eq!(grid[8], vec![1.0, 1.0]);
+    }
+
+    /// Lines 121-133: evaluate_multi_observable (Dense branch at lines 123-124)
+    #[test]
+    fn test_evaluate_multi_observable() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let obs1 = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let obs2 = PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 0.5);
+        let observables = vec![obs1, obs2];
+        let params = vec![0.5];
+        let values =
+            evaluate_multi_observable(&simulator, circuit_builder, &observables, &params).unwrap();
+        assert_eq!(values.len(), 2);
+        // Second observable is 0.5 * first
+        assert!((values[1] - 0.5 * values[0]).abs() < 1e-10);
+    }
+
+    /// Lines 140-154: batch_gradient
+    #[test]
+    fn test_batch_gradient() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+
+        // A simple gradient function — returns a fixed-size gradient for testing
+        let gradient_fn = |_sim: &Simulator,
+                           _cb: &_,
+                           _obs: &PauliObservable,
+                           params: &[f64]|
+         -> Result<Vec<f64>> { Ok(vec![params[0].cos()]) };
+
+        let batch_params = vec![vec![0.0], vec![0.5], vec![1.0]];
+        let results =
+            batch_gradient(&simulator, circuit_builder, gradient_fn, &observable, &batch_params)
+                .unwrap();
+        assert_eq!(results.len(), 3);
+        for grad in &results {
+            assert_eq!(grad.len(), 1);
+            assert!(grad[0].is_finite());
+        }
+    }
+
+    /// grid_search test
+    #[test]
+    fn test_grid_search() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(1);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("Z").unwrap(), 1.0);
+        let ranges = vec![(0.0, std::f64::consts::PI)];
+        let result = grid_search(&simulator, circuit_builder, &observable, &ranges, 3).unwrap();
+        assert_eq!(result.values.len(), 3);
+        assert!(result.optimal_value.is_finite());
+        assert_eq!(result.param_grid.len(), 3);
     }
 }

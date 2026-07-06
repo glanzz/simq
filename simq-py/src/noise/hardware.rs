@@ -1,10 +1,8 @@
-use pyo3::prelude::*;
-use simq_core::noise::hardware::{
-    HardwareNoiseModel as RustHardwareNoiseModel,
-};
 use crate::noise::channels::{
-    PyAmplitudeDamping, PyPhaseDamping, PyDepolarizingChannel, PyReadoutError
+    PyAmplitudeDamping, PyDepolarizingChannel, PyPhaseDamping, PyReadoutError,
 };
+use pyo3::prelude::*;
+use simq_core::noise::hardware::HardwareNoiseModel as RustHardwareNoiseModel;
 
 #[pyclass(name = "HardwareNoiseModel")]
 #[derive(Clone)]
@@ -69,8 +67,15 @@ impl PyHardwareNoiseModel {
         self.inner.set_single_qubit_fidelity(qubit, fidelity);
     }
 
-    fn set_two_qubit_gate(&mut self, qubit1: usize, qubit2: usize, fidelity: f64, duration_us: f64) {
-        self.inner.set_two_qubit_gate(qubit1, qubit2, fidelity, duration_us);
+    fn set_two_qubit_gate(
+        &mut self,
+        qubit1: usize,
+        qubit2: usize,
+        fidelity: f64,
+        duration_us: f64,
+    ) {
+        self.inner
+            .set_two_qubit_gate(qubit1, qubit2, fidelity, duration_us);
     }
 
     fn set_idle_noise_enabled(&mut self, enabled: bool) {
@@ -90,27 +95,35 @@ impl PyHardwareNoiseModel {
     }
 
     // Helper methods to get noise channels for a qubit (useful for debugging/inspection)
-    
+
     fn amplitude_damping_single_gate(&self, qubit: usize) -> PyResult<PyAmplitudeDamping> {
-        let inner = self.inner.amplitude_damping_single_gate(qubit)
+        let inner = self
+            .inner
+            .amplitude_damping_single_gate(qubit)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(PyAmplitudeDamping { inner })
     }
 
     fn phase_damping_single_gate(&self, qubit: usize) -> PyResult<PyPhaseDamping> {
-        let inner = self.inner.phase_damping_single_gate(qubit)
+        let inner = self
+            .inner
+            .phase_damping_single_gate(qubit)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(PyPhaseDamping { inner })
     }
 
     fn depolarizing_single_gate(&self, qubit: usize) -> PyResult<PyDepolarizingChannel> {
-        let inner = self.inner.depolarizing_single_gate(qubit)
+        let inner = self
+            .inner
+            .depolarizing_single_gate(qubit)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(PyDepolarizingChannel { inner })
     }
 
     fn readout_error(&self, qubit: usize) -> PyResult<PyReadoutError> {
-        let inner = self.inner.readout_error(qubit)
+        let inner = self
+            .inner
+            .readout_error(qubit)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(PyReadoutError { inner })
     }

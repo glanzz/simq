@@ -6,11 +6,9 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use simq_backend::{
-    BackendCapabilities, BackendResult, BackendType, JobStatus, LocalSimulatorBackend,
-    LocalSimulatorConfig, QuantumBackend as RustQuantumBackend,
+    BackendResult, BackendType, JobStatus, LocalSimulatorBackend, LocalSimulatorConfig,
+    QuantumBackend as RustQuantumBackend,
 };
-use simq_core::Circuit;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 #[cfg(feature = "ibm-quantum")]
@@ -76,10 +74,7 @@ impl PyBackendResult {
     /// Execution time in seconds
     #[getter]
     fn execution_time(&self) -> Option<f64> {
-        self.inner
-            .metadata
-            .execution_time
-            .map(|d| d.as_secs_f64())
+        self.inner.metadata.execution_time.map(|d| d.as_secs_f64())
     }
 
     /// Total time (including queue wait) in seconds
@@ -123,7 +118,7 @@ impl PyJobStatus {
             JobStatus::Validating => "Validating".to_string(),
             JobStatus::Running => "Running".to_string(),
             JobStatus::Completed => "Completed".to_string(),
-            JobStatus::Failed { .. } => "Failed".to_string(),
+            JobStatus::Failed => "Failed".to_string(),
             JobStatus::Cancelled => "Cancelled".to_string(),
         }
     }
@@ -135,7 +130,7 @@ impl PyJobStatus {
 
     /// Check if job failed
     fn is_failed(&self) -> bool {
-        matches!(self.inner, JobStatus::Failed { .. })
+        matches!(self.inner, JobStatus::Failed)
     }
 
     /// Check if job is running
@@ -247,9 +242,7 @@ impl PyLocalSimulatorBackend {
     #[pyo3(signature = (config=None, name=None))]
     fn new(config: Option<PyLocalSimulatorConfig>, name: Option<String>) -> Self {
         let backend = match (config, name) {
-            (Some(cfg), Some(n)) => {
-                LocalSimulatorBackend::with_config(cfg.inner).with_name(n)
-            }
+            (Some(cfg), Some(n)) => LocalSimulatorBackend::with_config(cfg.inner).with_name(n),
             (Some(cfg), None) => LocalSimulatorBackend::with_config(cfg.inner),
             (None, Some(n)) => LocalSimulatorBackend::new().with_name(n),
             (None, None) => LocalSimulatorBackend::new(),
@@ -291,7 +284,11 @@ impl PyLocalSimulatorBackend {
 
     /// Submit a job (for compatibility, executes immediately for local backend)
     #[pyo3(signature = (circuit, shots=1024))]
-    fn submit_job(&self, circuit: &crate::core::circuit::PyCircuit, shots: usize) -> PyResult<String> {
+    fn submit_job(
+        &self,
+        circuit: &crate::core::circuit::PyCircuit,
+        shots: usize,
+    ) -> PyResult<String> {
         self.inner
             .submit_job(circuit.inner(), shots)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -322,7 +319,11 @@ impl PyLocalSimulatorBackend {
 
     /// Estimate cost for executing circuit
     #[pyo3(signature = (circuit, shots=1024))]
-    fn estimate_cost(&self, circuit: &crate::core::circuit::PyCircuit, shots: usize) -> Option<f64> {
+    fn estimate_cost(
+        &self,
+        circuit: &crate::core::circuit::PyCircuit,
+        shots: usize,
+    ) -> Option<f64> {
         self.inner.estimate_cost(circuit.inner(), shots)
     }
 
@@ -376,7 +377,9 @@ impl PyIBMConfig {
     fn __repr__(&self) -> String {
         format!(
             "IBMConfig(instance={:?}, max_polling_attempts={}, polling_interval={}s)",
-            self.inner.instance, self.inner.max_polling_attempts, self.inner.polling_interval_seconds
+            self.inner.instance,
+            self.inner.max_polling_attempts,
+            self.inner.polling_interval_seconds
         )
     }
 }
@@ -440,7 +443,11 @@ impl PyIBMQuantumBackend {
 
     /// Submit a job without waiting for completion
     #[pyo3(signature = (circuit, shots=1024))]
-    fn submit_job(&self, circuit: &crate::core::circuit::PyCircuit, shots: usize) -> PyResult<String> {
+    fn submit_job(
+        &self,
+        circuit: &crate::core::circuit::PyCircuit,
+        shots: usize,
+    ) -> PyResult<String> {
         self.inner
             .submit_job(circuit.inner(), shots)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -480,7 +487,11 @@ impl PyIBMQuantumBackend {
 
     /// Estimate cost for executing circuit
     #[pyo3(signature = (circuit, shots=1024))]
-    fn estimate_cost(&self, circuit: &crate::core::circuit::PyCircuit, shots: usize) -> Option<f64> {
+    fn estimate_cost(
+        &self,
+        circuit: &crate::core::circuit::PyCircuit,
+        shots: usize,
+    ) -> Option<f64> {
         self.inner.estimate_cost(circuit.inner(), shots)
     }
 

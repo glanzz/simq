@@ -4,10 +4,9 @@
 //! DAG consistency checking, cycle detection, and parallelism analysis.
 
 pub mod dag;
-pub mod rules;
 pub mod report;
+pub mod rules;
 
-pub use dag::{DependencyGraph, DependencyEdge, GateNode, ParallelismAnalysis};
-pub use rules::{ValidationRule, ValidationResult, ValidationError, ValidationWarning};
+pub use dag::{DependencyEdge, DependencyGraph, GateNode, ParallelismAnalysis};
 pub use report::ValidationReport;
-
+pub use rules::{ValidationError, ValidationResult, ValidationRule, ValidationWarning};

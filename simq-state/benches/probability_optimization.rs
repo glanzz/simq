@@ -3,7 +3,7 @@
 //! Compares SIMD-optimized vs scalar implementation for computing
 //! probability distributions from quantum state amplitudes.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use num_complex::Complex64;
 use simq_state::DenseState;
 
