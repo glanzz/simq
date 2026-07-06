@@ -6,11 +6,16 @@
 //!
 //! # Architecture
 //!
-//! The caching system operates at multiple levels:
+//! 1. **Exact Angle Cache** (`CommonAngles`): Pre-computed matrices for specific
+//!    angles (e.g., π/4, π/2), looked up with zero cost.
+//! 2. **Const Generic Cache**: Type-level caching using const generics.
 //!
-//! 1. **Exact Angle Cache**: Pre-computed matrices for specific angles (e.g., π/4, π/2)
-//! 2. **Range Cache**: Evenly-spaced matrices for a range (useful for gradient descent)
-//! 3. **Const Generic Cache**: Type-level caching using const generics
+//! `VQEAngles` previously also carried a grid-based "range cache" for angles
+//! produced during gradient-descent optimization. That grid used an irrational
+//! step size, so a caller's floating-point angle essentially never landed on a
+//! grid entry exactly — every lookup silently fell through to runtime
+//! computation anyway. The grid has been removed; `VQEAngles::{rx,ry,rz}_cached`
+//! now compute the matrix directly.
 //!
 //! # Example
 //!
@@ -20,22 +25,19 @@
 //! // Zero-cost access to common angle
 //! let matrix = CommonAngles::rx_pi_over_2();
 //!
-//! // Cache lookup with fallback to computation
+//! // Direct computation for arbitrary angles
 //! let matrix2 = VQEAngles::rx_cached(0.1);
 //! ```
 //!
 //! # Performance
 //!
 //! - **Exact matches**: 0 ns (compile-time constant)
-//! - **Range cache lookups**: ~2-5 ns (array index + bounds check)
-//! - **Cache misses**: Falls back to standard computation (~20-50 ns)
+//! - **Everything else**: falls back to standard computation (~20-50 ns)
 //!
 //! # Memory Usage
 //!
 //! Each cached 2x2 complex matrix requires 64 bytes:
 //! - 4 Complex64 values × 16 bytes each = 64 bytes
-//!
-//! Range caches with N entries use: 64N bytes
 
 use num_complex::Complex64;
 use std::f64::consts::PI;
@@ -251,187 +253,42 @@ impl CommonAngles {
 // VQE/QAOA Optimized Cache
 // ============================================================================
 
-/// Cache optimized for Variational Quantum Eigensolver (VQE) and QAOA algorithms
+/// Angle-range marker for the VQE/QAOA gradient-descent optimization window
 ///
-/// Pre-computed matrices for angles from 0 to π/4 with fine granularity.
-/// This range covers most parameter updates during gradient descent.
+/// This previously carried a grid of pre-computed matrices spaced at
+/// `(π/4)/255` intervals, intended to serve as a fast path for angles
+/// produced during gradient descent. Because that step is irrational
+/// relative to the arbitrary floating-point angles an optimizer produces,
+/// an exact-match lookup against the grid essentially never hit — every
+/// call fell through to runtime trig computation anyway, after paying for
+/// the index arithmetic and carrying 48 KiB of matrices that were never
+/// returned. The grid has been removed; `*_cached` now simply computes the
+/// matrix directly. `MAX_ANGLE` is kept as the documented range boundary
+/// used by callers (e.g. `EnhancedUniversalCache`) to decide when to try
+/// this path before falling further back to build-time-generated ranges.
 pub struct VQEAngles;
 
 impl VQEAngles {
-    /// Number of cached angles (higher = better accuracy, more memory)
-    pub const NUM_ENTRIES: usize = 256;
-
-    /// Maximum cached angle (π/4 covers typical optimization ranges)
+    /// Upper bound of the angle range this type represents (π/4 covers
+    /// typical single-step optimization updates).
     pub const MAX_ANGLE: f64 = PI / 4.0;
 
-    /// Step size between cached angles
-    pub const STEP: f64 = Self::MAX_ANGLE / (Self::NUM_ENTRIES - 1) as f64;
-
-    /// Pre-computed RX matrices for VQE angles
-    const RX_CACHE: [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] = Self::gen_rx_cache();
-
-    /// Pre-computed RY matrices for VQE angles
-    const RY_CACHE: [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] = Self::gen_ry_cache();
-
-    /// Pre-computed RZ matrices for VQE angles
-    const RZ_CACHE: [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] = Self::gen_rz_cache();
-
-    /// Generate RX cache at compile time
-    const fn gen_rx_cache() -> [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] {
-        let mut cache = [[[Complex64::new(0.0, 0.0); 2]; 2]; Self::NUM_ENTRIES];
-        let mut i = 0;
-        while i < Self::NUM_ENTRIES {
-            let theta = i as f64 * Self::STEP;
-            let half_theta = theta / 2.0;
-
-            // Const approximation of cos and sin (using Taylor series for compile-time)
-            // For better accuracy, we use pre-computed values at runtime
-            let cos_val = Self::const_cos(half_theta);
-            let sin_val = Self::const_sin(half_theta);
-
-            cache[i] = [
-                [Complex64::new(cos_val, 0.0), Complex64::new(0.0, -sin_val)],
-                [Complex64::new(0.0, -sin_val), Complex64::new(cos_val, 0.0)],
-            ];
-            i += 1;
-        }
-        cache
-    }
-
-    /// Generate RY cache at compile time
-    const fn gen_ry_cache() -> [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] {
-        let mut cache = [[[Complex64::new(0.0, 0.0); 2]; 2]; Self::NUM_ENTRIES];
-        let mut i = 0;
-        while i < Self::NUM_ENTRIES {
-            let theta = i as f64 * Self::STEP;
-            let half_theta = theta / 2.0;
-
-            let cos_val = Self::const_cos(half_theta);
-            let sin_val = Self::const_sin(half_theta);
-
-            cache[i] = [
-                [Complex64::new(cos_val, 0.0), Complex64::new(-sin_val, 0.0)],
-                [Complex64::new(sin_val, 0.0), Complex64::new(cos_val, 0.0)],
-            ];
-            i += 1;
-        }
-        cache
-    }
-
-    /// Generate RZ cache at compile time
-    const fn gen_rz_cache() -> [[[Complex64; 2]; 2]; Self::NUM_ENTRIES] {
-        let mut cache = [[[Complex64::new(0.0, 0.0); 2]; 2]; Self::NUM_ENTRIES];
-        let mut i = 0;
-        while i < Self::NUM_ENTRIES {
-            let theta = i as f64 * Self::STEP;
-            let half_theta = theta / 2.0;
-
-            let cos_val = Self::const_cos(half_theta);
-            let sin_val = Self::const_sin(half_theta);
-
-            cache[i] = [
-                [Complex64::new(cos_val, -sin_val), Complex64::new(0.0, 0.0)],
-                [Complex64::new(0.0, 0.0), Complex64::new(cos_val, sin_val)],
-            ];
-            i += 1;
-        }
-        cache
-    }
-
-    /// Const-compatible cosine approximation (Taylor series, 7 terms)
-    const fn const_cos(x: f64) -> f64 {
-        let x2 = x * x;
-        let x4 = x2 * x2;
-        let x6 = x4 * x2;
-        let x8 = x4 * x4;
-        let x10 = x8 * x2;
-        let x12 = x8 * x4;
-        1.0 - x2 / 2.0 + x4 / 24.0 - x6 / 720.0 + x8 / 40320.0 - x10 / 3628800.0 + x12 / 479001600.0
-    }
-
-    /// Const-compatible sine approximation (Taylor series, 7 terms)
-    const fn const_sin(x: f64) -> f64 {
-        let x2 = x * x;
-        let x3 = x * x2;
-        let x5 = x3 * x2;
-        let x7 = x5 * x2;
-        let x9 = x7 * x2;
-        let x11 = x9 * x2;
-        let x13 = x11 * x2;
-        x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0 + x9 / 362880.0 - x11 / 39916800.0
-            + x13 / 6227020800.0
-    }
-
-    /// Lookup RX matrix, using cache only for exact angle matches
+    /// Compute the RX matrix for the given angle.
     #[inline]
     pub fn rx_cached(theta: f64) -> [[Complex64; 2]; 2] {
-        let abs_theta = theta.abs();
-
-        if abs_theta <= Self::MAX_ANGLE {
-            let float_index = abs_theta / Self::STEP;
-            let index = float_index.round() as usize;
-            let index = index.min(Self::NUM_ENTRIES - 1);
-            let cached_theta = index as f64 * Self::STEP;
-            if (abs_theta - cached_theta).abs() < 1e-12 {
-                let mut m = Self::RX_CACHE[index];
-                if theta < 0.0 {
-                    m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
-                    m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
-                }
-                return m;
-            }
-        }
         crate::matrices::rotation_x(theta)
     }
 
-    /// Lookup RY matrix, using cache only for exact angle matches
+    /// Compute the RY matrix for the given angle.
     #[inline]
     pub fn ry_cached(theta: f64) -> [[Complex64; 2]; 2] {
-        let abs_theta = theta.abs();
-
-        if abs_theta <= Self::MAX_ANGLE {
-            let float_index = abs_theta / Self::STEP;
-            let index = float_index.round() as usize;
-            let index = index.min(Self::NUM_ENTRIES - 1);
-            let cached_theta = index as f64 * Self::STEP;
-            if (abs_theta - cached_theta).abs() < 1e-12 {
-                let mut m = Self::RY_CACHE[index];
-                if theta < 0.0 {
-                    m[0][1] = Complex64::new(-m[0][1].re, -m[0][1].im);
-                    m[1][0] = Complex64::new(-m[1][0].re, -m[1][0].im);
-                }
-                return m;
-            }
-        }
         crate::matrices::rotation_y(theta)
     }
 
-    /// Lookup RZ matrix, using cache only for exact angle matches
+    /// Compute the RZ matrix for the given angle.
     #[inline]
     pub fn rz_cached(theta: f64) -> [[Complex64; 2]; 2] {
-        let abs_theta = theta.abs();
-
-        if abs_theta <= Self::MAX_ANGLE {
-            let float_index = abs_theta / Self::STEP;
-            let index = float_index.round() as usize;
-            let index = index.min(Self::NUM_ENTRIES - 1);
-            let cached_theta = index as f64 * Self::STEP;
-            if (abs_theta - cached_theta).abs() < 1e-12 {
-                let mut m = Self::RZ_CACHE[index];
-                if theta < 0.0 {
-                    m[0][0] = Complex64::new(m[0][0].re, -m[0][0].im);
-                    m[1][1] = Complex64::new(m[1][1].re, -m[1][1].im);
-                }
-                return m;
-            }
-        }
         crate::matrices::rotation_z(theta)
-    }
-
-    /// Get cache memory usage in bytes
-    #[inline]
-    pub const fn memory_bytes() -> usize {
-        std::mem::size_of::<[[Complex64; 2]; 2]>() * Self::NUM_ENTRIES * 3
     }
 }
 
@@ -535,10 +392,9 @@ mod tests {
 
         for i in 0..2 {
             for j in 0..2 {
-                // VQE cache uses Taylor series approximation in const fn,
-                // so use more tolerant epsilon (still very accurate for small angles)
-                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-3);
-                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-3);
+                // rx_cached now computes directly, so it must match exactly.
+                assert_relative_eq!(cached[i][j].re, computed[i][j].re, epsilon = 1e-12);
+                assert_relative_eq!(cached[i][j].im, computed[i][j].im, epsilon = 1e-12);
             }
         }
     }
@@ -599,12 +455,10 @@ mod tests {
 
     #[test]
     fn test_vqe_cache_entries_match_runtime_trig() {
-        // The VQE cache entries are generated by a const-fn Taylor series.
-        // Over the cached range (half-angles up to pi/8) the truncation error
-        // is ~1e-16, so every entry must agree with runtime trig to 1e-12.
-        // If anyone shrinks the series or widens the range, this catches it.
-        for i in 0..VQEAngles::NUM_ENTRIES {
-            let theta = i as f64 * VQEAngles::STEP;
+        // rx_cached/ry_cached/rz_cached now compute directly (no grid), so
+        // they must agree with runtime trig everywhere within the range.
+        for i in 0..256 {
+            let theta = i as f64 * (VQEAngles::MAX_ANGLE / 255.0);
             let rx = VQEAngles::rx_cached(theta);
             let rx_exact = crate::matrices::rotation_x(theta);
             let ry = VQEAngles::ry_cached(theta);
@@ -628,13 +482,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_memory_usage() {
-        let bytes = VQEAngles::memory_bytes();
-        // 256 entries × 3 caches (RX, RY, RZ) × 64 bytes per matrix
-        assert_eq!(bytes, 256 * 3 * 64);
     }
 
     // =========================================================================
@@ -743,7 +590,6 @@ mod tests {
 
     #[test]
     fn test_vqe_angles_rx_cached_in_range() {
-        // theta=0.0 is exactly on a cache entry
         let m0 = VQEAngles::rx_cached(0.0);
         let computed0 = crate::matrices::rotation_x(0.0);
         for i in 0..2 {
@@ -752,13 +598,11 @@ mod tests {
             }
         }
 
-        // theta=0.1 is within range but may or may not hit exact cache
         let m1 = VQEAngles::rx_cached(0.1);
         let computed1 = crate::matrices::rotation_x(0.1);
-        // Allow looser epsilon because Taylor series approx
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(m1[i][j].re, computed1[i][j].re, epsilon = 0.01);
+                assert_relative_eq!(m1[i][j].re, computed1[i][j].re, epsilon = 1e-12);
             }
         }
     }
@@ -782,12 +626,11 @@ mod tests {
         let pos = VQEAngles::rx_cached(0.1);
         let neg = VQEAngles::rx_cached(-0.1);
         // cos(-θ/2) = cos(θ/2), so diagonal should match
-        assert_relative_eq!(pos[0][0].re, neg[0][0].re, epsilon = 0.01);
-        // The returned matrix is from runtime computation for non-exact entries
+        assert_relative_eq!(pos[0][0].re, neg[0][0].re, epsilon = 1e-12);
         let computed_neg = crate::matrices::rotation_x(-0.1);
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(neg[i][j].re, computed_neg[i][j].re, epsilon = 0.01);
+                assert_relative_eq!(neg[i][j].re, computed_neg[i][j].re, epsilon = 1e-12);
             }
         }
     }
@@ -807,7 +650,7 @@ mod tests {
         let c_neg = crate::matrices::rotation_y(-0.1);
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 0.01);
+                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 1e-12);
             }
         }
         // Out of range
@@ -835,7 +678,7 @@ mod tests {
         let c_neg = crate::matrices::rotation_z(-0.1);
         for i in 0..2 {
             for j in 0..2 {
-                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 0.01);
+                assert_relative_eq!(m_neg[i][j].re, c_neg[i][j].re, epsilon = 1e-12);
             }
         }
         // Out of range (fallback)
@@ -846,15 +689,6 @@ mod tests {
                 assert_relative_eq!(m_pi[i][j].re, c_pi[i][j].re, epsilon = 1e-10);
             }
         }
-    }
-
-    #[test]
-    fn test_vqe_angles_memory_bytes() {
-        let bytes = VQEAngles::memory_bytes();
-        assert!(bytes > 0);
-        // Should be 256 * 3 * size_of([[Complex64;2];2])
-        let expected = 256 * 3 * std::mem::size_of::<[[Complex64; 2]; 2]>();
-        assert_eq!(bytes, expected);
     }
 
     // =========================================================================
