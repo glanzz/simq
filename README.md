@@ -3,9 +3,26 @@
 [![Coverage Status](https://coveralls.io/repos/github/glanzz/simq/badge.svg?branch=main)](https://coveralls.io/github/glanzz/simq?branch=main)
 [![Crates.io](https://img.shields.io/crates/v/simq.svg)](https://crates.io/crates/simq)
 [![Documentation](https://docs.rs/simq/badge.svg)](https://docs.rs/simq)
+[![Docs Site](https://github.com/glanzz/simq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/simq/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
 **SimQ** is a blazingly fast quantum computing SDK written in Rust, designed to be 8-10x faster than Qiskit for variational algorithms while maintaining type safety and ergonomic APIs.
+
+## Documentation
+
+The full documentation lives at **[glanzz.github.io/simq](https://glanzz.github.io/simq/)**:
+
+| Section | What's there |
+|---------|--------------|
+| [Installation](https://glanzz.github.io/simq/getting-started/installation.html) | Rust crate setup and Python bindings via maturin |
+| [Quickstart (Rust)](https://glanzz.github.io/simq/getting-started/quickstart-rust.html) | Your first circuit in five minutes |
+| [Quickstart (Python)](https://glanzz.github.io/simq/getting-started/quickstart-python.html) | The Python API tour |
+| [User guide](https://glanzz.github.io/simq/guide/circuits.html) | Circuits, simulation, VQE/QAOA, compiler, noise, backends |
+| [Examples](https://glanzz.github.io/simq/examples/) | Every runnable example in the workspace, catalogued |
+| [Architecture](https://glanzz.github.io/simq/architecture/) | How the eight crates fit together |
+| [Contributing](https://glanzz.github.io/simq/contributing/) | Dev setup, testing, and the PR workflow |
+
+Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --workspace --exclude simq-py --no-deps --open` locally).
 
 ## Features
 
@@ -172,7 +189,7 @@ SimQ consists of several optimized crates:
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see the [contributing guide](https://glanzz.github.io/simq/contributing/) for development setup, coding standards, and the PR workflow.
 
 ### Development Setup
 
@@ -194,6 +211,10 @@ cargo fmt
 
 # Run linter
 cargo clippy
+
+# Build the documentation site (output in docs/build/html)
+pip install -r docs/requirements.txt
+make -C docs html
 ```
 
 
@@ -224,6 +245,6 @@ If you use SimQ in your research, please cite:
   title = {SimQ: High-Performance Quantum Computing SDK in Rust},
   author = {SimQ Contributors},
   year = {2024},
-  url = {https://github.com/yourusername/simq}
+  url = {https://github.com/glanzz/simq}
 }
 ```

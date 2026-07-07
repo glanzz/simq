@@ -1,0 +1,102 @@
+/* SimQ documentation — custom styling on top of the Furo theme. */
+
+/* ---------------------------------------------------------------- hero -- */
+
+/* The landing page's markdown H1 ("SimQ") provides the document title for
+   Sphinx, but the hero banner already says it — hide the plain heading. */
+section#simq > h1 {
+  display: none;
+}
+
+.simq-hero {
+  text-align: center;
+  padding: 2.5rem 1rem 2rem;
+  margin-bottom: 2rem;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(124, 58, 237, 0.18), transparent),
+    radial-gradient(ellipse 80% 60% at 80% 100%, rgba(37, 99, 235, 0.16), transparent);
+}
+
+.simq-hero h1 {
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.simq-hero p.simq-tagline {
+  font-size: 1.15rem;
+  max-width: 44rem;
+  margin: 0 auto 1.4rem;
+  color: var(--color-foreground-secondary);
+}
+
+/* hero buttons */
+.simq-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.simq-buttons a.simq-btn {
+  display: inline-block;
+  padding: 0.55rem 1.3rem;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.simq-buttons a.simq-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(109, 40, 217, 0.3);
+}
+
+.simq-btn-primary {
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  color: #fff !important;
+}
+
+.simq-btn-secondary {
+  border: 2px solid var(--color-brand-primary);
+  color: var(--color-brand-primary) !important;
+}
+
+/* ---------------------------------------------------------- badge strip -- */
+
+.simq-badges {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+/* ---------------------------------------------------------------- cards -- */
+
+.sd-card {
+  border-radius: 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sd-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.sd-card .sd-card-title {
+  color: var(--color-brand-primary);
+}
+
+/* ------------------------------------------------------------- misc ----- */
+
+/* Slightly tighter tables */
+article table.docutils td,
+article table.docutils th {
+  padding: 0.4rem 0.75rem;
+}
