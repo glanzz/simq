@@ -1,0 +1,7 @@
+{#- Extends Furo's base template to inject site-wide <head> tags. -#}
+{% extends "!base.html" %}
+
+{%- block extrahead -%}
+    <meta name="google-site-verification" content="rSCd8L7c12hK2D7XNJlp-kua_GQ0skLVawjB0T3bVzo" />
+    {{ super() }}
+{%- endblock -%}
