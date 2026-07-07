@@ -65,8 +65,8 @@ docs/
 
 ## Deployment (GitHub Pages)
 
-`.github/workflows/docs.yml` builds the site on every push to `main` or
-`documentation` that touches `docs/**` and deploys it to GitHub Pages at
+`.github/workflows/docs.yml` builds the site on every push to `main` that
+touches `docs/**` and deploys it to GitHub Pages at
 <https://glanzz.github.io/simq/>. Pull requests get a build-only check (no
 deploy), so broken docs never land.
 

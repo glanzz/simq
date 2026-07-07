@@ -2,7 +2,7 @@ name: Documentation
 
 on:
   push:
-    branches: [main, documentation]
+    branches: [main]
     paths:
       - "docs/**"
       - ".github/workflows/docs.yml"
@@ -74,7 +74,7 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
-    # Deploy on pushes to main/documentation and manual runs — never on PRs,
+    # Deploy on pushes to main and manual runs — never on PRs,
     # and only once the repository's GitHub Pages site exists (enable it under
     # Settings -> Pages -> Source: GitHub Actions, then re-run this workflow)
     if: github.event_name != 'pull_request' && needs.build.outputs.pages_available == 'success'
