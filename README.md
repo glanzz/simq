@@ -7,6 +7,8 @@
 
 **SimQ** is a blazingly fast quantum computing SDK written in Rust, designed to be 8-10x faster than Qiskit for variational algorithms while maintaining type safety and ergonomic APIs.
 
+📚 **[Full documentation → glanzz.github.io/simq](https://glanzz.github.io/simq/)** — quickstarts (Rust & Python), user guide, examples, architecture, and contributor docs.
+
 ## Features
 
 - **Extreme Performance**: 8-10x faster than Qiskit for VQE/QAOA workloads
@@ -172,7 +174,7 @@ SimQ consists of several optimized crates:
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see the [contributing guide](https://glanzz.github.io/simq/contributing/) for development setup, coding standards, and the PR workflow.
 
 ### Development Setup
 
