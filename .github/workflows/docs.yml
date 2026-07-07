@@ -26,8 +26,20 @@ jobs:
   build:
     name: Build Sphinx site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      # Enables GitHub Pages (source: GitHub Actions) on first run if the
+      # repository doesn't have it switched on yet
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/setup-python@v5
         with:
