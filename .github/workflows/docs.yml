@@ -30,13 +30,21 @@ jobs:
       contents: read
       pages: write
       id-token: write
+    outputs:
+      # "success" only when the Pages site exists (or was just enabled)
+      pages_available: ${{ steps.configure.outcome }}
     steps:
       - uses: actions/checkout@v4
 
-      # Enables GitHub Pages (source: GitHub Actions) on first run if the
-      # repository doesn't have it switched on yet
+      # Tries to enable GitHub Pages (source: GitHub Actions) if the
+      # repository doesn't have it switched on yet. The default GITHUB_TOKEN
+      # may not be allowed to create the Pages site — in that case this step
+      # is skipped (continue-on-error) and Pages must be enabled once by an
+      # admin under Settings -> Pages -> Source: GitHub Actions.
       - name: Configure GitHub Pages
+        id: configure
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: actions/configure-pages@v5
         with:
           enablement: true
@@ -66,8 +74,10 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
-    # Deploy on pushes to main/documentation and manual runs — never on PRs
-    if: github.event_name != 'pull_request'
+    # Deploy on pushes to main/documentation and manual runs — never on PRs,
+    # and only once the repository's GitHub Pages site exists (enable it under
+    # Settings -> Pages -> Source: GitHub Actions, then re-run this workflow)
+    if: github.event_name != 'pull_request' && needs.build.outputs.pages_available == 'success'
     needs: build
     runs-on: ubuntu-latest
     permissions:
