@@ -1,0 +1,4 @@
+# Pinned Qiskit baseline for BENCHMARKS.md — keep in sync with the
+# versions quoted there when you re-run the comparison.
+qiskit==2.5.0
+qiskit-aer==0.17.2

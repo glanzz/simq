@@ -1,0 +1,54 @@
+{
+  "framework_versions": {
+    "qiskit": "2.5.0",
+    "qiskit_aer": "0.17.2",
+    "python": "3.11.15"
+  },
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "timings_seconds": {
+    "vqe_energy/4q": {
+      "statevector": 0.0017697190344827913,
+      "aer": 0.0018008529420286512
+    },
+    "vqe_energy/8q": {
+      "statevector": 0.0038669633796296742,
+      "aer": 0.002924033742857275
+    },
+    "vqe_energy/12q": {
+      "statevector": 0.0076221890600004375,
+      "aer": 0.005651948699999463
+    },
+    "vqe_energy/16q": {
+      "statevector": 0.12039241233333087,
+      "aer": 0.017611223727271863
+    },
+    "qaoa_maxcut/4q": {
+      "statevector": 0.0011265556805968647,
+      "aer": 0.0014619135525420508
+    },
+    "qaoa_maxcut/8q": {
+      "statevector": 0.0023612590828725687,
+      "aer": 0.0022207989891303787
+    },
+    "qaoa_maxcut/12q": {
+      "statevector": 0.004628471068180964,
+      "aer": 0.004131468176469708
+    },
+    "qaoa_maxcut/16q": {
+      "statevector": 0.0722441407999895,
+      "aer": 0.010213602108110167
+    },
+    "ghz_sampling/10q": {
+      "statevector": 0.004925751324999794,
+      "aer": 0.0020966947425148795
+    },
+    "ghz_sampling/16q": {
+      "statevector": 0.6342679210000597,
+      "aer": 0.004496825164383216
+    },
+    "ghz_sampling/20q": {
+      "statevector": 15.881479670999965,
+      "aer": 0.03656171600000975
+    }
+  }
+}
