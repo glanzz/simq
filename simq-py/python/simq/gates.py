@@ -53,28 +53,49 @@ Using gate classes::
     cnot = CXGate(control=0, target=1)
 """
 
-from .._simq import (
-    # Single-qubit gates
-    HGate, XGate, YGate, ZGate,
-    SGate, SdgGate, TGate, TdgGate,
-    SXGate, SXdgGate,
-    
-    # Parameterized single-qubit gates
-    RXGate, RYGate, RZGate, PhaseGate, U3Gate,
-    
-    # Two-qubit gates
-    CXGate, CZGate,
-    SwapGate, iSwapGate, ECRGate,
-    
-    # Parameterized two-qubit gates
-    RXXGate, RYYGate, RZZGate, CPhaseGate,
-    
-    # Three-qubit gates
-    ToffoliGate, FredkinGate,
-    
-    # Custom gates
-    CustomGate,
-)
+# The gate classes live on the `gates` submodule of the `_simq` extension
+# module. `_simq` is a binary module, not a package, so the submodule must
+# be pulled in as an attribute rather than via `from ._simq.gates import`.
+from ._simq import gates as _rust_gates
+
+# Single-qubit gates
+HGate = _rust_gates.HGate
+XGate = _rust_gates.XGate
+YGate = _rust_gates.YGate
+ZGate = _rust_gates.ZGate
+SGate = _rust_gates.SGate
+SdgGate = _rust_gates.SdgGate
+TGate = _rust_gates.TGate
+TdgGate = _rust_gates.TdgGate
+SXGate = _rust_gates.SXGate
+SXdgGate = _rust_gates.SXdgGate
+
+# Parameterized single-qubit gates
+RXGate = _rust_gates.RXGate
+RYGate = _rust_gates.RYGate
+RZGate = _rust_gates.RZGate
+PhaseGate = _rust_gates.PhaseGate
+U3Gate = _rust_gates.U3Gate
+
+# Two-qubit gates
+CXGate = _rust_gates.CXGate
+CZGate = _rust_gates.CZGate
+SwapGate = _rust_gates.SwapGate
+iSwapGate = _rust_gates.iSwapGate
+ECRGate = _rust_gates.ECRGate
+
+# Parameterized two-qubit gates
+RXXGate = _rust_gates.RXXGate
+RYYGate = _rust_gates.RYYGate
+RZZGate = _rust_gates.RZZGate
+CPhaseGate = _rust_gates.CPhaseGate
+
+# Three-qubit gates
+ToffoliGate = _rust_gates.ToffoliGate
+FredkinGate = _rust_gates.FredkinGate
+
+# Custom gates
+CustomGate = _rust_gates.CustomGate
 
 # Factory functions for convenience
 def h(qubit):
