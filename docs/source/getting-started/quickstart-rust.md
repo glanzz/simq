@@ -14,12 +14,17 @@ circuit with measurement statistics.
 ```bash
 cargo new hello-quantum
 cd hello-quantum
-cargo add simq
+cargo add simq --git https://github.com/glanzz/simq
+```
+
+```{warning}
+The `--git` flag matters: a plain `cargo add simq` installs an unrelated
+job-queue crate that happens to own the `simq` name on crates.io.
 ```
 
 ## 2. Build and simulate a circuit
 
-The fluent [`QuantumCircuit`](https://docs.rs/simq) builder is the fastest
+The fluent `QuantumCircuit` builder is the fastest
 way to get going. Replace `src/main.rs` with:
 
 ```rust

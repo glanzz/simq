@@ -11,11 +11,18 @@ track that matches how you want to use it.
 
 ## Rust
 
-Add the umbrella crate to your `Cargo.toml`:
+Add the umbrella crate to your `Cargo.toml` as a git dependency:
 
 ```toml
 [dependencies]
-simq = "0.1"
+simq = { git = "https://github.com/glanzz/simq" }
+```
+
+```{warning}
+Do **not** use `simq = "0.1"`: the `simq` name on crates.io belongs to an
+unrelated job-queue crate, so installing from crates.io will not give you
+this library. Until SimQ is published under its own crate name, the git
+dependency above is the supported install path.
 ```
 
 The `simq` crate re-exports every subcrate (`simq-core`, `simq-gates`,

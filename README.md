@@ -1,12 +1,10 @@
 # SimQ - High-Performance Quantum Computing SDK
 
 [![Coverage Status](https://coveralls.io/repos/github/glanzz/simq/badge.svg?branch=main)](https://coveralls.io/github/glanzz/simq?branch=main)
-[![Crates.io](https://img.shields.io/crates/v/simq.svg)](https://crates.io/crates/simq)
-[![Documentation](https://docs.rs/simq/badge.svg)](https://docs.rs/simq)
 [![Docs Site](https://github.com/glanzz/simq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/simq/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-**SimQ** is a blazingly fast quantum computing SDK written in Rust, designed to be 8-10x faster than Qiskit for variational algorithms while maintaining type safety and ergonomic APIs.
+**SimQ** is a fast quantum computing SDK written in Rust, built for variational-algorithm loops: measured **4-45× faster than Qiskit** (Statevector *and* Aer) for VQE/QAOA energy evaluations up to ~10 qubits, with type safety and ergonomic APIs. Every performance number we quote is reproducible with one command — see [Performance](#performance) below and [BENCHMARKS.md](BENCHMARKS.md) for the full, warts-and-all comparison.
 
 ## Documentation
 
@@ -22,11 +20,11 @@ The full documentation lives at **[glanzz.github.io/simq](https://glanzz.github.
 | [Architecture](https://glanzz.github.io/simq/architecture/) | How the eight crates fit together |
 | [Contributing](https://glanzz.github.io/simq/contributing/) | Dev setup, testing, and the PR workflow |
 
-Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --workspace --exclude simq-py --no-deps --open` locally).
+Rust API reference: `cargo doc --workspace --exclude simq-py --no-deps --open` locally (docs.rs will host it once the crate is published — see the note in [Quick Start](#quick-start)).
 
 ## Features
 
-- **Extreme Performance**: 8-10x faster than Qiskit for VQE/QAOA workloads
+- **Fast where variational algorithms live**: 4-45× faster than Qiskit for VQE/QAOA evaluation loops up to ~10 qubits ([measured](BENCHMARKS.md))
 - **⚡ Compile-Time Gate Matrix Caching (NEW!)**: Revolutionary multi-level caching system with ~0-5ns matrix access (see [details](#compile-time-caching))
 - **Type-Safe**: Compile-time verification of quantum operations
 - **Memory Efficient**: Hybrid sparse/dense state representation, simulate up to 35-40 qubits on 32GB RAM
@@ -35,14 +33,41 @@ Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --worksp
 - **Built-in Gradients**: Automatic gradient computation for variational algorithms
 - **Multi-Backend**: Support for IBM Quantum, AWS Braket, and more
 
+## Performance
+
+Measured on the workloads that matter for variational algorithms — one full
+build-simulate-measure iteration, cross-validated so SimQ and Qiskit provably
+run identical circuits:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results/2026-07-08/chart-dark.svg">
+  <img alt="SimQ speedup over Qiskit per workload, log scale" src="benchmarks/results/2026-07-08/chart-light.svg">
+</picture>
+
+SimQ wins big in the small-circuit regime where variational loops spend
+thousands of iterations; Qiskit Aer is currently faster above ~12 qubits
+(that gap is tracked in [#76](https://github.com/glanzz/simq/issues/76) —
+we publish both sides). Exact circuits, qubit counts, hardware, versions,
+and methodology: **[BENCHMARKS.md](BENCHMARKS.md)**. Reproduce on your
+machine with one command:
+
+```bash
+./benchmarks/run.sh
+```
+
 ## Quick Start
 
-Add SimQ to your `Cargo.toml`:
+Add SimQ to your `Cargo.toml` as a git dependency:
 
 ```toml
 [dependencies]
-simq = "0.1"
+simq = { git = "https://github.com/glanzz/simq" }
 ```
+
+> **Why not `simq = "0.1"`?** The `simq` name on crates.io is taken by an
+> unrelated job-queue crate, so installing from crates.io will *not* give
+> you this library. Until SimQ is published under its own crate name, use
+> the git dependency above.
 
 Create your first quantum circuit:
 
@@ -187,6 +212,12 @@ SimQ consists of several optimized crates:
 
 
 
+## Community
+
+- **Questions, ideas, show & tell**: [GitHub Discussions](https://github.com/glanzz/simq/discussions)
+- **Bugs and feature requests**: [Issues](https://github.com/glanzz/simq/issues)
+- **First contribution?** Grab a [`good first issue`](https://github.com/glanzz/simq/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — each one has file-level pointers and acceptance criteria, and we're happy to mentor you through it.
+
 ## Contributing
 
 We welcome contributions! Please see the [contributing guide](https://glanzz.github.io/simq/contributing/) for development setup, coding standards, and the PR workflow.
@@ -203,7 +234,7 @@ cargo build
 # Run tests
 cargo test
 
-# Run benchmarks
+# Run benchmarks (see BENCHMARKS.md; ./benchmarks/run.sh adds the Qiskit comparison)
 cargo bench
 
 # Format code
