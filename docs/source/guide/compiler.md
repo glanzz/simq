@@ -1,12 +1,12 @@
 ---
 myst:
   html_meta:
-    description: "SimQ's circuit compiler — gate fusion, commutation, dead-code elimination, template matching, and optimization pipelines for quantum circuits."
+    description: "Ferriq's circuit compiler — gate fusion, commutation, dead-code elimination, template matching, and optimization pipelines for quantum circuits."
 ---
 
 # Circuit compiler
 
-`simq-compiler` transforms circuits into more efficient, semantically
+`ferriq-compiler` transforms circuits into more efficient, semantically
 equivalent forms. The simulator can invoke it automatically
 (`SimulatorConfig::with_optimization_level`), or you can run passes
 yourself for full control.
@@ -26,9 +26,9 @@ yourself for full control.
 Gate fusion, for example:
 
 ```rust
-use simq_compiler::fusion::fuse_single_qubit_gates;
-use simq_core::{Circuit, Gate, QubitId};
-use simq_gates::standard::{Hadamard, PauliX, TGate};
+use ferriq_compiler::fusion::fuse_single_qubit_gates;
+use ferriq_core::{Circuit, Gate, QubitId};
+use ferriq_gates::standard::{Hadamard, PauliX, TGate};
 use std::sync::Arc;
 
 let mut circuit = Circuit::new(1);
@@ -49,7 +49,7 @@ of the individual matrices (rightmost applied first).
 
 Passes compose into pipelines that run until a fixed point or a
 configurable iteration budget. See these runnable demos in
-`simq-compiler/examples/`:
+`ferriq-compiler/examples/`:
 
 | Example | Shows |
 |---------|-------|
@@ -66,16 +66,16 @@ configurable iteration budget. See these runnable demos in
 Run any of them with:
 
 ```bash
-cargo run -p simq-compiler --example pipeline_demo
+cargo run -p ferriq-compiler --example pipeline_demo
 ```
 
 ## Writing your own pass
 
 A pass implements the `OptimizationPass` trait (take a circuit, return a
 transformed circuit plus a "changed" indicator). Look at
-`DeadCodeElimination` or `GateCommutation` in `simq-compiler/src/` as
+`DeadCodeElimination` or `GateCommutation` in `ferriq-compiler/src/` as
 templates, and add property tests that check semantic equivalence — the
 existing test suites show the pattern (e.g. comparing state vectors before
 and after optimization on random circuits).
 
-More detail: [`simq-compiler/README.md`](https://github.com/glanzz/simq/blob/main/simq-compiler/README.md).
+More detail: [`ferriq-compiler/README.md`](https://github.com/glanzz/ferriq/blob/main/ferriq-compiler/README.md).

@@ -1,0 +1,3 @@
+# Scratch output from ./benchmarks/run.sh without an explicit out-dir
+results/latest/
+.venv/

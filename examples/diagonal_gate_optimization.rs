@@ -7,8 +7,8 @@
 //! Run with: cargo run --example diagonal_gate_optimization --release
 
 use num_complex::Complex64;
-use simq_gates::standard::{PauliZ, Phase, RotationZ, SGate, TGate};
-use simq_state::DenseState;
+use ferriq_gates::standard::{PauliZ, Phase, RotationZ, SGate, TGate};
+use ferriq_state::DenseState;
 use std::time::Instant;
 
 fn main() {

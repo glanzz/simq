@@ -1,12 +1,12 @@
 ---
 myst:
   html_meta:
-    description: "Testing SimQ — unit, integration, doc, and property-based tests, end-to-end suites, Python pytest, and Criterion benchmarks."
+    description: "Testing Ferriq — unit, integration, doc, and property-based tests, end-to-end suites, Python pytest, and Criterion benchmarks."
 ---
 
 # Testing
 
-SimQ leans heavily on tests — from doc tests to property-based
+Ferriq leans heavily on tests — from doc tests to property-based
 semantic-equivalence checks. This page shows what exists and what new code
 is expected to add.
 
@@ -14,16 +14,16 @@ is expected to add.
 
 ```bash
 # Everything (except the Python extension)
-cargo test --workspace --exclude simq-py
+cargo test --workspace --exclude ferriq-py
 
 # A single crate
-cargo test -p simq-state
+cargo test -p ferriq-state
 
 # A single integration test file
-cargo test -p simq-sim --test vqe_qaoa_e2e
+cargo test -p ferriq-sim --test vqe_qaoa_e2e
 
 # Python bindings
-cd simq-py && maturin develop && pytest
+cd ferriq-py && maturin develop && pytest
 ```
 
 ## Test layers
@@ -44,12 +44,12 @@ Each crate has a `tests/` directory. Highlights:
 
 | Suite | Verifies |
 |-------|----------|
-| `simq/tests/comprehensive_e2e.rs` | The fluent API end to end |
-| `simq-sim/tests/kernel_correctness.rs` | Gate kernels against reference math |
-| `simq-sim/tests/vqe_qaoa_e2e.rs`, `qaoa_internals.rs` | Variational workflows converge |
-| `simq-sim/tests/execution_engine_internals.rs` | Adaptive executor behaviour |
-| `simq-state/tests/*_e2e.rs` | Sparse/dense/COW states, measurement, observables, SIMD |
-| `simq-compiler` suites | Pass semantic equivalence |
+| `ferriq/tests/comprehensive_e2e.rs` | The fluent API end to end |
+| `ferriq-sim/tests/kernel_correctness.rs` | Gate kernels against reference math |
+| `ferriq-sim/tests/vqe_qaoa_e2e.rs`, `qaoa_internals.rs` | Variational workflows converge |
+| `ferriq-sim/tests/execution_engine_internals.rs` | Adaptive executor behaviour |
+| `ferriq-state/tests/*_e2e.rs` | Sparse/dense/COW states, measurement, observables, SIMD |
+| `ferriq-compiler` suites | Pass semantic equivalence |
 
 ### Property-based tests
 
@@ -72,7 +72,7 @@ sampling deterministic in tests.
   before/after gate-count assertions.
 - **Simulator/engine change** → run `kernel_correctness` and the e2e
   suites; add cases for new configuration paths.
-- **Python API change** → pytest coverage in `simq-py/tests/`.
+- **Python API change** → pytest coverage in `ferriq-py/tests/`.
 
 ## Benchmarks
 
@@ -80,10 +80,10 @@ Criterion benchmarks live in each crate's `benches/` directory:
 
 ```bash
 cargo bench                # all benchmarks
-cargo bench -p simq-state  # one crate
+cargo bench -p ferriq-state  # one crate
 ```
 
-Python micro-benchmarks live in `simq-py/tests/benchmarks/`. For
+Python micro-benchmarks live in `ferriq-py/tests/benchmarks/`. For
 performance PRs, include before/after Criterion output.
 
 ## CI

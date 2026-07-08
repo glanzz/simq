@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "Working on the SimQ documentation — building the Sphinx site locally, page conventions, GitHub Pages deployment, and SEO setup."
+    description: "Working on the Ferriq documentation — building the Sphinx site locally, page conventions, GitHub Pages deployment, and SEO setup."
 ---
 
 # Working on the docs
@@ -61,13 +61,13 @@ docs/
 - Code samples must be real: lifted from working examples or doc tests, not
   invented. If an API changes, update the docs in the same PR.
 - Link source files on GitHub with full URLs
-  (`https://github.com/glanzz/simq/blob/main/...`).
+  (`https://github.com/glanzz/ferriq/blob/main/...`).
 
 ## Deployment (GitHub Pages)
 
 `.github/workflows/docs.yml` builds the site on every push to `main` that
 touches `docs/**` and deploys it to GitHub Pages at
-<https://glanzz.github.io/simq/>. Pull requests get a build-only check (no
+<https://glanzz.github.io/ferriq/>. Pull requests get a build-only check (no
 deploy), so broken docs never land.
 
 One-time repository setup (already done if the site is live):
@@ -88,6 +88,6 @@ Search-engine indexing is set up in `conf.py`:
 - Per-page descriptions come from the front-matter convention above
 
 To accelerate indexing after major changes, submit
-`https://glanzz.github.io/simq/sitemap.xml` in
+`https://glanzz.github.io/ferriq/sitemap.xml` in
 [Google Search Console](https://search.google.com/search-console) and
 [Bing Webmaster Tools](https://www.bing.com/webmasters).

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="490" viewBox="0 0 880 490" role="img" aria-label="Ferriq speedup over Qiskit per workload, log scale">
+<rect width="880" height="490" fill="#fcfcfb" rx="8"/>
+<text x="190" y="30" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="15" font-weight="600" fill="#0b0b0b">Ferriq speedup over Qiskit — one variational/sampling iteration</text>
+<text x="190" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">Speedup = Qiskit time ÷ Ferriq time (log scale) · GHZ rows include 1024 shots · Qiskit 2.5.0 / Aer 0.17.2</text>
+<circle cx="195" cy="68" r="5" fill="#2a78d6"/>
+<text x="205" y="72" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">vs Qiskit Statevector</text>
+<circle cx="355" cy="68" r="5" fill="#1baf7a"/>
+<text x="365" y="72" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">vs Qiskit Aer</text>
+<line x1="282.3" y1="96" x2="282.3" y2="426" stroke="#e1e0d9" stroke-width="1"/>
+<text x="282.3" y="444" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">0.1×</text>
+<line x1="414.3" y1="96" x2="414.3" y2="426" stroke="#c3c2b7" stroke-width="1.5"/>
+<text x="414.3" y="444" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#898781" text-anchor="middle">1× parity</text>
+<line x1="546.3" y1="96" x2="546.3" y2="426" stroke="#e1e0d9" stroke-width="1"/>
+<text x="546.3" y="444" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">10×</text>
+<line x1="678.3" y1="96" x2="678.3" y2="426" stroke="#e1e0d9" stroke-width="1"/>
+<text x="678.3" y="444" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">100×</text>
+<line x1="810.3" y1="96" x2="810.3" y2="426" stroke="#e1e0d9" stroke-width="1"/>
+<text x="810.3" y="444" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">1000×</text>
+<text x="282.3" y="462" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">← Qiskit faster</text>
+<text x="546.3" y="462" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">Ferriq faster →</text>
+<text x="12" y="115.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#0b0b0b">VQE energy</text>
+<text x="178" y="115.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">4 qubits</text>
+<line x1="622.9" y1="111.0" x2="623.9" y2="111.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="622.9" cy="111.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="623.9" cy="111.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="633.9" y="115.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">39×</text>
+<text x="178" y="145.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">8 qubits</text>
+<line x1="500.3" y1="141.0" x2="516.3" y2="141.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="516.3" cy="141.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="500.3" cy="141.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="526.3" y="145.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">5.9×</text>
+<text x="178" y="175.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">12 qubits</text>
+<line x1="359.5" y1="171.0" x2="376.6" y2="171.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="376.6" cy="171.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="359.5" cy="171.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="386.6" y="175.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">0.52×</text>
+<text x="178" y="205.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">16 qubits</text>
+<line x1="237.4" y1="201.0" x2="347.6" y2="201.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="347.6" cy="201.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="237.4" cy="201.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="357.6" y="205.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">0.31×</text>
+<text x="12" y="235.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#0b0b0b">QAOA MaxCut</text>
+<text x="178" y="235.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">4 qubits</text>
+<line x1="616.6" y1="231.0" x2="631.5" y2="231.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="616.6" cy="231.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="631.5" cy="231.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="641.5" y="235.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">44×</text>
+<text x="178" y="265.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">8 qubits</text>
+<line x1="498.4" y1="261.0" x2="502.0" y2="261.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="502.0" cy="261.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="498.4" cy="261.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="512.0" y="265.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">4.6×</text>
+<text x="178" y="295.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">12 qubits</text>
+<line x1="354.8" y1="291.0" x2="361.3" y2="291.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="361.3" cy="291.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="354.8" cy="291.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="371.3" y="295.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">0.40×</text>
+<text x="178" y="325.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">16 qubits</text>
+<line x1="218.5" y1="321.0" x2="330.7" y2="321.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="330.7" cy="321.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="218.5" cy="321.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="340.7" y="325.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">0.23×</text>
+<text x="12" y="355.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#0b0b0b">GHZ sampling</text>
+<text x="178" y="355.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">10 qubits</text>
+<line x1="634.2" y1="351.0" x2="683.2" y2="351.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="683.2" cy="351.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="634.2" cy="351.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="693.2" y="355.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">109×</text>
+<text x="624.2" y="355.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e" text-anchor="end">46×</text>
+<text x="178" y="385.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">16 qubits</text>
+<line x1="523.3" y1="381.0" x2="807.0" y2="381.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="807.0" cy="381.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="523.3" cy="381.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="817.0" y="385.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">945×</text>
+<text x="513.3" y="385.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e" text-anchor="end">6.7×</text>
+<text x="178" y="415.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">20 qubits</text>
+<line x1="405.4" y1="411.0" x2="753.6" y2="411.0" stroke="#e1e0d9" stroke-width="1"/>
+<circle cx="753.6" cy="411.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="405.4" cy="411.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="763.6" y="415.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e">372×</text>
+<text x="395.4" y="415.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#52514e" text-anchor="end">0.86×</text>
+</svg>

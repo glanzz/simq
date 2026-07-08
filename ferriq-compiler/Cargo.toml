@@ -1,0 +1,27 @@
+[package]
+name = "ferriq-compiler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Circuit optimization and compilation for Ferriq"
+
+[dependencies]
+ferriq-core.workspace = true
+ferriq-gates.workspace = true
+ferriq-state.workspace = true
+thiserror.workspace = true
+ahash.workspace = true
+smallvec.workspace = true
+num-complex.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+approx.workspace = true
+
+[[bench]]
+name = "optimization_passes"
+harness = false

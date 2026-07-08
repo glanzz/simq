@@ -1,13 +1,13 @@
 ---
 myst:
   html_meta:
-    description: "Noise modelling in SimQ — depolarizing, amplitude damping, phase damping, readout error channels and hardware noise models in Rust and Python."
+    description: "Noise modelling in Ferriq — depolarizing, amplitude damping, phase damping, readout error channels and hardware noise models in Rust and Python."
 ---
 
 # Noise modelling
 
-Real hardware is noisy. SimQ's noise system (in `simq-core::noise`, exposed
-to Python as `simq.noise`) lets you attach realistic error channels to
+Real hardware is noisy. Ferriq's noise system (in `ferriq-core::noise`, exposed
+to Python as `ferriq.noise`) lets you attach realistic error channels to
 simulations.
 
 ## Noise channels
@@ -37,20 +37,20 @@ profile:
 ## Using noise from Python
 
 ```python
-import simq
+import ferriq
 
 # Build a device-like noise model
-noise_model = simq.HardwareNoiseModel()
-noise_model.add_gate_error("cx", simq.DepolarizingChannel(0.01))
+noise_model = ferriq.HardwareNoiseModel()
+noise_model.add_gate_error("cx", ferriq.DepolarizingChannel(0.01))
 
 # Simulate with noise
-config = simq.SimulatorConfig(noise_model=noise_model, shots=1000)
-simulator = simq.Simulator(config)
+config = ferriq.SimulatorConfig(noise_model=noise_model, shots=1000)
+simulator = ferriq.Simulator(config)
 result = simulator.run(circuit)
 ```
 
 A complete, commented walkthrough lives in
-[`simq-py/examples/noise_simulation.py`](https://github.com/glanzz/simq/blob/main/simq-py/examples/noise_simulation.py) —
+[`ferriq-py/examples/noise_simulation.py`](https://github.com/glanzz/ferriq/blob/main/ferriq-py/examples/noise_simulation.py) —
 it builds noise channels, attaches them to a hardware model, and compares
 noisy versus ideal measurement distributions.
 

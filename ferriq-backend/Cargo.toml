@@ -1,0 +1,36 @@
+[package]
+name = "ferriq-backend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Hardware backend abstraction for Ferriq"
+
+[dependencies]
+ferriq-core.workspace = true
+ferriq-compiler.workspace = true
+ferriq-gates.workspace = true
+ferriq-sim = { workspace = true, optional = true }
+ferriq-state.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ahash.workspace = true
+rand.workspace = true
+uuid = { version = "1.6", features = ["v4"] }
+async-trait = "0.1"
+tokio = { version = "1.35", features = ["time"], optional = true }
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+
+[features]
+default = ["local-simulator"]
+local-simulator = ["ferriq-sim"]
+ibm-quantum = ["reqwest"]
+async = ["tokio"]
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["rt", "macros", "time", "test-util"] }
+num-complex.workspace = true

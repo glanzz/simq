@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://glanzz.github.io/simq/sitemap.xml
+Sitemap: https://glanzz.github.io/ferriq/sitemap.xml

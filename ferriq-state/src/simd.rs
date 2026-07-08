@@ -1,0 +1,509 @@
+//! SIMD-optimized matrix-vector operations for quantum gates
+//!
+//! This module provides high-performance implementations of matrix-vector
+//! multiplication using SIMD instructions (SSE2, AVX, AVX-512).
+//!
+//! The operations are specialized for 2×2 and 4×4 complex matrices,
+//! which correspond to single-qubit and two-qubit quantum gates.
+
+pub mod controlled_gates;
+pub mod diagonal;
+pub mod kernels;
+pub mod single_qubit;
+pub mod two_qubit;
+
+use num_complex::Complex64;
+
+/// Apply a 2×2 matrix to a state vector (single-qubit gate)
+///
+/// This function applies a single-qubit gate to a quantum state vector.
+/// It uses SIMD instructions when available for optimal performance.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `matrix` - 2×2 gate matrix in row-major order
+/// * `qubit` - Index of the qubit to apply the gate to
+/// * `num_qubits` - Total number of qubits in the state
+///
+/// # Safety
+/// This function uses unsafe SIMD intrinsics. The caller must ensure:
+/// - `state.len() == 2^num_qubits`
+/// - `qubit < num_qubits`
+/// - `state` is properly aligned (64-byte alignment recommended)
+///
+/// # Example
+/// ```ignore
+/// use num_complex::Complex64;
+/// use ferriq_state::simd::apply_single_qubit_gate;
+///
+/// let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+/// let hadamard = [
+///     [Complex64::new(0.7071, 0.0), Complex64::new(0.7071, 0.0)],
+///     [Complex64::new(0.7071, 0.0), Complex64::new(-0.7071, 0.0)],
+/// ];
+///
+/// apply_single_qubit_gate(&mut state, &hadamard, 0, 1);
+/// ```
+#[inline]
+pub fn apply_single_qubit_gate(
+    state: &mut [Complex64],
+    matrix: &[[Complex64; 2]; 2],
+    qubit: usize,
+    num_qubits: usize,
+) {
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    unsafe {
+        single_qubit::apply_gate_avx2(state, matrix, qubit, num_qubits);
+    }
+
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "avx2")
+    ))]
+    unsafe {
+        single_qubit::apply_gate_sse2(state, matrix, qubit, num_qubits);
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        single_qubit::apply_gate_scalar(state, matrix, qubit, num_qubits);
+    }
+}
+
+/// Apply a 4×4 matrix to a state vector (two-qubit gate)
+///
+/// This function applies a two-qubit gate to a quantum state vector.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `matrix` - 4×4 gate matrix in row-major order
+/// * `qubit1` - Index of the first qubit
+/// * `qubit2` - Index of the second qubit
+/// * `num_qubits` - Total number of qubits in the state
+///
+/// # Safety
+/// Similar safety requirements as `apply_single_qubit_gate`
+#[inline]
+pub fn apply_two_qubit_gate(
+    state: &mut [Complex64],
+    matrix: &[[Complex64; 4]; 4],
+    qubit1: usize,
+    qubit2: usize,
+    num_qubits: usize,
+) {
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    unsafe {
+        two_qubit::apply_gate_avx2(state, matrix, qubit1, qubit2, num_qubits);
+    }
+
+    #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
+    {
+        two_qubit::apply_gate_scalar(state, matrix, qubit1, qubit2, num_qubits);
+    }
+}
+
+/// Compute the norm of a complex vector using SIMD
+///
+/// # Arguments
+/// * `vec` - Complex vector
+///
+/// # Returns
+/// L2 norm of the vector
+#[inline]
+pub fn norm_simd(vec: &[Complex64]) -> f64 {
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    unsafe {
+        kernels::norm_avx2(vec)
+    }
+
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "avx2")
+    ))]
+    unsafe {
+        kernels::norm_sse2(vec)
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        vec.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt()
+    }
+}
+
+/// Normalize a complex vector using SIMD
+///
+/// # Arguments
+/// * `vec` - Complex vector to normalize
+#[inline]
+pub fn normalize_simd(vec: &mut [Complex64]) {
+    let norm = norm_simd(vec);
+    if norm > 1e-10 {
+        let inv_norm = 1.0 / norm;
+
+        #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+        unsafe {
+            kernels::scale_avx2(vec, inv_norm);
+        }
+
+        #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
+        for z in vec.iter_mut() {
+            *z *= inv_norm;
+        }
+    }
+}
+
+/// Apply a CNOT (Controlled-NOT) gate optimized for the controlled structure
+///
+/// This uses direct amplitude manipulation instead of full 4×4 matrix
+/// multiplication, providing 3-4x speedup for large state vectors.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `num_qubits` - Total number of qubits
+///
+/// # Example
+/// ```ignore
+/// use num_complex::Complex64;
+/// use ferriq_state::simd::apply_cnot;
+///
+/// let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), ...];
+/// apply_cnot(&mut state, 0, 1, 3);
+/// ```
+#[inline]
+pub fn apply_cnot(state: &mut [Complex64], control: usize, target: usize, num_qubits: usize) {
+    controlled_gates::apply_cnot_striped(state, control, target, num_qubits);
+}
+
+/// Apply a CZ (Controlled-Z) gate optimized for the controlled structure
+///
+/// This applies a phase of -1 only to the |11⟩ state, which is much faster
+/// than full 4×4 matrix multiplication.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `qubit1` - Index of the first qubit
+/// * `qubit2` - Index of the second qubit
+/// * `num_qubits` - Total number of qubits
+///
+/// # Example
+/// ```ignore
+/// use num_complex::Complex64;
+/// use ferriq_state::simd::apply_cz;
+///
+/// let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0), ...];
+/// apply_cz(&mut state, 0, 1, 3);
+/// ```
+#[inline]
+pub fn apply_cz(state: &mut [Complex64], qubit1: usize, qubit2: usize, num_qubits: usize) {
+    controlled_gates::apply_cz_striped(state, qubit1, qubit2, num_qubits);
+}
+
+/// Apply a controlled-U gate (U gate on target if control qubit is 1)
+///
+/// More general than CNOT but still optimized compared to full 4×4 multiplication.
+/// Uses cache-friendly striped iteration for better memory locality.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `u_matrix` - 2×2 unitary matrix to apply to target when control=1
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_controlled_u(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    u_matrix: &[[Complex64; 2]; 2],
+    num_qubits: usize,
+) {
+    controlled_gates::apply_controlled_u_striped(state, control, target, u_matrix, num_qubits);
+}
+
+/// Apply a controlled-RX(θ) gate
+///
+/// CRX(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RX(θ)
+/// Applies RX(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_crx(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_crx(state, control, target, theta, num_qubits);
+}
+
+/// Apply a controlled-RY(θ) gate
+///
+/// CRY(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RY(θ)
+/// Applies RY(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_cry(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_cry(state, control, target, theta, num_qubits);
+}
+
+/// Apply a controlled-RZ(θ) gate
+///
+/// CRZ(θ) = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ RZ(θ)
+/// Applies RZ(θ) to the target qubit when the control qubit is 1.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `control` - Index of the control qubit
+/// * `target` - Index of the target qubit
+/// * `theta` - Rotation angle in radians
+/// * `num_qubits` - Total number of qubits
+#[inline]
+pub fn apply_crz(
+    state: &mut [Complex64],
+    control: usize,
+    target: usize,
+    theta: f64,
+    num_qubits: usize,
+) {
+    controlled_gates::apply_crz(state, control, target, theta, num_qubits);
+}
+
+/// Apply a diagonal single-qubit gate with SIMD optimization
+///
+/// Diagonal gates have the form [[a, 0], [0, b]] and can be applied 2-3x faster
+/// than general gates because they only require scalar multiplication rather than
+/// full complex matrix multiplication.
+///
+/// # Arguments
+/// * `state` - Mutable slice of state amplitudes
+/// * `diagonal` - [a, b] diagonal elements of the gate matrix
+/// * `qubit` - Index of the qubit to apply the gate to
+/// * `num_qubits` - Total number of qubits in the state
+///
+/// # Examples
+///
+/// ```ignore
+/// use num_complex::Complex64;
+/// use ferriq_state::simd::apply_diagonal_gate;
+///
+/// // Apply Z gate: [[1, 0], [0, -1]]
+/// let diagonal = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+/// apply_diagonal_gate(&mut state, diagonal, 0, num_qubits);
+///
+/// // Apply Phase(π/4): [[1, 0], [0, e^(iπ/4)]]
+/// let theta = std::f64::consts::PI / 4.0;
+/// let diagonal = [
+///     Complex64::new(1.0, 0.0),
+///     Complex64::new(theta.cos(), theta.sin())
+/// ];
+/// apply_diagonal_gate(&mut state, diagonal, 0, num_qubits);
+/// ```
+///
+/// # Performance
+/// This function automatically selects the optimal implementation:
+/// - Parallel processing for state vectors with ≥16 qubits
+/// - AVX2 SIMD for large strides
+/// - SSE2 SIMD for small strides (better cache locality)
+/// - Scalar fallback when SIMD is unavailable
+#[inline]
+pub fn apply_diagonal_gate(
+    state: &mut [Complex64],
+    diagonal: [Complex64; 2],
+    qubit: usize,
+    num_qubits: usize,
+) {
+    diagonal::apply_diagonal_gate_optimized(state, diagonal, qubit, num_qubits);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    fn hadamard_matrix() -> [[Complex64; 2]; 2] {
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        [
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(inv_sqrt2, 0.0),
+            ],
+            [
+                Complex64::new(inv_sqrt2, 0.0),
+                Complex64::new(-inv_sqrt2, 0.0),
+            ],
+        ]
+    }
+
+    fn identity_4x4() -> [[Complex64; 4]; 4] {
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        [[i, o, o, o], [o, i, o, o], [o, o, i, o], [o, o, o, i]]
+    }
+
+    /// Covers apply_single_qubit_gate — exercises the SSE2 cfg path on x86_64
+    /// (no avx2 compile-time feature) or scalar on non-x86_64 targets.
+    #[test]
+    fn test_apply_single_qubit_gate_hadamard() {
+        let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+        let h = hadamard_matrix();
+        apply_single_qubit_gate(&mut state, &h, 0, 1);
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        assert_relative_eq!(state[0].re, inv_sqrt2, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, inv_sqrt2, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_single_qubit_gate_multi_qubit() {
+        // 3-qubit state, apply Hadamard on qubit 0 — exercises the same path
+        let num_qubits = 3;
+        let mut state_ref = vec![Complex64::new(0.0, 0.0); 1 << num_qubits];
+        state_ref[0] = Complex64::new(1.0, 0.0);
+        let mut state_simd = state_ref.clone();
+        let h = hadamard_matrix();
+
+        // reference via the scalar implementation
+        single_qubit::apply_gate_scalar(&mut state_ref, &h, 0, num_qubits);
+        // public API (SSE2 path on this target)
+        apply_single_qubit_gate(&mut state_simd, &h, 0, num_qubits);
+
+        for i in 0..state_ref.len() {
+            assert_relative_eq!(state_ref[i].re, state_simd[i].re, epsilon = 1e-10);
+            assert_relative_eq!(state_ref[i].im, state_simd[i].im, epsilon = 1e-10);
+        }
+    }
+
+    /// Covers apply_two_qubit_gate — exercises the scalar cfg path on non-avx2 build.
+    #[test]
+    fn test_apply_two_qubit_gate_identity() {
+        let mut state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        apply_two_qubit_gate(&mut state, &identity_4x4(), 0, 1, 2);
+        assert_relative_eq!(state[0].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_two_qubit_gate_swap() {
+        // SWAP matrix: swaps |01⟩ and |10⟩
+        let o = Complex64::new(0.0, 0.0);
+        let i = Complex64::new(1.0, 0.0);
+        let swap = [[i, o, o, o], [o, o, i, o], [o, i, o, o], [o, o, o, i]];
+        // Start in |01⟩ state
+        let mut state = vec![o, i, o, o];
+        apply_two_qubit_gate(&mut state, &swap, 0, 1, 2);
+        // Should become |10⟩
+        assert_relative_eq!(state[0].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 1.0, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, 0.0, epsilon = 1e-10);
+    }
+
+    /// Covers norm_simd — exercises the SSE2 cfg path on this target.
+    #[test]
+    fn test_norm_simd_simple() {
+        // |3+4i| = 5; |0+0i| = 0 => norm = 5
+        let state = vec![Complex64::new(3.0, 4.0), Complex64::new(0.0, 0.0)];
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 5.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_norm_simd_unit_state() {
+        // Normalized state should have norm 1
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let state = vec![
+            Complex64::new(inv_sqrt2, 0.0),
+            Complex64::new(inv_sqrt2, 0.0),
+        ];
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_norm_simd_odd_length() {
+        // 3-element vector to exercise potential tail handling
+        let state = vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 1.0),
+            Complex64::new(1.0, 1.0),
+        ];
+        let n = norm_simd(&state);
+        // norm_sqr: 1 + 1 + 2 = 4 => norm = 2
+        assert_relative_eq!(n, 2.0, epsilon = 1e-10);
+    }
+
+    /// Covers normalize_simd — the non-avx2 path scales element-by-element.
+    #[test]
+    fn test_normalize_simd_already_unit() {
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let mut state = vec![
+            Complex64::new(inv_sqrt2, 0.0),
+            Complex64::new(inv_sqrt2, 0.0),
+        ];
+        normalize_simd(&mut state);
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_simd_unnormalized() {
+        // Scale down by 2 then normalize — result must have norm 1
+        let mut state = vec![Complex64::new(2.0, 0.0), Complex64::new(0.0, 2.0)];
+        normalize_simd(&mut state);
+        let n = norm_simd(&state);
+        assert_relative_eq!(n, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_simd_near_zero_is_noop() {
+        // A near-zero vector should not be normalized (guard against divide-by-zero)
+        let mut state = vec![Complex64::new(1e-15, 0.0), Complex64::new(0.0, 0.0)];
+        normalize_simd(&mut state);
+        // After the guard (norm <= 1e-10), state remains near zero
+        assert!(state[0].norm() < 1.0, "state should remain small");
+    }
+
+    /// Covers apply_diagonal_gate public wrapper.
+    #[test]
+    fn test_apply_diagonal_gate_z() {
+        let mut state = vec![
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+        ];
+        let z_diag = [Complex64::new(1.0, 0.0), Complex64::new(-1.0, 0.0)];
+        apply_diagonal_gate(&mut state, z_diag, 0, 2);
+        // Odd indices get negated
+        assert_relative_eq!(state[0].re, 0.5, epsilon = 1e-10);
+        assert_relative_eq!(state[1].re, -0.5, epsilon = 1e-10);
+        assert_relative_eq!(state[2].re, 0.5, epsilon = 1e-10);
+        assert_relative_eq!(state[3].re, -0.5, epsilon = 1e-10);
+    }
+}

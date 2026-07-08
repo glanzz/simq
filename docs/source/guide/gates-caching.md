@@ -1,40 +1,40 @@
 ---
 myst:
   html_meta:
-    description: "SimQ's gate library and compile-time gate matrix caching — multi-level caches give rotation gates ~0-5 ns matrix access with exact accuracy."
+    description: "Ferriq's gate library and compile-time gate matrix caching — multi-level caches give rotation gates ~0-5 ns matrix access with exact accuracy."
 ---
 
 # Gates & compile-time caching
 
-`simq-gates` implements the standard gate library with SIMD-optimized
+`ferriq-gates` implements the standard gate library with SIMD-optimized
 kernels and a multi-level **compile-time gate matrix caching** system for
 rotation gates.
 
 ## The gate library
 
 Every standard gate is a zero-sized (or angle-carrying) struct implementing
-the `Gate` trait from `simq-core`:
+the `Gate` trait from `ferriq-core`:
 
 ```rust
-use simq::prelude::*; // pulls in simq_gates::standard::*
+use ferriq::prelude::*; // pulls in ferriq_gates::standard::*
 
 let mut circuit = Circuit::new(2);
 circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)])?;
 circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])?;
-# Ok::<(), simq::QuantumError>(())
+# Ok::<(), ferriq::QuantumError>(())
 ```
 
 Custom gates are fully supported — implement the `Gate` trait and pass an
 `Arc` of your type anywhere a standard gate goes. The complete walkthrough
 is in
-[`simq-gates/CUSTOM_GATES_GUIDE.md`](https://github.com/glanzz/simq/blob/main/simq-gates/CUSTOM_GATES_GUIDE.md)
-and `simq-gates/examples/custom_gates_tutorial.rs`.
+[`ferriq-gates/CUSTOM_GATES_GUIDE.md`](https://github.com/glanzz/ferriq/blob/main/ferriq-gates/CUSTOM_GATES_GUIDE.md)
+and `ferriq-gates/examples/custom_gates_tutorial.rs`.
 
 ## Compile-time matrix caching
 
 Rotation gates (RX, RY, RZ) dominate variational workloads, and computing a
 2×2 unitary from `sin`/`cos` on every call is wasted work for the angles
-that appear over and over. SimQ pre-computes matrices for common angles *at
+that appear over and over. Ferriq pre-computes matrices for common angles *at
 compile time* and embeds them in the binary:
 
 | Cache level | Coverage | Access time | Memory |
@@ -49,7 +49,7 @@ compile time* and embeds them in the binary:
 Total static memory: **~70 KB**, embedded in the binary.
 
 ```rust
-use simq_gates::RotationX;
+use ferriq_gates::RotationX;
 use std::f64::consts::PI;
 
 // Automatically uses the optimal caching strategy
@@ -66,12 +66,12 @@ computation. Gate matrices are never approximated or snapped to a grid.
 ```
 
 The full design document is
-[`simq-gates/COMPILE_TIME_CACHING.md`](https://github.com/glanzz/simq/blob/main/simq-gates/COMPILE_TIME_CACHING.md),
-and `simq-gates/examples/lookup_table_demo.rs` demonstrates the lookup
+[`ferriq-gates/COMPILE_TIME_CACHING.md`](https://github.com/glanzz/ferriq/blob/main/ferriq-gates/COMPILE_TIME_CACHING.md),
+and `ferriq-gates/examples/lookup_table_demo.rs` demonstrates the lookup
 tables directly.
 
 ## Procedural macros
 
-`simq-macros` generates the compile-time lookup tables and other
+`ferriq-macros` generates the compile-time lookup tables and other
 boilerplate. It is an implementation detail — you should never need to
 depend on it directly.

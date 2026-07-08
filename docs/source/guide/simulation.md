@@ -1,12 +1,12 @@
 ---
 myst:
   html_meta:
-    description: "Simulating quantum circuits with SimQ — SimulatorConfig presets, sparse vs dense state vectors, shots, seeding, statistics, and memory limits."
+    description: "Simulating quantum circuits with Ferriq — SimulatorConfig presets, sparse vs dense state vectors, shots, seeding, statistics, and memory limits."
 ---
 
 # Simulation
 
-`simq-sim` is SimQ's high-performance simulator. It picks sparse or dense
+`ferriq-sim` is Ferriq's high-performance simulator. It picks sparse or dense
 state representations adaptively, parallelizes across cores, and can
 optimize circuits before running them.
 
@@ -15,7 +15,7 @@ optimize circuits before running them.
 Through the fluent builder:
 
 ```rust
-use simq::QuantumCircuit;
+use ferriq::QuantumCircuit;
 
 let mut qc = QuantumCircuit::new(2);
 qc.h(0).cnot(0, 1);
@@ -28,7 +28,7 @@ let probs = qc.probabilities().unwrap();            // exact probabilities
 Or explicitly, with a configured simulator:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 let sim = Simulator::new(SimulatorConfig::default());
 let result = sim.run(&circuit)?;
@@ -40,7 +40,7 @@ let result = sim.run(&circuit)?;
 Configuration is a builder with sensible presets:
 
 ```rust
-use simq::SimulatorConfig;
+use ferriq::SimulatorConfig;
 
 let config = SimulatorConfig::new()
     .with_shots(4096)
@@ -93,11 +93,11 @@ For contributors: the `execution_engine` module contains the adaptive
 executor (`adaptive.rs`), SIMD kernels (`kernels/`), parallel scheduling
 (`parallel.rs`), checkpointing and recovery, result caching, and telemetry.
 The [architecture overview](../architecture/index.md) describes how these
-fit together, and `simq-sim/tests/execution_engine_internals.rs` exercises
+fit together, and `ferriq-sim/tests/execution_engine_internals.rs` exercises
 them directly.
 
 ## GPU
 
-`simq-sim` includes experimental GPU support (`gpu.rs`, WGSL shaders under
+`ferriq-sim` includes experimental GPU support (`gpu.rs`, WGSL shaders under
 `shaders/`) behind the `use_gpu` config flag. Treat it as experimental —
 the CPU path is the reference implementation.

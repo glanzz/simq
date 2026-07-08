@@ -1,0 +1,40 @@
+[package]
+name = "ferriq-state"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Quantum state representations for Ferriq"
+
+[dependencies]
+ferriq-core.workspace = true
+num-complex.workspace = true
+ahash.workspace = true
+bytemuck.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+criterion.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "state_operations"
+harness = false
+
+[[bench]]
+name = "measurement_performance"
+harness = false
+
+[[bench]]
+name = "observable_performance"
+harness = false
+
+[[bench]]
+name = "probability_optimization"
+harness = false

@@ -1,0 +1,24 @@
+[package]
+name = "ferriq-gates"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Quantum gate library for Ferriq"
+
+[dependencies]
+ferriq-core.workspace = true
+num-complex.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+criterion.workspace = true
+ferriq-macros = { path = "../ferriq-macros" }
+
+[[bench]]
+name = "gate_operations"
+harness = false

@@ -1,22 +1,22 @@
 [workspace]
 resolver = "2"
 members = [
-    "simq-core",
-    "simq-state",
-    "simq-gates",
-    "simq-compiler",
-    "simq-sim",
-    "simq-backend",
-    "simq", "simq-macros", "simq-py",
+    "ferriq-core",
+    "ferriq-state",
+    "ferriq-gates",
+    "ferriq-compiler",
+    "ferriq-sim",
+    "ferriq-backend",
+    "ferriq", "ferriq-macros", "ferriq-py",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["SimQ Contributors"]
+authors = ["Ferriq Contributors"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/simq"
-homepage = "https://github.com/yourusername/simq"
+repository = "https://github.com/glanzz/ferriq"
+homepage = "https://github.com/glanzz/ferriq"
 rust-version = "1.75"
 
 [workspace.dependencies]
@@ -50,12 +50,12 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 
 # Internal crates
-simq-core = { path = "simq-core" }
-simq-state = { path = "simq-state" }
-simq-gates = { path = "simq-gates" }
-simq-compiler = { path = "simq-compiler" }
-simq-sim = { path = "simq-sim" }
-simq-backend = { path = "simq-backend" }
+ferriq-core = { path = "ferriq-core" }
+ferriq-state = { path = "ferriq-state" }
+ferriq-gates = { path = "ferriq-gates" }
+ferriq-compiler = { path = "ferriq-compiler" }
+ferriq-sim = { path = "ferriq-sim" }
+ferriq-backend = { path = "ferriq-backend" }
 
 [profile.release]
 opt-level = 3
