@@ -57,6 +57,10 @@ mod circuit;
 
 pub use circuit::QuantumCircuit;
 
+/// Workload definitions shared by the end-to-end benchmarks and the Qiskit
+/// cross-validation harness (see `BENCHMARKS.md`).
+pub mod bench_workloads;
+
 // Most-used types at the crate root
 pub use simq_core::{
     Circuit, CircuitBuilder, Complex64, DynamicCircuitBuilder, Gate, GateOp, QuantumError, QubitId,

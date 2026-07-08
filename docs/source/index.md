@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "SimQ is a high-performance quantum computing SDK written in Rust with Python bindings — 8-10x faster than Qiskit for VQE and QAOA workloads, type-safe, and memory efficient."
+    description: "SimQ is a high-performance quantum computing SDK written in Rust with Python bindings — measured 1.6-90x faster than Qiskit Aer on a cross-validated VQE/QAOA/sampling suite at 4-16 qubits, type-safe, and memory efficient."
     keywords: "quantum computing, quantum simulator, Rust, Python, VQE, QAOA, SDK, quantum circuits, SimQ"
 ---
 
@@ -12,7 +12,7 @@ myst:
   <h1>Quantum computing at Rust speed</h1>
   <p class="simq-tagline">
     SimQ is a high-performance quantum computing SDK written in Rust —
-    designed to be 8–10× faster than Qiskit for variational algorithms,
+    measured 1.6–90× faster than Qiskit Aer on a cross-validated 4–16 qubit suite,
     with type-safe circuit construction and first-class Python bindings.
   </p>
   <div class="simq-buttons">
