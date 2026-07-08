@@ -63,29 +63,36 @@ pub fn apply_three_qubit_dense(
 
     let num_subspaces = n / 8;
 
-    if use_parallel && n >= parallel_threshold {
+    // Each subspace touches 8 amplitudes; keep rayon tasks ≥ 128 KiB of state
+    // so fork/join overhead stays negligible (issue #76).
+    const MIN_PAR_SUBSPACES: usize = 1 << 10;
+
+    if use_parallel && n >= parallel_threshold && num_subspaces >= MIN_PAR_SUBSPACES * 2 {
         let state_ptr_addr = state.as_mut_ptr() as usize;
-        (0..num_subspaces).into_par_iter().for_each(|k| {
-            let base = expand_three_qubit_base(k, &sorted);
-            let idx = get_three_qubit_indices(base, qubit1, qubit2, qubit3);
+        (0..num_subspaces)
+            .into_par_iter()
+            .with_min_len(MIN_PAR_SUBSPACES)
+            .for_each(|k| {
+                let base = expand_three_qubit_base(k, &sorted);
+                let idx = get_three_qubit_indices(base, qubit1, qubit2, qubit3);
 
-            // Safety: each k maps to a disjoint 8-tuple of in-bounds indices
-            unsafe {
-                let state_ptr = state_ptr_addr as *mut Complex64;
-                let mut a = [Complex64::new(0.0, 0.0); 8];
-                for (m, &i) in idx.iter().enumerate() {
-                    a[m] = *state_ptr.add(i);
-                }
-
-                for (out_idx, &out) in idx.iter().enumerate() {
-                    let mut sum = Complex64::new(0.0, 0.0);
-                    for (in_idx, &amp) in a.iter().enumerate() {
-                        sum += gate[out_idx][in_idx] * amp;
+                // Safety: each k maps to a disjoint 8-tuple of in-bounds indices
+                unsafe {
+                    let state_ptr = state_ptr_addr as *mut Complex64;
+                    let mut a = [Complex64::new(0.0, 0.0); 8];
+                    for (m, &i) in idx.iter().enumerate() {
+                        a[m] = *state_ptr.add(i);
                     }
-                    *state_ptr.add(out) = sum;
+
+                    for (out_idx, &out) in idx.iter().enumerate() {
+                        let mut sum = Complex64::new(0.0, 0.0);
+                        for (in_idx, &amp) in a.iter().enumerate() {
+                            sum += gate[out_idx][in_idx] * amp;
+                        }
+                        *state_ptr.add(out) = sum;
+                    }
                 }
-            }
-        });
+            });
     } else {
         for k in 0..num_subspaces {
             let base = expand_three_qubit_base(k, &sorted);

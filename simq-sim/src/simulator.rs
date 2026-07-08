@@ -129,8 +129,13 @@ impl Simulator {
         let gate_start = Instant::now();
         {
             use crate::execution_engine::{ExecutionConfig, ExecutionEngine};
+            // SimulatorConfig::parallel_threshold counts QUBITS, while
+            // ExecutionConfig::parallel_threshold counts AMPLITUDES. Passing
+            // the qubit count through unconverted (e.g. default 8) made every
+            // state with ≥ 8 amplitudes take the parallel path, drowning
+            // small-stride gates in rayon fork/join overhead (issue #76).
             let exec_config = ExecutionConfig {
-                parallel_threshold: self.config.parallel_threshold,
+                parallel_threshold: 1usize << self.config.parallel_threshold.min(48),
                 use_gpu: self.config.use_gpu,
                 ..Default::default()
             };

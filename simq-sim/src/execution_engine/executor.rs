@@ -29,7 +29,16 @@ pub struct ExecutionEngine {
     parallel_executor: ParallelExecutor,
     adaptive_strategy: AdaptiveStrategy,
     start_time: Option<Instant>,
+    /// Gates executed since the last dense→sparse density check
+    gates_since_density_check: usize,
 }
+
+/// How often (in gates) to run the O(2^n) dense→sparse density scan.
+///
+/// Checking after every gate made the scan itself dominate execution time on
+/// large dense states (issue #76); once dense, states rarely become sparse
+/// again mid-circuit, so a periodic check loses nothing.
+const DENSITY_CHECK_INTERVAL: usize = 64;
 
 impl ExecutionEngine {
     /// Create a new execution engine with the given configuration
@@ -55,6 +64,7 @@ impl ExecutionEngine {
             matrix_cache: Arc::new(GateMatrixCache::new(config.matrix_cache_size)),
             config,
             start_time: None,
+            gates_since_density_check: 0,
         }
     }
 
@@ -166,8 +176,18 @@ impl ExecutionEngine {
             ParallelExecutor::new(self.config.parallel_strategy),
         );
 
-        let result = parallel_executor
-            .execute(circuit, state, |gate_op, state| self.apply_gate_op(gate_op, state));
+        // Adaptive conversion must run here just like in the sequential path:
+        // without it a state that starts sparse stays sparse forever, and
+        // every gate on a dense-in-practice state pays for a full AHashMap
+        // rebuild — ~2.5 ms/gate at 16 qubits (issue #76).
+        let adaptive = self.config.adaptive_state;
+        let result = parallel_executor.execute(circuit, state, |gate_op, state| {
+            self.apply_gate_op(gate_op, state)?;
+            if adaptive {
+                self.maybe_convert_state(state);
+            }
+            Ok(())
+        });
 
         // Put it back
         self.parallel_executor = parallel_executor;
@@ -206,12 +226,13 @@ impl ExecutionEngine {
         state: &mut AdaptiveState,
     ) -> Result<()> {
         let gate_name = gate_op.gate().name();
-        let start = Instant::now();
+        let collect = self.config.collect_telemetry;
+        let start = if collect { Some(Instant::now()) } else { None };
 
-        self.telemetry.inc_gate_type(gate_name);
-        self.telemetry
-            .log_event(format!("apply_gate:{}", gate_name));
-        self.telemetry.record_thread();
+        if collect {
+            self.telemetry.inc_gate_type(gate_name);
+            self.telemetry.record_thread();
+        }
 
         let mut attempts = 0;
 
@@ -220,21 +241,34 @@ impl ExecutionEngine {
 
             match self.apply_gate_op(gate_op, state) {
                 Ok(()) => {
-                    let elapsed = start.elapsed();
-                    self.telemetry.total_gate_time += elapsed;
-                    self.telemetry.per_gate_times.push(elapsed);
-                    self.telemetry.state_density.push(state.density());
+                    if let Some(start) = start {
+                        let elapsed = start.elapsed();
+                        self.telemetry.total_gate_time += elapsed;
+                        self.telemetry.per_gate_times.push(elapsed);
 
-                    // Record memory usage
-                    let mem_bytes = match state {
-                        AdaptiveState::Dense(ref dense) => {
-                            dense.dimension() * std::mem::size_of::<Complex64>()
-                        },
-                        AdaptiveState::Sparse {
-                            state: ref sparse, ..
-                        } => sparse.amplitudes().len() * std::mem::size_of::<Complex64>(),
-                    };
-                    self.telemetry.record_memory(mem_bytes);
+                        // Sparse states track density incrementally (O(1));
+                        // for dense states a density reading would be a full
+                        // O(2^n) scan per gate, which used to dominate large
+                        // simulations (issue #76) — record 1.0 instead.
+                        let density = match state {
+                            AdaptiveState::Sparse {
+                                state: ref sparse, ..
+                            } => sparse.density(),
+                            AdaptiveState::Dense(_) => 1.0,
+                        };
+                        self.telemetry.state_density.push(density);
+
+                        // Record memory usage
+                        let mem_bytes = match state {
+                            AdaptiveState::Dense(ref dense) => {
+                                dense.dimension() * std::mem::size_of::<Complex64>()
+                            },
+                            AdaptiveState::Sparse {
+                                state: ref sparse, ..
+                            } => sparse.amplitudes().len() * std::mem::size_of::<Complex64>(),
+                        };
+                        self.telemetry.record_memory(mem_bytes);
+                    }
 
                     return Ok(());
                 },
@@ -390,6 +424,72 @@ impl ExecutionEngine {
         let gate_name = gate.name();
         let num_qubits = qubits.len();
 
+        // Specialized kernels need no gate matrix at all — dispatch before
+        // touching the matrix cache (string key + Arc + matrix build per gate).
+        {
+            let amplitudes = state.amplitudes_mut();
+            match (num_qubits, gate_name) {
+                (1, "X" | "PauliX") => {
+                    single_qubit::apply_pauli_x(
+                        qubits[0].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                    return Ok(());
+                },
+                (1, "Z" | "PauliZ") => {
+                    single_qubit::apply_pauli_z(
+                        qubits[0].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                    return Ok(());
+                },
+                (1, "H" | "Hadamard") => {
+                    single_qubit::apply_hadamard(
+                        qubits[0].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                    return Ok(());
+                },
+                (2, "CNOT" | "CX") => {
+                    two_qubit::apply_cnot(
+                        qubits[0].index(),
+                        qubits[1].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                    return Ok(());
+                },
+                (2, "CZ") => {
+                    two_qubit::apply_cz(
+                        qubits[0].index(),
+                        qubits[1].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                    return Ok(());
+                },
+                (2, "SWAP") => {
+                    two_qubit::apply_swap(
+                        qubits[0].index(),
+                        qubits[1].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
+                    return Ok(());
+                },
+                _ => {},
+            }
+        }
+
         let cacheable = Self::is_fixed_matrix_gate(gate_name);
 
         let matrix = if cacheable {
@@ -433,94 +533,30 @@ impl ExecutionEngine {
 
         match num_qubits {
             1 => {
-                let qubit_idx = qubits[0].index();
-
+                // Specialized X/Z/H kernels were dispatched above; everything
+                // else (including diagonal gates, detected inside the kernel)
+                // goes through the general path.
                 if let CachedMatrix::Single(ref mat) = *matrix {
-                    // Check for special gates and use optimized implementations
-                    match gate_name {
-                        "X" | "PauliX" => {
-                            single_qubit::apply_pauli_x(
-                                qubit_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                        "Z" | "PauliZ" => {
-                            single_qubit::apply_pauli_z(
-                                qubit_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                        "H" | "Hadamard" => {
-                            single_qubit::apply_hadamard(
-                                qubit_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                        _ => {
-                            // General single-qubit gate
-                            single_qubit::apply_single_qubit_dense(
-                                mat,
-                                qubit_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                    }
+                    single_qubit::apply_single_qubit_dense(
+                        mat,
+                        qubits[0].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
                 }
             },
             2 => {
-                let qubit1_idx = qubits[0].index();
-                let qubit2_idx = qubits[1].index();
-
+                // Specialized CNOT/CZ/SWAP kernels were dispatched above.
                 if let CachedMatrix::Two(ref mat) = *matrix {
-                    // Check for special two-qubit gates
-                    match gate_name {
-                        "CNOT" | "CX" => {
-                            two_qubit::apply_cnot(
-                                qubit1_idx,
-                                qubit2_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                        "CZ" => {
-                            two_qubit::apply_cz(
-                                qubit1_idx,
-                                qubit2_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                        "SWAP" => {
-                            two_qubit::apply_swap(
-                                qubit1_idx,
-                                qubit2_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                        _ => {
-                            // General two-qubit gate
-                            two_qubit::apply_two_qubit_dense(
-                                mat,
-                                qubit1_idx,
-                                qubit2_idx,
-                                amplitudes,
-                                use_parallel,
-                                threshold,
-                            )?;
-                        },
-                    }
+                    two_qubit::apply_two_qubit_dense(
+                        mat,
+                        qubits[0].index(),
+                        qubits[1].index(),
+                        amplitudes,
+                        use_parallel,
+                        threshold,
+                    )?;
                 }
             },
             3 => {
@@ -643,6 +679,13 @@ impl ExecutionEngine {
             },
         }
 
+        // The kernels above mutate the amplitude map directly, bypassing the
+        // incremental density bookkeeping. Without this O(1) refresh the
+        // density reads as its initial value forever and the adaptive
+        // sparse→dense conversion never fires, leaving dense-in-practice
+        // states on the AHashMap path at ~2.5 ms/gate (issue #76).
+        state.update_density();
+
         Ok(())
     }
 
@@ -650,6 +693,17 @@ impl ExecutionEngine {
     /// configured thresholds (sparse → dense when dense enough, dense →
     /// sparse when it becomes very sparse again)
     fn maybe_convert_state(&mut self, state: &mut AdaptiveState) {
+        // The sparse→dense check is O(1) (sparse states track their density
+        // incrementally), but the dense→sparse check is a full O(2^n) scan.
+        // Run the expensive direction only every DENSITY_CHECK_INTERVAL gates.
+        if state.is_dense() {
+            self.gates_since_density_check += 1;
+            if self.gates_since_density_check < DENSITY_CHECK_INTERVAL {
+                return;
+            }
+            self.gates_since_density_check = 0;
+        }
+
         if state.is_sparse() && self.adaptive_strategy.should_convert_to_dense(state) {
             match state.force_to_dense() {
                 Ok(true) => {

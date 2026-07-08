@@ -1,13 +1,49 @@
 //! Single-qubit gate application kernels
+//!
+//! All kernels process the state in cache-sized blocks. Parallel execution
+//! splits the state into blocks of at least [`MIN_PAR_BLOCK`] amplitudes so
+//! rayon tasks stay coarse-grained: the old per-pair task splitting spent
+//! more time in fork/join than in the actual complex arithmetic (issue #76).
 
 use super::Matrix2x2;
 use crate::execution_engine::error::{ExecutionError, Result};
 use num_complex::Complex64;
 use rayon::prelude::*;
 
+/// Minimum amplitudes per rayon task (128 KiB of Complex64).
+///
+/// Below this, fork/join overhead dominates the memory-bound kernel work.
+pub(crate) const MIN_PAR_BLOCK: usize = 1 << 13;
+
+/// Whether a state of `n` amplitudes should be split into parallel blocks of
+/// `unit`-amplitude groups (`unit` = 2*stride for single-qubit gates).
+#[inline]
+pub(crate) fn par_block_len(n: usize, unit: usize) -> Option<usize> {
+    let block = unit.max(MIN_PAR_BLOCK);
+    // Require at least two blocks, otherwise parallelism buys nothing.
+    if n >= block * 2 {
+        Some(block)
+    } else {
+        None
+    }
+}
+
+#[inline]
+fn check_qubit(qubit: usize, n: usize) -> Result<usize> {
+    let num_qubits = n.trailing_zeros() as usize;
+    if qubit >= num_qubits {
+        return Err(ExecutionError::QubitOutOfBounds {
+            qubit: simq_core::QubitId::new(qubit),
+            max: num_qubits,
+        });
+    }
+    Ok(num_qubits)
+}
+
 /// Apply a single-qubit gate to a dense state vector
 ///
-/// This is the non-SIMD version that works on any architecture.
+/// Dispatches to a diagonal fast path when the matrix has zero off-diagonal
+/// elements (RZ, Phase, S, T, Z, ...), which halves the memory traffic.
 ///
 /// # Arguments
 ///
@@ -28,69 +64,96 @@ pub fn apply_single_qubit_dense(
     parallel_threshold: usize,
 ) -> Result<()> {
     let n = state.len();
-    let num_qubits = (n as f64).log2() as usize;
-
-    if qubit >= num_qubits {
-        return Err(ExecutionError::QubitOutOfBounds {
-            qubit: simq_core::QubitId::new(qubit),
-            max: num_qubits,
-        });
-    }
+    check_qubit(qubit, n)?;
 
     // Little-endian convention: qubit k corresponds to bit k of the state index.
-    // This matches the sparse kernels, the specialized X/Z/H kernels below, and
-    // the simq-state DenseState implementation.
     let stride = 1 << qubit;
 
-    // Validate gate matrix (optional in release builds)
     #[cfg(debug_assertions)]
     validate_gate_matrix(gate)?;
 
-    if use_parallel && n >= parallel_threshold {
-        apply_single_qubit_parallel(gate, stride, state);
-    } else {
-        apply_single_qubit_sequential(gate, stride, state);
+    // Diagonal fast path: no amplitude mixing, one multiply per amplitude.
+    if gate[0][1] == Complex64::ZERO && gate[1][0] == Complex64::ZERO {
+        return apply_diagonal(
+            [gate[0][0], gate[1][1]],
+            qubit,
+            state,
+            use_parallel,
+            parallel_threshold,
+        );
+    }
+
+    let parallel = use_parallel && n >= parallel_threshold;
+    match par_block_len(n, stride * 2).filter(|_| parallel) {
+        Some(block) => {
+            state
+                .par_chunks_mut(block)
+                .for_each(|chunk| apply_single_qubit_block(gate, stride, chunk));
+        },
+        None => apply_single_qubit_block(gate, stride, state),
     }
 
     Ok(())
 }
 
-/// Apply single-qubit gate sequentially
+/// Apply the gate to a block whose length is a multiple of `2 * stride`.
+///
+/// The zip over two disjoint sub-slices is bounds-check free and
+/// auto-vectorizes.
 #[inline]
-fn apply_single_qubit_sequential(gate: &Matrix2x2, stride: usize, state: &mut [Complex64]) {
-    let n = state.len();
-    let mut i = 0;
-
-    while i < n {
-        for j in 0..stride {
-            let idx0 = i + j;
-            let idx1 = idx0 + stride;
-
-            let a = state[idx0];
-            let b = state[idx1];
-
-            state[idx0] = gate[0][0] * a + gate[0][1] * b;
-            state[idx1] = gate[1][0] * a + gate[1][1] * b;
+fn apply_single_qubit_block(gate: &Matrix2x2, stride: usize, block: &mut [Complex64]) {
+    let [[g00, g01], [g10, g11]] = *gate;
+    for group in block.chunks_exact_mut(stride * 2) {
+        let (lo, hi) = group.split_at_mut(stride);
+        for (a, b) in lo.iter_mut().zip(hi.iter_mut()) {
+            let x = *a;
+            let y = *b;
+            *a = g00 * x + g01 * y;
+            *b = g10 * x + g11 * y;
         }
-        i += stride * 2;
     }
 }
 
-/// Apply single-qubit gate in parallel
+/// Apply a diagonal single-qubit gate diag(d0, d1)
 #[inline]
-fn apply_single_qubit_parallel(gate: &Matrix2x2, stride: usize, state: &mut [Complex64]) {
-    state.par_chunks_mut(stride * 2).for_each(|chunk| {
-        for j in 0..stride.min(chunk.len() - stride) {
-            let idx0 = j;
-            let idx1 = j + stride;
+fn apply_diagonal(
+    diag: [Complex64; 2],
+    qubit: usize,
+    state: &mut [Complex64],
+    use_parallel: bool,
+    parallel_threshold: usize,
+) -> Result<()> {
+    let n = state.len();
+    let stride = 1 << qubit;
+    let parallel = use_parallel && n >= parallel_threshold;
 
-            let a = chunk[idx0];
-            let b = chunk[idx1];
+    match par_block_len(n, stride * 2).filter(|_| parallel) {
+        Some(block) => {
+            state
+                .par_chunks_mut(block)
+                .for_each(|chunk| apply_diagonal_block(diag, stride, chunk));
+        },
+        None => apply_diagonal_block(diag, stride, state),
+    }
+    Ok(())
+}
 
-            chunk[idx0] = gate[0][0] * a + gate[0][1] * b;
-            chunk[idx1] = gate[1][0] * a + gate[1][1] * b;
+#[inline]
+fn apply_diagonal_block(diag: [Complex64; 2], stride: usize, block: &mut [Complex64]) {
+    let [d0, d1] = diag;
+    let one = Complex64::new(1.0, 0.0);
+    let scale_lo = d0 != one;
+    for group in block.chunks_exact_mut(stride * 2) {
+        let (lo, hi) = group.split_at_mut(stride);
+        if scale_lo {
+            for a in lo.iter_mut() {
+                *a *= d0;
+            }
         }
-    });
+        for b in hi.iter_mut() {
+            *b *= d1;
+        }
+    }
 }
 
 /// Validate that a gate matrix is unitary (in debug mode)
@@ -128,13 +191,6 @@ fn validate_gate_matrix(gate: &Matrix2x2) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(debug_assertions))]
-#[inline]
-#[allow(dead_code)]
-fn validate_gate_matrix(_gate: &Matrix2x2) -> Result<()> {
-    Ok(())
-}
-
 /// Apply a Pauli-X gate (optimized special case)
 pub fn apply_pauli_x(
     qubit: usize,
@@ -143,31 +199,20 @@ pub fn apply_pauli_x(
     parallel_threshold: usize,
 ) -> Result<()> {
     let n = state.len();
-    let num_qubits = (n as f64).log2() as usize;
-
-    if qubit >= num_qubits {
-        return Err(ExecutionError::QubitOutOfBounds {
-            qubit: simq_core::QubitId::new(qubit),
-            max: num_qubits,
-        });
-    }
-
+    check_qubit(qubit, n)?;
     let stride = 1 << qubit;
 
-    if use_parallel && n >= parallel_threshold {
-        state.par_chunks_mut(stride * 2).for_each(|chunk| {
-            for j in 0..stride.min(chunk.len() - stride) {
-                chunk.swap(j, j + stride);
-            }
-        });
-    } else {
-        let mut i = 0;
-        while i < n {
-            for j in 0..stride {
-                state.swap(i + j, i + j + stride);
-            }
-            i += stride * 2;
+    let x_block = |block: &mut [Complex64]| {
+        for group in block.chunks_exact_mut(stride * 2) {
+            let (lo, hi) = group.split_at_mut(stride);
+            lo.swap_with_slice(hi);
         }
+    };
+
+    let parallel = use_parallel && n >= parallel_threshold;
+    match par_block_len(n, stride * 2).filter(|_| parallel) {
+        Some(block) => state.par_chunks_mut(block).for_each(x_block),
+        None => x_block(state),
     }
 
     Ok(())
@@ -181,33 +226,21 @@ pub fn apply_pauli_z(
     parallel_threshold: usize,
 ) -> Result<()> {
     let n = state.len();
-    let num_qubits = (n as f64).log2() as usize;
-
-    if qubit >= num_qubits {
-        return Err(ExecutionError::QubitOutOfBounds {
-            qubit: simq_core::QubitId::new(qubit),
-            max: num_qubits,
-        });
-    }
-
+    check_qubit(qubit, n)?;
     let stride = 1 << qubit;
 
-    if use_parallel && n >= parallel_threshold {
-        state.par_chunks_mut(stride * 2).for_each(|chunk| {
-            for j in stride..stride * 2 {
-                if j < chunk.len() {
-                    chunk[j] = -chunk[j];
-                }
+    let z_block = |block: &mut [Complex64]| {
+        for group in block.chunks_exact_mut(stride * 2) {
+            for b in &mut group[stride..] {
+                *b = -*b;
             }
-        });
-    } else {
-        let mut i = 0;
-        while i < n {
-            for j in stride..stride * 2 {
-                state[i + j] = -state[i + j];
-            }
-            i += stride * 2;
         }
+    };
+
+    let parallel = use_parallel && n >= parallel_threshold;
+    match par_block_len(n, stride * 2).filter(|_| parallel) {
+        Some(block) => state.par_chunks_mut(block).for_each(z_block),
+        None => z_block(state),
     }
 
     Ok(())
@@ -221,40 +254,27 @@ pub fn apply_hadamard(
     parallel_threshold: usize,
 ) -> Result<()> {
     const SQRT_2_INV: f64 = std::f64::consts::FRAC_1_SQRT_2;
-    let factor = Complex64::new(SQRT_2_INV, 0.0);
 
     let n = state.len();
-    let num_qubits = (n as f64).log2() as usize;
-
-    if qubit >= num_qubits {
-        return Err(ExecutionError::QubitOutOfBounds {
-            qubit: simq_core::QubitId::new(qubit),
-            max: num_qubits,
-        });
-    }
-
+    check_qubit(qubit, n)?;
     let stride = 1 << qubit;
 
-    if use_parallel && n >= parallel_threshold {
-        state.par_chunks_mut(stride * 2).for_each(|chunk| {
-            for j in 0..stride.min(chunk.len() - stride) {
-                let a = chunk[j];
-                let b = chunk[j + stride];
-                chunk[j] = (a + b) * factor;
-                chunk[j + stride] = (a - b) * factor;
+    let h_block = |block: &mut [Complex64]| {
+        for group in block.chunks_exact_mut(stride * 2) {
+            let (lo, hi) = group.split_at_mut(stride);
+            for (a, b) in lo.iter_mut().zip(hi.iter_mut()) {
+                let x = *a;
+                let y = *b;
+                *a = (x + y) * SQRT_2_INV;
+                *b = (x - y) * SQRT_2_INV;
             }
-        });
-    } else {
-        let mut i = 0;
-        while i < n {
-            for j in 0..stride {
-                let a = state[i + j];
-                let b = state[i + j + stride];
-                state[i + j] = (a + b) * factor;
-                state[i + j + stride] = (a - b) * factor;
-            }
-            i += stride * 2;
         }
+    };
+
+    let parallel = use_parallel && n >= parallel_threshold;
+    match par_block_len(n, stride * 2).filter(|_| parallel) {
+        Some(block) => state.par_chunks_mut(block).for_each(h_block),
+        None => h_block(state),
     }
 
     Ok(())
@@ -319,6 +339,38 @@ mod tests {
         assert_abs_diff_eq!(state[1].re, sqrt_2_inv, epsilon = 1e-10);
     }
 
+    /// The diagonal fast path (RZ-like gate) must match the general kernel.
+    #[test]
+    fn test_diagonal_fast_path_matches_general() {
+        let theta: f64 = 0.7;
+        let rz: Matrix2x2 = [
+            [Complex64::from_polar(1.0, -theta / 2.0), Complex64::ZERO],
+            [Complex64::ZERO, Complex64::from_polar(1.0, theta / 2.0)],
+        ];
+
+        // A 4-qubit random-ish state
+        let mut state: Vec<Complex64> = (0..16)
+            .map(|i| Complex64::new(0.1 + i as f64 * 0.05, 0.02 * i as f64))
+            .collect();
+        let mut expected = state.clone();
+
+        // Reference: manual dense application
+        for (i, amp) in expected.iter_mut().enumerate() {
+            if i & 0b10 == 0 {
+                *amp *= rz[0][0];
+            } else {
+                *amp *= rz[1][1];
+            }
+        }
+
+        apply_single_qubit_dense(&rz, 1, &mut state, false, usize::MAX).unwrap();
+
+        for (got, want) in state.iter().zip(expected.iter()) {
+            assert_abs_diff_eq!(got.re, want.re, epsilon = 1e-12);
+            assert_abs_diff_eq!(got.im, want.im, epsilon = 1e-12);
+        }
+    }
+
     #[test]
     fn test_qubit_out_of_bounds() {
         let gate: Matrix2x2 = [
@@ -334,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_pauli_x_parallel() {
-        // threshold=0 forces parallel path
+        // threshold=0 forces the parallel branch selection logic
         let mut state = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
         apply_pauli_x(0, &mut state, true, 0).unwrap();
         assert_abs_diff_eq!(state[0].re, 0.0, epsilon = 1e-10);
@@ -396,6 +448,27 @@ mod tests {
         let sqrt_2_inv = std::f64::consts::FRAC_1_SQRT_2;
         assert_abs_diff_eq!(state[0].re, sqrt_2_inv, epsilon = 1e-10);
         assert_abs_diff_eq!(state[1].re, sqrt_2_inv, epsilon = 1e-10);
+    }
+
+    /// Large state: parallel and sequential kernels must agree bit-for-bit.
+    #[test]
+    fn test_parallel_matches_sequential_large_state() {
+        let ry: Matrix2x2 = [
+            [Complex64::new(0.8, 0.0), Complex64::new(-0.6, 0.0)],
+            [Complex64::new(0.6, 0.0), Complex64::new(0.8, 0.0)],
+        ];
+        let n = 1 << 15;
+        let base: Vec<Complex64> = (0..n)
+            .map(|i| Complex64::new((i as f64).sin(), (i as f64).cos()) / (n as f64).sqrt())
+            .collect();
+
+        for qubit in [0usize, 3, 7, 14] {
+            let mut seq = base.clone();
+            let mut par = base.clone();
+            apply_single_qubit_dense(&ry, qubit, &mut seq, false, usize::MAX).unwrap();
+            apply_single_qubit_dense(&ry, qubit, &mut par, true, 0).unwrap();
+            assert_eq!(seq, par, "qubit {} mismatch", qubit);
+        }
     }
 
     #[cfg(debug_assertions)]

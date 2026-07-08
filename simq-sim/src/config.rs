@@ -22,9 +22,11 @@ pub struct SimulatorConfig {
     /// Minimum number of qubits to enable parallel execution
     ///
     /// Circuits with fewer qubits use single-threaded execution to avoid
-    /// synchronization overhead.
+    /// synchronization overhead. Gate kernels are memory-bound, so rayon
+    /// fork/join only pays for itself once the state vector is several MiB;
+    /// below that, single-threaded cache-blocked kernels are faster.
     ///
-    /// Default: 8
+    /// Default: 18
     pub parallel_threshold: usize,
 
     /// Number of measurement shots for sampling
@@ -79,7 +81,7 @@ impl Default for SimulatorConfig {
     fn default() -> Self {
         Self {
             sparse_threshold: 0.1,
-            parallel_threshold: 8,
+            parallel_threshold: 18,
             shots: 1024,
             optimize_circuit: true,
             optimization_level: 2,
@@ -101,12 +103,10 @@ impl SimulatorConfig {
     ///
     /// - Aggressive optimization (O3)
     /// - No statistics collection
-    /// - Lower parallel threshold
     pub fn fast() -> Self {
         Self {
             optimization_level: 3,
             collect_statistics: false,
-            parallel_threshold: 6,
             ..Default::default()
         }
     }
@@ -220,7 +220,7 @@ mod tests {
     fn test_default_config() {
         let config = SimulatorConfig::default();
         assert_eq!(config.sparse_threshold, 0.1);
-        assert_eq!(config.parallel_threshold, 8);
+        assert_eq!(config.parallel_threshold, 18);
         assert_eq!(config.shots, 1024);
         assert!(config.optimize_circuit);
         assert_eq!(config.optimization_level, 2);
@@ -231,7 +231,7 @@ mod tests {
         let config = SimulatorConfig::fast();
         assert_eq!(config.optimization_level, 3);
         assert!(!config.collect_statistics);
-        assert_eq!(config.parallel_threshold, 6);
+        assert_eq!(config.parallel_threshold, 18);
     }
 
     #[test]
