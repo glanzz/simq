@@ -1,13 +1,13 @@
 ---
 myst:
   html_meta:
-    description: "Variational algorithms with SimQ — Pauli observables, exact expectation values, gradients, built-in optimizers, and VQE/QAOA helpers."
+    description: "Variational algorithms with Ferriq — Pauli observables, exact expectation values, gradients, built-in optimizers, and VQE/QAOA helpers."
 ---
 
 # Observables, VQE & QAOA
 
-SimQ is built for variational algorithms: exact expectation values are one
-call away, gradients come built in, and `simq-sim` ships classical
+Ferriq is built for variational algorithms: exact expectation values are one
+call away, gradients come built in, and `ferriq-sim` ships classical
 optimizers plus VQE/QAOA circuit helpers.
 
 ## Pauli observables
@@ -15,7 +15,7 @@ optimizers plus VQE/QAOA circuit helpers.
 Hamiltonians are sums of weighted Pauli strings:
 
 ```rust
-use simq::{PauliObservable, PauliString};
+use ferriq::{PauliObservable, PauliString};
 
 // H = 1.0 * Z
 let h = PauliObservable::from_pauli_string(
@@ -31,7 +31,7 @@ let zz = PauliObservable::from_pauli_string(
 An energy function for VQE is a few lines:
 
 ```rust
-use simq::{PauliObservable, PauliString, QuantumCircuit};
+use ferriq::{PauliObservable, PauliString, QuantumCircuit};
 
 let hamiltonian = PauliObservable::from_pauli_string(
     PauliString::from_str("Z").unwrap(), 1.0);
@@ -46,12 +46,12 @@ let energy = |theta: f64| {
 
 ## A complete VQE loop
 
-The runnable example `simq/examples/vqe_fluent.rs` optimizes RY(θ)|0⟩
+The runnable example `ferriq/examples/vqe_fluent.rs` optimizes RY(θ)|0⟩
 against H = Z with gradient descent and converges to the ground state
 energy −1 at θ = π:
 
 ```bash
-cargo run -p simq --example vqe_fluent
+cargo run -p ferriq --example vqe_fluent
 ```
 
 The core of the loop is nothing more than the energy function above plus a
@@ -66,7 +66,7 @@ Exact gate matrices make finite differences reliable at any angle.
 
 ## Gradient methods
 
-The `simq_sim::gradient` module provides several strategies:
+The `ferriq_sim::gradient` module provides several strategies:
 
 | Method | Module | Notes |
 |--------|--------|-------|
@@ -76,22 +76,22 @@ The `simq_sim::gradient` module provides several strategies:
 | Reverse-mode autodiff | `autodiff` (`ReverseTape`, `HybridAD`) | Scales to many parameters |
 | Batch evaluation | `batch`, `batch_advanced` | Parallel energy/gradient batches, grid search, importance sampling |
 
-`gradient_fallback.rs` (in `simq-sim/examples/`) shows how methods degrade
+`gradient_fallback.rs` (in `ferriq-sim/examples/`) shows how methods degrade
 gracefully when a gate has no analytic rule.
 
 ## Classical optimizers
 
-`simq_sim::gradient::classical_optimizers` includes ready-made
+`ferriq_sim::gradient::classical_optimizers` includes ready-made
 implementations of **L-BFGS** (`LBFGSOptimizer`) and **Nelder–Mead**
 (`NelderMeadOptimizer`), each with a config struct. Convergence monitoring
 lives in `gradient::convergence` (`ConvergenceMonitor`,
 `StoppingCriterion`, `BestTracker`) — see
-`simq-sim/examples/convergence_monitoring.rs` and
+`ferriq-sim/examples/convergence_monitoring.rs` and
 `optimizer_comparison.rs`.
 
 ## VQE / QAOA circuit helpers
 
-`simq_sim` also provides ansatz constructors:
+`ferriq_sim` also provides ansatz constructors:
 
 - `vqe_hardware_efficient_ansatz(num_qubits, params)` — the standard
   hardware-efficient layered ansatz
@@ -101,7 +101,7 @@ lives in `gradient::convergence` (`ConvergenceMonitor`,
 
 | Example | Run with |
 |---------|----------|
-| H₂ molecule ground state (VQE) | `cargo run -p simq-sim --example vqe_h2_molecule` |
-| MaxCut (QAOA) | `cargo run -p simq-sim --example qaoa_maxcut` |
-| Comprehensive QAOA workflow | `cargo run -p simq-sim --example qaoa_comprehensive` |
-| Optimizer comparison | `cargo run -p simq-sim --example optimizer_comparison` |
+| H₂ molecule ground state (VQE) | `cargo run -p ferriq-sim --example vqe_h2_molecule` |
+| MaxCut (QAOA) | `cargo run -p ferriq-sim --example qaoa_maxcut` |
+| Comprehensive QAOA workflow | `cargo run -p ferriq-sim --example qaoa_comprehensive` |
+| Optimizer comparison | `cargo run -p ferriq-sim --example optimizer_comparison` |

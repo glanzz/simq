@@ -1,17 +1,17 @@
 ---
 myst:
   html_meta:
-    description: "SimQ Python API reference — circuits, gates, simulator, noise models, compiler, backends, and visualization from the simq package."
+    description: "Ferriq Python API reference — circuits, gates, simulator, noise models, compiler, backends, and visualization from the ferriq package."
 ---
 
 # Python API reference
 
-The `simq` package is a PyO3 extension built from the Rust core, plus thin
+The `ferriq` package is a PyO3 extension built from the Rust core, plus thin
 pure-Python layers for gates, noise, simulation, and visualization. This
 page maps the public surface; docstrings on each class/function carry the
-details (`help(simq.CircuitBuilder)`).
+details (`help(ferriq.CircuitBuilder)`).
 
-## Core types (`simq`)
+## Core types (`ferriq`)
 
 | Name | Description |
 |------|-------------|
@@ -25,7 +25,7 @@ details (`help(simq.CircuitBuilder)`).
 `QuantumException` (base), `InvalidQubitError`, `InvalidGateError`,
 `InvalidParameterError`.
 
-## Gates (`simq.gates`)
+## Gates (`ferriq.gates`)
 
 Gate classes and lowercase factory functions, mirroring the Rust standard
 gate set:
@@ -43,7 +43,7 @@ gate set:
 - **Custom**: `CustomGate` / `custom(qubits, matrix, name=None)` — any
   unitary from a NumPy matrix
 
-## Simulation (`simq.simulation`, re-exported at top level)
+## Simulation (`ferriq.simulation`, re-exported at top level)
 
 | Name | Description |
 |------|-------------|
@@ -51,7 +51,7 @@ gate set:
 | `SimulatorConfig(shots=..., noise_model=..., seed=..., ...)` | Simulation options |
 | `SimulationResult` | `state_vector`, probabilities, measurement counts |
 
-## Noise (`simq.noise`, re-exported at top level)
+## Noise (`ferriq.noise`, re-exported at top level)
 
 `DepolarizingChannel`, `AmplitudeDamping`, `PhaseDamping`, `ReadoutError`,
 and `HardwareNoiseModel` (with `add_gate_error(gate_name, channel)`). See
@@ -68,7 +68,7 @@ passes and inspect circuit metrics from Python.
 `IBMConfig` / `IBMQuantumBackend` for IBM Quantum, plus `BackendResult`,
 `JobStatus`, and `BackendType`.
 
-## Visualization (`simq.visualization`)
+## Visualization (`ferriq.visualization`)
 
 | Function | Description |
 |----------|-------------|

@@ -1,6 +1,6 @@
 # Configuration file for the Sphinx documentation builder.
 #
-# This builds the project-wide SimQ documentation site (Rust workspace +
+# This builds the project-wide Ferriq documentation site (Rust workspace +
 # Python bindings). It is deployed to GitHub Pages by
 # .github/workflows/docs.yml.
 #
@@ -8,9 +8,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = "SimQ"
-copyright = "2025, SimQ Contributors"
-author = "SimQ Contributors"
+project = "Ferriq"
+copyright = "2025, Ferriq Contributors"
+author = "Ferriq Contributors"
 release = "0.1.0"
 version = "0.1"
 
@@ -49,8 +49,8 @@ highlight_language = "rust"
 # -- Options for HTML output -------------------------------------------------
 
 html_theme = "furo"
-html_title = "SimQ — High-Performance Quantum Computing SDK"
-html_short_title = "SimQ"
+html_title = "Ferriq — High-Performance Quantum Computing SDK"
+html_short_title = "Ferriq"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 html_favicon = "_static/favicon.svg"
@@ -59,7 +59,7 @@ html_logo = "_static/logo.svg"
 # Canonical base URL of the deployed site (GitHub Pages). Required by
 # sphinx-sitemap and used to emit <link rel="canonical"> tags — both matter
 # for search-engine indexing.
-html_baseurl = "https://glanzz.github.io/simq/"
+html_baseurl = "https://glanzz.github.io/ferriq/"
 
 # GitHub Pages serves files starting with underscores only if Jekyll
 # processing is disabled; the deploy workflow adds .nojekyll, but keep the
@@ -68,7 +68,7 @@ html_copy_source = False
 html_show_sourcelink = False
 
 html_theme_options = {
-    "source_repository": "https://github.com/glanzz/simq",
+    "source_repository": "https://github.com/glanzz/ferriq",
     "source_branch": "main",
     "source_directory": "docs/source/",
     "light_css_variables": {
@@ -82,7 +82,7 @@ html_theme_options = {
     "footer_icons": [
         {
             "name": "GitHub",
-            "url": "https://github.com/glanzz/simq",
+            "url": "https://github.com/glanzz/ferriq",
             "html": (
                 '<svg stroke="currentColor" fill="currentColor" stroke-width="0"'
                 ' viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 0C3.58 0 0'
@@ -114,8 +114,8 @@ sitemap_excludes = ["search.html", "genindex.html"]
 
 # -- sphinxext-opengraph (SEO / social cards) --------------------------------
 
-ogp_site_url = "https://glanzz.github.io/simq/"
-ogp_site_name = "SimQ Documentation"
+ogp_site_url = "https://glanzz.github.io/ferriq/"
+ogp_site_name = "Ferriq Documentation"
 ogp_description_length = 200
 ogp_type = "website"
 ogp_enable_meta_description = True

@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="490" viewBox="0 0 880 490" role="img" aria-label="SimQ speedup over Qiskit per workload, log scale">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="490" viewBox="0 0 880 490" role="img" aria-label="Ferriq speedup over Qiskit per workload, log scale">
 <rect width="880" height="490" fill="#fcfcfb" rx="8"/>
-<text x="190" y="30" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="15" font-weight="600" fill="#0b0b0b">SimQ speedup over Qiskit — one variational/sampling iteration</text>
-<text x="190" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">Speedup = Qiskit time ÷ SimQ time (log scale) · GHZ rows include 1024 shots · Qiskit 2.5.0 / Aer 0.17.2</text>
+<text x="190" y="30" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="15" font-weight="600" fill="#0b0b0b">Ferriq speedup over Qiskit — one variational/sampling iteration</text>
+<text x="190" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">Speedup = Qiskit time ÷ Ferriq time (log scale) · GHZ rows include 1024 shots · Qiskit 2.5.0 / Aer 0.17.2</text>
 <circle cx="195" cy="68" r="5" fill="#2a78d6"/>
 <text x="205" y="72" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">vs Qiskit Statevector</text>
 <circle cx="355" cy="68" r="5" fill="#1baf7a"/>
@@ -17,7 +17,7 @@
 <line x1="810.3" y1="96" x2="810.3" y2="426" stroke="#e1e0d9" stroke-width="1"/>
 <text x="810.3" y="444" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">1000×</text>
 <text x="282.3" y="462" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">← Qiskit faster</text>
-<text x="546.3" y="462" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">SimQ faster →</text>
+<text x="546.3" y="462" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781" text-anchor="middle">Ferriq faster →</text>
 <text x="12" y="115.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#0b0b0b">VQE energy</text>
 <text x="178" y="115.0" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e" text-anchor="end">4 qubits</text>
 <line x1="622.9" y1="111.0" x2="623.9" y2="111.0" stroke="#e1e0d9" stroke-width="1"/>

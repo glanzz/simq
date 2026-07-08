@@ -1,10 +1,10 @@
 ---
 myst:
   html_meta:
-    description: "Contribute to SimQ — development environment setup, workspace layout, coding standards, commit conventions, and the pull-request workflow."
+    description: "Contribute to Ferriq — development environment setup, workspace layout, coding standards, commit conventions, and the pull-request workflow."
 ---
 
-# Contributing to SimQ
+# Contributing to Ferriq
 
 Contributions are welcome — bug reports, docs, examples, optimization
 passes, new gates, backends, you name it. This guide gets you from clone to
@@ -23,25 +23,25 @@ merged PR.
 ### Clone and build
 
 ```bash
-git clone https://github.com/glanzz/simq.git
-cd simq
+git clone https://github.com/glanzz/ferriq.git
+cd ferriq
 
 # Build everything except the Python extension
-cargo build --workspace --exclude simq-py
+cargo build --workspace --exclude ferriq-py
 
 # Run the test suite
-cargo test --workspace --exclude simq-py
+cargo test --workspace --exclude ferriq-py
 ```
 
 ```{note}
-`simq-py` is a PyO3 extension module and cannot be linked by a plain
+`ferriq-py` is a PyO3 extension module and cannot be linked by a plain
 `cargo build` — build it with maturin instead (below).
 ```
 
 ### Python bindings setup
 
 ```bash
-cd simq-py
+cd ferriq-py
 pip install -e ".[dev]"
 maturin develop
 pytest
@@ -53,7 +53,7 @@ pytest
    descriptive name (`gate_fusion_fix`, `docs-vqe-guide`, ...).
 2. **Find the right crate** — the
    [architecture overview](../architecture/index.md) maps responsibilities.
-   Types shared by several crates belong in `simq-core`.
+   Types shared by several crates belong in `ferriq-core`.
 3. **Write tests first (or at least alongside)** — see
    [Testing](testing.md). Every crate has unit tests plus `tests/`
    integration suites; optimization passes need semantic-equivalence tests.
@@ -69,8 +69,8 @@ CI runs these exact checks — run them locally first:
 ```bash
 cargo fmt -- --check                                             # formatting
 cargo clippy --all-targets --all-features -- -D warnings         # lints
-cargo build --verbose --all-features --workspace --exclude simq-py
-cargo test  --workspace --exclude simq-py
+cargo build --verbose --all-features --workspace --exclude ferriq-py
+cargo test  --workspace --exclude ferriq-py
 ```
 
 Formatting is governed by the checked-in `rustfmt.toml`, lints by
@@ -79,7 +79,7 @@ Formatting is governed by the checked-in `rustfmt.toml`, lints by
 For Python changes:
 
 ```bash
-cd simq-py && maturin develop && pytest
+cd ferriq-py && maturin develop && pytest
 ```
 
 ## Pull requests
@@ -92,10 +92,10 @@ cd simq-py && maturin develop && pytest
 
 ## Performance-sensitive code
 
-SimQ's value proposition is speed, so:
+Ferriq's value proposition is speed, so:
 
 - Avoid allocation in hot loops (`smallvec` is available workspace-wide).
-- Preserve SIMD paths — check `simq-state`/`simq-gates` kernels before
+- Preserve SIMD paths — check `ferriq-state`/`ferriq-gates` kernels before
   touching state application code.
 - Never regress the compile-time caching guarantees
   ([details](../guide/gates-caching.md)) — cached matrices must remain
@@ -105,6 +105,6 @@ SimQ's value proposition is speed, so:
 ## License
 
 By contributing you agree that your work is dual-licensed under
-[MIT](https://github.com/glanzz/simq/blob/main/LICENSE-MIT) and
-[Apache-2.0](https://github.com/glanzz/simq/blob/main/LICENSE-APACHE),
+[MIT](https://github.com/glanzz/ferriq/blob/main/LICENSE-MIT) and
+[Apache-2.0](https://github.com/glanzz/ferriq/blob/main/LICENSE-APACHE),
 like the rest of the project.

@@ -1,4 +1,4 @@
-| Workload | SimQ | Qiskit Statevector | Qiskit Aer | vs Statevector | vs Aer |
+| Workload | Ferriq | Qiskit Statevector | Qiskit Aer | vs Statevector | vs Aer |
 |---|---|---|---|---|---|
 | `vqe_energy/4q` | 0.047 ms | 1.770 ms | 1.801 ms | **38.1× faster** | **38.7× faster** |
 | `vqe_energy/8q` | 0.652 ms | 3.867 ms | 2.924 ms | **5.9× faster** | **4.5× faster** |

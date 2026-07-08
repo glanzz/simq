@@ -10,57 +10,57 @@
   },
   "timings_ms": {
     "vqe_energy/4q": {
-      "simq": 0.046506290724599705,
+      "ferriq": 0.046506290724599705,
       "qiskit_statevector": 1.7697190344827913,
       "qiskit_aer": 1.8008529420286512
     },
     "vqe_energy/8q": {
-      "simq": 0.6517719953174266,
+      "ferriq": 0.6517719953174266,
       "qiskit_statevector": 3.866963379629674,
       "qiskit_aer": 2.9240337428572754
     },
     "vqe_energy/12q": {
-      "simq": 14.6999375525,
+      "ferriq": 14.6999375525,
       "qiskit_statevector": 7.622189060000437,
       "qiskit_aer": 5.651948699999464
     },
     "vqe_energy/16q": {
-      "simq": 385.32225845999994,
+      "ferriq": 385.32225845999994,
       "qiskit_statevector": 120.39241233333087,
       "qiskit_aer": 17.611223727271863
     },
     "qaoa_maxcut/4q": {
-      "simq": 0.033037541437835945,
+      "ferriq": 0.033037541437835945,
       "qiskit_statevector": 1.1265556805968646,
       "qiskit_aer": 1.4619135525420508
     },
     "qaoa_maxcut/8q": {
-      "simq": 0.5113974877229398,
+      "ferriq": 0.5113974877229398,
       "qiskit_statevector": 2.361259082872569,
       "qiskit_aer": 2.2207989891303788
     },
     "qaoa_maxcut/12q": {
-      "simq": 11.649443384000001,
+      "ferriq": 11.649443384000001,
       "qiskit_statevector": 4.628471068180964,
       "qiskit_aer": 4.131468176469708
     },
     "qaoa_maxcut/16q": {
-      "simq": 310.47363881,
+      "ferriq": 310.47363881,
       "qiskit_statevector": 72.24414079998951,
       "qiskit_aer": 10.213602108110168
     },
     "ghz_sampling/10q": {
-      "simq": 0.04519368173611207,
+      "ferriq": 0.04519368173611207,
       "qiskit_statevector": 4.925751324999794,
       "qiskit_aer": 2.0966947425148796
     },
     "ghz_sampling/16q": {
-      "simq": 0.6714022980304777,
+      "ferriq": 0.6714022980304777,
       "qiskit_statevector": 634.2679210000597,
       "qiskit_aer": 4.496825164383216
     },
     "ghz_sampling/20q": {
-      "simq": 42.69169430909398,
+      "ferriq": 42.69169430909398,
       "qiskit_statevector": 15881.479670999965,
       "qiskit_aer": 36.56171600000975
     }

@@ -1,0 +1,27 @@
+[package]
+name = "ferriq"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "High-performance quantum computing SDK in Rust"
+
+[dependencies]
+ferriq-core.workspace = true
+ferriq-state.workspace = true
+ferriq-gates.workspace = true
+ferriq-compiler.workspace = true
+ferriq-sim.workspace = true
+ferriq-backend.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "end_to_end"
+harness = false

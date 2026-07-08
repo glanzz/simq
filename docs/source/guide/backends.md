@@ -1,12 +1,12 @@
 ---
 myst:
   html_meta:
-    description: "Running SimQ circuits on real hardware — the QuantumBackend trait, IBM Quantum backend, transpiler, routing, and backend selection."
+    description: "Running Ferriq circuits on real hardware — the QuantumBackend trait, IBM Quantum backend, transpiler, routing, and backend selection."
 ---
 
 # Hardware backends
 
-`simq-backend` abstracts over execution targets so the same circuit runs on
+`ferriq-backend` abstracts over execution targets so the same circuit runs on
 the local simulator or a real quantum computer.
 
 ## The `QuantumBackend` trait
@@ -20,13 +20,13 @@ Implementations in-tree:
 
 | Backend | Module | Notes |
 |---------|--------|-------|
-| Local simulator | `local_simulator` | Wraps `simq-sim`; the default |
+| Local simulator | `local_simulator` | Wraps `ferriq-sim`; the default |
 | IBM Quantum | `ibm_quantum` | Submits jobs to IBM Quantum services |
 
 ## IBM Quantum
 
 ```rust
-use simq_backend::ibm_quantum::{IBMConfig, IBMQuantumBackend};
+use ferriq_backend::ibm_quantum::{IBMConfig, IBMQuantumBackend};
 
 let config = IBMConfig::new(std::env::var("IBM_API_TOKEN")?);
 let backend = IBMQuantumBackend::new(config, "ibm_brisbane")?;
@@ -62,6 +62,6 @@ simulator locally and hardware in production.
 
 ## From Python
 
-The Python bindings expose backend support through `simq`'s compiled core
-(see `simq-py/src/backend/`), including IBM Quantum access. The interface
+The Python bindings expose backend support through `ferriq`'s compiled core
+(see `ferriq-py/src/backend/`), including IBM Quantum access. The interface
 mirrors the Rust API.

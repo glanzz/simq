@@ -1,12 +1,12 @@
 ---
 myst:
   html_meta:
-    description: "Building quantum circuits in SimQ — the fluent QuantumCircuit API, const-generic and dynamic builders, validation, and circuit visualization."
+    description: "Building quantum circuits in Ferriq — the fluent QuantumCircuit API, const-generic and dynamic builders, validation, and circuit visualization."
 ---
 
 # Building circuits
 
-SimQ offers three ways to build circuits, from ergonomic to maximally
+Ferriq offers three ways to build circuits, from ergonomic to maximally
 type-safe. All of them produce the same `Circuit` value that the simulator,
 compiler, and backends consume.
 
@@ -16,7 +16,7 @@ The recommended entry point for most code. Gate methods chain, and errors
 are deferred — nothing panics mid-chain:
 
 ```rust
-use simq::QuantumCircuit;
+use ferriq::QuantumCircuit;
 
 let mut qc = QuantumCircuit::new(3);
 qc.h(0)
@@ -49,7 +49,7 @@ gives you typed qubit references, so out-of-range qubits are impossible to
 even name:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 let mut builder = CircuitBuilder::<4>::new();
 let [q0, q1, q2, q3] = builder.qubits();
@@ -64,41 +64,41 @@ let circuit = builder.build();
 at run time, and `Circuit` itself exposes the lowest-level API:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 let mut circuit = Circuit::new(2);
 circuit.add_gate(Arc::new(Hadamard), &[QubitId::new(0)])?;
 circuit.add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(1)])?;
-# Ok::<(), simq::QuantumError>(())
+# Ok::<(), ferriq::QuantumError>(())
 ```
 
 ## Validation
 
-`simq-core` ships a circuit validation module that checks structural
+`ferriq-core` ships a circuit validation module that checks structural
 invariants (qubit bounds, gate arity, connectivity constraints where
 applicable) before execution. The builders run these checks for you; if you
 construct circuits by hand, run validation explicitly — see
-`simq-core/examples/circuit_validation.rs`.
+`ferriq-core/examples/circuit_validation.rs`.
 
 ## Visualization and debugging
 
 - **ASCII rendering** — `qc.to_ascii()` or the `ascii_renderer` module
-  (`simq-core/examples/ascii_circuit.rs`)
+  (`ferriq-core/examples/ascii_circuit.rs`)
 - **LaTeX rendering** — `latex_renderer` produces publication-quality
   circuit diagrams
 - **Bloch sphere** — `bloch_sphere` visualizes single-qubit states
-  (`simq-core/examples/bloch_sphere.rs`)
+  (`ferriq-core/examples/bloch_sphere.rs`)
 - **Circuit debugger** — step through a circuit gate by gate and inspect
-  intermediate states (`simq-core/examples/circuit_debugger.rs`)
+  intermediate states (`ferriq-core/examples/circuit_debugger.rs`)
 
 ## Serialization
 
 Circuits serialize to/from JSON via `serde` — see the `serialization`
-module and `simq-core/examples/circuit_serialization.rs`.
+module and `ferriq-core/examples/circuit_serialization.rs`.
 
 ## Parameterized circuits
 
 Rotation gates accept `f64` angles directly. For symbolic parameters that
-you bind later (parameter sweeps, VQE), `simq-core` provides `Parameter`,
+you bind later (parameter sweeps, VQE), `ferriq-core` provides `Parameter`,
 `ParameterId`, and a `ParameterRegistry`; see
-`simq-core/examples/parameter_tracking.rs`.
+`ferriq-core/examples/parameter_tracking.rs`.

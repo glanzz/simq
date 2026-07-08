@@ -1,26 +1,26 @@
-# SimQ - High-Performance Quantum Computing SDK
+# Ferriq - High-Performance Quantum Computing SDK
 
-[![Coverage Status](https://coveralls.io/repos/github/glanzz/simq/badge.svg?branch=main)](https://coveralls.io/github/glanzz/simq?branch=main)
-[![Docs Site](https://github.com/glanzz/simq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/simq/)
+[![Coverage Status](https://coveralls.io/repos/github/glanzz/ferriq/badge.svg?branch=main)](https://coveralls.io/github/glanzz/ferriq?branch=main)
+[![Docs Site](https://github.com/glanzz/ferriq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/ferriq/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-**SimQ** is a fast quantum computing SDK written in Rust, built for variational-algorithm loops: measured **4-45× faster than Qiskit** (Statevector *and* Aer) for VQE/QAOA energy evaluations up to ~10 qubits, with type safety and ergonomic APIs. Every performance number we quote is reproducible with one command — see [Performance](#performance) below and [BENCHMARKS.md](BENCHMARKS.md) for the full, warts-and-all comparison.
+**Ferriq** is a fast quantum computing SDK written in Rust, built for variational-algorithm loops: measured **4-45× faster than Qiskit** (Statevector *and* Aer) for VQE/QAOA energy evaluations up to ~10 qubits, with type safety and ergonomic APIs. Every performance number we quote is reproducible with one command — see [Performance](#performance) below and [BENCHMARKS.md](BENCHMARKS.md) for the full, warts-and-all comparison.
 
 ## Documentation
 
-The full documentation lives at **[glanzz.github.io/simq](https://glanzz.github.io/simq/)**:
+The full documentation lives at **[glanzz.github.io/ferriq](https://glanzz.github.io/ferriq/)**:
 
 | Section | What's there |
 |---------|--------------|
-| [Installation](https://glanzz.github.io/simq/getting-started/installation.html) | Rust crate setup and Python bindings via maturin |
-| [Quickstart (Rust)](https://glanzz.github.io/simq/getting-started/quickstart-rust.html) | Your first circuit in five minutes |
-| [Quickstart (Python)](https://glanzz.github.io/simq/getting-started/quickstart-python.html) | The Python API tour |
-| [User guide](https://glanzz.github.io/simq/guide/circuits.html) | Circuits, simulation, VQE/QAOA, compiler, noise, backends |
-| [Examples](https://glanzz.github.io/simq/examples/) | Every runnable example in the workspace, catalogued |
-| [Architecture](https://glanzz.github.io/simq/architecture/) | How the eight crates fit together |
-| [Contributing](https://glanzz.github.io/simq/contributing/) | Dev setup, testing, and the PR workflow |
+| [Installation](https://glanzz.github.io/ferriq/getting-started/installation.html) | Rust crate setup and Python bindings via maturin |
+| [Quickstart (Rust)](https://glanzz.github.io/ferriq/getting-started/quickstart-rust.html) | Your first circuit in five minutes |
+| [Quickstart (Python)](https://glanzz.github.io/ferriq/getting-started/quickstart-python.html) | The Python API tour |
+| [User guide](https://glanzz.github.io/ferriq/guide/circuits.html) | Circuits, simulation, VQE/QAOA, compiler, noise, backends |
+| [Examples](https://glanzz.github.io/ferriq/examples/) | Every runnable example in the workspace, catalogued |
+| [Architecture](https://glanzz.github.io/ferriq/architecture/) | How the eight crates fit together |
+| [Contributing](https://glanzz.github.io/ferriq/contributing/) | Dev setup, testing, and the PR workflow |
 
-Rust API reference: `cargo doc --workspace --exclude simq-py --no-deps --open` locally (docs.rs will host it once the crate is published — see the note in [Quick Start](#quick-start)).
+Rust API reference: `cargo doc --workspace --exclude ferriq-py --no-deps --open` locally (docs.rs will host it once the crate is published — see the note in [Quick Start](#quick-start)).
 
 ## Features
 
@@ -36,17 +36,17 @@ Rust API reference: `cargo doc --workspace --exclude simq-py --no-deps --open` l
 ## Performance
 
 Measured on the workloads that matter for variational algorithms — one full
-build-simulate-measure iteration, cross-validated so SimQ and Qiskit provably
+build-simulate-measure iteration, cross-validated so Ferriq and Qiskit provably
 run identical circuits:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results/2026-07-08/chart-dark.svg">
-  <img alt="SimQ speedup over Qiskit per workload, log scale" src="benchmarks/results/2026-07-08/chart-light.svg">
+  <img alt="Ferriq speedup over Qiskit per workload, log scale" src="benchmarks/results/2026-07-08/chart-light.svg">
 </picture>
 
-SimQ wins big in the small-circuit regime where variational loops spend
+Ferriq wins big in the small-circuit regime where variational loops spend
 thousands of iterations; Qiskit Aer is currently faster above ~12 qubits
-(that gap is tracked in [#76](https://github.com/glanzz/simq/issues/76) —
+(that gap is tracked in [#76](https://github.com/glanzz/ferriq/issues/76) —
 we publish both sides). Exact circuits, qubit counts, hardware, versions,
 and methodology: **[BENCHMARKS.md](BENCHMARKS.md)**. Reproduce on your
 machine with one command:
@@ -57,22 +57,22 @@ machine with one command:
 
 ## Quick Start
 
-Add SimQ to your `Cargo.toml` as a git dependency:
+Add Ferriq to your `Cargo.toml` as a git dependency:
 
 ```toml
 [dependencies]
-simq = { git = "https://github.com/glanzz/simq" }
+ferriq = { git = "https://github.com/glanzz/ferriq" }
 ```
 
-> **Why not `simq = "0.1"`?** The `simq` name on crates.io is taken by an
-> unrelated job-queue crate, so installing from crates.io will *not* give
-> you this library. Until SimQ is published under its own crate name, use
-> the git dependency above.
+> **Why the git dependency?** Ferriq isn't on crates.io quite yet — the
+> git dependency is the supported install path until `cargo add ferriq`
+> lands. (Ferriq was briefly known as SimQ; it was renamed because the
+> `simq` name on crates.io and PyPI belongs to unrelated projects.)
 
 Create your first quantum circuit:
 
 ```rust
-use simq::QuantumCircuit;
+use ferriq::QuantumCircuit;
 
 fn main() {
     // Create a 3-qubit GHZ circuit
@@ -101,7 +101,7 @@ If you need lower-level control, the subcrate APIs remain fully accessible
 through the same dependency:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut circuit = Circuit::new(2);
@@ -114,11 +114,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Why SimQ?
+## Why Ferriq?
 
 ### Performance First
 
-SimQ is designed from the ground up for speed:
+Ferriq is designed from the ground up for speed:
 
 - **Sparse state vectors** for memory-efficient simulation
 - **SIMD-optimized** gate operations
@@ -131,7 +131,7 @@ SimQ is designed from the ground up for speed:
 For compile-time qubit bounds, use the const-generic `CircuitBuilder`:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 let mut builder = CircuitBuilder::<4>::new(); // 4-qubit circuit
 let [q0, q1, q2, q3] = builder.qubits();      // typed qubit references
@@ -146,7 +146,7 @@ Exact expectation values are one call away, so an energy function for VQE is
 a few lines:
 
 ```rust
-use simq::{PauliObservable, PauliString, QuantumCircuit};
+use ferriq::{PauliObservable, PauliString, QuantumCircuit};
 
 let hamiltonian = PauliObservable::from_pauli_string(
     PauliString::from_str("Z").unwrap(), 1.0);
@@ -159,13 +159,13 @@ let energy = |theta: f64| {
 // energy(θ) = cos(θ); minimize with your favourite optimizer
 ```
 
-Run `cargo run -p simq --example vqe_fluent` for a complete gradient-descent
-VQE loop, and see `simq-sim/examples/` for full workflows with the built-in
+Run `cargo run -p ferriq --example vqe_fluent` for a complete gradient-descent
+VQE loop, and see `ferriq-sim/examples/` for full workflows with the built-in
 optimizers and gradient methods (`vqe_h2_molecule`, `qaoa_maxcut`, ...).
 
 ## Compile-Time Caching
 
-SimQ features a revolutionary **multi-level compile-time gate matrix caching system** that dramatically improves performance for rotation gates (RX, RY, RZ):
+Ferriq features a revolutionary **multi-level compile-time gate matrix caching system** that dramatically improves performance for rotation gates (RX, RY, RZ):
 
 | Cache Level | Access Time | Speedup | Memory |
 |-------------|-------------|---------|--------|
@@ -184,7 +184,7 @@ within 1e-12. Any other angle falls through to full-precision runtime
 computation. Gate matrices are never approximated or snapped to a grid.
 
 ```rust
-use simq_gates::RotationX;
+use ferriq_gates::RotationX;
 use std::f64::consts::PI;
 
 // Automatically uses optimal caching strategy
@@ -193,20 +193,20 @@ let rx2 = RotationX::new(0.1);         // ~2-5 ns (VQE range cache)
 let rx3 = RotationX::new(10.0);        // ~20-50 ns (runtime fallback)
 ```
 
-**For complete documentation**, see [`simq-gates/COMPILE_TIME_CACHING.md`](simq-gates/COMPILE_TIME_CACHING.md)
+**For complete documentation**, see [`ferriq-gates/COMPILE_TIME_CACHING.md`](ferriq-gates/COMPILE_TIME_CACHING.md)
 
 ## Architecture
 
-SimQ consists of several optimized crates:
+Ferriq consists of several optimized crates:
 
-- **simq**: Umbrella crate — the fluent `QuantumCircuit` builder plus re-exports of everything below
-- **simq-core**: Core types and traits
-- **simq-state**: Quantum state representations (sparse/dense)
-- **simq-gates**: Gate library with SIMD optimizations and compile-time caching
-- **simq-macros**: Procedural macros for compile-time code generation
-- **simq-compiler**: Circuit optimization passes
-- **simq-sim**: High-performance simulator
-- **simq-backend**: Hardware backend abstraction
+- **ferriq**: Umbrella crate — the fluent `QuantumCircuit` builder plus re-exports of everything below
+- **ferriq-core**: Core types and traits
+- **ferriq-state**: Quantum state representations (sparse/dense)
+- **ferriq-gates**: Gate library with SIMD optimizations and compile-time caching
+- **ferriq-macros**: Procedural macros for compile-time code generation
+- **ferriq-compiler**: Circuit optimization passes
+- **ferriq-sim**: High-performance simulator
+- **ferriq-backend**: Hardware backend abstraction
 
 
 
@@ -214,19 +214,19 @@ SimQ consists of several optimized crates:
 
 ## Community
 
-- **Questions, ideas, show & tell**: [GitHub Discussions](https://github.com/glanzz/simq/discussions)
-- **Bugs and feature requests**: [Issues](https://github.com/glanzz/simq/issues)
-- **First contribution?** Grab a [`good first issue`](https://github.com/glanzz/simq/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — each one has file-level pointers and acceptance criteria, and we're happy to mentor you through it.
+- **Questions, ideas, show & tell**: [GitHub Discussions](https://github.com/glanzz/ferriq/discussions)
+- **Bugs and feature requests**: [Issues](https://github.com/glanzz/ferriq/issues)
+- **First contribution?** Grab a [`good first issue`](https://github.com/glanzz/ferriq/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — each one has file-level pointers and acceptance criteria, and we're happy to mentor you through it.
 
 ## Contributing
 
-We welcome contributions! Please see the [contributing guide](https://glanzz.github.io/simq/contributing/) for development setup, coding standards, and the PR workflow.
+We welcome contributions! Please see the [contributing guide](https://glanzz.github.io/ferriq/contributing/) for development setup, coding standards, and the PR workflow.
 
 ### Development Setup
 
 ```bash
 # Clone the repository
-cd simq
+cd ferriq
 
 # Build the project
 cargo build
@@ -260,7 +260,7 @@ at your option.
 
 ## Acknowledgments
 
-SimQ is inspired by:
+Ferriq is inspired by:
 
 - [Qiskit](https://qiskit.org/) - Python quantum computing framework
 - [Cirq](https://quantumai.google/cirq) - Google's quantum framework
@@ -269,13 +269,13 @@ SimQ is inspired by:
 
 ## Citation
 
-If you use SimQ in your research, please cite:
+If you use Ferriq in your research, please cite:
 
 ```bibtex
-@software{simq2024,
-  title = {SimQ: High-Performance Quantum Computing SDK in Rust},
-  author = {SimQ Contributors},
+@software{ferriq2024,
+  title = {Ferriq: High-Performance Quantum Computing SDK in Rust},
+  author = {Ferriq Contributors},
   year = {2024},
-  url = {https://github.com/glanzz/simq}
+  url = {https://github.com/glanzz/ferriq}
 }
 ```

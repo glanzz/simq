@@ -1,23 +1,23 @@
 ---
 myst:
   html_meta:
-    description: "SimQ is a high-performance quantum computing SDK written in Rust with Python bindings — 8-10x faster than Qiskit for VQE and QAOA workloads, type-safe, and memory efficient."
-    keywords: "quantum computing, quantum simulator, Rust, Python, VQE, QAOA, SDK, quantum circuits, SimQ"
+    description: "Ferriq is a high-performance quantum computing SDK written in Rust with Python bindings — 8-10x faster than Qiskit for VQE and QAOA workloads, type-safe, and memory efficient."
+    keywords: "quantum computing, quantum simulator, Rust, Python, VQE, QAOA, SDK, quantum circuits, Ferriq"
 ---
 
-# SimQ
+# Ferriq
 
 ```{raw} html
-<div class="simq-hero">
+<div class="ferriq-hero">
   <h1>Quantum computing at Rust speed</h1>
-  <p class="simq-tagline">
-    SimQ is a high-performance quantum computing SDK written in Rust —
+  <p class="ferriq-tagline">
+    Ferriq is a high-performance quantum computing SDK written in Rust —
     designed to be 8–10× faster than Qiskit for variational algorithms,
     with type-safe circuit construction and first-class Python bindings.
   </p>
-  <div class="simq-buttons">
-    <a class="simq-btn simq-btn-primary" href="getting-started/quickstart-rust.html">Get started&nbsp;→</a>
-    <a class="simq-btn simq-btn-secondary" href="https://github.com/glanzz/simq">View on GitHub</a>
+  <div class="ferriq-buttons">
+    <a class="ferriq-btn ferriq-btn-primary" href="getting-started/quickstart-rust.html">Get started&nbsp;→</a>
+    <a class="ferriq-btn ferriq-btn-secondary" href="https://github.com/glanzz/ferriq">View on GitHub</a>
   </div>
 </div>
 ```
@@ -26,7 +26,7 @@ myst:
 
 :::{tab-item} Rust
 ```rust
-use simq::QuantumCircuit;
+use ferriq::QuantumCircuit;
 
 fn main() {
     // 3-qubit GHZ state
@@ -42,14 +42,14 @@ fn main() {
 
 :::{tab-item} Python
 ```python
-import simq
+import ferriq
 
-builder = simq.CircuitBuilder(2)
+builder = ferriq.CircuitBuilder(2)
 builder.h(0)
 builder.cx(0, 1)
 circuit = builder.build()
 
-simulator = simq.Simulator(simq.SimulatorConfig(shots=1024))
+simulator = ferriq.Simulator(ferriq.SimulatorConfig(shots=1024))
 result = simulator.run(circuit)
 print(result.state_vector)
 ```
@@ -57,7 +57,7 @@ print(result.state_vector)
 
 ::::
 
-## Why SimQ?
+## Why Ferriq?
 
 ::::{grid} 1 2 2 3
 :gutter: 3
@@ -102,7 +102,7 @@ including noise models and visualization.
 :::{grid-item-card} 🚀 Getting started
 :link: getting-started/installation
 :link-type: doc
-Install SimQ and run your first circuit in Rust or Python in under five
+Install Ferriq and run your first circuit in Rust or Python in under five
 minutes.
 :::
 

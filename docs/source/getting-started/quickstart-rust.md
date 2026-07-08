@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "SimQ Rust quickstart — build and simulate your first quantum circuit with the fluent QuantumCircuit API in five minutes."
+    description: "Ferriq Rust quickstart — build and simulate your first quantum circuit with the fluent QuantumCircuit API in five minutes."
 ---
 
 # Quickstart (Rust)
@@ -14,12 +14,11 @@ circuit with measurement statistics.
 ```bash
 cargo new hello-quantum
 cd hello-quantum
-cargo add simq --git https://github.com/glanzz/simq
+cargo add ferriq --git https://github.com/glanzz/ferriq
 ```
 
-```{warning}
-The `--git` flag matters: a plain `cargo add simq` installs an unrelated
-job-queue crate that happens to own the `simq` name on crates.io.
+```{note}
+The `--git` flag is needed until Ferriq is published to crates.io.
 ```
 
 ## 2. Build and simulate a circuit
@@ -28,7 +27,7 @@ The fluent `QuantumCircuit` builder is the fastest
 way to get going. Replace `src/main.rs` with:
 
 ```rust
-use simq::QuantumCircuit;
+use ferriq::QuantumCircuit;
 
 fn main() {
     // Create a 3-qubit GHZ circuit
@@ -60,7 +59,7 @@ Gate methods chain fluently and never panic: the first invalid operation
 error from `build()` or `simulate()`:
 
 ```rust
-use simq::QuantumCircuit;
+use ferriq::QuantumCircuit;
 
 let mut qc = QuantumCircuit::new(2);
 qc.h(0).cnot(0, 5); // qubit 5 doesn't exist
@@ -85,7 +84,7 @@ You don't need sampling to inspect a state — probabilities and expectation
 values are exact:
 
 ```rust
-use simq::{PauliObservable, PauliString, QuantumCircuit};
+use ferriq::{PauliObservable, PauliString, QuantumCircuit};
 
 let mut qc = QuantumCircuit::new(1);
 qc.ry(0.8, 0);
@@ -105,7 +104,7 @@ assert!((energy - 0.8f64.cos()).abs() < 1e-10);
 The subcrate APIs stay fully accessible through the same dependency:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut circuit = Circuit::new(2);
@@ -122,7 +121,7 @@ For compile-time qubit-bounds checking, use the const-generic
 `CircuitBuilder`:
 
 ```rust
-use simq::prelude::*;
+use ferriq::prelude::*;
 
 let mut builder = CircuitBuilder::<4>::new(); // 4-qubit circuit
 let [q0, q1, q2, q3] = builder.qubits();      // typed qubit references

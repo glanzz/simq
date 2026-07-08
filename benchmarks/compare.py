@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Merge SimQ criterion results with the Qiskit baseline and report.
+"""Merge Ferriq criterion results with the Qiskit baseline and report.
 
 This script is the one-stop reproduction path for `BENCHMARKS.md`:
 
 1. (optional, default on) runs the workload cross-validation so both
    suites provably simulate identical circuits,
-2. runs ``cargo bench -p simq --bench end_to_end``,
+2. runs ``cargo bench -p ferriq --bench end_to_end``,
 3. runs ``qiskit_baseline.py`` with the Python interpreter you point it at,
 4. parses criterion's ``estimates.json`` files and the baseline JSON,
 5. prints a Markdown results table and writes ``results.json`` plus the
@@ -46,16 +46,16 @@ def read_criterion_results():
     for name in WORKLOADS:
         est = REPO_ROOT / "target" / "criterion" / name / "new" / "estimates.json"
         if not est.exists():
-            sys.exit(f"missing {est} — did `cargo bench -p simq` run?")
+            sys.exit(f"missing {est} — did `cargo bench -p ferriq` run?")
         with open(est) as f:
             timings[name] = json.load(f)["mean"]["point_estimate"] / 1e9
     return timings
 
 
 def cross_validate(python):
-    """Assert SimQ and Qiskit compute identical expectation values."""
+    """Assert Ferriq and Qiskit compute identical expectation values."""
     rust = subprocess.run(
-        ["cargo", "run", "--release", "-p", "simq", "--example", "xcheck_bench"],
+        ["cargo", "run", "--release", "-p", "ferriq", "--example", "xcheck_bench"],
         check=True, capture_output=True, text=True, cwd=REPO_ROOT,
     ).stdout
     qiskit = subprocess.run(
@@ -76,7 +76,7 @@ for e in [1, 2, 7]:
     if rust.strip() != qiskit.strip():
         print(rust)
         print(qiskit)
-        sys.exit("cross-validation FAILED: SimQ and Qiskit disagree on workload values")
+        sys.exit("cross-validation FAILED: Ferriq and Qiskit disagree on workload values")
     print(f"cross-validation OK: {len(rust.strip().splitlines())} expectation values identical")
 
 
@@ -103,7 +103,7 @@ ROW_LABELS = {
 
 
 def render_chart(rows, mode, versions):
-    """Dot plot of SimQ speedup vs Qiskit on a log axis. rows:
+    """Dot plot of Ferriq speedup vs Qiskit on a log axis. rows:
     (workload, speedup_vs_statevector, speedup_vs_aer)."""
     c = INK[mode]
     width, row_h = 880, 30
@@ -117,10 +117,10 @@ def render_chart(rows, mode, versions):
 
     font = 'font-family="system-ui, -apple-system, Segoe UI, sans-serif"'
     s = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="SimQ speedup over Qiskit per workload, log scale">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="Ferriq speedup over Qiskit per workload, log scale">',
         f'<rect width="{width}" height="{height}" fill="{c["surface"]}" rx="8"/>',
-        f'<text x="{left}" y="30" {font} font-size="15" font-weight="600" fill="{c["primary"]}">SimQ speedup over Qiskit — one variational/sampling iteration</text>',
-        f'<text x="{left}" y="50" {font} font-size="12" fill="{c["secondary"]}">Speedup = Qiskit time ÷ SimQ time (log scale) · GHZ rows include 1024 shots · {versions}</text>',
+        f'<text x="{left}" y="30" {font} font-size="15" font-weight="600" fill="{c["primary"]}">Ferriq speedup over Qiskit — one variational/sampling iteration</text>',
+        f'<text x="{left}" y="50" {font} font-size="12" fill="{c["secondary"]}">Speedup = Qiskit time ÷ Ferriq time (log scale) · GHZ rows include 1024 shots · {versions}</text>',
     ]
     # legend
     lx = left
@@ -141,7 +141,7 @@ def render_chart(rows, mode, versions):
         weight = ' font-weight="600"' if major else ""
         s.append(f'<text x="{tx:.1f}" y="{plot_bottom + 18}" {font} font-size="11"{weight} fill="{c["muted"]}" text-anchor="middle">{label}</text>')
     s.append(f'<text x="{x(0.1):.1f}" y="{plot_bottom + 36}" {font} font-size="11" fill="{c["muted"]}" text-anchor="middle">← Qiskit faster</text>')
-    s.append(f'<text x="{x(10):.1f}" y="{plot_bottom + 36}" {font} font-size="11" fill="{c["muted"]}" text-anchor="middle">SimQ faster →</text>')
+    s.append(f'<text x="{x(10):.1f}" y="{plot_bottom + 36}" {font} font-size="11" fill="{c["muted"]}" text-anchor="middle">Ferriq faster →</text>')
 
     prev_family = None
     for i, (name, sv, aer) in enumerate(rows):
@@ -184,13 +184,13 @@ def main():
     if not args.skip_validation:
         cross_validate(args.python)
     if not args.skip_rust:
-        run(["cargo", "bench", "-p", "simq", "--bench", "end_to_end"], cwd=REPO_ROOT)
+        run(["cargo", "bench", "-p", "ferriq", "--bench", "end_to_end"], cwd=REPO_ROOT)
     qiskit_json = out_dir / "qiskit.json"
     if not args.skip_qiskit:
         run([args.python, str(REPO_ROOT / "benchmarks" / "qiskit_baseline.py"),
              "--out", str(qiskit_json)])
 
-    simq = read_criterion_results()
+    ferriq = read_criterion_results()
     with open(qiskit_json) as f:
         baseline = json.load(f)
     qk = baseline["timings_seconds"]
@@ -203,25 +203,25 @@ def main():
     }
     rows = []
     lines = [
-        "| Workload | SimQ | Qiskit Statevector | Qiskit Aer | vs Statevector | vs Aer |",
+        "| Workload | Ferriq | Qiskit Statevector | Qiskit Aer | vs Statevector | vs Aer |",
         "|---|---|---|---|---|---|",
     ]
     fmt_ms = lambda s: f"{s * 1e3:,.3f} ms" if s < 1 else f"{s:,.2f} s"
     for name in WORKLOADS:
-        t_simq = simq[name]
+        t_ferriq = ferriq[name]
         t_sv = qk[name]["statevector"]
         t_aer = qk[name].get("aer")
-        sv_speedup = t_sv / t_simq
-        aer_speedup = t_aer / t_simq if t_aer else float("nan")
+        sv_speedup = t_sv / t_ferriq
+        aer_speedup = t_aer / t_ferriq if t_aer else float("nan")
         rows.append((name, sv_speedup, aer_speedup))
         results["timings_ms"][name] = {
-            "simq": t_simq * 1e3,
+            "ferriq": t_ferriq * 1e3,
             "qiskit_statevector": t_sv * 1e3,
             "qiskit_aer": t_aer * 1e3 if t_aer else None,
         }
         fmt_x = lambda v: f"**{v:,.1f}× faster**" if v >= 1.05 else f"{1 / v:,.1f}× slower"
         lines.append(
-            f"| `{name}` | {fmt_ms(t_simq)} | {fmt_ms(t_sv)} | {fmt_ms(t_aer)} | "
+            f"| `{name}` | {fmt_ms(t_ferriq)} | {fmt_ms(t_sv)} | {fmt_ms(t_aer)} | "
             f"{fmt_x(sv_speedup)} | {fmt_x(aer_speedup)} |"
         )
 

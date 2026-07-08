@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Qiskit baseline for the SimQ end-to-end benchmarks.
+"""Qiskit baseline for the Ferriq end-to-end benchmarks.
 
 Every workload here mirrors, gate for gate, a criterion benchmark in
-`simq/benches/end_to_end.rs`; the shared definition lives in
+`ferriq/benches/end_to_end.rs`; the shared definition lives in
 `BENCHMARKS.md`. If you change a circuit here, change it there too.
 
 One iteration always includes circuit *construction* as well as

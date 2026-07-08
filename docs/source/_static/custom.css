@@ -1,14 +1,14 @@
-/* SimQ documentation — custom styling on top of the Furo theme. */
+/* Ferriq documentation — custom styling on top of the Furo theme. */
 
 /* ---------------------------------------------------------------- hero -- */
 
-/* The landing page's markdown H1 ("SimQ") provides the document title for
+/* The landing page's markdown H1 ("Ferriq") provides the document title for
    Sphinx, but the hero banner already says it — hide the plain heading. */
-section#simq > h1 {
+section#ferriq > h1 {
   display: none;
 }
 
-.simq-hero {
+.ferriq-hero {
   text-align: center;
   padding: 2.5rem 1rem 2rem;
   margin-bottom: 2rem;
@@ -18,7 +18,7 @@ section#simq > h1 {
     radial-gradient(ellipse 80% 60% at 80% 100%, rgba(37, 99, 235, 0.16), transparent);
 }
 
-.simq-hero h1 {
+.ferriq-hero h1 {
   font-size: 2.4rem;
   font-weight: 800;
   margin-bottom: 0.6rem;
@@ -28,7 +28,7 @@ section#simq > h1 {
   -webkit-text-fill-color: transparent;
 }
 
-.simq-hero p.simq-tagline {
+.ferriq-hero p.ferriq-tagline {
   font-size: 1.15rem;
   max-width: 44rem;
   margin: 0 auto 1.4rem;
@@ -36,14 +36,14 @@ section#simq > h1 {
 }
 
 /* hero buttons */
-.simq-buttons {
+.ferriq-buttons {
   display: flex;
   gap: 0.75rem;
   justify-content: center;
   flex-wrap: wrap;
 }
 
-.simq-buttons a.simq-btn {
+.ferriq-buttons a.ferriq-btn {
   display: inline-block;
   padding: 0.55rem 1.3rem;
   border-radius: 999px;
@@ -52,24 +52,24 @@ section#simq > h1 {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.simq-buttons a.simq-btn:hover {
+.ferriq-buttons a.ferriq-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(109, 40, 217, 0.3);
 }
 
-.simq-btn-primary {
+.ferriq-btn-primary {
   background: linear-gradient(90deg, #7c3aed, #2563eb);
   color: #fff !important;
 }
 
-.simq-btn-secondary {
+.ferriq-btn-secondary {
   border: 2px solid var(--color-brand-primary);
   color: var(--color-brand-primary) !important;
 }
 
 /* ---------------------------------------------------------- badge strip -- */
 
-.simq-badges {
+.ferriq-badges {
   display: flex;
   gap: 0.4rem;
   justify-content: center;

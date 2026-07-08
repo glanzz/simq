@@ -1,43 +1,43 @@
-# SimQ Benchmarks
+# Ferriq Benchmarks
 
-Reproducible, cross-validated comparison of SimQ against Qiskit on the
-workloads SimQ is built for: variational-algorithm inner loops (VQE, QAOA)
+Reproducible, cross-validated comparison of Ferriq against Qiskit on the
+workloads Ferriq is built for: variational-algorithm inner loops (VQE, QAOA)
 and circuit sampling.
 
-**TL;DR (measured, not marketing):** SimQ's advantage is per-iteration
+**TL;DR (measured, not marketing):** Ferriq's advantage is per-iteration
 overhead. In the regime where variational algorithms actually spend their
-iterations — small-to-medium circuits evaluated thousands of times — SimQ
+iterations — small-to-medium circuits evaluated thousands of times — Ferriq
 is **4–45× faster than Qiskit** (both `Statevector` and Aer), and up to
 **~950× faster** for shot sampling against pure-Python `Statevector`
 sampling. Above ~12 qubits the picture reverses: **Qiskit Aer's C++
-kernels are currently faster than SimQ** (up to ~30× at 16 qubits). The
+kernels are currently faster than Ferriq** (up to ~30× at 16 qubits). The
 gate-kernel scaling gap is tracked in
-[#76](https://github.com/glanzz/simq/issues/76). We publish both sides of
+[#76](https://github.com/glanzz/ferriq/issues/76). We publish both sides of
 this chart on purpose.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results/2026-07-08/chart-dark.svg">
-  <img alt="SimQ speedup over Qiskit per workload, log scale" src="benchmarks/results/2026-07-08/chart-light.svg">
+  <img alt="Ferriq speedup over Qiskit per workload, log scale" src="benchmarks/results/2026-07-08/chart-light.svg">
 </picture>
 
 ## Reproduce it in one command
 
 ```bash
-git clone https://github.com/glanzz/simq.git && cd simq
+git clone https://github.com/glanzz/ferriq.git && cd ferriq
 ./benchmarks/run.sh
 ```
 
 The script creates a venv with the pinned Qiskit version
 (`benchmarks/requirements.txt`), **cross-validates that both suites
 simulate identical circuits** (12 expectation values compared to 12
-decimal places), runs `cargo bench -p simq` and the Qiskit baseline on
+decimal places), runs `cargo bench -p ferriq` and the Qiskit baseline on
 your machine, and writes the merged table, charts, and raw JSON to
 `benchmarks/results/<date>/`.
 
 Pieces, if you'd rather run them yourself:
 
 ```bash
-cargo bench -p simq --bench end_to_end          # SimQ side (criterion)
+cargo bench -p ferriq --bench end_to_end          # Ferriq side (criterion)
 pip install -r benchmarks/requirements.txt
 python benchmarks/qiskit_baseline.py            # Qiskit side
 python benchmarks/compare.py --skip-rust --skip-qiskit --out-dir ...  # merge/report
@@ -53,7 +53,7 @@ Environment for the published numbers (2026-07-08):
 | RAM | 15 GiB |
 | OS | Linux 6.18 (x86_64) |
 | Rust | rustc 1.94.1, `--release` with fat LTO (workspace default) |
-| SimQ | this repository, commit the results were published with |
+| Ferriq | this repository, commit the results were published with |
 | Python | 3.11.15 |
 | Qiskit | **2.5.0**, qiskit-aer **0.17.2** |
 
@@ -61,7 +61,7 @@ Time per iteration (lower is better). One iteration always includes
 circuit **construction + simulation**, because that is what a variational
 optimizer does on every step:
 
-| Workload | SimQ | Qiskit Statevector | Qiskit Aer | vs Statevector | vs Aer |
+| Workload | Ferriq | Qiskit Statevector | Qiskit Aer | vs Statevector | vs Aer |
 |---|---|---|---|---|---|
 | `vqe_energy/4q` | 0.047 ms | 1.770 ms | 1.801 ms | **38.1× faster** | **38.7× faster** |
 | `vqe_energy/8q` | 0.652 ms | 3.867 ms | 2.924 ms | **5.9× faster** | **4.5× faster** |
@@ -80,16 +80,16 @@ Raw data: [`benchmarks/results/2026-07-08/results.json`](benchmarks/results/2026
 ### How to read this
 
 - **Small circuits (≤ ~10 qubits) are where variational loops live**, and
-  where SimQ wins by a wide margin: a VQE run is thousands of
+  where Ferriq wins by a wide margin: a VQE run is thousands of
   build-simulate-measure iterations, and Python-side circuit construction
   plus framework dispatch dominates when each simulation is microseconds.
-  SimQ's whole pipeline is compiled, so a 4-qubit energy evaluation costs
+  Ferriq's whole pipeline is compiled, so a 4-qubit energy evaluation costs
   47 µs instead of ~1.8 ms.
 - **At 12–16 qubits the state-vector kernels dominate**, and Qiskit Aer's
-  mature C++ SIMD kernels currently beat SimQ's — by 2.6× at 12 qubits and
-  ~22–30× at 16. This is an honest, known gap in SimQ's gate-application
+  mature C++ SIMD kernels currently beat Ferriq's — by 2.6× at 12 qubits and
+  ~22–30× at 16. This is an honest, known gap in Ferriq's gate-application
   scaling, tracked with profiling data in
-  [#76](https://github.com/glanzz/simq/issues/76). If your workload is
+  [#76](https://github.com/glanzz/ferriq/issues/76). If your workload is
   large-circuit statevector crunching, use Aer today.
 - **Qiskit `Statevector` vs Aer**: `qiskit.quantum_info.Statevector` is
   what most tutorials and quick scripts use; Aer is the optimized backend.
@@ -97,16 +97,16 @@ Raw data: [`benchmarks/results/2026-07-08/results.json`](benchmarks/results/2026
 
 ## Exact workload definitions
 
-Every workload is implemented twice — `simq/benches/end_to_end.rs` (Rust,
+Every workload is implemented twice — `ferriq/benches/end_to_end.rs` (Rust,
 criterion) and `benchmarks/qiskit_baseline.py` (Python) — from the shared
 definition below. `benchmarks/compare.py` refuses to report before
 verifying both implementations produce **identical expectation values**
-(also runnable standalone: `cargo run --release -p simq --example
+(also runnable standalone: `cargo run --release -p ferriq --example
 xcheck_bench`).
 
 **Parameter schedule** (shared): evaluation `e`, parameter slot `j`:
 `θ = (2·((131·e + 31·j) mod 1000)/1000 − 1)·π`. These are generic angles,
-chosen deliberately so SimQ's compile-time caches for common angles
+chosen deliberately so Ferriq's compile-time caches for common angles
 (π/4, π/2, …) do **not** kick in — the comparison measures the
 runtime-computation path, not a cache sweet spot.
 
@@ -127,7 +127,7 @@ plus **1024 measurement shots**.
 
 ## Methodology and fairness notes
 
-- **Timers**: SimQ numbers are criterion's mean estimate
+- **Timers**: Ferriq numbers are criterion's mean estimate
   (`cargo bench`, warmup + ~100 samples). Qiskit numbers are the median
   over 5 batches of the mean per-iteration wall time, with warmup, batch
   size auto-scaled to ≥ 0.4 s (`benchmarks/qiskit_baseline.py`).
