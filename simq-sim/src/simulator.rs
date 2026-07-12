@@ -193,17 +193,38 @@ impl Simulator {
 
     /// Estimate maximum number of qubits that can be simulated
     ///
-    /// Based on memory limit and state vector size.
+    /// Based on the configured memory limit, or — when no limit is set — the
+    /// memory actually available on the machine. Rejecting an oversized
+    /// circuit upfront with `TooManyQubits` beats the alternative observed at
+    /// 30 qubits on a 15 GiB host: the dense conversion fails mid-circuit,
+    /// the state stays sparse, and the amplitude map grows until the process
+    /// aborts inside an allocator call.
     fn estimate_max_qubits(&self) -> usize {
-        if self.config.memory_limit == 0 {
-            // No limit - use practical maximum (35-40 qubits)
-            40
+        let budget = if self.config.memory_limit == 0 {
+            match Self::available_memory_bytes() {
+                // Leave 10% headroom for the rest of the process
+                Some(avail) => avail / 10 * 9,
+                None => return 40, // Unknown platform: previous practical cap
+            }
         } else {
-            // Each amplitude is 16 bytes (Complex<f64>)
-            // State vector size = 2^n * 16 bytes
-            let max_amplitudes = self.config.memory_limit / 16;
-            (max_amplitudes as f64).log2().floor() as usize
+            self.config.memory_limit
+        };
+
+        // Each amplitude is 16 bytes (Complex<f64>); state = 2^n * 16 bytes
+        let max_amplitudes = (budget / 16).max(1);
+        (max_amplitudes as f64).log2().floor() as usize
+    }
+
+    /// Memory available to this process, if the platform exposes it.
+    fn available_memory_bytes() -> Option<usize> {
+        let meminfo = std::fs::read_to_string("/proc/meminfo").ok()?;
+        for line in meminfo.lines() {
+            if let Some(rest) = line.strip_prefix("MemAvailable:") {
+                let kb: usize = rest.trim().trim_end_matches(" kB").trim().parse().ok()?;
+                return Some(kb * 1024);
+            }
         }
+        None
     }
 }
 

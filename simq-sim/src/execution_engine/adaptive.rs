@@ -13,6 +13,20 @@ pub struct AdaptiveStrategy {
     parallel_threshold: usize,
 }
 
+/// Density at which hash-map gate application costs as much as a dense pass.
+///
+/// A sparse gate costs O(entries) with a large per-entry constant (hash
+/// lookups, rebuild allocations — measured ~300× the per-amplitude cost of
+/// the dense kernels), so the cost crossover sits near 1/300 density, not at
+/// the 10% default threshold — and the per-entry constant grows further once
+/// the map outgrows cache (DRAM-latency-bound probing at ≥0.5M entries).
+/// Waiting for 10% let the map grow to millions of entries on the way to a
+/// dense state: at 24 qubits the sparse warm-up alone was ~55% of total
+/// runtime, and at 26 qubits a 1/128 threshold still left ~2.5 s of hashing
+/// that 1/1024 cuts to a handful of extra (cheap, sequential) dense passes.
+/// The dense→sparse direction uses half the threshold as hysteresis.
+const COST_CROSSOVER_DENSITY: f32 = 1.0 / 1024.0;
+
 impl AdaptiveStrategy {
     pub fn new(sparse_threshold: f32, gpu_threshold: usize, parallel_threshold: usize) -> Self {
         Self {
@@ -22,14 +36,20 @@ impl AdaptiveStrategy {
         }
     }
 
+    /// The density at which representation conversion actually happens:
+    /// the configured threshold, capped at the measured cost crossover.
+    fn effective_threshold(&self) -> f32 {
+        self.sparse_threshold.min(COST_CROSSOVER_DENSITY)
+    }
+
     /// Decide whether to convert sparse to dense
     pub fn should_convert_to_dense(&self, state: &AdaptiveState) -> bool {
-        state.density() > self.sparse_threshold
+        state.density() > self.effective_threshold()
     }
 
     /// Decide whether to convert dense to sparse
     pub fn should_convert_to_sparse(&self, state: &AdaptiveState) -> bool {
-        state.density() < (self.sparse_threshold / 2.0)
+        state.density() < (self.effective_threshold() / 2.0)
     }
 
     /// Decide which execution mode to use

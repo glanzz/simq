@@ -127,14 +127,59 @@ and gate fusion (SimQ's compiler already provided fusion) — as described for
 itself applies [cache-blocking remaps](https://arxiv.org/pdf/2604.12256) for
 large circuits.
 
+## Where it actually fails: 18–30 qubits
+
+We pushed the same 1-layer VQE circuit (H + RY + CNOT-chain + RZ, built by
+`simq-sim/examples/scaling_probe.rs`) beyond the published table to find the
+edges. Same machine (15 GiB RAM); SimQ at default settings including its
+optimizer in the timed run, Aer timed on a once-transpiled circuit including
+final statevector retrieval:
+
+| Qubits | State | SimQ | Aer | Verdict |
+|-------:|------:|-----:|----:|---------|
+| 20 | 16 MiB | 44 ms | 53 ms | SimQ 1.2× faster |
+| 22 | 64 MiB | 243 ms | 240 ms | tie |
+| 24 | 256 MiB | 1.15 s | 1.03 s | Aer 1.1× faster |
+| 26 | 1 GiB | 4.3 s | 4.3 s | tie |
+| 28 | 4 GiB | 58.6 s | 17.2 s | **Aer 3.4× faster** |
+| 30 | 16 GiB | rejected: "max supported is 29" | rejected: "maximum (29)" | physics: state > RAM |
+
+So: **parity through 26 qubits, a real loss at 28, and a wall at 30** on this
+box. What the probing found (and what got fixed along the way):
+
+- **Sparse warm-up cliff (fixed).** Sparse→dense conversion used to trigger
+  at 10% density — a relative threshold, so bigger registers hashed longer:
+  at 24q the warm-up AHashMap grew to ~1.6M entries and consumed 55% of total
+  runtime (1.3 s of 2.4 s). The conversion point is now the measured
+  hash-vs-dense cost crossover (~1/1024 density), cutting the 26q warm-up
+  from ~2.6 s to ~0.6 s.
+- **28-qubit gap (open, the real ≥28q work item).** SimQ's dense kernels
+  match Aer per pass (~0.6 ns/amplitude at 26q), but SimQ sweeps the state
+  once per gate (111 passes × 8 GiB of traffic at 28q) while Aer's runtime
+  gate fusion collapses circuits into multi-qubit blocks and sweeps far
+  fewer times. Once the state outgrows the last-level cache, passes are the
+  whole game. Deeper fusion in `simq-compiler` (to 2–3-qubit unitaries, like
+  Aer/qsim fuse to ~5) is the tracked follow-up in issue #76.
+- **30-qubit failure mode (fixed).** A 30q dense state is 16 GiB; with 15 GiB
+  of RAM both simulators must refuse — but SimQ used to *abort the process*
+  inside an infallible `Vec` allocation (and, once the conversion was made
+  fallible, would limp along sparse until the hash map itself blew up at
+  ~234M entries). `Simulator::run` now derives the qubit cap from
+  `MemAvailable` when no memory limit is configured and rejects upfront with
+  `TooManyQubits`, exactly like Aer's clean "circuit too wide" error. Dense
+  conversion also allocates once (null-checked) instead of twice.
+
 ## Honest limitations
 
 - Results above are from a 4-vCPU cloud container; ratios will differ on
   wider machines (more cores help Aer's OpenMP too). Run `run.sh` on your own
   hardware — that is what it is for.
-- Above ~20 qubits, Aer's threading and cache-blocked kernels are expected to
-  scale better than SimQ's current single-socket settings; issue #76 stays
-  open to track ≥20-qubit parity.
+- At ≥28 qubits Aer's deeper runtime gate fusion wins (see the scaling table
+  above); issue #76 stays open to track it. The 28q Aer number *includes*
+  copying the 4 GiB result statevector into Python, so Aer's compute-only
+  advantage is larger than 3.4×.
+- The 26–28q SimQ numbers are single cold runs (first-touch page faults
+  included); warm-loop numbers would be a few percent better.
 - GHZ sampling vs `Statevector` overstates SimQ's advantage at 16q because
   `Statevector.sample_counts` is known to be slow for wide registers; the Aer
   column is the meaningful one there.

@@ -862,8 +862,22 @@ impl DenseState {
     /// assert_eq!(dense.num_qubits(), 3);
     /// ```
     pub fn from_sparse(sparse: &SparseState) -> Result<Self> {
-        let amplitudes = sparse.to_dense();
-        Self::from_amplitudes(sparse.num_qubits(), &amplitudes)
+        // Allocate through StateVector::new (null-checked, returns
+        // AllocationError) instead of sparse.to_dense()'s infallible Vec,
+        // which aborts the whole process when a large state doesn't fit in
+        // memory — a 30-qubit conversion is a 16 GiB allocation. This also
+        // fills amplitudes in place rather than materializing an intermediate
+        // dense Vec and copying it over.
+        let mut vector = StateVector::new(sparse.num_qubits())?;
+        let amplitudes = vector.amplitudes_mut();
+        amplitudes[0] = Complex64::new(0.0, 0.0); // undo the |0...0⟩ init
+        for (&idx, &amp) in sparse.amplitudes().iter() {
+            amplitudes[idx as usize] = amp;
+        }
+        Ok(Self {
+            vector,
+            needs_normalization: true,
+        })
     }
 
     /// Convert to a sparse state representation
