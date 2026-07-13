@@ -196,3 +196,160 @@ pub fn ghz_sample(sim: &Simulator, num_qubits: usize, shots: usize, seed: u64) -
 pub fn default_simulator() -> Simulator {
     Simulator::new(SimulatorConfig::default())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vqe_theta_formula() {
+        assert_eq!(vqe_theta(0, 0, 4), 0.1);
+        assert_eq!(vqe_theta(1, 2, 4), 0.1 + 0.37 * 6.0);
+    }
+
+    #[test]
+    fn vqe_phi_formula() {
+        assert_eq!(vqe_phi(0, 0, 4), 0.05);
+        assert_eq!(vqe_phi(1, 2, 4), 0.05 + 0.21 * 6.0);
+    }
+
+    #[test]
+    fn vqe_circuit_gate_count() {
+        let n = 4;
+        let c = vqe_circuit(n);
+        // H per qubit, then VQE_LAYERS * (RY per qubit + CNOT chain + RZ per qubit)
+        let expected = n + VQE_LAYERS * (n + (n - 1) + n);
+        assert_eq!(c.len(), expected);
+    }
+
+    #[test]
+    fn vqe_circuit_minimum_two_qubits() {
+        // num_qubits=1 would underflow the `num_qubits - 1` CNOT-chain bound;
+        // the smallest sane workload size is 2.
+        let c = vqe_circuit(2);
+        assert_eq!(c.len(), 2 + VQE_LAYERS * (2 + 1 + 2));
+    }
+
+    #[test]
+    fn vqe_observable_term_count_and_diagonality() {
+        let n = 4;
+        let obs = vqe_observable(n);
+        // (n - 1) ZZ terms + n X terms
+        assert_eq!(obs.num_terms(), (n - 1) + n);
+        // Contains off-diagonal X terms, so it is not purely diagonal.
+        assert!(!obs.is_diagonal());
+    }
+
+    #[test]
+    fn qaoa_circuit_gate_count() {
+        let n = 4;
+        let c = qaoa_circuit(n);
+        // H per qubit, then per layer: n edges * (CNOT, RZ, CNOT) + n RX mixers
+        let per_layer = n * 3 + n;
+        let expected = n + QAOA_GAMMA.len() * per_layer;
+        assert_eq!(c.len(), expected);
+    }
+
+    #[test]
+    fn qaoa_zz_observable_is_diagonal_ring() {
+        let n = 5;
+        let obs = qaoa_zz_observable(n);
+        // One ZZ term per ring edge.
+        assert_eq!(obs.num_terms(), n);
+        assert!(obs.is_diagonal());
+    }
+
+    #[test]
+    fn qaoa_cost_from_zz_matches_formula() {
+        assert_eq!(qaoa_cost_from_zz(4, 1.0), 0.5 * 4.0 - 0.5);
+        assert_eq!(qaoa_cost_from_zz(6, -1.0), 0.5 * 6.0 + 0.5);
+        assert_eq!(qaoa_cost_from_zz(4, 0.0), 0.5 * 4.0);
+    }
+
+    #[test]
+    fn ghz_circuit_gate_count() {
+        let n = 5;
+        let c = ghz_circuit(n);
+        // 1 Hadamard + (n - 1) CNOTs
+        assert_eq!(c.len(), 1 + (n - 1));
+    }
+
+    #[test]
+    fn run_to_dense_produces_normalized_state() {
+        let sim = default_simulator();
+        let circuit = ghz_circuit(3);
+        let dense = run_to_dense(&sim, &circuit);
+        let norm: f64 = dense.get_all_probabilities().iter().sum();
+        assert!((norm - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn run_to_dense_converts_sparse_state() {
+        let sim = default_simulator();
+        // GHZ state has exactly 2 non-zero amplitudes throughout, so its
+        // density is 2 / 2^n. The executor's *effective* sparse->dense
+        // threshold is capped at a measured cost-crossover density of
+        // 1/1024 (see `COST_CROSSOVER_DENSITY` in
+        // `execution_engine::adaptive`), not the naive 10% config default,
+        // and the sparse->dense check runs on every gate (it's O(1)), so
+        // the state converts as soon as density crosses that line. n=12
+        // keeps density (2/4096 ≈ 0.00049) safely below 1/1024 (≈0.00098)
+        // for the whole circuit, so `sim.run` returns `AdaptiveState::Sparse`.
+        // Confirm that directly, then run it through `run_to_dense` to
+        // exercise its sparse-to-dense conversion branch (the
+        // `sparse => { ... }` arm).
+        let circuit = ghz_circuit(12);
+        let result = sim.run(&circuit).expect("simulation failed");
+        assert!(
+            matches!(result.state, AdaptiveState::Sparse { .. }),
+            "expected GHZ(12) to stay sparse under the effective threshold"
+        );
+
+        let dense = run_to_dense(&sim, &circuit);
+        assert_eq!(dense.num_qubits(), 12);
+        let norm: f64 = dense.get_all_probabilities().iter().sum();
+        assert!((norm - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn vqe_energy_is_finite_and_reproducible() {
+        let sim = default_simulator();
+        let e1 = vqe_energy(&sim, 4);
+        let e2 = vqe_energy(&sim, 4);
+        assert!(e1.is_finite());
+        assert_eq!(e1, e2);
+    }
+
+    #[test]
+    fn qaoa_cost_is_finite_and_reproducible() {
+        let sim = default_simulator();
+        let c1 = qaoa_cost(&sim, 4);
+        let c2 = qaoa_cost(&sim, 4);
+        assert!(c1.is_finite());
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn ghz_sample_returns_two_outcomes_for_ghz_state() {
+        let sim = default_simulator();
+        // Enough shots that both |00..0> and |11..1> almost certainly appear.
+        let distinct = ghz_sample(&sim, 3, 2000, 42);
+        assert_eq!(distinct, 2);
+    }
+
+    #[test]
+    fn ghz_sample_is_deterministic_given_seed() {
+        let sim = default_simulator();
+        let a = ghz_sample(&sim, 3, 500, 7);
+        let b = ghz_sample(&sim, 3, 500, 7);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn default_simulator_runs_a_trivial_circuit() {
+        let sim = default_simulator();
+        let circuit = ghz_circuit(2);
+        let result = sim.run(&circuit).expect("simulation failed");
+        assert_eq!(result.num_qubits(), 2);
+    }
+}
