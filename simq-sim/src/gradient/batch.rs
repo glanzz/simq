@@ -333,6 +333,71 @@ mod tests {
         }
     }
 
+    /// Lines 92-100: evaluate_single_expectation (Sparse branch, lines 94, 97-98).
+    /// A freshly-initialized state stays sparse (density well below the
+    /// default 10% threshold), so running an empty/near-empty circuit
+    /// through `evaluate_batch_expectation` exercises the sparse path.
+    #[test]
+    fn test_evaluate_batch_expectation_sparse_state() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+
+        // A tiny-angle rotation keeps the state sparse (density well below
+        // the default 10% threshold) while satisfying the "non-empty
+        // circuit" requirement.
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(4);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+
+        let observable =
+            PauliObservable::from_pauli_string(PauliString::from_str("ZZZZ").unwrap(), 1.0);
+
+        // Use only angle 0.0, which leaves the state exactly |0000> so the
+        // expectation value can be checked precisely, while the circuit is
+        // non-empty (Ry(0) is a no-op gate but is still a real gate).
+        let batch_params = vec![vec![0.0], vec![0.0]];
+
+        let result =
+            evaluate_batch_expectation(&simulator, circuit_builder, &observable, &batch_params)
+                .unwrap();
+
+        assert_eq!(result.values.len(), 2);
+        // <0000|ZZZZ|0000> = 1.0
+        for v in &result.values {
+            assert!((v - 1.0).abs() < 1e-10);
+        }
+    }
+
+    /// Lines 121-133: evaluate_multi_observable (Sparse branch, lines 125-128).
+    #[test]
+    fn test_evaluate_multi_observable_sparse_state() {
+        let simulator = Simulator::new(SimulatorConfig::default());
+
+        // Ry(0) is a no-op gate, so the state remains exactly |000> (sparse).
+        let circuit_builder = |params: &[f64]| {
+            let mut circuit = Circuit::new(3);
+            circuit
+                .add_gate(Arc::new(RotationY::new(params[0])), &[QubitId::new(0)])
+                .unwrap();
+            circuit
+        };
+
+        let obs1 = PauliObservable::from_pauli_string(PauliString::from_str("ZZZ").unwrap(), 1.0);
+        let obs2 = PauliObservable::from_pauli_string(PauliString::from_str("ZZZ").unwrap(), 2.0);
+        let observables = vec![obs1, obs2];
+        let params = vec![0.0];
+
+        let values =
+            evaluate_multi_observable(&simulator, circuit_builder, &observables, &params).unwrap();
+
+        assert_eq!(values.len(), 2);
+        assert!((values[0] - 1.0).abs() < 1e-10);
+        assert!((values[1] - 2.0).abs() < 1e-10);
+    }
+
     /// grid_search test
     #[test]
     fn test_grid_search() {

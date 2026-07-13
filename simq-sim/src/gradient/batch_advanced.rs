@@ -567,6 +567,87 @@ mod tests {
         assert!(result.max_difference < 1e-3);
     }
 
+    /// Lines 111-117: timeout error path in `AdaptiveBatchEvaluator::evaluate`.
+    #[test]
+    fn test_adaptive_evaluator_timeout() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig {
+            adaptive_sizing: false,
+            max_batch_size: 1,
+            timeout: Some(Duration::from_nanos(1)),
+            ..BatchConfig::default()
+        };
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        let param_sets = vec![vec![0.0], vec![0.5], vec![1.0]];
+        let result = evaluator.evaluate(&sim, ry_circuit, &obs, &param_sets);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("timeout"));
+    }
+
+    /// Lines 120-124: progress callback branch (`progress_frequency` divides evenly).
+    #[test]
+    fn test_adaptive_evaluator_progress_callback() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig {
+            adaptive_sizing: false,
+            max_batch_size: 1,
+            progress_frequency: 1,
+            ..BatchConfig::default()
+        };
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        let param_sets = vec![vec![0.0], vec![0.5], vec![1.0]];
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
+        assert_eq!(result.num_evaluations, 3);
+    }
+
+    /// Line 172: `successful_batch_sizes` history trimming once more than 10
+    /// batches have been processed.
+    #[test]
+    fn test_adaptive_evaluator_history_trimming() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig {
+            adaptive_sizing: false,
+            max_batch_size: 1,
+            ..BatchConfig::default()
+        };
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        // 12 single-element batches -> 12 calls to update_statistics, so the
+        // history (capped at 10) is trimmed at least twice.
+        let param_sets: Vec<Vec<f64>> = (0..12).map(|i| vec![i as f64 * 0.1]).collect();
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
+        assert_eq!(result.num_evaluations, 12);
+        assert_eq!(evaluator.successful_batch_sizes.len(), 10);
+    }
+
+    /// Lines 185-191: `evaluate_single` Sparse branch, exercised indirectly
+    /// via a fresh (sparse) state through `verify_gradients` -> parameter
+    /// shift / finite difference -> eventually `AdaptiveBatchEvaluator`.
+    /// We hit it directly through `AdaptiveBatchEvaluator::evaluate` with an
+    /// identity-like circuit that keeps the state sparse.
+    #[test]
+    fn test_adaptive_evaluator_sparse_state() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = BatchConfig::default();
+        let mut evaluator = AdaptiveBatchEvaluator::new(config);
+        // Ry(0) is a no-op, keeping the resulting state sparse (|0>).
+        let param_sets = vec![vec![0.0]];
+        let result = evaluator
+            .evaluate(&sim, ry_circuit, &obs, &param_sets)
+            .unwrap();
+        assert_eq!(result.values.len(), 1);
+        // <0|Z|0> = 1.0
+        assert!((result.values[0] - 1.0).abs() < 1e-10);
+    }
+
     #[test]
     fn test_gradient_verification_struct() {
         let gv = GradientVerification {
