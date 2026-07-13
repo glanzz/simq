@@ -14,8 +14,7 @@ use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{CNot, Hadamard, RotationX, RotationY, RotationZ};
 use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::{
-    measurement::ComputationalBasis, AdaptiveState, DenseState, Pauli, PauliObservable,
-    PauliString,
+    measurement::ComputationalBasis, AdaptiveState, DenseState, Pauli, PauliObservable, PauliString,
 };
 use std::sync::Arc;
 
@@ -48,22 +47,16 @@ pub fn vqe_circuit(num_qubits: usize) -> Circuit {
     }
     for l in 0..VQE_LAYERS {
         for q in 0..num_qubits {
-            c.add_gate(
-                Arc::new(RotationY::new(vqe_theta(l, q, num_qubits))),
-                &[QubitId::new(q)],
-            )
-            .unwrap();
+            c.add_gate(Arc::new(RotationY::new(vqe_theta(l, q, num_qubits))), &[QubitId::new(q)])
+                .unwrap();
         }
         for q in 0..num_qubits - 1 {
             c.add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
                 .unwrap();
         }
         for q in 0..num_qubits {
-            c.add_gate(
-                Arc::new(RotationZ::new(vqe_phi(l, q, num_qubits))),
-                &[QubitId::new(q)],
-            )
-            .unwrap();
+            c.add_gate(Arc::new(RotationZ::new(vqe_phi(l, q, num_qubits))), &[QubitId::new(q)])
+                .unwrap();
         }
     }
     c

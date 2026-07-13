@@ -27,16 +27,8 @@ fn main() {
 
     let mut entries = Vec::new();
     for &n in &sizes {
-        entries.push(format!(
-            "    \"vqe_energy/{}q\": {:.15e}",
-            n,
-            wl::vqe_energy(&sim, n)
-        ));
-        entries.push(format!(
-            "    \"qaoa_maxcut/{}q\": {:.15e}",
-            n,
-            wl::qaoa_cost(&sim, n)
-        ));
+        entries.push(format!("    \"vqe_energy/{}q\": {:.15e}", n, wl::vqe_energy(&sim, n)));
+        entries.push(format!("    \"qaoa_maxcut/{}q\": {:.15e}", n, wl::qaoa_cost(&sim, n)));
         entries.push(format!("    \"ghz_p0/{}q\": {:.15e}", n, ghz_p0(&sim, n)));
     }
 

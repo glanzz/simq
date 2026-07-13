@@ -344,8 +344,14 @@ mod tests {
     fn test_diagonal_fast_path_matches_general() {
         let theta: f64 = 0.7;
         let rz: Matrix2x2 = [
-            [Complex64::from_polar(1.0, -theta / 2.0), Complex64::new(0.0, 0.0)],
-            [Complex64::new(0.0, 0.0), Complex64::from_polar(1.0, theta / 2.0)],
+            [
+                Complex64::from_polar(1.0, -theta / 2.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::from_polar(1.0, theta / 2.0),
+            ],
         ];
 
         // A 4-qubit random-ish state
