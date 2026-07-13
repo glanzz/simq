@@ -73,7 +73,7 @@ pub fn apply_single_qubit_dense(
     validate_gate_matrix(gate)?;
 
     // Diagonal fast path: no amplitude mixing, one multiply per amplitude.
-    if gate[0][1] == Complex64::ZERO && gate[1][0] == Complex64::ZERO {
+    if gate[0][1] == Complex64::new(0.0, 0.0) && gate[1][0] == Complex64::new(0.0, 0.0) {
         return apply_diagonal(
             [gate[0][0], gate[1][1]],
             qubit,
@@ -344,8 +344,8 @@ mod tests {
     fn test_diagonal_fast_path_matches_general() {
         let theta: f64 = 0.7;
         let rz: Matrix2x2 = [
-            [Complex64::from_polar(1.0, -theta / 2.0), Complex64::ZERO],
-            [Complex64::ZERO, Complex64::from_polar(1.0, theta / 2.0)],
+            [Complex64::from_polar(1.0, -theta / 2.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::from_polar(1.0, theta / 2.0)],
         ];
 
         // A 4-qubit random-ish state
