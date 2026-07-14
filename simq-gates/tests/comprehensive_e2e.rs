@@ -53,6 +53,12 @@ fn is_unitary_2x2(m: &[[Complex64; 2]; 2]) -> bool {
 // ============================================================================
 
 #[test]
+fn is_identity_2x2_rejects_non_identity() {
+    // Covers the early `return false` branch: X is unitary but not identity.
+    assert!(!is_identity_2x2(PauliX::matrix()));
+}
+
+#[test]
 fn hadamard_properties() {
     assert_eq!(Hadamard.name(), "H");
     assert_eq!(Hadamard.num_qubits(), 1);

@@ -1093,6 +1093,24 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[test]
+    fn test_validation_completeness_relation_not_unitary() {
+        use validation::check_completeness_relation;
+
+        // A single zero operator: sum(E_i^dagger E_i) = 0, which deviates
+        // from the identity by 1.0 -> triggers the NotUnitary branch
+        // (lines 874-878).
+        let zero = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+
+        let result = check_completeness_relation(&[zero], 1e-10);
+        assert!(matches!(result, Err(CustomGateError::NotUnitary { .. })));
+    }
+
     // --- Coverage for lines 308-309, 323, 329-330 ---
 
     #[test]
@@ -1107,6 +1125,53 @@ mod tests {
             .unwrap();
         // line 308-309: is_hermitian() → self.is_hermitian (false)
         assert!(!gate.is_hermitian());
+    }
+
+    // --- Coverage for validation module: InvalidSize (718), InvalidDeterminant ---
+    // --- (805-806), compute_determinant n=1 (819) and n>2 fallback (827) ---
+
+    #[test]
+    fn test_validate_quantum_gate_invalid_size() {
+        // A matrix whose length isn't a perfect square of a power of two
+        // triggers validate_unitarity's InvalidSize error (line 718).
+        let matrix = vec![Complex64::new(1.0, 0.0); 3]; // len=3, sqrt(3) truncates to 1, 1*1 != 3
+        let result = validation::validate_quantum_gate(&matrix, 1, 1e-10);
+        assert!(matches!(result, Err(CustomGateError::InvalidSize { .. })));
+    }
+
+    #[test]
+    fn test_validate_quantum_gate_invalid_determinant() {
+        // This matrix is unitary within tolerance 0.6 (max U†U deviation from
+        // I is ~0.5) but its determinant magnitude deviates from 1 by ~1.0,
+        // which exceeds the same tolerance -> triggers InvalidDeterminant
+        // (lines 805-806) via compute_determinant's n=2 branch (line 820-823).
+        let matrix = vec![
+            Complex64::new(0.6111666622662423, -0.06758749025467026),
+            Complex64::new(0.6116441696873639, -0.06312026292614906),
+            Complex64::new(0.020908889094386932, -0.3485255520789755),
+            Complex64::new(0.023454795338248527, -0.34836348067928236),
+        ];
+        let result = validation::validate_quantum_gate(&matrix, 1, 0.6);
+        assert!(matches!(result, Err(CustomGateError::InvalidDeterminant { .. })));
+    }
+
+    #[test]
+    fn test_validate_quantum_gate_determinant_n1() {
+        // A 1-qubit... actually 0-qubit (1x1) "gate" exercises
+        // compute_determinant's n=1 branch (line 819).
+        let matrix = vec![Complex64::new(1.0, 0.0)];
+        let result = validation::validate_quantum_gate(&matrix, 0, 1e-6);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_quantum_gate_determinant_fallback_n4() {
+        // A 2-qubit (4x4) identity matrix has size == 4, so the determinant
+        // check runs; compute_determinant falls into the `_` branch for n=4
+        // (line 824-828), which always returns 1.0, so this should pass.
+        let matrix = crate::matrix_ops::identity_matrix(4);
+        let result = validation::validate_quantum_gate(&matrix, 2, 1e-10);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -1233,8 +1298,24 @@ mod tests {
                 ]
             }))
             .with_initial_params(vec![PI / 4.0])
+            .with_tolerance(1e-8)
             .build()
             .unwrap();
         assert_eq!(gate.parameter_names(), &["theta"]);
+    }
+
+    #[test]
+    fn test_custom_gate_trait_is_hermitian_via_dyn_dispatch() {
+        // Covers `impl Gate for CustomGate::is_hermitian` (trait-object dispatch),
+        // which is otherwise shadowed by the inherent method of the same name.
+        let matrix = vec![
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let gate = CustomGate::new("CustomX", 1, matrix, 1e-10).unwrap();
+        let dyn_gate: &dyn Gate = &gate;
+        assert!(dyn_gate.is_hermitian());
     }
 }
