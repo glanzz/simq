@@ -701,4 +701,74 @@ mod tests {
         let expectation = zx.expectation_value(&state).unwrap();
         assert_relative_eq!(expectation, 0.0, epsilon = 1e-10);
     }
+
+    #[test]
+    fn test_apply_to_basis_state_identity_and_y() {
+        // "IY" exercises the Pauli::I branch (no-op) and both arms of the
+        // Pauli::Y branch (phase +i when bit==0, phase -i when bit==1) of
+        // `apply_to_basis_state`. Paulis are indexed left-to-right as
+        // qubit0, qubit1, ...: "IY" means qubit0=I, qubit1=Y.
+        let iy = PauliString::from_str("IY").unwrap();
+
+        // basis_state = 0b00 -> qubit0 (I) unchanged, qubit1 (Y) bit=0 => flip + i phase
+        let (new_state, phase) = iy.apply_to_basis_state(0b00);
+        assert_eq!(new_state, 0b10);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, 1.0, epsilon = 1e-10);
+
+        // basis_state = 0b10 -> qubit0 (I) unchanged, qubit1 (Y) bit=1 => flip - i phase
+        let (new_state, phase) = iy.apply_to_basis_state(0b10);
+        assert_eq!(new_state, 0b00);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, -1.0, epsilon = 1e-10);
+
+        // basis_state = 0b01 -> qubit0 (I) unchanged (bit stays set), qubit1
+        // (Y) bit=0 => flip + i phase.
+        let (new_state, phase) = iy.apply_to_basis_state(0b01);
+        assert_eq!(new_state, 0b11);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_expectation_value_general_three_y_phase() {
+        // With exactly 3 Y operators, y_mask.count_ones() % 4 == 3, which
+        // exercises the final `_` arm of the global i^|Y| phase match in
+        // `expectation_value_general` (phase = -i). |000⟩ has amplitude 1 on
+        // basis state 0, and YYY maps |000⟩ -> i^3 |111⟩ = -i|111⟩, which is
+        // orthogonal to |000⟩, so the expectation value is 0 but the
+        // -i branch is still exercised on the way there.
+        let yyy = PauliString::from_str("YYY").unwrap();
+        assert!(!yyy.is_diagonal());
+
+        let state = DenseState::new(3).unwrap();
+        let expectation = yyy.expectation_value(&state).unwrap();
+        assert_relative_eq!(expectation, 0.0, epsilon = 1e-10);
+
+        // Directly exercise apply_to_basis_state for the 3-Y case too: all
+        // three bits start at 0, so each Y contributes a +i phase and flips
+        // its qubit, giving overall phase i^3 = -i and new_state = 0b111.
+        let (new_state, phase) = yyy.apply_to_basis_state(0b000);
+        assert_eq!(new_state, 0b111);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, -1.0, epsilon = 1e-10);
+
+        // Build a state where ⟨YYY⟩ is nonzero: ψ = (|000⟩ + i|111⟩)/sqrt(2).
+        // Since YYY|000⟩ = -i|111⟩ and YYY|111⟩ = i|000⟩ (derived from the
+        // per-qubit phase i on a 0-bit and -i on a 1-bit, cubed), YYYψ =
+        // (-1/sqrt2)|000⟩ + (-i/sqrt2)|111⟩, giving ⟨ψ|YYY|ψ⟩ = -1.
+        let amplitudes = vec![
+            Complex64::new(1.0 / std::f64::consts::SQRT_2, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 1.0 / std::f64::consts::SQRT_2),
+        ];
+        let ghz = DenseState::from_amplitudes(3, &amplitudes).unwrap();
+        let expectation = yyy.expectation_value(&ghz).unwrap();
+        assert_relative_eq!(expectation, -1.0, epsilon = 1e-10);
+    }
 }

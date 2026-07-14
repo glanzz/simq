@@ -37,7 +37,7 @@ fn pauli_x_flat() -> [Complex64; 4] {
     [ZERO, ONE, ONE, ZERO]
 }
 
-fn _pauli_z_matrix() -> [[Complex64; 2]; 2] {
+fn pauli_z_matrix() -> [[Complex64; 2]; 2] {
     [[ONE, ZERO], [ZERO, Complex64::new(-1.0, 0.0)]]
 }
 
@@ -140,6 +140,23 @@ fn dense_state_pauli_x() {
     state.apply_single_qubit_gate(&pauli_x_matrix(), 0).unwrap();
     assert!(state.amplitudes()[0].norm() < EPSILON);
     assert!((state.amplitudes()[1] - ONE).norm() < EPSILON);
+}
+
+#[test]
+fn dense_state_pauli_z_flips_phase_of_one_state() {
+    let mut state = DenseState::new(1).unwrap();
+    state.apply_single_qubit_gate(&pauli_x_matrix(), 0).unwrap();
+    state.apply_single_qubit_gate(&pauli_z_matrix(), 0).unwrap();
+    assert!(state.amplitudes()[0].norm() < EPSILON);
+    assert!((state.amplitudes()[1] - Complex64::new(-1.0, 0.0)).norm() < EPSILON);
+}
+
+#[test]
+fn dense_state_pauli_z_leaves_zero_state_unchanged() {
+    let mut state = DenseState::new(1).unwrap();
+    state.apply_single_qubit_gate(&pauli_z_matrix(), 0).unwrap();
+    assert!((state.amplitudes()[0] - ONE).norm() < EPSILON);
+    assert!(state.amplitudes()[1].norm() < EPSILON);
 }
 
 #[test]
@@ -402,6 +419,32 @@ fn sparse_state_normalize() {
 }
 
 #[test]
+fn dense_state_measure_probability_zero_state() {
+    let state = DenseState::new(2).unwrap();
+    let (p0, p1) = state.measure_probability(0).unwrap();
+    assert!((p0 - 1.0).abs() < EPSILON);
+    assert!(p1.abs() < EPSILON);
+}
+
+#[test]
+fn dense_state_measure_probability_after_hadamard() {
+    let mut state = DenseState::new(1).unwrap();
+    state
+        .apply_single_qubit_gate(&hadamard_matrix(), 0)
+        .unwrap();
+    let (p0, p1) = state.measure_probability(0).unwrap();
+    assert!((p0 - 0.5).abs() < EPSILON);
+    assert!((p1 - 0.5).abs() < EPSILON);
+}
+
+#[test]
+fn dense_state_measure_probability_invalid_qubit() {
+    let state = DenseState::new(2).unwrap();
+    let result = state.measure_probability(5);
+    assert!(result.is_err());
+}
+
+#[test]
 fn sparse_state_measure() {
     let state = SparseState::new(2).unwrap();
     let (p0, p1) = state.measure_probability(0).unwrap();
@@ -510,6 +553,15 @@ fn adaptive_state_to_dense_vec() {
     let dense = state.to_dense_vec();
     assert_eq!(dense.len(), 4);
     assert!((dense[0] - ONE).norm() < EPSILON);
+}
+
+#[test]
+fn adaptive_state_sparse_measure_probability() {
+    let state = AdaptiveState::new(2).unwrap();
+    assert!(state.is_sparse());
+    let (p0, p1) = state.measure_probability(0).unwrap();
+    assert!((p0 - 1.0).abs() < EPSILON);
+    assert!(p1.abs() < EPSILON);
 }
 
 #[test]
