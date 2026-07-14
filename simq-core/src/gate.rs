@@ -235,6 +235,17 @@ mod tests {
     }
 
     #[test]
+    fn test_default_is_hermitian_is_false() {
+        // Covers the default `Gate::is_hermitian` trait method (lines 41-42),
+        // which MockGate doesn't override.
+        let gate = MockGate {
+            name: "M".to_string(),
+            num_qubits: 1,
+        };
+        assert!(!gate.is_hermitian());
+    }
+
+    #[test]
     fn test_gate_op_creation() {
         let gate = Arc::new(MockGate {
             name: "H".to_string(),

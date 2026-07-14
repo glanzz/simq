@@ -1083,6 +1083,67 @@ mod tests {
     }
 
     #[test]
+    fn test_from_bytes_unknown_gate_errors() {
+        // Covers line 460: create_gate_op fails for an unrecognized gate name
+        // inside from_bytes's deserialization loop.
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::{SerializedGate, SerializedGateOp};
+
+        let serialized = SerializedCircuit::new(
+            1,
+            vec![SerializedGateOp {
+                gate: SerializedGate::StandardGate {
+                    name: "NOT_A_REAL_GATE".to_string(),
+                },
+                qubits: vec![0],
+            }],
+        );
+        let bytes = bincode::serialize(&serialized).unwrap();
+
+        let result = Circuit::from_bytes(&bytes);
+        assert!(matches!(result, Err(QuantumError::DeserializationError(_))));
+    }
+
+    #[test]
+    fn test_from_json_unknown_gate_errors() {
+        // Covers line 572: create_gate_op fails for an unrecognized gate name
+        // inside from_json's deserialization loop.
+        use crate::serialization::circuit::SerializedCircuit;
+        use crate::serialization::gate::{SerializedGate, SerializedGateOp};
+
+        let serialized = SerializedCircuit::new(
+            1,
+            vec![SerializedGateOp {
+                gate: SerializedGate::StandardGate {
+                    name: "NOT_A_REAL_GATE".to_string(),
+                },
+                qubits: vec![0],
+            }],
+        );
+        let json = serde_json::to_string(&serialized).unwrap();
+
+        let result = Circuit::from_json(&json);
+        assert!(matches!(result, Err(QuantumError::DeserializationError(_))));
+    }
+
+    #[test]
+    fn test_validate_rejects_out_of_bounds_qubit() {
+        // Covers lines 255-257: validate()'s out-of-bounds qubit error.
+        // `operations_mut()` bypasses add_gate's own bounds check so we can
+        // construct an invalid circuit state to exercise this path.
+        let gate: std::sync::Arc<dyn Gate> = std::sync::Arc::new(MockGate {
+            name: "M".to_string(),
+            num_qubits: 1,
+        });
+        let mut circuit = Circuit::new(1);
+        let bad_op = GateOp::new(gate, &[QubitId::new(5)]).unwrap();
+        circuit.operations_mut().push(bad_op);
+
+        let result = circuit.validate();
+        assert!(matches!(result, Err(QuantumError::ValidationError(_))));
+    }
+
+    #[test]
     fn test_to_latex() {
         // Covers lines 668-669: to_latex and to_latex_with_config
         let circuit = Circuit::new(2);
