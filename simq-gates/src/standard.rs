@@ -1946,8 +1946,16 @@ mod tests {
         // Hadamard turns it into Z (exactly, no global phase)
         let theta = 0.9;
         let i_h = tensor_product(
-            &matrices::IDENTITY.iter().flatten().copied().collect::<Vec<_>>(),
-            &matrices::HADAMARD.iter().flatten().copied().collect::<Vec<_>>(),
+            &matrices::IDENTITY
+                .iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>(),
+            &matrices::HADAMARD
+                .iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>(),
         );
         let rzx = flatten4(&matrices::rzx(theta));
         let conjugated = matrix_multiply(&i_h, &matrix_multiply(&rzx, &i_h));
