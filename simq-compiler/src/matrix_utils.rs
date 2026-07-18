@@ -4,6 +4,12 @@
 //! for quantum gate matrices.
 
 use num_complex::Complex64;
+use smallvec::{smallvec, SmallVec};
+
+/// Inline-capacity buffer for flat row-major square matrices up to 8x8
+/// (3-qubit blocks, 64 entries). Sized to cover this crate's fusion block
+/// width cap so composing a fused gate's matrix never heap-allocates.
+pub type FlatMatrix = SmallVec<[Complex64; 64]>;
 
 /// Multiply two 2x2 complex matrices
 ///
@@ -39,6 +45,62 @@ pub fn multiply_2x2(a: &[[Complex64; 2]; 2], b: &[[Complex64; 2]; 2]) -> [[Compl
             a[1][0] * b[0][1] + a[1][1] * b[1][1],
         ],
     ]
+}
+
+/// Multiply two flat row-major `dim x dim` complex matrices: C = A * B
+///
+/// Generalizes [`multiply_2x2`] to arbitrary block widths (used for fused
+/// multi-qubit gate blocks, `dim` up to 8 for a 3-qubit block). Panics (via
+/// debug assertion) if `a`/`b` don't have exactly `dim * dim` elements.
+///
+/// # Arguments
+/// * `a` - Left matrix (applied second in the gate sequence), flat row-major
+/// * `b` - Right matrix (applied first in the gate sequence), flat row-major
+/// * `dim` - Matrix dimension (2^k for a k-qubit block)
+pub fn multiply_square(a: &[Complex64], b: &[Complex64], dim: usize) -> FlatMatrix {
+    debug_assert_eq!(a.len(), dim * dim, "matrix A must be dim x dim");
+    debug_assert_eq!(b.len(), dim * dim, "matrix B must be dim x dim");
+
+    let mut result: FlatMatrix = smallvec![Complex64::new(0.0, 0.0); dim * dim];
+    for i in 0..dim {
+        for j in 0..dim {
+            let mut sum = Complex64::new(0.0, 0.0);
+            for k in 0..dim {
+                sum += a[i * dim + k] * b[k * dim + j];
+            }
+            result[i * dim + j] = sum;
+        }
+    }
+    result
+}
+
+/// Flat row-major `dim x dim` identity matrix.
+pub fn identity_flat(dim: usize) -> FlatMatrix {
+    let mut result: FlatMatrix = smallvec![Complex64::new(0.0, 0.0); dim * dim];
+    for i in 0..dim {
+        result[i * dim + i] = Complex64::new(1.0, 0.0);
+    }
+    result
+}
+
+/// Check if a flat row-major `dim x dim` matrix is approximately identity.
+///
+/// Generalizes [`is_identity`] to arbitrary block widths.
+pub fn is_identity_flat(matrix: &[Complex64], dim: usize, epsilon: f64) -> bool {
+    debug_assert_eq!(matrix.len(), dim * dim, "matrix must be dim x dim");
+    for i in 0..dim {
+        for j in 0..dim {
+            let expected = if i == j {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
+            if (matrix[i * dim + j] - expected).norm() > epsilon {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// Convert a 2x2 matrix to a flattened vector in row-major order
@@ -202,5 +264,50 @@ mod tests {
 
         let not_identity = [[ONE, ONE], [ZERO, ONE]];
         assert!(!is_identity(&not_identity, 1e-10));
+    }
+
+    #[test]
+    fn test_multiply_square_identity_4x4() {
+        let id = identity_flat(4);
+        let result = multiply_square(&id, &id, 4);
+        assert!(is_identity_flat(&result, 4, 1e-10));
+    }
+
+    #[test]
+    fn test_multiply_square_matches_multiply_2x2() {
+        // X * H via multiply_square(dim=2) should match multiply_2x2(X, H)
+        let x = [[ZERO, ONE], [ONE, ZERO]];
+        let h = [
+            [Complex64::new(INV_SQRT2, 0.0), Complex64::new(INV_SQRT2, 0.0)],
+            [Complex64::new(INV_SQRT2, 0.0), Complex64::new(-INV_SQRT2, 0.0)],
+        ];
+        let expected = multiply_2x2(&x, &h);
+
+        let x_flat = matrix_to_vec(&x);
+        let h_flat = matrix_to_vec(&h);
+        let result = multiply_square(&x_flat, &h_flat, 2);
+
+        assert_relative_eq!(result[0].re, expected[0][0].re, epsilon = 1e-10);
+        assert_relative_eq!(result[1].re, expected[0][1].re, epsilon = 1e-10);
+        assert_relative_eq!(result[2].re, expected[1][0].re, epsilon = 1e-10);
+        assert_relative_eq!(result[3].re, expected[1][1].re, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_identity_flat_dims() {
+        let id2 = identity_flat(2);
+        assert_eq!(id2.len(), 4);
+        assert!(is_identity_flat(&id2, 2, 1e-10));
+
+        let id8 = identity_flat(8);
+        assert_eq!(id8.len(), 64);
+        assert!(is_identity_flat(&id8, 8, 1e-10));
+    }
+
+    #[test]
+    fn test_is_identity_flat_rejects_non_identity() {
+        let mut not_identity = identity_flat(2);
+        not_identity[1] = ONE;
+        assert!(!is_identity_flat(&not_identity, 2, 1e-10));
     }
 }
