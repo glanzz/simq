@@ -75,6 +75,20 @@ pub struct SimulatorConfig {
     ///
     /// Default: 0 (unlimited)
     pub memory_limit: usize,
+
+    /// Maximum number of distinct circuit *shapes* whose multi-qubit fusion
+    /// block structure the simulator caches across repeated [`super::Simulator::run`]
+    /// calls (0 disables this cache entirely). This is what lets a VQE/QAOA
+    /// optimizer's outer loop — which calls `run` on the same-shaped
+    /// circuit hundreds of times with only rotation angles differing —
+    /// skip re-deriving fusion's block assignment on every call; the actual
+    /// fused matrices are still recomputed fresh from each call's angles,
+    /// so this never risks a stale-parameter bug (see
+    /// `simq_compiler::fusion_cache`'s module docs).
+    ///
+    /// Default: 32 (a VQE/QAOA loop typically evaluates one circuit shape;
+    /// this comfortably covers a handful without unbounded growth).
+    pub fusion_cache_size: usize,
 }
 
 impl Default for SimulatorConfig {
@@ -89,6 +103,7 @@ impl Default for SimulatorConfig {
             seed: None,
             memory_limit: 0,
             use_gpu: false,
+            fusion_cache_size: 32,
         }
     }
 }
@@ -180,6 +195,12 @@ impl SimulatorConfig {
     /// Set memory limit in bytes
     pub fn with_memory_limit(mut self, limit: usize) -> Self {
         self.memory_limit = limit;
+        self
+    }
+
+    /// Set the fusion structure cache size (0 disables it)
+    pub fn with_fusion_cache_size(mut self, size: usize) -> Self {
+        self.fusion_cache_size = size;
         self
     }
 

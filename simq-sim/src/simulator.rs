@@ -1,8 +1,10 @@
 //! Core simulator implementation
 
-use simq_compiler::pipeline::{create_compiler, OptimizationLevel};
+use simq_compiler::fusion_cache::FusionStructureCache;
+use simq_compiler::pipeline::{create_compiler_with_fusion_cache, OptimizationLevel};
 use simq_core::Circuit;
 use simq_state::AdaptiveState;
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
@@ -34,6 +36,17 @@ use crate::{
 /// ```
 pub struct Simulator {
     config: SimulatorConfig,
+    /// Persists across repeated [`Self::run`] calls (unlike the compiler
+    /// and execution engine, which are rebuilt fresh every call — see
+    /// `compile_circuit`) so a VQE/QAOA optimizer's outer loop, which calls
+    /// `run` on the same-shaped circuit hundreds of times with only
+    /// rotation angles differing, doesn't re-derive multi-qubit fusion's
+    /// block assignment from scratch on every single call. Sized by
+    /// `config.fusion_cache_size`; see `SimulatorConfig::fusion_cache_size`
+    /// and `simq_compiler::fusion_cache` for why caching block structure
+    /// (not matrix values) is exact, not approximate, across differing
+    /// gate parameters.
+    fusion_cache: Arc<FusionStructureCache>,
 }
 
 impl Simulator {
@@ -49,12 +62,27 @@ impl Simulator {
     pub fn new(config: SimulatorConfig) -> Self {
         config.validate().expect("Invalid simulator configuration");
 
-        Self { config }
+        let fusion_cache = Arc::new(FusionStructureCache::new(config.fusion_cache_size));
+        Self { config, fusion_cache }
     }
 
     /// Get the simulator configuration
     pub fn config(&self) -> &SimulatorConfig {
         &self.config
+    }
+
+    /// Number of hits on the persistent fusion-structure cache since this
+    /// `Simulator` was created — see the `fusion_cache` field docs. Mainly
+    /// useful for tests/introspection confirming the cache is actually
+    /// engaging across repeated [`Self::run`] calls.
+    pub fn fusion_cache_hits(&self) -> usize {
+        self.fusion_cache.hits()
+    }
+
+    /// Number of misses on the persistent fusion-structure cache since
+    /// this `Simulator` was created.
+    pub fn fusion_cache_misses(&self) -> usize {
+        self.fusion_cache.misses()
     }
 
     /// Run a quantum circuit simulation
@@ -179,7 +207,7 @@ impl Simulator {
             _ => OptimizationLevel::O3,
         };
 
-        let compiler = create_compiler(opt_level);
+        let compiler = create_compiler_with_fusion_cache(opt_level, Arc::clone(&self.fusion_cache));
         let mut compiled = circuit.clone();
 
         compiler

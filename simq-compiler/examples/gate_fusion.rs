@@ -232,6 +232,7 @@ fn example_custom_config() {
         max_fusion_size: Some(3), // Limit fusion chains to 3 gates
         eliminate_identity: true,
         identity_epsilon: 1e-10,
+        ..Default::default()
     };
 
     let optimized_custom = fuse_single_qubit_gates(&circuit, Some(config)).unwrap();
