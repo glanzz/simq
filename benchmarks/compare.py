@@ -17,6 +17,8 @@ Inputs:
                  (produced by `python3 benchmarks/qiskit_baseline.py`)
 * qsim side:     benchmarks/qsim_results.json (optional)
                  (produced by `python3 benchmarks/qsim_baseline.py`)
+* qulacs side:   benchmarks/qulacs_results.json (optional)
+                 (produced by `python3 benchmarks/qulacs_baseline.py`)
 
 Run everything in order with ./benchmarks/run.sh
 """
@@ -28,6 +30,7 @@ import sys
 
 QISKIT_TOLERANCE = 1e-12
 QSIM_TOLERANCE = 5e-6  # qsim's Python wheel is float32-only, see module docstring
+QULACS_TOLERANCE = 1e-12  # qulacs is a float64 C++ core, same order as Qiskit
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = [4, 8, 12, 16]
 GROUPS = ["vqe_energy", "qaoa_maxcut", "ghz_sampling"]
@@ -86,6 +89,12 @@ def main():
         with open(qsim_path) as f:
             qsim = json.load(f)
 
+    qulacs_path = os.path.join(REPO, "benchmarks", "qulacs_results.json")
+    qulacs = None
+    if os.path.exists(qulacs_path):
+        with open(qulacs_path) as f:
+            qulacs = json.load(f)
+
     simq = simq_values()
     cross_validate("Qiskit exact statevector", simq, qiskit["values"], QISKIT_TOLERANCE)
     if qsim is not None:
@@ -93,15 +102,24 @@ def main():
     else:
         print("(benchmarks/qsim_results.json missing - skipping qsim cross-validation; "
               "run benchmarks/qsim_baseline.py to include it)\n")
+    if qulacs is not None:
+        cross_validate("qulacs exact statevector", simq, qulacs["values"], QULACS_TOLERANCE)
+    else:
+        print("(benchmarks/qulacs_results.json missing - skipping qulacs cross-validation; "
+              "run benchmarks/qulacs_baseline.py to include it)\n")
 
     header_bits = [f"Qiskit {qiskit['versions']['qiskit']}/Aer {qiskit['versions']['qiskit_aer']}"]
     if qsim is not None:
         header_bits.append(f"cirq {qsim['versions']['cirq']}/qsim {qsim['versions']['qsimcirq']}")
+    if qulacs is not None:
+        header_bits.append(f"qulacs {qulacs['versions']['qulacs']}")
     print(f"== Timings (median, ms) - {' vs '.join(header_bits)} ==")
 
     cols = [("SimQ", None), ("Statevector", "qiskit-sv"), ("Aer", "qiskit-aer")]
     if qsim is not None:
         cols += [("Cirq", "cirq-sv"), ("qsim", "qsim")]
+    if qulacs is not None:
+        cols += [("qulacs", "qulacs")]
 
     header = f"{'workload':<18}" + "".join(f" {name:>11}" + (f" {'ratio':>7}" if name != "SimQ" else "")
                                             for name, _ in cols)
@@ -124,6 +142,8 @@ def main():
             if qsim is not None:
                 values["cirq-sv"] = qsim["timings_ms"]["cirq"].get(key)
                 values["qsim"] = qsim["timings_ms"]["qsim"].get(key)
+            if qulacs is not None:
+                values["qulacs"] = qulacs["timings_ms"]["qulacs"].get(key)
 
             def ratio(other):
                 if other is None:
