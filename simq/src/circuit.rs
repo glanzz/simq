@@ -25,7 +25,7 @@ use simq_core::{Circuit, Gate, QuantumError, QubitId};
 use simq_gates::standard::{
     CNot, CPhase, Fredkin, Hadamard, ISwap, Identity, PauliX, PauliY, PauliZ, Phase, RotationX,
     RotationY, RotationZ, SGate, SGateDagger, SXGate, SXGateDagger, Swap, TGate, TGateDagger,
-    Toffoli, CY, CZ, ECR, RXX, RYY, RZZ, U1, U2, U3,
+    Toffoli, CH, CRX, CRY, CRZ, CY, CZ, ECR, RXX, RYY, RZX, RZZ, U1, U2, U3,
 };
 use simq_sim::{MeasurementCounts, SimulationResult, Simulator, SimulatorConfig, SimulatorError};
 use simq_state::{measurement::ComputationalBasis, AdaptiveState, DenseState, PauliObservable};
@@ -185,9 +185,29 @@ impl QuantumCircuit {
         self.gate(Arc::new(CZ), &[control, target])
     }
 
+    /// Controlled-Hadamard gate
+    pub fn ch(&mut self, control: usize, target: usize) -> &mut Self {
+        self.gate(Arc::new(CH), &[control, target])
+    }
+
     /// Controlled-phase gate
     pub fn cp(&mut self, theta: f64, control: usize, target: usize) -> &mut Self {
         self.gate(Arc::new(CPhase::new(theta)), &[control, target])
+    }
+
+    /// Controlled rotation around the X-axis by `theta` radians
+    pub fn crx(&mut self, theta: f64, control: usize, target: usize) -> &mut Self {
+        self.gate(Arc::new(CRX::new(theta)), &[control, target])
+    }
+
+    /// Controlled rotation around the Y-axis by `theta` radians
+    pub fn cry(&mut self, theta: f64, control: usize, target: usize) -> &mut Self {
+        self.gate(Arc::new(CRY::new(theta)), &[control, target])
+    }
+
+    /// Controlled rotation around the Z-axis by `theta` radians
+    pub fn crz(&mut self, theta: f64, control: usize, target: usize) -> &mut Self {
+        self.gate(Arc::new(CRZ::new(theta)), &[control, target])
     }
 
     /// SWAP gate
@@ -218,6 +238,13 @@ impl QuantumCircuit {
     /// ZZ-interaction rotation by `theta` radians
     pub fn rzz(&mut self, theta: f64, a: usize, b: usize) -> &mut Self {
         self.gate(Arc::new(RZZ::new(theta)), &[a, b])
+    }
+
+    /// ZX-interaction (cross-resonance) rotation by `theta` radians
+    ///
+    /// Qubit `a` carries the Z factor, qubit `b` the X factor.
+    pub fn rzx(&mut self, theta: f64, a: usize, b: usize) -> &mut Self {
+        self.gate(Arc::new(RZX::new(theta)), &[a, b])
     }
 
     // --- Three-qubit gates ---
@@ -446,19 +473,100 @@ mod tests {
             .cx(1, 2)
             .cy(0, 2)
             .cz(1, 0)
+            .ch(0, 1)
             .cp(0.8, 0, 1)
+            .crx(0.2, 0, 1)
+            .cry(0.3, 1, 2)
+            .crz(0.4, 2, 0)
             .swap(1, 2)
             .iswap(0, 1)
             .ecr(1, 2)
             .rxx(0.2, 0, 1)
             .ryy(0.3, 1, 2)
             .rzz(0.4, 0, 2)
+            .rzx(0.5, 1, 0)
             .toffoli(0, 1, 2)
             .ccx(2, 1, 0)
             .cswap(0, 1, 2);
 
         let circuit = qc.build().unwrap();
-        assert_eq!(circuit.len(), 32);
+        assert_eq!(circuit.len(), 37);
+    }
+
+    #[test]
+    fn ch_applies_hadamard_on_control_one_branch() {
+        // H(0); CH(0→1) on |00⟩: the control-0 branch keeps amplitude 1/√2,
+        // the control-1 branch gets a Hadamard on the target. State indices
+        // are little-endian: index bit i is qubit i.
+        let mut qc = QuantumCircuit::new(2);
+        qc.h(0).ch(0, 1);
+
+        let probs = qc.probabilities().unwrap();
+        // q0=0, q1=0: untouched control-0 branch
+        assert!((probs[0] - 0.5).abs() < 1e-10, "p[0] = {}", probs[0]);
+        // q0=1: Hadamard splits the target between q1=0 and q1=1
+        assert!((probs[1] - 0.25).abs() < 1e-10, "p[1] = {}", probs[1]);
+        assert!((probs[3] - 0.25).abs() < 1e-10, "p[3] = {}", probs[3]);
+        // q0=0, q1=1 never gains amplitude
+        assert!(probs[2].abs() < 1e-10, "p[2] = {}", probs[2]);
+    }
+
+    #[test]
+    fn controlled_rotations_match_uncontrolled_on_set_control() {
+        let theta = 0.7;
+
+        // With the control in |1⟩, crx/cry/crz act exactly like rx/ry/rz
+        // on the target qubit
+        type GatePair = (
+            fn(&mut QuantumCircuit, f64) -> &mut QuantumCircuit,
+            fn(&mut QuantumCircuit, f64) -> &mut QuantumCircuit,
+        );
+        let cases: [GatePair; 3] = [
+            (|qc, t| qc.crx(t, 0, 1), |qc, t| qc.rx(t, 1)),
+            (|qc, t| qc.cry(t, 0, 1), |qc, t| qc.ry(t, 1)),
+            (|qc, t| qc.crz(t, 0, 1), |qc, t| qc.rz(t, 1)),
+        ];
+
+        for (controlled, uncontrolled) in cases {
+            let mut qc_c = QuantumCircuit::new(2);
+            qc_c.x(0);
+            controlled(&mut qc_c, theta);
+
+            let mut qc_u = QuantumCircuit::new(2);
+            qc_u.x(0);
+            uncontrolled(&mut qc_u, theta);
+
+            let p_c = qc_c.probabilities().unwrap();
+            let p_u = qc_u.probabilities().unwrap();
+            for (a, b) in p_c.iter().zip(p_u.iter()) {
+                assert!((a - b).abs() < 1e-10, "{a} != {b}");
+            }
+        }
+
+        // With the control in |0⟩, the controlled rotation is a no-op
+        let mut qc = QuantumCircuit::new(2);
+        qc.crx(theta, 0, 1).cry(theta, 0, 1).crz(theta, 0, 1);
+        let probs = qc.probabilities().unwrap();
+        assert!((probs[0] - 1.0).abs() < 1e-10, "p(00) = {}", probs[0]);
+    }
+
+    #[test]
+    fn rzx_hadamard_conjugation_equals_rzz() {
+        // H(1); RZX(θ, 0, 1); H(1) = RZZ(θ, 0, 1): compare the two circuits
+        // on the same non-trivial input state
+        let theta = 0.9;
+
+        let mut qc_zx = QuantumCircuit::new(2);
+        qc_zx.ry(0.3, 0).ry(0.8, 1).h(1).rzx(theta, 0, 1).h(1);
+
+        let mut qc_zz = QuantumCircuit::new(2);
+        qc_zz.ry(0.3, 0).ry(0.8, 1).rzz(theta, 0, 1);
+
+        let a = qc_zx.simulate().unwrap().state.to_dense_vec();
+        let b = qc_zz.simulate().unwrap().state.to_dense_vec();
+        for (x, y) in a.iter().zip(b.iter()) {
+            assert!((x - y).norm() < 1e-10, "{x} != {y}");
+        }
     }
 
     #[test]
