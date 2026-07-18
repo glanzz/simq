@@ -358,6 +358,45 @@ mod tests {
     }
 
     #[test]
+    fn test_corrupt_snapshot_too_many_qubits_rejected() {
+        // num_qubits > 63 must be rejected before any allocation is attempted
+        let mut bytes = vec![SNAPSHOT_VERSION, TAG_DENSE];
+        bytes.extend_from_slice(&64u64.to_le_bytes());
+        let err = deserialize_state(&bytes).unwrap_err();
+        assert!(format!("{}", err).contains("64") || format!("{:?}", err).contains("64"));
+    }
+
+    #[test]
+    fn test_corrupt_snapshot_sparse_index_out_of_range_rejected() {
+        // Sparse snapshot for 2 qubits (dimension 4) with a basis index of 10,
+        // which is out of range and must be rejected.
+        let mut bytes = vec![SNAPSHOT_VERSION, TAG_SPARSE];
+        bytes.extend_from_slice(&2u64.to_le_bytes()); // num_qubits
+        bytes.extend_from_slice(&1u64.to_le_bytes()); // one entry
+        bytes.extend_from_slice(&10u64.to_le_bytes()); // out-of-range index
+        bytes.extend_from_slice(&1.0f64.to_le_bytes()); // re
+        bytes.extend_from_slice(&0.0f64.to_le_bytes()); // im
+        let err = deserialize_state(&bytes).unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("out of range"), "unexpected error: {}", msg);
+    }
+
+    #[test]
+    fn test_corrupt_snapshot_trailing_bytes_rejected() {
+        // Well-formed dense snapshot for 1 qubit, plus extra trailing garbage.
+        let mut bytes = vec![SNAPSHOT_VERSION, TAG_DENSE];
+        bytes.extend_from_slice(&1u64.to_le_bytes());
+        bytes.extend_from_slice(&1.0f64.to_le_bytes());
+        bytes.extend_from_slice(&0.0f64.to_le_bytes());
+        bytes.extend_from_slice(&0.0f64.to_le_bytes());
+        bytes.extend_from_slice(&0.0f64.to_le_bytes());
+        bytes.push(0xFF); // trailing garbage byte
+        let err = deserialize_state(&bytes).unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("trailing"), "unexpected error: {}", msg);
+    }
+
+    #[test]
     fn test_checkpoint_eviction() {
         let mut manager = CheckpointManager::new(2);
         let state = AdaptiveState::new(1).unwrap();

@@ -1341,6 +1341,51 @@ mod tests {
         assert!(tracker.total_improvement().is_none());
     }
 
+    /// Line 887-888: BestTracker::default() delegates to BestTracker::new()
+    #[test]
+    fn test_best_tracker_default() {
+        let tracker = BestTracker::default();
+        assert!(!tracker.has_improved());
+        assert_eq!(tracker.num_iterations(), 0);
+        assert!(tracker.history().is_empty());
+    }
+
+    /// Lines 537-538: ConvergenceMonitor::history() returns the recorded step metrics
+    #[test]
+    fn test_monitor_history_accessor() {
+        let config = MonitorConfig::default();
+        let mut monitor = ConvergenceMonitor::new(config);
+        monitor.record(0, 1.0, &[0.5], &[0.5]);
+        monitor.record(1, 0.5, &[0.25], &[0.4]);
+        let history = monitor.history();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].iteration, 0);
+        assert_eq!(history[1].iteration, 1);
+    }
+
+    /// Line 717: ConvergenceReport::summary() — converged branch prints "Converged"
+    #[test]
+    fn test_report_summary_converged_branch() {
+        let report = ConvergenceReport {
+            converged: true,
+            stopping_criterion: StoppingCriterion::FullConvergence,
+            num_iterations: 3,
+            total_time: Duration::from_millis(10),
+            initial_energy: 1.0,
+            final_energy: 0.01,
+            best_energy: 0.01,
+            best_iteration: 3,
+            energy_improvement: 0.99,
+            final_gradient_norm: 1e-8,
+            avg_step_time: 0.001,
+            warnings: vec![],
+            diagnostics: vec![],
+        };
+        let summary = report.summary();
+        assert!(summary.contains("Converged"));
+        assert!(!summary.contains("Stopped"));
+    }
+
     #[test]
     fn test_tracked_optimization_result_converged() {
         let result = TrackedOptimizationResult {

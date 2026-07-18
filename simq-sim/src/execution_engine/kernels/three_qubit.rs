@@ -216,4 +216,119 @@ mod tests {
         // duplicate qubits
         assert!(apply_three_qubit_dense(&gate, 0, 1, 1, &mut state, false, usize::MAX).is_err());
     }
+
+    /// Directly exercise the helper functions (`expand_three_qubit_base`,
+    /// `get_three_qubit_indices`) so coverage isn't solely dependent on
+    /// whether rayon actually forks work for the closure that inlines them.
+    #[test]
+    fn test_expand_three_qubit_base_basic() {
+        // sorted = [0, 1, 2]: every bit of k should shift up by 3 (no room left)
+        let sorted = [0usize, 1, 2];
+        assert_eq!(expand_three_qubit_base(0, &sorted), 0);
+        assert_eq!(expand_three_qubit_base(1, &sorted), 0b1000);
+
+        // Non-contiguous, non-sorted-input positions (function assumes ascending
+        // order in `sorted`, as produced by `sort_unstable` in the caller).
+        let sorted = [0usize, 2, 4];
+        // k=0 -> base 0
+        assert_eq!(expand_three_qubit_base(0, &sorted), 0);
+        // k=1: bit0 of k inserted before position 0 -> occupies the lowest free bit
+        let base = expand_three_qubit_base(1, &sorted);
+        // Resulting base must have zero bits at positions 0, 2, 4
+        assert_eq!(base & 0b10101, 0);
+    }
+
+    #[test]
+    fn test_get_three_qubit_indices_matches_bit_layout() {
+        // qubit1=2, qubit2=1, qubit3=0 (matches the matrix basis ordering
+        // m = bit(qubit1)<<2 | bit(qubit2)<<1 | bit(qubit3))
+        let idx = get_three_qubit_indices(0, 2, 1, 0);
+        // m=0 -> all bits clear -> base
+        assert_eq!(idx[0], 0);
+        // m=0b001 -> qubit3 bit set (bit 0)
+        assert_eq!(idx[1], 0b001);
+        // m=0b010 -> qubit2 bit set (bit 1)
+        assert_eq!(idx[2], 0b010);
+        // m=0b011 -> qubit2 and qubit3 bits set
+        assert_eq!(idx[3], 0b011);
+        // m=0b100 -> qubit1 bit set (bit 2)
+        assert_eq!(idx[4], 0b100);
+        // m=0b101
+        assert_eq!(idx[5], 0b101);
+        // m=0b110
+        assert_eq!(idx[6], 0b110);
+        // m=0b111 -> all bits set
+        assert_eq!(idx[7], 0b111);
+    }
+
+    #[test]
+    fn test_get_three_qubit_indices_nonzero_base_and_scattered_qubits() {
+        // Non-adjacent qubit positions (1, 3, 5) with a nonzero base offset.
+        let base = 0b1000000; // bit 6 set, independent of qubits 1/3/5
+        let idx = get_three_qubit_indices(base, 1, 3, 5);
+        for &i in &idx {
+            // The base bit (6) must always be preserved
+            assert_eq!(i & 0b1000000, 0b1000000);
+        }
+        // All 8 combinations of bits 1,3,5 (relative to base) must be distinct
+        let mut seen = idx.to_vec();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), 8);
+    }
+
+    /// Force the parallel path on a larger state (5 qubits = 32 amplitudes,
+    /// 4 subspaces) so rayon has enough work to actually fork, and verify it
+    /// agrees with the sequential path element-by-element including edge
+    /// qubit orderings (qubit3 < qubit2 < qubit1, and reversed).
+    #[test]
+    fn test_three_qubit_parallel_large_state_and_orderings() {
+        let gate = toffoli_matrix();
+        for &(q1, q2, q3) in &[(0, 1, 2), (4, 2, 0), (1, 3, 4), (3, 1, 0), (0, 4, 2)] {
+            let mut seq: Vec<Complex64> = (0..32)
+                .map(|i| Complex64::new(1.0 + i as f64, 0.5 * i as f64))
+                .collect();
+            let mut par = seq.clone();
+
+            apply_three_qubit_dense(&gate, q1, q2, q3, &mut seq, false, usize::MAX).unwrap();
+            apply_three_qubit_dense(&gate, q1, q2, q3, &mut par, true, 0).unwrap();
+
+            for i in 0..32 {
+                assert_abs_diff_eq!(seq[i].re, par[i].re, epsilon = 1e-10);
+                assert_abs_diff_eq!(seq[i].im, par[i].im, epsilon = 1e-10);
+            }
+        }
+    }
+
+    /// Fredkin (CSWAP)-style gate through the parallel path: verifies the
+    /// unsafe pointer read/write loop in the parallel closure body actually
+    /// swaps amplitudes correctly (not just leaves them fixed as Toffoli
+    /// mostly would for a computational basis state).
+    #[test]
+    fn test_three_qubit_parallel_fredkin_swap() {
+        let o = Complex64::new(0.0, 0.0);
+        let l = Complex64::new(1.0, 0.0);
+        let mut m = [[o; 8]; 8];
+        for (i, row) in m.iter_mut().enumerate() {
+            row[i] = l;
+        }
+        // Fredkin: control bit set (m & 0b100) swaps the other two bits
+        // i.e. swap |101⟩ (5) <-> |110⟩ (6)
+        m[5][5] = o;
+        m[6][6] = o;
+        m[5][6] = l;
+        m[6][5] = l;
+
+        // 4-qubit state (16 amplitudes, 2 subspaces) forces parallel to do work.
+        let mut state = vec![Complex64::new(0.0, 0.0); 16];
+        // control=qubit0, targets=qubit1,qubit2. Set bits: q0=1,q1=0,q2=1 -> index 0b0101=5
+        state[0b0101] = Complex64::new(1.0, 0.0);
+
+        apply_three_qubit_dense(&m, 2, 1, 0, &mut state, true, 0).unwrap();
+
+        // Matrix basis m=(bit(q2)<<2)|(bit(q1)<<1)|bit(q0). For index 5 (q2=1,q1=0,q0=1):
+        // m = 1<<2 | 0<<1 | 1 = 5, which swaps with m=6 (q2=1,q1=1,q0=0) -> index 0b0110=6
+        assert_abs_diff_eq!(state[5].re, 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(state[6].re, 1.0, epsilon = 1e-10);
+    }
 }

@@ -6,7 +6,12 @@
 [![Docs Site](https://github.com/glanzz/simq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/simq/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-**SimQ** is a blazingly fast quantum computing SDK written in Rust, designed to be 8-10x faster than Qiskit for variational algorithms while maintaining type safety and ergonomic APIs.
+**SimQ** is a blazingly fast quantum computing SDK written in Rust. On a cross-validated benchmark suite (identical circuits verified against Qiskit to 1e-12 before any timing is reported), SimQ is **1.6–90× faster than Qiskit Aer and 7.8–799× faster than exact Statevector** across VQE, QAOA, and sampling workloads at 4–16 qubits — while maintaining type safety and ergonomic APIs. Every number is reproducible with one command: see [BENCHMARKS.md](BENCHMARKS.md).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-dark.svg">
+  <img alt="SimQ vs Qiskit benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ is fastest on all twelve workloads." src="benchmarks/results-light.svg">
+</picture>
 
 ## Documentation
 
@@ -26,7 +31,7 @@ Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --worksp
 
 ## Features
 
-- **Extreme Performance**: 8-10x faster than Qiskit for VQE/QAOA workloads
+- **Measured Performance**: faster than Qiskit (both Aer and Statevector) on every workload of a [cross-validated 4–16 qubit suite](BENCHMARKS.md) — 1.6–90× vs Aer, reproducible via `./benchmarks/run.sh`
 - **⚡ Compile-Time Gate Matrix Caching (NEW!)**: Revolutionary multi-level caching system with ~0-5ns matrix access (see [details](#compile-time-caching))
 - **Type-Safe**: Compile-time verification of quantum operations
 - **Memory Efficient**: Hybrid sparse/dense state representation, simulate up to 35-40 qubits on 32GB RAM

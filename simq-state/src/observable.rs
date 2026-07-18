@@ -212,70 +212,85 @@ impl PauliString {
         }
     }
 
+    /// Bit masks of the qubits carrying X, Y, and Z operators.
+    ///
+    /// Qubit q corresponds to bit q (little-endian), matching the state
+    /// indexing convention.
+    fn masks(&self) -> (usize, usize, usize) {
+        let (mut x_mask, mut y_mask, mut z_mask) = (0usize, 0usize, 0usize);
+        for (qubit, &pauli) in self.paulis.iter().enumerate() {
+            match pauli {
+                Pauli::I => {},
+                Pauli::X => x_mask |= 1 << qubit,
+                Pauli::Y => y_mask |= 1 << qubit,
+                Pauli::Z => z_mask |= 1 << qubit,
+            }
+        }
+        (x_mask, y_mask, z_mask)
+    }
+
     /// Compute expectation value for diagonal Pauli string (fast path)
+    ///
+    /// The eigenvalue of a Z-string on basis state |i⟩ is
+    /// (-1)^popcount(i & z_mask) — one popcount per amplitude instead of a
+    /// loop over all qubits.
     fn expectation_value_diagonal(&self, state: &DenseState) -> Result<f64> {
-        let amplitudes = state.amplitudes();
+        let (_, _, z_mask) = self.masks();
 
         let mut expectation = 0.0;
-
-        for (basis_state, amplitude) in amplitudes.iter().enumerate() {
+        for (basis_state, amplitude) in state.amplitudes().iter().enumerate() {
             let probability = amplitude.norm_sqr();
-
-            // Compute eigenvalue for this basis state
-            let mut eigenvalue = self.coeff as f64;
-            for (qubit, &pauli) in self.paulis.iter().enumerate() {
-                if pauli == Pauli::Z {
-                    // Check if qubit is |1⟩ in this basis state
-                    let bit = (basis_state >> qubit) & 1 == 1;
-                    eigenvalue *= pauli.eigenvalue(bit);
-                }
-                // Pauli::I contributes factor of 1
+            if (basis_state & z_mask).count_ones() & 1 == 1 {
+                expectation -= probability;
+            } else {
+                expectation += probability;
             }
-
-            expectation += probability * eigenvalue;
         }
 
-        Ok(expectation)
+        Ok(expectation * self.coeff as f64)
     }
 
     /// Compute expectation value for general Pauli string
+    ///
+    /// Evaluates ⟨ψ|P|ψ⟩ = Σ_i conj(ψ[i ^ flip]) · ψ[i] · phase(i) in a single
+    /// allocation-free pass: `flip` is the X|Y mask, and
+    /// phase(i) = i^{|Y|} · (-1)^popcount(i & (Y|Z)). (The previous
+    /// implementation allocated a full 2^n scratch vector and walked the
+    /// whole Pauli vector per amplitude — it dominated VQE energy
+    /// evaluations at 16 qubits.)
     fn expectation_value_general(&self, state: &DenseState) -> Result<f64> {
-        // For non-diagonal operators, we need to apply the Pauli string
-        // and compute the inner product ⟨ψ|P|ψ⟩
-
         let amplitudes = state.amplitudes();
-        let num_qubits = state.num_qubits();
-        let dimension = 1 << num_qubits;
+        let (x_mask, y_mask, z_mask) = self.masks();
+        let flip = x_mask | y_mask;
+        let sign_mask = y_mask | z_mask;
 
-        // Compute P|ψ⟩
-        let mut transformed = vec![Complex64::new(0.0, 0.0); dimension];
-
-        for (basis_state, &amplitude) in amplitudes.iter().enumerate() {
-            if amplitude.norm_sqr() < 1e-15 {
-                continue; // Skip zero amplitudes
+        let mut acc = Complex64::new(0.0, 0.0);
+        for (i, &a) in amplitudes.iter().enumerate() {
+            let partner = amplitudes[i ^ flip].conj() * a;
+            if (i & sign_mask).count_ones() & 1 == 1 {
+                acc -= partner;
+            } else {
+                acc += partner;
             }
-
-            // Apply Pauli string to this basis state
-            let (new_state, phase) = self.apply_to_basis_state(basis_state);
-            transformed[new_state] += amplitude * phase;
         }
 
-        // Compute ⟨ψ|P|ψ⟩ = Σ conj(ψ[i]) * transformed[i]
-        let expectation: Complex64 = amplitudes
-            .iter()
-            .zip(transformed.iter())
-            .map(|(a, b)| a.conj() * b)
-            .sum();
+        // Global i^{|Y|} factor
+        let y_phase = match y_mask.count_ones() % 4 {
+            0 => Complex64::new(1.0, 0.0),
+            1 => Complex64::new(0.0, 1.0),
+            2 => Complex64::new(-1.0, 0.0),
+            _ => Complex64::new(0.0, -1.0),
+        };
 
-        // Apply overall coefficient
-        let result = expectation.re * self.coeff as f64;
-
-        Ok(result)
+        Ok((acc * y_phase).re * self.coeff as f64)
     }
 
     /// Apply Pauli string to a computational basis state
     ///
     /// Returns (new_state, phase_factor)
+    /// Reference implementation kept for the unit tests; the hot paths above
+    /// use the mask/popcount form instead.
+    #[cfg_attr(not(test), allow(dead_code))]
     fn apply_to_basis_state(&self, basis_state: usize) -> (usize, Complex64) {
         let mut new_state = basis_state;
         let mut phase = Complex64::new(1.0, 0.0);
@@ -685,5 +700,75 @@ mod tests {
         let state = DenseState::new(2).unwrap();
         let expectation = zx.expectation_value(&state).unwrap();
         assert_relative_eq!(expectation, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_apply_to_basis_state_identity_and_y() {
+        // "IY" exercises the Pauli::I branch (no-op) and both arms of the
+        // Pauli::Y branch (phase +i when bit==0, phase -i when bit==1) of
+        // `apply_to_basis_state`. Paulis are indexed left-to-right as
+        // qubit0, qubit1, ...: "IY" means qubit0=I, qubit1=Y.
+        let iy = PauliString::from_str("IY").unwrap();
+
+        // basis_state = 0b00 -> qubit0 (I) unchanged, qubit1 (Y) bit=0 => flip + i phase
+        let (new_state, phase) = iy.apply_to_basis_state(0b00);
+        assert_eq!(new_state, 0b10);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, 1.0, epsilon = 1e-10);
+
+        // basis_state = 0b10 -> qubit0 (I) unchanged, qubit1 (Y) bit=1 => flip - i phase
+        let (new_state, phase) = iy.apply_to_basis_state(0b10);
+        assert_eq!(new_state, 0b00);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, -1.0, epsilon = 1e-10);
+
+        // basis_state = 0b01 -> qubit0 (I) unchanged (bit stays set), qubit1
+        // (Y) bit=0 => flip + i phase.
+        let (new_state, phase) = iy.apply_to_basis_state(0b01);
+        assert_eq!(new_state, 0b11);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, 1.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_expectation_value_general_three_y_phase() {
+        // With exactly 3 Y operators, y_mask.count_ones() % 4 == 3, which
+        // exercises the final `_` arm of the global i^|Y| phase match in
+        // `expectation_value_general` (phase = -i). |000⟩ has amplitude 1 on
+        // basis state 0, and YYY maps |000⟩ -> i^3 |111⟩ = -i|111⟩, which is
+        // orthogonal to |000⟩, so the expectation value is 0 but the
+        // -i branch is still exercised on the way there.
+        let yyy = PauliString::from_str("YYY").unwrap();
+        assert!(!yyy.is_diagonal());
+
+        let state = DenseState::new(3).unwrap();
+        let expectation = yyy.expectation_value(&state).unwrap();
+        assert_relative_eq!(expectation, 0.0, epsilon = 1e-10);
+
+        // Directly exercise apply_to_basis_state for the 3-Y case too: all
+        // three bits start at 0, so each Y contributes a +i phase and flips
+        // its qubit, giving overall phase i^3 = -i and new_state = 0b111.
+        let (new_state, phase) = yyy.apply_to_basis_state(0b000);
+        assert_eq!(new_state, 0b111);
+        assert_relative_eq!(phase.re, 0.0, epsilon = 1e-10);
+        assert_relative_eq!(phase.im, -1.0, epsilon = 1e-10);
+
+        // Build a state where ⟨YYY⟩ is nonzero: ψ = (|000⟩ + i|111⟩)/sqrt(2).
+        // Since YYY|000⟩ = -i|111⟩ and YYY|111⟩ = i|000⟩ (derived from the
+        // per-qubit phase i on a 0-bit and -i on a 1-bit, cubed), YYYψ =
+        // (-1/sqrt2)|000⟩ + (-i/sqrt2)|111⟩, giving ⟨ψ|YYY|ψ⟩ = -1.
+        let amplitudes = vec![
+            Complex64::new(1.0 / std::f64::consts::SQRT_2, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 1.0 / std::f64::consts::SQRT_2),
+        ];
+        let ghz = DenseState::from_amplitudes(3, &amplitudes).unwrap();
+        let expectation = yyy.expectation_value(&ghz).unwrap();
+        assert_relative_eq!(expectation, -1.0, epsilon = 1e-10);
     }
 }

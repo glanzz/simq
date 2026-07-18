@@ -87,6 +87,12 @@ fn test_pauli_gates_squaring() {
 }
 
 #[test]
+fn test_is_identity_2x2_rejects_non_identity() {
+    // Covers the early `return false` branch: X is unitary but not identity.
+    assert!(!is_identity_2x2(PauliX::matrix()));
+}
+
+#[test]
 fn test_hadamard_gate() {
     assert_eq!(Hadamard.name(), "H");
     assert_eq!(Hadamard.num_qubits(), 1);

@@ -926,6 +926,60 @@ mod tests {
         assert_eq!(result.num_iterations, 5);
     }
 
+    /// Lines 53, 55-56: `compute_expectation` Sparse branch, exercised via a
+    /// no-op circuit (Ry(0)) that keeps the state sparse.
+    #[test]
+    fn test_lbfgs_optimizer_sparse_state() {
+        let sim = make_sim();
+        let obs = z_observable();
+        let config = LBFGSConfig {
+            max_iterations: 2,
+            tolerance: 1e-20,
+            ..LBFGSConfig::default()
+        };
+        let mut optimizer = LBFGSOptimizer::new(ry_circuit, config);
+        // Start at 0.0 so the initial state is sparse (|0>).
+        let result = optimizer.optimize(&sim, &obs, &[0.0]).unwrap();
+        assert!(result.energy.is_finite());
+    }
+
+    /// Lines 641-646, 748-755: Force the Nelder-Mead shrink branch by using
+    /// an objective that only decreases exactly at one point (params = 0),
+    /// making reflection/expansion/contraction all fail to improve on most
+    /// simplex configurations, eventually triggering a shrink step.
+    #[test]
+    fn test_nelder_mead_shrink_branch() {
+        let sim = make_sim();
+        let obs = z_observable();
+        // A pathological circuit builder: the "energy" is the sum of squares
+        // of the parameters computed directly (bypassing simulation cost),
+        // implemented by building a circuit whose <Z> expectation approximates
+        // a sharply peaked function of params via a large rotation scaling,
+        // making local moves (reflect/expand/contract) unable to improve and
+        // forcing a shrink.
+        let sharp_circuit = |params: &[f64]| {
+            let mut c = Circuit::new(1);
+            // Scale up the parameter drastically so that reflected/expanded/
+            // contracted points overshoot into oscillatory <Z> regions,
+            // discouraging improvement and favoring shrink steps.
+            c.add_gate(Arc::new(RotationY::new(params[0] * 50.0)), &[q(0)])
+                .unwrap();
+            c
+        };
+        let config = NelderMeadConfig {
+            max_iterations: 100,
+            tolerance: 1e-12, // Very tight: unlikely to converge via simplex size alone
+            ..NelderMeadConfig::default()
+        };
+        let mut optimizer = NelderMeadOptimizer::new(sharp_circuit, config);
+        let result = optimizer.optimize(&sim, &obs, &[0.5]).unwrap();
+        assert!(result.energy.is_finite());
+        // With a highly oscillatory objective, a shrink step should occur at
+        // some point in the history (only meaningful as an implicit check
+        // that the optimizer ran through many iterations without crashing).
+        assert!(!optimizer.history().is_empty());
+    }
+
     /// Nelder-Mead history() and reset()
     #[test]
     fn test_nelder_mead_history_and_reset() {

@@ -5,6 +5,14 @@ use crate::execution_engine::error::Result;
 use ahash::AHashMap;
 use num_complex::Complex64;
 
+/// Squared-magnitude cutoff below which an amplitude is treated as zero.
+///
+/// This exists to keep genuinely dead entries out of the sparse map; it must
+/// sit far below the 1e-12 accuracy the cross-validated benchmark suite
+/// certifies. The previous value (1e-15, i.e. |amp| < 3e-8) truncated real
+/// amplitudes and showed up as ~1e-9 errors in 16-qubit VQE energies.
+const AMPLITUDE_CUTOFF: f64 = 1e-28;
+
 /// Apply a single-qubit gate to a sparse state
 pub fn apply_single_qubit_sparse(
     gate: &Matrix2x2,
@@ -32,10 +40,10 @@ pub fn apply_single_qubit_sparse(
         let new0 = gate[0][0] * amp0 + gate[0][1] * amp1;
         let new1 = gate[1][0] * amp0 + gate[1][1] * amp1;
 
-        if new0.norm_sqr() > 1e-15 {
+        if new0.norm_sqr() > AMPLITUDE_CUTOFF {
             new_amplitudes.insert(idx0, new0);
         }
-        if new1.norm_sqr() > 1e-15 {
+        if new1.norm_sqr() > AMPLITUDE_CUTOFF {
             new_amplitudes.insert(idx1, new1);
         }
     }
@@ -98,7 +106,7 @@ pub fn apply_three_qubit_sparse(
                 sum += gate[out_idx][in_idx] * a;
             }
 
-            if sum.norm_sqr() > 1e-15 {
+            if sum.norm_sqr() > AMPLITUDE_CUTOFF {
                 new_amplitudes.insert(idx, sum);
             }
         }
@@ -161,7 +169,7 @@ pub fn apply_two_qubit_sparse(
                 sum += gate[out_idx][in_idx] * a;
             }
 
-            if sum.norm_sqr() > 1e-15 {
+            if sum.norm_sqr() > AMPLITUDE_CUTOFF {
                 new_amplitudes.insert(idx, sum);
             }
         }

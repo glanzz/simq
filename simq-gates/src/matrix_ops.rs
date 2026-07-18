@@ -610,13 +610,55 @@ mod tests {
 
     #[test]
     fn test_embed_gate_matrix_vec_two_qubit_gate() {
-        // Covers the multi-qubit branch in embed_gate_matrix_vec (line 155+, incl. 165 `continue`).
+        // Covers the multi-qubit branch in embed_gate_matrix_vec (line 155+).
         // Embed a 2-qubit gate (CNOT as flat vec) into a 2-qubit system.
         let cnot = matrix_to_vec(&CNOT);
         let embedded = embed_gate_matrix_vec(&cnot, 2, &[0, 1]);
         // CNOT embedded in a 2-qubit system should equal the CNOT itself (4x4)
         assert_eq!(embedded.len(), 16);
         assert!(is_unitary(&embedded, 1e-10));
+    }
+
+    #[test]
+    fn test_embed_gate_matrix_vec_two_qubit_gate_with_spectator() {
+        // Covers line 165's `continue` branch: when there's a spectator qubit
+        // not involved in the gate, `non_gate_mask` is nonzero, so rows/cols
+        // whose spectator bits differ take the `continue` path (line 164-166).
+        let cnot = matrix_to_vec(&CNOT);
+        // 3 qubits total, gate acts on qubits [0, 1]; qubit 2 is a spectator.
+        let embedded = embed_gate_matrix_vec(&cnot, 3, &[0, 1]);
+        assert_eq!(embedded.len(), 64);
+        assert!(is_unitary(&embedded, 1e-10));
+
+        // Entries where the spectator qubit (bit 2) differs between row and
+        // column must be zero -- this is exactly what the `continue` skips.
+        let system_size = 8usize;
+        for i in 0..system_size {
+            for j in 0..system_size {
+                if (i & 0b100) != (j & 0b100) {
+                    let val = embedded[i * system_size + j];
+                    assert_eq!(val, Complex64::new(0.0, 0.0));
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn test_embed_gate_matrix_qubit_index_out_of_bounds() {
+        // Covers the panic branch (lines 97-102) when the qubit index is
+        // not a valid index into a system of `num_qubits`.
+        let _ = embed_gate_matrix(&PAULI_X, 2, &[5]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Number of qubit indices must match gate size")]
+    fn test_embed_gate_matrix_vec_mismatched_qubit_indices_len() {
+        // Covers the panic branch (lines 119-123) when the number of qubit
+        // indices provided doesn't match the gate matrix's qubit count.
+        let cnot = matrix_to_vec(&CNOT);
+        // CNOT is a 2-qubit gate; providing only 1 index should panic.
+        let _ = embed_gate_matrix_vec(&cnot, 3, &[0]);
     }
 
     #[test]

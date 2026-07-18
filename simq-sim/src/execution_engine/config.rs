@@ -69,7 +69,10 @@ impl Default for ExecutionConfig {
         Self {
             mode: ExecutionMode::Adaptive,
             parallel_strategy: ParallelStrategy::LayerBased,
-            parallel_threshold: 1 << 10, // 1024 amplitudes
+            // Gate kernels are memory-bound: on typical 4-8 core hosts rayon
+            // fork/join costs more than it saves below a few MiB of state
+            // (issue #76), so parallelism engages at 2^18 amplitudes (4 MiB).
+            parallel_threshold: 1 << 18,
             use_gpu: false,
             gpu_device_id: 0,
             adaptive_state: true,
@@ -104,7 +107,7 @@ impl ExecutionConfig {
         Self {
             mode: ExecutionMode::Parallel,
             parallel_strategy: ParallelStrategy::LayerBased,
-            parallel_threshold: 1 << 8,
+            parallel_threshold: 1 << 18,
             use_gpu: false,
             adaptive_state: true,
             validate_state: false,
