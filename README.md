@@ -6,50 +6,34 @@
 [![Docs Site](https://github.com/glanzz/simq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/simq/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-**SimQ** is a blazingly fast quantum computing SDK written in Rust. On a cross-validated benchmark suite (identical circuits verified against Qiskit to 1e-12, qsim to 5e-6, and qulacs to 1e-12 before any timing is reported), SimQ beats Qiskit Aer on 19 of 20 workloads (**1.5–72.6×**) and exact Statevector on all 20 (**2.7–2534×**) across VQE, QAOA, GHZ sampling, QFT, and random-circuit workloads at 4–16 qubits — while maintaining type safety and ergonomic APIs. The strongest competitor found is [qulacs](https://github.com/qulacs/qulacs), which SimQ beats on all 12 covered workloads by a narrower 1.0–1.9×; the one documented loss (deep QFT at 16 qubits, where gates aren't local) is analyzed in full rather than hidden. Every number is reproducible with one command: see [BENCHMARKS.md](BENCHMARKS.md).
+SimQ is a quantum computing SDK in Rust, built for speed without giving up type safety or an ergonomic API.
+
+## Benchmarks
+
+Every number below comes from a cross-validated suite: SimQ's output is checked against Qiskit (to 1e-12), qsim (to 5e-6), and qulacs (to 1e-12) on identical circuits before any timing is trusted. Full methodology, all 20 workloads, and the one documented loss are in [BENCHMARKS.md](BENCHMARKS.md); `./benchmarks/run.sh` reproduces it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-dark.svg">
   <img alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ leads on 10 of these 12 workloads; qsim is faster for 16-qubit VQE and QAOA (see BENCHMARKS.md)." src="benchmarks/results-light.svg">
 </picture>
 
-## Documentation
+*4-16 qubits, VQE / QAOA / GHZ sampling. SimQ beats Qiskit Aer on 19 of 20 workloads in the full suite (1.5-72.6x) and exact Statevector on all 20 (2.7-2534x). The strongest competitor found is [qulacs](https://github.com/qulacs/qulacs) — SimQ still leads it on every covered workload, by 1.0-1.9x.*
 
-The full documentation lives at **[glanzz.github.io/simq](https://glanzz.github.io/simq/)**:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-scaling-dark.svg">
+  <img alt="SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale. SimQ leads through 28 qubits; all three simulators hit a hard wall at 30 qubits (16 GiB state vs. 15 GiB RAM), shown as a dashed 'rejected / not attempted' marker rather than a bar." src="benchmarks/results-scaling-light.svg">
+</picture>
 
-| Section | What's there |
-|---------|--------------|
-| [Installation](https://glanzz.github.io/simq/getting-started/installation.html) | Rust crate setup and Python bindings via maturin |
-| [Quickstart (Rust)](https://glanzz.github.io/simq/getting-started/quickstart-rust.html) | Your first circuit in five minutes |
-| [Quickstart (Python)](https://glanzz.github.io/simq/getting-started/quickstart-python.html) | The Python API tour |
-| [User guide](https://glanzz.github.io/simq/guide/circuits.html) | Circuits, simulation, VQE/QAOA, compiler, noise, backends |
-| [Examples](https://glanzz.github.io/simq/examples/) | Every runnable example in the workspace, catalogued |
-| [Architecture](https://glanzz.github.io/simq/architecture/) | How the eight crates fit together |
-| [Contributing](https://glanzz.github.io/simq/contributing/) | Dev setup, testing, and the PR workflow |
+*Same machine, pushed to the edge: 20-30 qubits. SimQ still leads at 28 qubits (4 GiB state), and every simulator hits the same wall at 30 — a dense statevector needs 16 GiB, more than the 15 GiB box has. That's physics, not a bug: SimQ fails cleanly with a clear error instead of aborting.*
 
-Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --workspace --exclude simq-py --no-deps --open` locally).
-
-## Features
-
-- **Measured Performance**: faster than Qiskit Aer on 19 of 20 workloads and exact Statevector on all 20 of a [cross-validated 4–16 qubit suite](BENCHMARKS.md) — 1.5–72.6× vs Aer, reproducible via `./benchmarks/run.sh` — and still faster than qulacs, the strongest competitor found, on all 12 workloads it covers
-- **⚡ Compile-Time Gate Matrix Caching (NEW!)**: Revolutionary multi-level caching system with ~0-5ns matrix access (see [details](#compile-time-caching))
-- **Type-Safe**: Compile-time verification of quantum operations
-- **Memory Efficient**: Hybrid sparse/dense state representation; a dense statevector needs `16 × 2^n` bytes, so 15 GiB of RAM holds up to 29 qubits (measured — see [BENCHMARKS.md](BENCHMARKS.md)'s "Where it actually fails" section) and 32 GiB holds up to ~30-31, with `Simulator::run` deriving the cap from available memory and rejecting oversized circuits cleanly instead of aborting
-- **Hardware Ready**: Same code runs on simulators and real quantum computers
-- **Zero-Cost Abstractions**: No runtime overhead from high-level APIs
-- **Built-in Gradients**: Automatic gradient computation for variational algorithms
-- **Multi-Backend**: Support for IBM Quantum, AWS Braket, and more
+This isn't cherry-picked. The suite also loses one workload — deep QFT at 16 qubits, where the gate structure is long-range and SimQ's fusion pass is local — and BENCHMARKS.md documents that loss and why it happens, not just the wins.
 
 ## Quick Start
-
-Add SimQ to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 simq = "0.1"
 ```
-
-Create your first quantum circuit:
 
 ```rust
 use simq::QuantumCircuit;
@@ -77,8 +61,7 @@ Gate methods chain fluently and never panic: the first invalid operation
 `rxx`/`ryy`/`rzz`, `toffoli`/`ccx`, `cswap` — plus a `gate(...)` escape
 hatch for custom gates.
 
-If you need lower-level control, the subcrate APIs remain fully accessible
-through the same dependency:
+For lower-level control, the subcrate APIs are available through the same dependency:
 
 ```rust
 use simq::prelude::*;
@@ -94,36 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Why SimQ?
-
-### Performance First
-
-SimQ is designed from the ground up for speed:
-
-- **Sparse state vectors** for memory-efficient simulation
-- **SIMD-optimized** gate operations
-- **Compile-time circuit optimization** with zero runtime overhead
-- **Parallel execution** with automatic work distribution
-- **Zero-copy operations** wherever possible
-
-### Type Safety Without Compromise
-
-For compile-time qubit bounds, use the const-generic `CircuitBuilder`:
-
-```rust
-use simq::prelude::*;
-
-let mut builder = CircuitBuilder::<4>::new(); // 4-qubit circuit
-let [q0, q1, q2, q3] = builder.qubits();      // typed qubit references
-builder.apply_gate(Arc::new(Hadamard), &[q0]).unwrap();
-builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist — caught immediately
-let circuit = builder.build();
-```
-
-### Built for Variational Algorithms
-
-Exact expectation values are one call away, so an energy function for VQE is
-a few lines:
+VQE energy functions are a few lines, since exact expectation values are one call away:
 
 ```rust
 use simq::{PauliObservable, PauliString, QuantumCircuit};
@@ -143,41 +97,20 @@ Run `cargo run -p simq --example vqe_fluent` for a complete gradient-descent
 VQE loop, and see `simq-sim/examples/` for full workflows with the built-in
 optimizers and gradient methods (`vqe_h2_molecule`, `qaoa_maxcut`, ...).
 
-## Compile-Time Caching
+## Why SimQ
 
-SimQ features a revolutionary **multi-level compile-time gate matrix caching system** that dramatically improves performance for rotation gates (RX, RY, RZ):
-
-| Cache Level | Access Time | Speedup | Memory |
-|-------------|-------------|---------|--------|
-| Level 1: Common Angles (π/4, π/2, π) | ~0 ns | ∞× | 0 bytes |
-| Level 2: Clifford+T (π/8, π/16, π/32) | ~1 ns | ~50× | ~1 KB |
-| Level 3: π Fractions (π/3, π/5, π/6, ...) | ~1 ns | ~50× | ~2 KB |
-| Level 4: VQE Range (0 to π/4, 256 steps) | ~2-5 ns | ~10× | 48 KB |
-| Level 5: QAOA Range (0 to π, 100 steps) | ~2-5 ns | ~10× | 19 KB |
-| Level 6: Runtime Compute (any angle) | ~20-50 ns | 1× | 0 bytes |
-
-**Total static memory: ~70 KB** (embedded in binary)
-
-**Accuracy guarantee**: every cache level is exact-match only — a cached
-matrix is returned only when the requested angle equals the cached angle to
-within 1e-12. Any other angle falls through to full-precision runtime
-computation. Gate matrices are never approximated or snapped to a grid.
-
-```rust
-use simq_gates::RotationX;
-use std::f64::consts::PI;
-
-// Automatically uses optimal caching strategy
-let rx1 = RotationX::new(PI / 4.0);   // ~0 ns (common angle cache)
-let rx2 = RotationX::new(0.1);         // ~2-5 ns (VQE range cache)
-let rx3 = RotationX::new(10.0);        // ~20-50 ns (runtime fallback)
-```
-
-**For complete documentation**, see [`simq-gates/COMPILE_TIME_CACHING.md`](simq-gates/COMPILE_TIME_CACHING.md)
+- **Measured, not claimed, performance** — see Benchmarks above; every number is reproducible with `./benchmarks/run.sh`.
+- **Type-safe by construction** — the const-generic `CircuitBuilder<N>` catches an out-of-range qubit at the call site, not at runtime:
+  ```rust
+  let mut builder = simq::prelude::CircuitBuilder::<4>::new();
+  builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist — caught immediately
+  ```
+- **Memory-aware, not just memory-efficient** — a hybrid sparse/dense state representation, and `Simulator::run` derives its qubit cap from actual available memory (`16 x 2^n` bytes per state), refusing an oversized circuit cleanly instead of aborting. Measured cap: 29 qubits on 15 GiB of RAM (see BENCHMARKS.md).
+- **Hardware ready** — the same circuit code runs on the simulator or against IBM Quantum / AWS Braket backends.
+- **Built-in gradients** — automatic gradient computation for VQE/QAOA-style variational algorithms.
+- **Compile-time gate matrix caching** — common rotation angles resolve in 0-5ns instead of computing a matrix at runtime; see [`simq-gates/COMPILE_TIME_CACHING.md`](simq-gates/COMPILE_TIME_CACHING.md) for the full design and its accuracy guarantee (cache hits are exact-match only, to 1e-12 — never approximated).
 
 ## Architecture
-
-SimQ consists of several optimized crates:
 
 - **simq**: Umbrella crate — the fluent `QuantumCircuit` builder plus re-exports of everything below
 - **simq-core**: Core types and traits
@@ -188,9 +121,21 @@ SimQ consists of several optimized crates:
 - **simq-sim**: High-performance simulator
 - **simq-backend**: Hardware backend abstraction
 
+## Documentation
 
+The full documentation lives at **[glanzz.github.io/simq](https://glanzz.github.io/simq/)**:
 
+| Section | What's there |
+|---------|--------------|
+| [Installation](https://glanzz.github.io/simq/getting-started/installation.html) | Rust crate setup and Python bindings via maturin |
+| [Quickstart (Rust)](https://glanzz.github.io/simq/getting-started/quickstart-rust.html) | Your first circuit in five minutes |
+| [Quickstart (Python)](https://glanzz.github.io/simq/getting-started/quickstart-python.html) | The Python API tour |
+| [User guide](https://glanzz.github.io/simq/guide/circuits.html) | Circuits, simulation, VQE/QAOA, compiler, noise, backends |
+| [Examples](https://glanzz.github.io/simq/examples/) | Every runnable example in the workspace, catalogued |
+| [Architecture](https://glanzz.github.io/simq/architecture/) | How the eight crates fit together |
+| [Contributing](https://glanzz.github.io/simq/contributing/) | Dev setup, testing, and the PR workflow |
 
+Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --workspace --exclude simq-py --no-deps --open` locally).
 
 ## Contributing
 
@@ -224,7 +169,6 @@ cargo clippy
 pip install -r docs/requirements.txt
 make -C docs html
 ```
-
 
 ## License
 
