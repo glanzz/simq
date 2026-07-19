@@ -167,6 +167,28 @@ pub const CY: [[Complex64; 4]; 4] = [
     [ZERO, ZERO, I, ZERO],
 ];
 
+/// CH gate matrix (Controlled-Hadamard)
+/// CH = [[1, 0,    0,    0],
+///       [0, 1,    0,    0],
+///       [0, 0,  1/√2,  1/√2],
+///       [0, 0,  1/√2, -1/√2]]
+pub const CH: [[Complex64; 4]; 4] = [
+    [ONE, ZERO, ZERO, ZERO],
+    [ZERO, ONE, ZERO, ZERO],
+    [
+        ZERO,
+        ZERO,
+        Complex64::new(INV_SQRT2, 0.0),
+        Complex64::new(INV_SQRT2, 0.0),
+    ],
+    [
+        ZERO,
+        ZERO,
+        Complex64::new(INV_SQRT2, 0.0),
+        Complex64::new(-INV_SQRT2, 0.0),
+    ],
+];
+
 /// ECR gate matrix (Echoed Cross-Resonance)
 /// ECR = 1/√2 * [[0,  0, 1,  i],
 ///               [0,  0, i,  1],
@@ -385,6 +407,67 @@ pub fn rzz(theta: f64) -> [[Complex64; 4]; 4] {
         [ZERO, e_pos, ZERO, ZERO],
         [ZERO, ZERO, e_pos, ZERO],
         [ZERO, ZERO, ZERO, e_neg],
+    ]
+}
+
+/// Generate RZX gate matrix (cross-resonance interaction)
+/// RZX(θ) = exp(-i θ/2 Z⊗X)
+///
+/// Block-diagonal in the first (control) qubit's basis: the control-0
+/// subspace gets RX(θ), the control-1 subspace gets RX(-θ).
+#[inline]
+pub fn rzx(theta: f64) -> [[Complex64; 4]; 4] {
+    let half_theta = theta / 2.0;
+    let cos_val = Complex64::new(half_theta.cos(), 0.0);
+    let sin_val = Complex64::new(0.0, -half_theta.sin());
+
+    [
+        [cos_val, sin_val, ZERO, ZERO],
+        [sin_val, cos_val, ZERO, ZERO],
+        [ZERO, ZERO, cos_val, -sin_val],
+        [ZERO, ZERO, -sin_val, cos_val],
+    ]
+}
+
+/// Generate controlled-RX gate matrix
+/// Identity on the control-0 subspace, RX(θ) on the control-1 subspace
+#[inline]
+pub fn controlled_rx(theta: f64) -> [[Complex64; 4]; 4] {
+    let rx = rotation_x(theta);
+
+    [
+        [ONE, ZERO, ZERO, ZERO],
+        [ZERO, ONE, ZERO, ZERO],
+        [ZERO, ZERO, rx[0][0], rx[0][1]],
+        [ZERO, ZERO, rx[1][0], rx[1][1]],
+    ]
+}
+
+/// Generate controlled-RY gate matrix
+/// Identity on the control-0 subspace, RY(θ) on the control-1 subspace
+#[inline]
+pub fn controlled_ry(theta: f64) -> [[Complex64; 4]; 4] {
+    let ry = rotation_y(theta);
+
+    [
+        [ONE, ZERO, ZERO, ZERO],
+        [ZERO, ONE, ZERO, ZERO],
+        [ZERO, ZERO, ry[0][0], ry[0][1]],
+        [ZERO, ZERO, ry[1][0], ry[1][1]],
+    ]
+}
+
+/// Generate controlled-RZ gate matrix
+/// Identity on the control-0 subspace, RZ(θ) on the control-1 subspace
+#[inline]
+pub fn controlled_rz(theta: f64) -> [[Complex64; 4]; 4] {
+    let rz = rotation_z(theta);
+
+    [
+        [ONE, ZERO, ZERO, ZERO],
+        [ZERO, ONE, ZERO, ZERO],
+        [ZERO, ZERO, rz[0][0], rz[0][1]],
+        [ZERO, ZERO, rz[1][0], rz[1][1]],
     ]
 }
 

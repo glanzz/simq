@@ -481,6 +481,32 @@ impl Gate for CY {
 
 impl_matrix_method!(CY, &matrices::CY, 4);
 
+/// CH gate (Controlled-Hadamard)
+///
+/// Applies a Hadamard gate to target if control qubit is |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct CH;
+
+impl Gate for CH {
+    fn name(&self) -> &str {
+        "CH"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn is_hermitian(&self) -> bool {
+        true
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(Self::matrix_vec())
+    }
+}
+
+impl_matrix_method!(CH, &matrices::CH, 4);
+
 /// ECR gate (Echoed Cross-Resonance)
 ///
 /// Native gate for IBM quantum hardware
@@ -1162,6 +1188,184 @@ impl Gate for RZZ {
     }
 }
 
+/// RZX gate (cross-resonance interaction)
+///
+/// Two-qubit rotation around the Z⊗X axis: RZX(θ) = exp(-i θ/2 Z⊗X).
+/// This is the native interaction of cross-resonance hardware; the first
+/// qubit carries the Z factor, the second the X factor.
+#[derive(Debug, Clone, Copy)]
+pub struct RZX {
+    theta: f64,
+}
+
+impl RZX {
+    /// Creates a new RZX gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the RZX matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::rzx(self.theta)
+    }
+}
+
+impl Gate for RZX {
+    fn name(&self) -> &str {
+        "RZX"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("RZX({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// Controlled-RX gate
+///
+/// Applies RX(θ) to target if control qubit is |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct CRX {
+    theta: f64,
+}
+
+impl CRX {
+    /// Creates a new Controlled-RX gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the CRX matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::controlled_rx(self.theta)
+    }
+}
+
+impl Gate for CRX {
+    fn name(&self) -> &str {
+        "CRX"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("CRX({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// Controlled-RY gate
+///
+/// Applies RY(θ) to target if control qubit is |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct CRY {
+    theta: f64,
+}
+
+impl CRY {
+    /// Creates a new Controlled-RY gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the CRY matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::controlled_ry(self.theta)
+    }
+}
+
+impl Gate for CRY {
+    fn name(&self) -> &str {
+        "CRY"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("CRY({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
+/// Controlled-RZ gate
+///
+/// Applies RZ(θ) to target if control qubit is |1⟩
+#[derive(Debug, Clone, Copy)]
+pub struct CRZ {
+    theta: f64,
+}
+
+impl CRZ {
+    /// Creates a new Controlled-RZ gate with the given angle
+    pub const fn new(theta: f64) -> Self {
+        Self { theta }
+    }
+
+    /// Returns the rotation angle
+    pub const fn angle(&self) -> f64 {
+        self.theta
+    }
+
+    /// Computes the CRZ matrix for this angle
+    #[inline]
+    pub fn matrix(&self) -> [[Complex64; 4]; 4] {
+        matrices::controlled_rz(self.theta)
+    }
+}
+
+impl Gate for CRZ {
+    fn name(&self) -> &str {
+        "CRZ"
+    }
+
+    fn num_qubits(&self) -> usize {
+        2
+    }
+
+    fn description(&self) -> String {
+        format!("CRZ({:.4})", self.theta)
+    }
+
+    fn matrix(&self) -> Option<Vec<Complex64>> {
+        Some(self.matrix().iter().flatten().copied().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1572,6 +1776,194 @@ mod tests {
             for j in 0..2 {
                 assert!((rz_cached[i][j].re - rz_uncached[i][j].re).abs() < 1e-10);
             }
+        }
+    }
+
+    /// Flatten a 4x4 matrix for use with matrix_ops helpers
+    fn flatten4(m: &[[Complex64; 4]; 4]) -> Vec<Complex64> {
+        m.iter().flatten().copied().collect()
+    }
+
+    #[test]
+    fn test_ch_gate() {
+        use crate::matrix_ops::is_unitary;
+        use approx::assert_relative_eq;
+
+        assert_eq!(CH.name(), "CH");
+        assert_eq!(CH.num_qubits(), 2);
+        assert!(CH.is_hermitian());
+
+        let m = CH::matrix();
+        assert!(is_unitary(&flatten4(m), 1e-12));
+
+        // Identity on the control-0 subspace, Hadamard on the control-1 subspace
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let expected = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, s, s],
+            [0.0, 0.0, s, -s],
+        ];
+        for i in 0..4 {
+            for j in 0..4 {
+                assert_relative_eq!(m[i][j].re, expected[i][j], epsilon = 1e-12);
+                assert_relative_eq!(m[i][j].im, 0.0, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    #[allow(clippy::type_complexity)]
+    fn test_controlled_rotation_gates() {
+        use crate::matrix_ops::is_unitary;
+        use approx::assert_relative_eq;
+        use std::f64::consts::PI;
+
+        let theta = 0.7;
+
+        assert_eq!(CRX::new(theta).name(), "CRX");
+        assert_eq!(CRY::new(theta).name(), "CRY");
+        assert_eq!(CRZ::new(theta).name(), "CRZ");
+        assert_eq!(CRX::new(theta).num_qubits(), 2);
+        assert_eq!(CRX::new(theta).angle(), theta);
+        assert!(CRX::new(theta).description().contains("CRX("));
+        assert!(CRY::new(theta).description().contains("CRY("));
+        assert!(CRZ::new(theta).description().contains("CRZ("));
+
+        let blocks: [([[Complex64; 4]; 4], [[Complex64; 2]; 2]); 3] = [
+            (CRX::new(theta).matrix(), matrices::rotation_x(theta)),
+            (CRY::new(theta).matrix(), matrices::rotation_y(theta)),
+            (CRZ::new(theta).matrix(), matrices::rotation_z(theta)),
+        ];
+
+        for (m, block) in &blocks {
+            assert!(is_unitary(&flatten4(m), 1e-12));
+            // Control-0 subspace is untouched
+            for i in 0..2 {
+                for j in 0..2 {
+                    let expected = if i == j { 1.0 } else { 0.0 };
+                    assert_relative_eq!(m[i][j].re, expected, epsilon = 1e-12);
+                    assert_relative_eq!(m[i][j].im, 0.0, epsilon = 1e-12);
+                    // Off-diagonal blocks are zero
+                    assert_relative_eq!(m[i][j + 2].norm(), 0.0, epsilon = 1e-12);
+                    assert_relative_eq!(m[i + 2][j].norm(), 0.0, epsilon = 1e-12);
+                }
+            }
+            // Control-1 subspace gets the corresponding single-qubit rotation
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_relative_eq!(m[i + 2][j + 2].re, block[i][j].re, epsilon = 1e-12);
+                    assert_relative_eq!(m[i + 2][j + 2].im, block[i][j].im, epsilon = 1e-12);
+                }
+            }
+        }
+
+        // CRX(π) acts as -iX on the control-1 subspace: analytic spot-check
+        let crx_pi = CRX::new(PI).matrix();
+        assert_relative_eq!(crx_pi[2][3].im, -1.0, epsilon = 1e-12);
+        assert_relative_eq!(crx_pi[3][2].im, -1.0, epsilon = 1e-12);
+        assert_relative_eq!(crx_pi[2][2].norm(), 0.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    #[allow(clippy::needless_range_loop)]
+    fn test_controlled_rotation_zero_angle_is_identity() {
+        use approx::assert_relative_eq;
+
+        for m in [
+            CRX::new(0.0).matrix(),
+            CRY::new(0.0).matrix(),
+            CRZ::new(0.0).matrix(),
+        ] {
+            for i in 0..4 {
+                for j in 0..4 {
+                    let expected = if i == j { 1.0 } else { 0.0 };
+                    assert_relative_eq!(m[i][j].re, expected, epsilon = 1e-12);
+                    assert_relative_eq!(m[i][j].im, 0.0, epsilon = 1e-12);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_rzx_gate() {
+        use crate::matrix_ops::is_unitary;
+        use approx::assert_relative_eq;
+        use std::f64::consts::{FRAC_1_SQRT_2, PI};
+
+        let rzx = RZX::new(PI / 2.0);
+        assert_eq!(rzx.name(), "RZX");
+        assert_eq!(rzx.num_qubits(), 2);
+        assert_eq!(rzx.angle(), PI / 2.0);
+        assert!(rzx.description().contains("RZX("));
+
+        let m = rzx.matrix();
+        assert!(is_unitary(&flatten4(&m), 1e-12));
+
+        // RZX(π/2) = 1/√2 · [[1, -i, 0, 0], [-i, 1, 0, 0],
+        //                    [0, 0, 1, i], [0, 0, i, 1]]
+        let s = FRAC_1_SQRT_2;
+        let c = Complex64::new(s, 0.0);
+        let ni = Complex64::new(0.0, -s);
+        let pi_ = Complex64::new(0.0, s);
+        let expected = [
+            [c, ni, ZERO_C, ZERO_C],
+            [ni, c, ZERO_C, ZERO_C],
+            [ZERO_C, ZERO_C, c, pi_],
+            [ZERO_C, ZERO_C, pi_, c],
+        ];
+        for i in 0..4 {
+            for j in 0..4 {
+                assert_relative_eq!(m[i][j].re, expected[i][j].re, epsilon = 1e-12);
+                assert_relative_eq!(m[i][j].im, expected[i][j].im, epsilon = 1e-12);
+            }
+        }
+    }
+
+    const ZERO_C: Complex64 = Complex64::new(0.0, 0.0);
+
+    #[test]
+    #[allow(clippy::needless_range_loop)]
+    fn test_rzx_zero_angle_is_identity() {
+        use approx::assert_relative_eq;
+
+        let m = RZX::new(0.0).matrix();
+        for i in 0..4 {
+            for j in 0..4 {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert_relative_eq!(m[i][j].re, expected, epsilon = 1e-12);
+                assert_relative_eq!(m[i][j].im, 0.0, epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_rzx_hadamard_conjugation_gives_rzz() {
+        use crate::matrix_ops::{matrix_multiply, tensor_product};
+        use approx::assert_relative_eq;
+
+        // (I⊗H) · RZX(θ) · (I⊗H) = RZZ(θ): conjugating the X factor by
+        // Hadamard turns it into Z (exactly, no global phase)
+        let theta = 0.9;
+        let i_h = tensor_product(
+            &matrices::IDENTITY
+                .iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>(),
+            &matrices::HADAMARD
+                .iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>(),
+        );
+        let rzx = flatten4(&matrices::rzx(theta));
+        let conjugated = matrix_multiply(&i_h, &matrix_multiply(&rzx, &i_h));
+        let rzz = flatten4(&matrices::rzz(theta));
+
+        for (a, b) in conjugated.iter().zip(rzz.iter()) {
+            assert_relative_eq!(a.re, b.re, epsilon = 1e-12);
+            assert_relative_eq!(a.im, b.im, epsilon = 1e-12);
         }
     }
 }
