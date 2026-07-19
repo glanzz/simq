@@ -3,13 +3,15 @@
 
 Reads SimQ medians from target/criterion/*/new/estimates.json, Qiskit
 medians from benchmarks/qiskit_results.json, and (if present) qsim/Cirq
-medians from benchmarks/qsim_results.json, so the committed chart always
-reflects the committed measurements. Run after ./benchmarks/run.sh:
+medians from benchmarks/qsim_results.json and qulacs medians from
+benchmarks/qulacs_results.json, so the committed chart always reflects the
+committed measurements. Run after ./benchmarks/run.sh:
 
     python3 benchmarks/make_chart.py
 
 The qsim/Cirq series are omitted automatically if qsim_results.json is
-missing (that leg of run.sh is optional, see its docstring).
+missing, and likewise qulacs if qulacs_results.json is missing (both legs
+of run.sh are optional, see its docstring).
 """
 
 import json
@@ -20,20 +22,20 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = [4, 8, 12, 16]
 PANELS = [("vqe_energy", "VQE energy"), ("qaoa_maxcut", "QAOA MaxCut"),
           ("ghz_sampling", "GHZ 1024 shots")]
-SERIES = ["SimQ", "Statevector", "Aer", "Cirq", "qsim"]
+SERIES = ["SimQ", "Statevector", "Aer", "Cirq", "qsim", "qulacs"]
 
-# Categorical slots (blue, aqua, yellow, purple, red), stepped per surface
-# mode; palette validated with the six-checks script for both modes.
+# Categorical slots (blue, aqua, yellow, purple, red, teal), stepped per
+# surface mode; palette validated with the six-checks script for both modes.
 THEMES = {
     "light": {
         "surface": "#fcfcfb", "text": "#0b0b0b", "muted": "#52514e",
         "grid": "#e4e3df",
-        "series": ["#2a78d6", "#1baf7a", "#eda100", "#8b5cf6", "#e0483e"],
+        "series": ["#2a78d6", "#1baf7a", "#eda100", "#8b5cf6", "#e0483e", "#0d9488"],
     },
     "dark": {
         "surface": "#1a1a19", "text": "#ffffff", "muted": "#c3c2b7",
         "grid": "#33322f",
-        "series": ["#3987e5", "#199e70", "#c98500", "#a684f0", "#e8695f"],
+        "series": ["#3987e5", "#199e70", "#c98500", "#a684f0", "#e8695f", "#2dd4bf"],
     },
 }
 
@@ -48,6 +50,11 @@ def load_data():
     if os.path.exists(qsim_path):
         with open(qsim_path) as f:
             qs = json.load(f)
+    qulacs_path = os.path.join(REPO, "benchmarks", "qulacs_results.json")
+    ql = None
+    if os.path.exists(qulacs_path):
+        with open(qulacs_path) as f:
+            ql = json.load(f)
     data = {}
     for group, _ in PANELS:
         for n in SIZES:
@@ -61,6 +68,8 @@ def load_data():
                    q["timings_ms"]["aer"][key]]
             if qs is not None:
                 row += [qs["timings_ms"]["cirq"][key], qs["timings_ms"]["qsim"][key]]
+            if ql is not None:
+                row += [ql["timings_ms"]["qulacs"][key]]
             data[key] = row
     return data
 
@@ -78,8 +87,9 @@ def render(mode, data):
     n_series = len(next(iter(data.values())))
     series = SERIES[:n_series]
     has_qsim = n_series > 3
+    has_qulacs = n_series > 5
     panel_w, panel_gap, left_pad = 268, 26, 46
-    bar_h, bar_gap, group_gap = (7, 2, 14) if has_qsim else (9, 2, 16)
+    bar_h, bar_gap, group_gap = (6, 2, 12) if has_qulacs else (7, 2, 14) if has_qsim else (9, 2, 16)
     group_h = n_series * bar_h + (n_series - 1) * bar_gap
     top = 100
     plot_h = 4 * group_h + 3 * group_gap
@@ -94,15 +104,23 @@ def render(mode, data):
     s.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
              f'viewBox="0 0 {width} {height}" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">')
     s.append(f'<rect width="{width}" height="{height}" fill="{t["surface"]}" rx="8"/>')
-    title = ("SimQ vs Qiskit vs qsim — median time per full evaluation (log scale, lower is better)"
-              if has_qsim else
-              "SimQ vs Qiskit — median time per full evaluation (log scale, lower is better)")
+    if has_qulacs:
+        title = "SimQ vs Qiskit vs qsim vs qulacs — median time per full evaluation (log scale, lower is better)"
+    elif has_qsim:
+        title = "SimQ vs Qiskit vs qsim — median time per full evaluation (log scale, lower is better)"
+    else:
+        title = "SimQ vs Qiskit — median time per full evaluation (log scale, lower is better)"
     s.append(f'<text x="{left_pad}" y="26" fill="{t["text"]}" font-size="15" font-weight="600">'
              f'{title}</text>')
-    subtitle = ('Identical cross-validated circuits (12 values agree to 1e-12 vs Qiskit, 5e-6 vs qsim) · '
-                'Xeon 2.80 GHz, 4 vCPU · Qiskit 2.5.0/Aer 0.17.2 · Cirq 1.7.0/qsim 0.22.0 · ./benchmarks/run.sh'
-                if has_qsim else
-                'Identical cross-validated circuits (12 values agree to 1e-12) · Xeon 2.80 GHz, 4 vCPU · '
+    if has_qulacs:
+        subtitle = ('Identical cross-validated circuits (12 values agree to 1e-12 vs Qiskit/qulacs, 5e-6 vs qsim) · '
+                     'Xeon 2.10 GHz, 4 vCPU · Qiskit 2.5.0/Aer 0.17.2 · Cirq 1.7.0/qsim 0.22.0 · qulacs 0.6.13 · '
+                     './benchmarks/run.sh')
+    elif has_qsim:
+        subtitle = ('Identical cross-validated circuits (12 values agree to 1e-12 vs Qiskit, 5e-6 vs qsim) · '
+                     'Xeon 2.10 GHz, 4 vCPU · Qiskit 2.5.0/Aer 0.17.2 · Cirq 1.7.0/qsim 0.22.0 · ./benchmarks/run.sh')
+    else:
+        subtitle = ('Identical cross-validated circuits (12 values agree to 1e-12) · Xeon 2.10 GHz, 4 vCPU · '
                 'Qiskit 2.5.0 / Aer 0.17.2 · ./benchmarks/run.sh')
     s.append(f'<text x="{left_pad}" y="44" fill="{t["muted"]}" font-size="11">{subtitle}</text>')
 

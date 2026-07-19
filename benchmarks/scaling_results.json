@@ -1,0 +1,15 @@
+{
+  "machine": "Intel Xeon @ 2.10 GHz, 4 vCPU, 15 GiB RAM (cloud container)",
+  "circuit": "1-layer VQE (H + RY + CNOT-chain + RZ)",
+  "source": "See BENCHMARKS.md 'Where it actually fails: 18-30 qubits'. Measured by simq-sim/examples/scaling_probe.rs, benchmarks/aer_scaling_probe.py, benchmarks/qulacs_scaling_probe.py -- median of 3 fresh-process runs each, all in one sitting on this machine.",
+  "qubits": [20, 22, 24, 26, 28, 30],
+  "state_gib": [0.016, 0.062, 0.25, 1.0, 4.0, 16.0],
+  "simq_ms":   [17.9, 88.3, 580.9, 2861.2, 11851.3, null],
+  "aer_ms":    [37.2, 170.1, 783.5, 3156.7, 13461.7, null],
+  "qulacs_ms": [30.3, 141.8, 855.2, 4545.4, 19539.4, null],
+  "failure_30q": {
+    "simq": "rejected: \"max supported is 29\"",
+    "aer": "rejected: \"maximum (29) in the coupling_map\"",
+    "qulacs": "not attempted (no memory-aware qubit cap, OOM risk on a 15 GiB box)"
+  }
+}

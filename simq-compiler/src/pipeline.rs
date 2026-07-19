@@ -4,6 +4,7 @@
 //! with sensible defaults for different use cases.
 
 use crate::compiler::{Compiler, CompilerBuilder};
+use crate::fusion_cache::FusionStructureCache;
 use crate::passes::{
     AdvancedTemplateMatching, DeadCodeElimination, GateCommutation, GateFusion,
     TemplateSubstitution,
@@ -93,6 +94,68 @@ fn create_o3_compiler() -> Compiler {
         .add_pass(Arc::new(GateCommutation::new()))
         .add_pass(Arc::new(AdvancedTemplateMatching::new()))
         .add_pass(Arc::new(GateFusion::new()))
+        .max_iterations(10)
+        .enable_timing(true)
+        .build()
+}
+
+/// Create a compiler at the given optimization level, wiring `fusion_cache`
+/// into its `GateFusion` pass (levels O2/O3; O0/O1 have no fusion pass and
+/// ignore the cache) so multi-qubit fusion block *structure* persists
+/// across repeated compiles of a same-shaped circuit.
+///
+/// [`create_compiler`] builds a fresh, cache-less `GateFusion` every call —
+/// fine for a one-shot compile, but a VQE/QAOA optimizer's outer loop calls
+/// `Simulator::run` (which calls `create_compiler` internally) hundreds of
+/// times on the *same-shaped* circuit with only rotation angles differing.
+/// `simq-sim`'s `Simulator` holds one `FusionStructureCache` for its
+/// lifetime and passes it to this function on every `run()` call instead,
+/// so fusion's block-assignment analysis — not the angle-dependent matrix
+/// values, which are always recomputed fresh, see `crate::fusion_cache`'s
+/// module docs — is derived once per circuit *shape*, not once per call.
+///
+/// # Example
+/// ```ignore
+/// use simq_compiler::pipeline::{create_compiler_with_fusion_cache, OptimizationLevel};
+/// use simq_compiler::fusion_cache::FusionStructureCache;
+/// use std::sync::Arc;
+///
+/// let cache = Arc::new(FusionStructureCache::default());
+/// // Reuse `cache` across many `create_compiler_with_fusion_cache` calls.
+/// let compiler = create_compiler_with_fusion_cache(OptimizationLevel::O2, Arc::clone(&cache));
+/// ```
+pub fn create_compiler_with_fusion_cache(
+    level: OptimizationLevel,
+    fusion_cache: Arc<FusionStructureCache>,
+) -> Compiler {
+    match level {
+        OptimizationLevel::O0 => create_o0_compiler(),
+        OptimizationLevel::O1 => create_o1_compiler(),
+        OptimizationLevel::O2 => create_o2_compiler_with_cache(fusion_cache),
+        OptimizationLevel::O3 => create_o3_compiler_with_cache(fusion_cache),
+    }
+}
+
+/// Same as [`create_o2_compiler`], but its `GateFusion` pass shares
+/// `fusion_cache` — see [`create_compiler_with_fusion_cache`].
+fn create_o2_compiler_with_cache(fusion_cache: Arc<FusionStructureCache>) -> Compiler {
+    CompilerBuilder::new()
+        .add_pass(Arc::new(DeadCodeElimination::new()))
+        .add_pass(Arc::new(AdvancedTemplateMatching::new()))
+        .add_pass(Arc::new(GateFusion::new().with_cache(fusion_cache)))
+        .max_iterations(5)
+        .enable_timing(true)
+        .build()
+}
+
+/// Same as [`create_o3_compiler`], but its `GateFusion` pass shares
+/// `fusion_cache` — see [`create_compiler_with_fusion_cache`].
+fn create_o3_compiler_with_cache(fusion_cache: Arc<FusionStructureCache>) -> Compiler {
+    CompilerBuilder::new()
+        .add_pass(Arc::new(DeadCodeElimination::new()))
+        .add_pass(Arc::new(GateCommutation::new()))
+        .add_pass(Arc::new(AdvancedTemplateMatching::new()))
+        .add_pass(Arc::new(GateFusion::new().with_cache(fusion_cache)))
         .max_iterations(10)
         .enable_timing(true)
         .build()

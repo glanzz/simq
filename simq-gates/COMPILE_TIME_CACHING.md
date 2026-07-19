@@ -134,7 +134,7 @@ let rx6 = EnhancedUniversalCache::rx(10.0);        // Level 6: Runtime compute
 Every level is exact-match only: a cached matrix is returned only when the
 requested angle equals the cached angle (within 1e-12 for the range caches,
 1e-10 for the named-angle levels). Angles that miss every cache are computed
-at full precision — gate matrices are never snapped to a nearby grid point.
+at full precision; gate matrices are never snapped to a nearby grid point.
 
 ---
 

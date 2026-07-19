@@ -173,6 +173,7 @@ pub mod compiler;
 pub mod decomposition;
 pub mod execution_plan;
 pub mod fusion;
+pub mod fusion_cache;
 pub mod hardware_aware;
 pub mod lazy;
 pub mod matrix_computation;
@@ -191,7 +192,8 @@ pub use decomposition::{
     UniversalDecomposer,
 };
 pub use execution_plan::{ExecutionLayer, ExecutionPlan, ExecutionPlanner, ResourceRequirements};
-pub use fusion::{fuse_single_qubit_gates, FusedGate};
+pub use fusion::{fuse_gates_with_cache, fuse_single_qubit_gates, FusedGate, FusionConfig};
+pub use fusion_cache::FusionStructureCache;
 pub use hardware_aware::{
     CostModel, GoogleHardware, HardwareModel, HardwareType, IBMHardware, IonQHardware,
 };
@@ -202,4 +204,6 @@ pub use matrix_computation::{
     Matrix8,
 };
 pub use passes::{OptimizationPass, OptimizationResult, PassStatistics};
-pub use pipeline::{create_compiler, OptimizationLevel, PipelineBuilder};
+pub use pipeline::{
+    create_compiler, create_compiler_with_fusion_cache, OptimizationLevel, PipelineBuilder,
+};

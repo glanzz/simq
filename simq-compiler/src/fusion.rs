@@ -1,20 +1,46 @@
 //! Gate fusion optimization pass
 //!
-//! This module implements gate fusion, which combines adjacent single-qubit gates
-//! operating on the same qubit into a single composite gate. This reduces the
-//! circuit depth and can improve simulation performance.
+//! This module implements gate fusion, which combines adjacent gates into a
+//! single composite gate to reduce the number of full-state passes the
+//! simulator has to make. Two algorithms are implemented:
+//!
+//! - [`find_fusion_chains`] — the original algorithm: fuses adjacent
+//!   *single-qubit* gates on the *same wire* into a 2x2 matrix. Always used
+//!   when `circuit.num_qubits()` is below `FusionConfig::parallel_threshold_qubits`
+//!   (default 18) or `FusionConfig::max_block_width <= 1`.
+//! - [`find_fusion_blocks`] — a greedy, single-forward-pass, width-bounded
+//!   frontier merge that fuses adjacent gates spanning *multiple* qubits
+//!   into one block (up to `FusionConfig::max_block_width` qubits). Only
+//!   used above the qubit-count gate above, since multi-qubit fusion only
+//!   pays for itself once per-pass memory traffic dominates over per-gate
+//!   dispatch overhead (see `simq-sim`'s `parallel_threshold`, default
+//!   `1 << 18` amplitudes / 18 qubits — the same crossover this module's
+//!   default `parallel_threshold_qubits` reuses).
+//!
+//! Deliberately **not** implemented: a circuit-wide fusion graph with a
+//! per-edge cost model and shortest-path schedule selection, and fusion
+//! that crosses a measurement boundary. Both are the specific mechanisms
+//! claimed by two granted patents found during this feature's design
+//! diligence; this module's greedy width-bounded approach (matching the
+//! independently-documented "greedy gate fusion" baseline used elsewhere,
+//! e.g. Google's qsim) and its hard stop at any gate with no matrix
+//! representation (which includes measurement) are structurally distinct
+//! from both.
 //!
 //! # Theory
 //!
-//! When multiple single-qubit gates act on the same qubit sequentially, they can
-//! be combined by multiplying their unitary matrices:
+//! When multiple gates act on the same qubit(s) sequentially with no
+//! intervening operation on those qubits, they can be combined by
+//! multiplying their unitary matrices (embedded into a shared basis when
+//! they act on different, overlapping qubit subsets):
 //!
 //! ```text
 //! |ψ⟩ → U₃(U₂(U₁|ψ⟩)) = (U₃·U₂·U₁)|ψ⟩
 //! ```
 //!
-//! The fused gate's matrix is the product of the individual gate matrices,
-//! applied in reverse order (rightmost gate is applied first).
+//! The fused gate's matrix is the product of the individual (embedded) gate
+//! matrices, composed in application order (rightmost/earliest gate is
+//! multiplied first).
 //!
 //! # Example
 //!
@@ -35,13 +61,18 @@
 //! assert!(optimized.len() < circuit.len());
 //! ```
 
-use crate::matrix_utils::{is_identity, matrix_to_vec, multiply_2x2};
+use crate::matrix_utils::{
+    identity_flat, is_identity, is_identity_flat, multiply_2x2, multiply_square, FlatMatrix,
+};
 use ahash::{AHashMap, AHashSet};
 use num_complex::Complex64;
 use simq_core::{gate::Gate, Circuit, GateOp, QubitId, Result};
+use simq_gates::matrix_ops::embed_gate_matrix_vec;
 use smallvec::SmallVec;
 use std::fmt;
 use std::sync::Arc;
+
+type FusedGateEntry = (Arc<dyn Gate>, SmallVec<[QubitId; 4]>);
 
 /// Configuration for gate fusion optimization
 #[derive(Debug, Clone)]
@@ -57,9 +88,32 @@ pub struct FusionConfig {
     /// Epsilon for identity detection (default: 1e-10)
     pub identity_epsilon: f64,
 
-    /// Maximum fusion chain length (default: None = unlimited)
-    /// Limits how many consecutive gates can be fused together
+    /// Maximum number of component gates a single fused unit may absorb
+    /// (default: None = unlimited). Orthogonal to `max_block_width`: this
+    /// limits gate *count* per fused unit, `max_block_width` limits qubit
+    /// *span*.
     pub max_fusion_size: Option<usize>,
+
+    /// Maximum number of qubits a single fused block may span (default: 3).
+    /// Only takes effect once `circuit.num_qubits() >= parallel_threshold_qubits`
+    /// — see `parallel_threshold_qubits` and [`fuse_single_qubit_gates`]'s
+    /// dispatch. A value of `1` forces the legacy single-qubit-chain path
+    /// unconditionally.
+    pub max_block_width: usize,
+
+    /// Circuit qubit count below which fusion always uses the legacy
+    /// single-qubit chain path ([`find_fusion_chains`]) regardless of
+    /// `max_block_width` (default: 18). Matches `simq-sim`'s
+    /// `ExecutionConfig`/`SimulatorConfig` `parallel_threshold` default of
+    /// `1 << 18` amplitudes / 18 qubits (see
+    /// `simq-sim/src/execution_engine/config.rs` and
+    /// `simq-sim/src/config.rs`) — the point where per-pass memory traffic
+    /// starts to dominate over per-gate dispatch overhead, which is when
+    /// multi-qubit fusion's extra compile-time bookkeeping starts to pay
+    /// for itself. `simq-compiler` has no dependency on `simq-sim`, so this
+    /// is a separately-defined constant kept in sync by convention, not by
+    /// a shared type.
+    pub parallel_threshold_qubits: usize,
 }
 
 impl Default for FusionConfig {
@@ -69,18 +123,32 @@ impl Default for FusionConfig {
             eliminate_identity: true,
             identity_epsilon: 1e-10,
             max_fusion_size: None,
+            max_block_width: 3,
+            parallel_threshold_qubits: 18,
         }
     }
 }
 
-/// A fused quantum gate representing the composition of multiple single-qubit gates
+/// A fused quantum gate representing the composition of multiple gates
+/// spanning one or more qubits.
 ///
-/// This gate stores the product of multiple gate matrices and maintains
-/// information about the original gates for debugging and visualization.
+/// This gate stores the product of multiple (embedded) gate matrices and
+/// maintains information about the original gates for debugging and
+/// visualization.
 #[derive(Clone)]
 pub struct FusedGate {
-    /// The composed unitary matrix (2x2 for single-qubit gates)
-    matrix: [[Complex64; 2]; 2],
+    /// Qubits this block spans, in the fixed canonical order the matrix was
+    /// composed against. Whoever executes this gate (the simulator
+    /// executor) must pass qubits to the underlying kernel in exactly this
+    /// order — see the module-level bit-ordering note on
+    /// [`compose_block_matrix`].
+    qubits: SmallVec<[QubitId; 4]>,
+
+    /// The composed unitary matrix, flat row-major `2^k x 2^k` where
+    /// `k = qubits.len()`. Inline-capacity 64 (an 8x8 / 3-qubit block)
+    /// avoids a heap allocation for every block up to the width this crate
+    /// currently supports.
+    matrix: FlatMatrix,
 
     /// Names of the original gates in application order
     /// (first gate in vector is applied first)
@@ -88,20 +156,27 @@ pub struct FusedGate {
 }
 
 impl FusedGate {
-    /// Create a new fused gate from a matrix and component gate names
-    ///
-    /// # Arguments
-    /// * `matrix` - The composed 2x2 unitary matrix
-    /// * `component_gates` - Names of the original gates (in application order)
-    pub fn new(matrix: [[Complex64; 2]; 2], component_gates: SmallVec<[String; 4]>) -> Self {
+    /// Create a new fused gate from its qubits (canonical order), composed
+    /// matrix (flat row-major `2^k x 2^k`), and component gate names.
+    pub fn new(
+        qubits: SmallVec<[QubitId; 4]>,
+        matrix: FlatMatrix,
+        component_gates: SmallVec<[String; 4]>,
+    ) -> Self {
         Self {
+            qubits,
             matrix,
             component_gates,
         }
     }
 
-    /// Get the unitary matrix
-    pub fn matrix(&self) -> &[[Complex64; 2]; 2] {
+    /// Get the qubits this block spans, in canonical order.
+    pub fn qubits(&self) -> &[QubitId] {
+        &self.qubits
+    }
+
+    /// Get the composed unitary matrix (flat row-major `2^k x 2^k`)
+    pub fn matrix(&self) -> &[Complex64] {
         &self.matrix
     }
 
@@ -122,7 +197,7 @@ impl Gate for FusedGate {
     }
 
     fn num_qubits(&self) -> usize {
-        1
+        self.qubits.len()
     }
 
     fn is_unitary(&self) -> bool {
@@ -134,18 +209,23 @@ impl Gate for FusedGate {
     }
 
     fn matrix(&self) -> Option<Vec<Complex64>> {
-        Some(matrix_to_vec(&self.matrix))
+        Some(self.matrix.to_vec())
     }
 }
 
 impl fmt::Debug for FusedGate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FusedGate")
+            .field("qubits", &self.qubits)
             .field("components", &self.component_gates)
             .field("num_gates", &self.num_components())
             .finish()
     }
 }
+
+// ---------------------------------------------------------------------
+// Legacy path: single-qubit chain fusion (unchanged algorithm)
+// ---------------------------------------------------------------------
 
 /// A fusion opportunity represents a sequence of gates that can be fused
 #[derive(Debug)]
@@ -160,6 +240,12 @@ struct FusionChain {
 ///
 /// Identifies sequences of adjacent single-qubit gates operating on the same qubit
 /// that have no intervening operations on that qubit.
+///
+/// **This is the original fusion algorithm, kept unmodified.** It is always
+/// used when `circuit.num_qubits()` is below `FusionConfig::parallel_threshold_qubits`
+/// — see [`fuse_single_qubit_gates`]'s dispatch. This guarantee is
+/// structural, not a performance prediction: every currently-published
+/// small-circuit benchmark takes this exact code path, unchanged.
 ///
 /// # Arguments
 /// * `circuit` - The circuit to analyze
@@ -311,37 +397,20 @@ fn fuse_gates(gates: &[&GateOp], config: &FusionConfig) -> Option<Arc<dyn Gate>>
         .map(|op| op.gate().name().to_string())
         .collect();
 
-    Some(Arc::new(FusedGate::new(result, component_gates)))
+    let qubit = gates[0].qubits()[0];
+    let flat: FlatMatrix =
+        FlatMatrix::from_slice(&[result[0][0], result[0][1], result[1][0], result[1][1]]);
+    let qubits: SmallVec<[QubitId; 4]> = SmallVec::from_slice(&[qubit]);
+
+    Some(Arc::new(FusedGate::new(qubits, flat, component_gates)))
 }
 
-/// Apply gate fusion optimization to a quantum circuit
-///
-/// This function analyzes the circuit to find sequences of adjacent single-qubit
-/// gates on the same qubit and combines them into fused gates.
-///
-/// # Arguments
-/// * `circuit` - The input circuit to optimize
-/// * `config` - Optional fusion configuration (uses default if None)
-///
-/// # Returns
-/// A new optimized circuit with fused gates
-///
-/// # Errors
-/// Returns error if circuit construction fails (should be rare)
-///
-/// # Example
-/// ```ignore
-/// use simq_core::Circuit;
-/// use simq_compiler::fusion::fuse_single_qubit_gates;
-///
-/// let circuit = /* ... build circuit ... */;
-/// let optimized = fuse_single_qubit_gates(&circuit, None).unwrap();
-/// ```
-pub fn fuse_single_qubit_gates(circuit: &Circuit, config: Option<FusionConfig>) -> Result<Circuit> {
-    let config = config.unwrap_or_default();
-
+/// The legacy single-qubit-chain fusion pass body (verbatim algorithm from
+/// before this module supported multi-qubit blocks). Reconstructs the
+/// circuit by replacing each fusion chain with one [`FusedGate`].
+fn fuse_single_qubit_chains(circuit: &Circuit, config: &FusionConfig) -> Result<Circuit> {
     // Find all fusion opportunities
-    let fusion_chains = find_fusion_chains(circuit, &config);
+    let fusion_chains = find_fusion_chains(circuit, config);
 
     // If no fusion opportunities, return original circuit
     if fusion_chains.is_empty() {
@@ -368,7 +437,7 @@ pub fn fuse_single_qubit_gates(circuit: &Circuit, config: Option<FusionConfig>) 
             .map(|&idx| operations[idx])
             .collect();
 
-        if let Some(fused_gate) = fuse_gates(&chain_ops, &config) {
+        if let Some(fused_gate) = fuse_gates(&chain_ops, config) {
             let start_idx = chain.operation_indices[0];
             fused_gates.insert(start_idx, (fused_gate, chain.qubit));
         }
@@ -387,6 +456,391 @@ pub fn fuse_single_qubit_gates(circuit: &Circuit, config: Option<FusionConfig>) 
     }
 
     Ok(optimized)
+}
+
+// ---------------------------------------------------------------------
+// New path: greedy width-bounded multi-qubit block fusion
+// ---------------------------------------------------------------------
+
+/// A group of operations fused into a single multi-qubit block.
+///
+/// Unlike [`FusionChain`] (single qubit, used by [`find_fusion_chains`]), a
+/// block can span up to `FusionConfig::max_block_width` qubits and is found
+/// by [`find_fusion_blocks`], which is only ever invoked when
+/// `circuit.num_qubits() >= FusionConfig::parallel_threshold_qubits` and
+/// `FusionConfig::max_block_width > 1` — see [`fuse_single_qubit_gates`]'s
+/// dispatch. `pub(crate)` so [`crate::fusion_cache`] can store block
+/// *structure* (never matrix values — see that module's docs for why this
+/// is exact, not approximate, to cache across circuits with the same shape
+/// but different parameters).
+#[derive(Debug, Clone)]
+pub(crate) struct FusionBlock {
+    /// Indices of operations in the circuit, in application order.
+    pub(crate) operation_indices: Vec<usize>,
+    /// Canonical qubit order for this block (ascending qubit index), fixed
+    /// once the block closes. Every component gate's matrix is embedded
+    /// into local positions within this order — see
+    /// [`compose_block_matrix`] — and the executor must receive qubits in
+    /// exactly this order, never re-sorted.
+    pub(crate) qubits: SmallVec<[QubitId; 4]>,
+}
+
+/// Mutable accumulator for an in-progress (not yet closed) fusion block.
+struct FusionBlockBuilder {
+    operation_indices: Vec<usize>,
+    qubit_set: AHashSet<QubitId>,
+}
+
+/// Close block `block_idx` if still open: release its qubit ownership and,
+/// if it met `min_size` (component gate count), push it to `finished` with
+/// qubits sorted into canonical (ascending index) order. No-op if the block
+/// was already closed.
+fn close_block(
+    blocks: &mut [Option<FusionBlockBuilder>],
+    qubit_owner: &mut [Option<usize>],
+    finished: &mut Vec<FusionBlock>,
+    block_idx: usize,
+    min_size: usize,
+) {
+    let Some(b) = blocks[block_idx].take() else {
+        return;
+    };
+    for &q in &b.qubit_set {
+        if qubit_owner[q.index()] == Some(block_idx) {
+            qubit_owner[q.index()] = None;
+        }
+    }
+    if b.operation_indices.len() >= min_size {
+        let mut qubits: SmallVec<[QubitId; 4]> = b.qubit_set.into_iter().collect();
+        qubits.sort_by_key(|q| q.index());
+        finished.push(FusionBlock {
+            operation_indices: b.operation_indices,
+            qubits,
+        });
+    }
+}
+
+/// Analyze a circuit to find multi-qubit fusion blocks using a greedy,
+/// single-forward-pass frontier merge — deliberately **not** a circuit-wide
+/// fusion graph with a per-edge cost model and shortest-path schedule
+/// selection (see the module-level docs: that specific mechanism is what a
+/// granted patent found during this feature's diligence claims, and this
+/// design avoids it by construction).
+///
+/// For each operation, in this fixed priority order (no lookahead, no cost
+/// comparison):
+/// 1. No matrix (e.g. measurement) → close every block it touches. Fusion
+///    never crosses this boundary (a separate, on-point patent covers
+///    fusing measurement gates specifically; this design never does that).
+/// 2. Exactly one open block overlaps its qubits and merging stays within
+///    `max_block_width` and `max_fusion_size` → merge into that block.
+/// 3. Otherwise, close any block(s) it overlaps (bridging ≥2 blocks closes
+///    all of them; exceeding the width/size cap closes the one it would
+///    have joined) and open a fresh block for this operation (if its own
+///    qubit count fits within `max_block_width`; if not, it is left
+///    standalone).
+///
+/// Only ever called when `config.max_block_width > 1`; the single-qubit
+/// path ([`find_fusion_chains`]) is untouched and used otherwise.
+pub(crate) fn find_fusion_blocks(circuit: &Circuit, config: &FusionConfig) -> Vec<FusionBlock> {
+    let max_width = config.max_block_width.max(1);
+    let num_qubits = circuit.num_qubits();
+    let operations: Vec<_> = circuit.operations().collect();
+
+    // Which open block (index into `blocks`) currently owns each qubit's wire.
+    let mut qubit_owner: Vec<Option<usize>> = vec![None; num_qubits];
+    let mut blocks: Vec<Option<FusionBlockBuilder>> = Vec::new();
+    let mut finished: Vec<FusionBlock> = Vec::new();
+
+    for (op_idx, op) in operations.iter().enumerate() {
+        let qubits = op.qubits();
+
+        if op.gate().matrix().is_none() {
+            let touched: AHashSet<usize> = qubits
+                .iter()
+                .filter_map(|q| qubit_owner[q.index()])
+                .collect();
+            for block_idx in touched {
+                close_block(
+                    &mut blocks,
+                    &mut qubit_owner,
+                    &mut finished,
+                    block_idx,
+                    config.min_fusion_size,
+                );
+            }
+            continue;
+        }
+
+        let touched: AHashSet<usize> = qubits
+            .iter()
+            .filter_map(|q| qubit_owner[q.index()])
+            .collect();
+
+        let mut merged = false;
+        if touched.len() == 1 {
+            let block_idx = *touched.iter().next().unwrap();
+            let builder = blocks[block_idx].as_ref().unwrap();
+
+            let at_gate_cap = config
+                .max_fusion_size
+                .is_some_and(|max| builder.operation_indices.len() >= max);
+
+            let would_grow_to = {
+                let mut merged_set: AHashSet<QubitId> = builder.qubit_set.clone();
+                merged_set.extend(qubits.iter().copied());
+                merged_set.len()
+            };
+
+            if !at_gate_cap && would_grow_to <= max_width {
+                let b = blocks[block_idx].as_mut().unwrap();
+                b.operation_indices.push(op_idx);
+                for &q in qubits {
+                    b.qubit_set.insert(q);
+                    qubit_owner[q.index()] = Some(block_idx);
+                }
+                merged = true;
+            } else {
+                close_block(
+                    &mut blocks,
+                    &mut qubit_owner,
+                    &mut finished,
+                    block_idx,
+                    config.min_fusion_size,
+                );
+            }
+        } else if touched.len() > 1 {
+            for block_idx in touched {
+                close_block(
+                    &mut blocks,
+                    &mut qubit_owner,
+                    &mut finished,
+                    block_idx,
+                    config.min_fusion_size,
+                );
+            }
+        }
+
+        if !merged && qubits.len() <= max_width {
+            let block_idx = blocks.len();
+            let mut qubit_set = AHashSet::new();
+            for &q in qubits {
+                qubit_set.insert(q);
+                qubit_owner[q.index()] = Some(block_idx);
+            }
+            blocks.push(Some(FusionBlockBuilder {
+                operation_indices: vec![op_idx],
+                qubit_set,
+            }));
+        }
+        // else (!merged && qubits.len() > max_width): the gate itself is
+        // wider than max_block_width — left standalone, never fused. Any
+        // block that owned its qubits was already closed above.
+    }
+
+    for block_idx in 0..blocks.len() {
+        close_block(
+            &mut blocks,
+            &mut qubit_owner,
+            &mut finished,
+            block_idx,
+            config.min_fusion_size,
+        );
+    }
+
+    finished
+}
+
+/// Compose a fusion block's component gate matrices into a single flat
+/// `2^k x 2^k` unitary.
+///
+/// # Bit-ordering convention (the correctness-critical part)
+///
+/// The dense kernels this crate's fused gates ultimately run through
+/// (`simq-sim`'s `two_qubit`/`three_qubit` kernels) use an **argument-order,
+/// MSB-first** convention: for `apply_three_qubit_dense(matrix, qubit1,
+/// qubit2, qubit3, ...)`, the matrix's local basis index is `m =
+/// (bit(qubit1)<<2) | (bit(qubit2)<<1) | bit(qubit3)` — the *first* argument
+/// is the *most significant* bit.
+///
+/// `simq_gates::matrix_ops::embed_gate_matrix_vec`, which this function uses
+/// to lift each component gate's small matrix into the block's shared
+/// basis, instead uses a **position-index, LSB-first** convention: local
+/// position `p` maps to bit `p` (position `0` is the *least significant*
+/// bit) — documented and tested in `simq-gates/src/matrix_ops.rs`.
+///
+/// These are reversed orderings of each other. Since this crate always
+/// passes `block.qubits` to the executor/kernel in unchanged canonical
+/// (ascending) order — `qubit1 = block.qubits[0]`, ..., `qubitK =
+/// block.qubits[K-1]` — reconciling the two conventions requires mapping
+/// `block.qubits[i]` to **local position `width - 1 - i`** (not `i`) when
+/// building the `qubit_indices` argument to `embed_gate_matrix_vec`. This
+/// has been verified analytically (embedding a gate whose own qubits equal
+/// `block.qubits` in the same order reduces to the identity embedding,
+/// reproducing the gate's original matrix unchanged, as it must) and is
+/// additionally covered by fused-vs-sequential-execution correctness tests
+/// below that exercise multiple qubit orderings, per this crate's own
+/// "don't trust the derivation alone" testing norm.
+fn compose_block_matrix(
+    block: &FusionBlock,
+    operations: &[&GateOp],
+    config: &FusionConfig,
+) -> Option<Arc<dyn Gate>> {
+    let width = block.qubits.len();
+    let dim = 1usize << width;
+
+    let mut result: FlatMatrix = identity_flat(dim);
+    for &op_idx in &block.operation_indices {
+        let op = operations[op_idx];
+        let gate_matrix = op.gate().matrix()?;
+        let local_qubits: SmallVec<[usize; 4]> = op
+            .qubits()
+            .iter()
+            .map(|q| {
+                let i = block
+                    .qubits
+                    .iter()
+                    .position(|bq| bq == q)
+                    .expect("component gate's qubit must belong to its block");
+                width - 1 - i
+            })
+            .collect();
+        let embedded = embed_gate_matrix_vec(&gate_matrix, width, &local_qubits);
+        result = multiply_square(&embedded, &result, dim);
+    }
+
+    if config.eliminate_identity && is_identity_flat(&result, dim, config.identity_epsilon) {
+        return None;
+    }
+
+    let component_gates: SmallVec<[String; 4]> = block
+        .operation_indices
+        .iter()
+        .map(|&idx| operations[idx].gate().name().to_string())
+        .collect();
+
+    Some(Arc::new(FusedGate::new(block.qubits.clone(), result, component_gates)))
+}
+
+/// Multi-qubit block fusion pass body. Reconstructs the circuit by
+/// replacing each fusion block with one [`FusedGate`]. Only called when
+/// [`fuse_single_qubit_gates`]'s dispatch selects the multi-qubit path.
+///
+/// If `cache` is provided, consults it for this circuit's block
+/// *structure* (never matrix values) keyed by
+/// [`crate::cache::CircuitFingerprint`] before re-running
+/// [`find_fusion_blocks`] — see `fusion_cache` module docs for why this is
+/// exact, not approximate, across repeated compiles of a same-shaped
+/// circuit with different gate parameters (e.g. a VQE/QAOA outer loop).
+fn fuse_multi_qubit_blocks(
+    circuit: &Circuit,
+    config: &FusionConfig,
+    cache: Option<&crate::fusion_cache::FusionStructureCache>,
+) -> Result<Circuit> {
+    let blocks: Arc<Vec<FusionBlock>> = match cache {
+        Some(cache) => {
+            let fingerprint = crate::cache::CircuitFingerprint::compute(circuit);
+            if let Some(cached) = cache.get(fingerprint) {
+                cached
+            } else {
+                let computed = find_fusion_blocks(circuit, config);
+                cache.insert(fingerprint, computed.clone());
+                Arc::new(computed)
+            }
+        },
+        None => Arc::new(find_fusion_blocks(circuit, config)),
+    };
+
+    if blocks.is_empty() {
+        return Ok(circuit.clone());
+    }
+
+    let operations: Vec<&GateOp> = circuit.operations().collect();
+
+    let fused_indices: AHashSet<usize> = blocks
+        .iter()
+        .flat_map(|b| b.operation_indices.iter().copied())
+        .collect();
+
+    let mut fused_gates: AHashMap<usize, FusedGateEntry> = AHashMap::new();
+    for block in blocks.iter() {
+        if let Some(fused) = compose_block_matrix(block, &operations, config) {
+            let start_idx = block.operation_indices[0];
+            fused_gates.insert(start_idx, (fused, block.qubits.clone()));
+        }
+    }
+
+    let mut optimized = Circuit::with_capacity(circuit.num_qubits(), circuit.len());
+    for (idx, op) in operations.iter().enumerate() {
+        if let Some((fused_gate, qubits)) = fused_gates.get(&idx) {
+            optimized.add_gate(Arc::clone(fused_gate), qubits.as_slice())?;
+        } else if !fused_indices.contains(&idx) {
+            optimized.add_gate(Arc::clone(op.gate()), op.qubits())?;
+        }
+    }
+
+    Ok(optimized)
+}
+
+// ---------------------------------------------------------------------
+// Public entry point: dispatch between the two paths
+// ---------------------------------------------------------------------
+
+/// Apply gate fusion optimization to a quantum circuit
+///
+/// Dispatches between the legacy single-qubit-chain algorithm and the
+/// multi-qubit block algorithm based on `circuit.num_qubits()` and
+/// `config.max_block_width` — see the module-level docs and
+/// [`FusionConfig::parallel_threshold_qubits`]. Below the threshold (or
+/// with `max_block_width <= 1`), this is **exactly** the original
+/// single-qubit fusion pass, unmodified: the new multi-qubit code is not
+/// merely equivalent for small circuits, it is never reached.
+///
+/// # Arguments
+/// * `circuit` - The input circuit to optimize
+/// * `config` - Optional fusion configuration (uses default if None)
+///
+/// # Returns
+/// A new optimized circuit with fused gates
+///
+/// # Errors
+/// Returns error if circuit construction fails (should be rare)
+///
+/// # Example
+/// ```ignore
+/// use simq_core::Circuit;
+/// use simq_compiler::fusion::fuse_single_qubit_gates;
+///
+/// let circuit = /* ... build circuit ... */;
+/// let optimized = fuse_single_qubit_gates(&circuit, None).unwrap();
+/// ```
+pub fn fuse_single_qubit_gates(circuit: &Circuit, config: Option<FusionConfig>) -> Result<Circuit> {
+    fuse_gates_with_cache(circuit, config, None)
+}
+
+/// Same as [`fuse_single_qubit_gates`], but consults an optional
+/// [`crate::fusion_cache::FusionStructureCache`] for the multi-qubit block
+/// path (ignored entirely below `parallel_threshold_qubits`, exactly like
+/// the rest of the multi-qubit machinery — see the dispatch below).
+///
+/// This is the entry point [`crate::passes::GateFusion::with_cache`] wires
+/// up to, which in turn is what `simq-sim`'s `Simulator` uses to persist
+/// fusion block structure across repeated compiles of a same-shaped
+/// circuit (e.g. a VQE/QAOA optimizer's outer loop, which otherwise
+/// reconstructs a fresh `Compiler` — and re-derives fusion from scratch —
+/// on every single iteration).
+pub fn fuse_gates_with_cache(
+    circuit: &Circuit,
+    config: Option<FusionConfig>,
+    cache: Option<&crate::fusion_cache::FusionStructureCache>,
+) -> Result<Circuit> {
+    let config = config.unwrap_or_default();
+
+    if circuit.num_qubits() < config.parallel_threshold_qubits || config.max_block_width <= 1 {
+        return fuse_single_qubit_chains(circuit, &config);
+    }
+
+    fuse_multi_qubit_blocks(circuit, &config, cache)
 }
 
 #[cfg(test)]
@@ -643,18 +1097,22 @@ mod tests {
     fn test_fused_gate_accessors() {
         use num_complex::Complex64;
         use smallvec::smallvec;
-        let matrix = [
-            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        let matrix: FlatMatrix = smallvec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
         ];
         let names: SmallVec<[String; 4]> = smallvec!["H".to_string(), "X".to_string()];
-        let gate = FusedGate::new(matrix, names);
+        let qubits: SmallVec<[QubitId; 4]> = smallvec![QubitId::new(0)];
+        let gate = FusedGate::new(qubits, matrix, names);
 
         assert_eq!(gate.component_gates(), &["H", "X"]);
         assert_eq!(gate.num_components(), 2);
         assert!(gate.is_unitary());
         assert_eq!(gate.num_qubits(), 1);
         assert_eq!(gate.name(), "FUSED");
+        assert_eq!(gate.qubits(), &[QubitId::new(0)]);
 
         // Gate trait matrix() method (via trait object to avoid field name collision)
         let gate_dyn: &dyn Gate = &gate;
@@ -678,12 +1136,15 @@ mod tests {
     fn test_fused_gate_debug() {
         use num_complex::Complex64;
         use smallvec::smallvec;
-        let matrix = [
-            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        let matrix: FlatMatrix = smallvec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
         ];
         let names: SmallVec<[String; 4]> = smallvec!["H".to_string()];
-        let gate = FusedGate::new(matrix, names);
+        let qubits: SmallVec<[QubitId; 4]> = smallvec![QubitId::new(0)];
+        let gate = FusedGate::new(qubits, matrix, names);
         let dbg = format!("{:?}", gate);
         assert!(dbg.contains("FusedGate"));
     }
@@ -692,26 +1153,29 @@ mod tests {
     // New tests for previously uncovered lines
     // -----------------------------------------------------------------------
 
-    /// Lines 104-105: FusedGate inherent method `matrix()` (field accessor).
+    /// Lines 104-105 (original): FusedGate inherent method `matrix()` (field accessor).
     /// The existing test_fused_gate_accessors called the Gate TRAIT method via
     /// a trait object.  This test calls the inherent struct method directly.
     #[test]
     fn test_fused_gate_matrix_field_accessor() {
         use num_complex::Complex64;
         use smallvec::smallvec;
-        let matrix = [
-            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-            [Complex64::new(0.0, 0.0), Complex64::new(-1.0, 0.0)],
+        let matrix: FlatMatrix = smallvec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(-1.0, 0.0),
         ];
         let names: SmallVec<[String; 4]> = smallvec!["Z".to_string()];
-        let gate = FusedGate::new(matrix, names);
+        let qubits: SmallVec<[QubitId; 4]> = smallvec![QubitId::new(0)];
+        let gate = FusedGate::new(qubits, matrix, names);
         // Call the inherent method (not the Gate trait method)
-        let m: &[[Complex64; 2]; 2] = gate.matrix();
-        assert!((m[0][0].re - 1.0).abs() < 1e-10);
-        assert!((m[1][1].re - (-1.0)).abs() < 1e-10);
+        let m: &[Complex64] = gate.matrix();
+        assert!((m[0].re - 1.0).abs() < 1e-10);
+        assert!((m[3].re - (-1.0)).abs() < 1e-10);
     }
 
-    /// Lines 211-214: a gate with matrix()=None in the middle of a fuseable chain
+    /// A gate with matrix()=None in the middle of a fuseable chain
     /// terminates the chain and pushes it to fusion_chains.
     /// Setup: two H gates (forming a chain of length 2 ≥ min_fusion_size=2) on q0,
     /// followed by a no-matrix gate on q0 → chain is pushed, then fused into one.
@@ -757,5 +1221,327 @@ mod tests {
             2,
             "Expected 2 operations after fusion: fused(H,X) + LocalNoMatrix"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // §6-0 / §8: the <16q structural non-regression guarantee, made checkable
+    // -----------------------------------------------------------------------
+
+    /// Below `parallel_threshold_qubits`, `fuse_single_qubit_gates` must
+    /// produce byte-identical output to calling `fuse_single_qubit_chains`
+    /// (the legacy path) directly — i.e. the new multi-qubit machinery is
+    /// provably never reached, not just "equivalent." This is the check
+    /// that makes the "<16q is unaffected" claim in the implementation plan
+    /// checkable rather than argued.
+    #[test]
+    fn test_below_threshold_dispatches_to_legacy_path_exactly() {
+        // 16 qubits: matches BENCHMARKS.md's largest published row, and is
+        // below the default parallel_threshold_qubits (18).
+        let mut circuit = Circuit::new(16);
+        for q in 0..16 {
+            circuit
+                .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[QubitId::new(q)])
+                .unwrap();
+            circuit
+                .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[QubitId::new(q)])
+                .unwrap();
+        }
+        // A CNOT chain, exactly like the benchmarked VQE/QAOA shapes, to
+        // confirm multi-qubit gates don't change the dispatch decision.
+        for q in 0..15 {
+            circuit
+                .add_gate(
+                    Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
+                    &[QubitId::new(q), QubitId::new(q + 1)],
+                )
+                .unwrap();
+        }
+
+        let config = FusionConfig::default(); // max_block_width: 3, threshold: 18
+        assert!(circuit.num_qubits() < config.parallel_threshold_qubits);
+
+        let via_dispatch = fuse_single_qubit_gates(&circuit, Some(config.clone())).unwrap();
+        let via_legacy_directly = fuse_single_qubit_chains(&circuit, &config).unwrap();
+
+        assert_eq!(via_dispatch.len(), via_legacy_directly.len());
+        for (a, b) in via_dispatch
+            .operations()
+            .zip(via_legacy_directly.operations())
+        {
+            assert_eq!(a.gate().name(), b.gate().name());
+            assert_eq!(a.qubits(), b.qubits());
+        }
+    }
+
+    /// At/above `parallel_threshold_qubits`, the multi-qubit block path
+    /// should actually be reached (a CNOT-adjacent chain should fuse across
+    /// the two-qubit boundary, which the legacy path never does).
+    #[test]
+    fn test_at_threshold_reaches_multi_qubit_block_path() {
+        let mut circuit = Circuit::new(18);
+        let q0 = QubitId::new(0);
+        let q1 = QubitId::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+
+        let config = FusionConfig::default();
+        assert!(circuit.num_qubits() >= config.parallel_threshold_qubits);
+
+        let optimized = fuse_single_qubit_gates(&circuit, Some(config)).unwrap();
+        // The legacy path could never fuse across the CNOT; the block path
+        // should collapse all three gates into one 2-qubit FusedGate.
+        assert_eq!(optimized.len(), 1);
+        let op = optimized.operations().next().unwrap();
+        assert_eq!(op.gate().name(), "FUSED");
+        assert_eq!(op.gate().num_qubits(), 2);
+    }
+
+    /// Explicit `max_block_width: 1` forces the legacy path even at/above
+    /// the qubit threshold (documented override behavior).
+    #[test]
+    fn test_explicit_width_one_forces_legacy_path_above_threshold() {
+        let mut circuit = Circuit::new(18);
+        let q0 = QubitId::new(0);
+        let q1 = QubitId::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+
+        let config = FusionConfig {
+            max_block_width: 1,
+            ..Default::default()
+        };
+        let optimized = fuse_single_qubit_gates(&circuit, Some(config)).unwrap();
+        // Legacy behavior: CNOT breaks fusion, H gates on either side are
+        // singletons (below min_fusion_size), so nothing fuses at all.
+        assert_eq!(optimized.len(), 3);
+    }
+
+    // -----------------------------------------------------------------------
+    // §5: multi-qubit block fusion correctness
+    // -----------------------------------------------------------------------
+
+    fn wide_circuit_config() -> FusionConfig {
+        // Force the block path on small test circuits without needing an
+        // 18-qubit circuit in every test.
+        FusionConfig {
+            parallel_threshold_qubits: 0,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_block_fusion_h_cnot_h_fuses_across_two_qubits() {
+        let mut circuit = Circuit::new(2);
+        let q0 = QubitId::new(0);
+        let q1 = QubitId::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+
+        let optimized = fuse_single_qubit_gates(&circuit, Some(wide_circuit_config())).unwrap();
+        assert_eq!(optimized.len(), 1);
+        let op = optimized.operations().next().unwrap();
+        assert_eq!(op.gate().name(), "FUSED");
+        assert_eq!(op.gate().num_qubits(), 2);
+        assert_eq!(op.qubits(), &[q0, q1]);
+    }
+
+    #[test]
+    fn test_block_fusion_respects_max_width() {
+        // H(q0)-CNOT(q0,q1)-CNOT(q1,q2): with max_block_width=2, the second
+        // CNOT would grow the block to 3 qubits, so it must close the first
+        // block and start a new one instead of growing unbounded.
+        let mut circuit = Circuit::new(3);
+        let q0 = QubitId::new(0);
+        let q1 = QubitId::new(1);
+        let q2 = QubitId::new(2);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q1, q2])
+            .unwrap();
+
+        let config = FusionConfig {
+            parallel_threshold_qubits: 0,
+            max_block_width: 2,
+            ..Default::default()
+        };
+        let blocks = find_fusion_blocks(&circuit, &config);
+        for block in &blocks {
+            assert!(block.qubits.len() <= 2);
+        }
+        // Two separate blocks: {q0,q1} (H+CNOT) and the lone CNOT(q1,q2)
+        // (dropped for being below min_fusion_size=2, so only 1 finished block).
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].qubits.as_slice(), &[q0, q1]);
+    }
+
+    #[test]
+    fn test_block_fusion_bridging_gate_closes_prior_blocks() {
+        // Two independent single-qubit chains on q0 and q1, then a CNOT
+        // bridging them — the bridge must close both prior blocks rather
+        // than silently merging or corrupting state.
+        let mut circuit = Circuit::new(2);
+        let q0 = QubitId::new(0);
+        let q1 = QubitId::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+
+        let config = wide_circuit_config();
+        let blocks = find_fusion_blocks(&circuit, &config);
+        // The two 2-gate chains each close as their own block (both meet
+        // min_fusion_size=2); the trailing lone CNOT is dropped (size 1).
+        assert_eq!(blocks.len(), 2);
+        for block in &blocks {
+            assert_eq!(block.operation_indices.len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_block_fusion_measurement_still_breaks_chain() {
+        /// Regression guard for the deliberate non-goal: fusion must never
+        /// extend across a measurement boundary (see module docs / IP
+        /// diligence notes).
+        #[derive(Debug)]
+        struct MockMeasure;
+        impl Gate for MockMeasure {
+            fn name(&self) -> &str {
+                "Measure"
+            }
+            fn num_qubits(&self) -> usize {
+                1
+            }
+            fn matrix(&self) -> Option<Vec<Complex64>> {
+                None
+            }
+        }
+
+        let mut circuit = Circuit::new(2);
+        let q0 = QubitId::new(0);
+        let q1 = QubitId::new(1);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockMeasure) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        let _ = q1;
+
+        let optimized = fuse_single_qubit_gates(&circuit, Some(wide_circuit_config())).unwrap();
+        // Two 2-gate chains on either side of the measurement, fused
+        // separately; the measurement itself passes through unchanged.
+        assert_eq!(optimized.len(), 3); // fused(H,X) + Measure + fused(H,Y)
+        let names: Vec<&str> = optimized.operations().map(|op| op.gate().name()).collect();
+        assert_eq!(names, vec!["FUSED", "Measure", "FUSED"]);
+    }
+
+    /// The correctness-critical test: fused vs. sequential (unfused)
+    /// execution of a small VQE-shaped circuit must agree numerically, for
+    /// multiple qubit orderings, to catch the bit-ordering risk documented
+    /// on `compose_block_matrix`.
+    #[test]
+    fn test_block_fusion_matches_sequential_application_multiple_orderings() {
+        // simq-compiler has no dependency on simq-sim (no execution engine
+        // here), so correctness is checked via the full circuit unitary
+        // (simq_gates::matrix_ops::circuit_matrix, already used by this
+        // crate's dependencies) rather than by running a simulator.
+        use simq_gates::matrix_ops::circuit_matrix;
+        use simq_gates::standard::{RotationY, RotationZ};
+
+        // (q0, q1, q2) permutations to exercise ascending / descending /
+        // interleaved orderings against the block's canonical (ascending)
+        // qubit order.
+        let orderings: [[usize; 3]; 3] = [[0, 1, 2], [2, 1, 0], [1, 0, 2]];
+
+        for perm in orderings {
+            let [a, b, c] = perm;
+            let (qa, qb, qc) = (QubitId::new(a), QubitId::new(b), QubitId::new(c));
+
+            let build = || -> Circuit {
+                let mut circuit = Circuit::new(3);
+                circuit
+                    .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qa])
+                    .unwrap();
+                circuit
+                    .add_gate(Arc::new(RotationY::new(0.7)) as Arc<dyn Gate>, &[qa])
+                    .unwrap();
+                circuit
+                    .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[qa, qb])
+                    .unwrap();
+                circuit
+                    .add_gate(Arc::new(RotationZ::new(1.3)) as Arc<dyn Gate>, &[qb])
+                    .unwrap();
+                circuit
+                    .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[qb, qc])
+                    .unwrap();
+                circuit
+            };
+
+            let unfused = build();
+            let fused = fuse_single_qubit_gates(&unfused, Some(wide_circuit_config())).unwrap();
+
+            // Sanity: fusion actually did something (collapsed multiple ops).
+            assert!(fused.len() < unfused.len());
+
+            let unfused_matrix = circuit_matrix(&unfused).expect("unfused circuit matrix");
+            let fused_matrix = circuit_matrix(&fused).expect("fused circuit matrix");
+
+            assert_eq!(unfused_matrix.len(), fused_matrix.len());
+            for (u, f) in unfused_matrix.iter().zip(fused_matrix.iter()) {
+                assert!(
+                    (u - f).norm() < 1e-10,
+                    "fused vs unfused circuit matrix mismatch for ordering {:?}: {} vs {}",
+                    perm,
+                    u,
+                    f
+                );
+            }
+        }
     }
 }

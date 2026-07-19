@@ -17,6 +17,8 @@ Inputs:
                  (produced by `python3 benchmarks/qiskit_baseline.py`)
 * qsim side:     benchmarks/qsim_results.json (optional)
                  (produced by `python3 benchmarks/qsim_baseline.py`)
+* qulacs side:   benchmarks/qulacs_results.json (optional)
+                 (produced by `python3 benchmarks/qulacs_baseline.py`)
 
 Run everything in order with ./benchmarks/run.sh
 """
@@ -28,9 +30,25 @@ import sys
 
 QISKIT_TOLERANCE = 1e-12
 QSIM_TOLERANCE = 5e-6  # qsim's Python wheel is float32-only, see module docstring
+QULACS_TOLERANCE = 1e-12  # qulacs is a float64 C++ core, same order as Qiskit
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = [4, 8, 12, 16]
-GROUPS = ["vqe_energy", "qaoa_maxcut", "ghz_sampling"]
+# vqe_energy/qaoa_maxcut/ghz_sampling: the original local (nearest-neighbor,
+# fixed linear chain) workloads. qft_probe/random_circuit: added to cover
+# the standard non-local and structure-agnostic benchmark categories this
+# suite was missing -- see BENCHMARKS.md's methodology notes.
+GROUPS = ["vqe_energy", "qaoa_maxcut", "ghz_sampling", "qft_probe", "random_circuit"]
+# Multi-instance groups: (value-key prefix, timing-group name). Value keys
+# are per-instance (`{value_prefix}/{size}q_i{0..NUM_INSTANCES}`) and get
+# cross-validated by the same `cross_validate` used for GROUPS above (it
+# doesn't care about key structure); timing is measured once per group as
+# the cost of the whole NUM_INSTANCES-instance batch, under a differently-
+# named criterion group -- see `simq::bench_workloads::NUM_INSTANCES` docs.
+MULTI_INSTANCE_GROUPS = [
+    ("vqe_energy_multi", "vqe_energy_multi_instance"),
+    ("qaoa_maxcut_multi", "qaoa_cost_multi_instance"),
+]
+GHZ_MULTI_INSTANCE_TIMING_GROUP = "ghz_sampling_multi_instance"
 
 
 def simq_values():
@@ -57,7 +75,16 @@ def cross_validate(name, simq, other_values, tolerance):
     print(f"== Cross-validation (SimQ vs {name}) ==")
     worst = 0.0
     failed = False
+    skipped = []
     for key, sv in sorted(simq.items()):
+        if key not in other_values:
+            # Not every backend mirrors every workload (e.g. qulacs_baseline.py
+            # only covers the original 12 vqe_energy/qaoa_maxcut/ghz_p0 values,
+            # not qft_probe/random_circuit/the multi-instance keys added later)
+            # -- skip rather than crash, and say so explicitly rather than
+            # silently under-counting what was actually checked.
+            skipped.append(key)
+            continue
         ov = other_values[key]
         diff = abs(sv - ov)
         worst = max(worst, diff)
@@ -66,6 +93,8 @@ def cross_validate(name, simq, other_values, tolerance):
         if diff > tolerance:
             failed = True
     print(f"  worst deviation: {worst:.2e} (tolerance {tolerance:.0e})")
+    if skipped:
+        print(f"  skipped (not covered by {name}): {', '.join(skipped)}")
     if failed:
         sys.exit(f"\nCROSS-VALIDATION FAILED against {name} - timings withheld. The "
                   "suites are not simulating the same circuits; fix that before "
@@ -86,6 +115,12 @@ def main():
         with open(qsim_path) as f:
             qsim = json.load(f)
 
+    qulacs_path = os.path.join(REPO, "benchmarks", "qulacs_results.json")
+    qulacs = None
+    if os.path.exists(qulacs_path):
+        with open(qulacs_path) as f:
+            qulacs = json.load(f)
+
     simq = simq_values()
     cross_validate("Qiskit exact statevector", simq, qiskit["values"], QISKIT_TOLERANCE)
     if qsim is not None:
@@ -93,15 +128,24 @@ def main():
     else:
         print("(benchmarks/qsim_results.json missing - skipping qsim cross-validation; "
               "run benchmarks/qsim_baseline.py to include it)\n")
+    if qulacs is not None:
+        cross_validate("qulacs exact statevector", simq, qulacs["values"], QULACS_TOLERANCE)
+    else:
+        print("(benchmarks/qulacs_results.json missing - skipping qulacs cross-validation; "
+              "run benchmarks/qulacs_baseline.py to include it)\n")
 
     header_bits = [f"Qiskit {qiskit['versions']['qiskit']}/Aer {qiskit['versions']['qiskit_aer']}"]
     if qsim is not None:
         header_bits.append(f"cirq {qsim['versions']['cirq']}/qsim {qsim['versions']['qsimcirq']}")
+    if qulacs is not None:
+        header_bits.append(f"qulacs {qulacs['versions']['qulacs']}")
     print(f"== Timings (median, ms) - {' vs '.join(header_bits)} ==")
 
     cols = [("SimQ", None), ("Statevector", "qiskit-sv"), ("Aer", "qiskit-aer")]
     if qsim is not None:
         cols += [("Cirq", "cirq-sv"), ("qsim", "qsim")]
+    if qulacs is not None:
+        cols += [("qulacs", "qulacs")]
 
     header = f"{'workload':<18}" + "".join(f" {name:>11}" + (f" {'ratio':>7}" if name != "SimQ" else "")
                                             for name, _ in cols)
@@ -124,6 +168,8 @@ def main():
             if qsim is not None:
                 values["cirq-sv"] = qsim["timings_ms"]["cirq"].get(key)
                 values["qsim"] = qsim["timings_ms"]["qsim"].get(key)
+            if qulacs is not None:
+                values["qulacs"] = qulacs["timings_ms"]["qulacs"].get(key)
 
             def ratio(other):
                 if other is None:
@@ -140,6 +186,50 @@ def main():
     if missing:
         print("\n(some SimQ rows missing - run: cargo bench -p simq --bench end_to_end)")
     print("\nratio > 1x means SimQ is faster; 1/Nx means SimQ is N times slower.")
+
+    # ---- Multi-instance timing (see MULTI_INSTANCE_GROUPS docstring) --------
+    n = qiskit.get("multi_instance_size")
+    if n is not None:
+        num_instances = qiskit.get("num_instances")
+        print(
+            f"\n== Multi-instance timing (median ms for all {num_instances} instances, "
+            f"{n}q) =="
+        )
+        print(header)
+        print("-" * len(header))
+        timing_groups = [g for _, g in MULTI_INSTANCE_GROUPS] + [
+            GHZ_MULTI_INSTANCE_TIMING_GROUP
+        ]
+        for group in timing_groups:
+            key = f"{group}/{n}q"
+            simq_ms = criterion_median_ms(group, f"{n}q")
+            if simq_ms is None:
+                print(f"{key:<18} {'(run cargo bench)':>11}")
+                continue
+            values = {
+                "qiskit-sv": qiskit["timings_ms"]["statevector"].get(key),
+                "qiskit-aer": qiskit["timings_ms"]["aer"].get(key),
+            }
+            if qsim is not None:
+                values["cirq-sv"] = qsim["timings_ms"]["cirq"].get(key)
+                values["qsim"] = qsim["timings_ms"]["qsim"].get(key)
+
+            def ratio(other):
+                if other is None:
+                    return "-"
+                r = other / simq_ms
+                return f"{r:.1f}x" if r >= 1 else f"1/{1 / r:.1f}x"
+
+            row = f"{key:<18} {simq_ms:>11.3f}"
+            for name, tag in cols[1:]:
+                ms = values.get(tag)
+                ms_s = f"{ms:.3f}" if ms is not None else "-"
+                row += f" {ms_s:>11} {ratio(ms):>7}"
+            print(row)
+        print(
+            "\n(these time the whole batch of instances per iteration, not one "
+            "instance -- see simq::bench_workloads::NUM_INSTANCES docs)"
+        )
 
 
 if __name__ == "__main__":

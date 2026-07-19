@@ -4,6 +4,7 @@
 //! ExecutionStatistics, ExecutionEngine, gradient computation, VQE/QAOA helpers,
 //! autodiff, caching, checkpointing, and stress tests.
 
+use num_complex::Complex64;
 use simq_core::circuit::Circuit;
 use simq_core::QubitId;
 use simq_gates::standard::*;
@@ -716,4 +717,127 @@ fn simulate_then_analyze() {
     let _ = stats.optimization_ratio();
     let _ = stats.peak_memory_mb();
     let _ = stats.compilation_overhead_percent();
+}
+
+// ============================================================================
+// 8. Multi-qubit gate fusion (issue #76 follow-up): correctness at/above the
+// qubit-count gate, and correctness of the persistent fusion-structure cache
+// across repeated Simulator::run() calls with different gate parameters.
+// ============================================================================
+
+/// VQE-shaped circuit (H + RY-CNOT-RZ neighborhoods), matching
+/// `simq-sim/examples/scaling_probe.rs`'s pattern, parametrized by a single
+/// angle so repeated calls can vary it. `num_qubits` must be >=
+/// `SimulatorConfig::parallel_threshold` (default 18) for multi-qubit block
+/// fusion to engage at all (see `FusionConfig::parallel_threshold_qubits`
+/// in simq-compiler) — the whole point of gating fusion width on qubit
+/// count is that below that, this code path is provably unreached.
+fn vqe_shaped_circuit(num_qubits: usize, theta: f64) -> Circuit {
+    let mut circuit = Circuit::new(num_qubits);
+    for i in 0..num_qubits {
+        circuit.add_gate(Arc::new(Hadamard), &[q(i)]).unwrap();
+    }
+    for i in 0..num_qubits {
+        circuit
+            .add_gate(Arc::new(RotationY::new(theta + i as f64 * 0.1)), &[q(i)])
+            .unwrap();
+    }
+    for i in 0..num_qubits - 1 {
+        circuit.add_gate(Arc::new(CNot), &[q(i), q(i + 1)]).unwrap();
+    }
+    for i in 0..num_qubits {
+        circuit
+            .add_gate(Arc::new(RotationZ::new(theta * 0.5 + i as f64 * 0.07)), &[q(i)])
+            .unwrap();
+    }
+    circuit
+}
+
+fn assert_states_close(a: &[Complex64], b: &[Complex64], tol: f64) {
+    assert_eq!(a.len(), b.len());
+    for (x, y) in a.iter().zip(b.iter()) {
+        assert!((x - y).norm() < tol, "state mismatch: {:?} vs {:?}", x, y);
+    }
+}
+
+/// At 20 qubits (above the default 18-qubit fusion-width gate), a fused
+/// (optimized) run must agree with an unoptimized run — this is the
+/// integration-level version of `simq-compiler`'s own multi-ordering
+/// correctness test, now exercised through the real dense kernels
+/// (`apply_three_qubit_dense` and friends), not just `circuit_matrix`.
+#[test]
+fn multi_qubit_fusion_matches_unoptimized_above_threshold() {
+    let circuit = vqe_shaped_circuit(20, 0.83);
+
+    let optimized_sim = Simulator::new(SimulatorConfig::default().with_optimization_level(2));
+    let unoptimized_sim = Simulator::new(SimulatorConfig::default().with_optimization(false));
+
+    let optimized = optimized_sim.run(&circuit).unwrap();
+    let unoptimized = unoptimized_sim.run(&circuit).unwrap();
+
+    assert_states_close(&optimized.state.to_dense_vec(), &unoptimized.state.to_dense_vec(), 1e-9);
+}
+
+/// Below the fusion-width gate (16 qubits, matching BENCHMARKS.md's largest
+/// published row), optimized and unoptimized runs must still agree — this
+/// doesn't prove the <16q *code path* is untouched (that's
+/// `simq-compiler`'s own `test_below_threshold_dispatches_to_legacy_path_exactly`),
+/// but it does confirm the qubit-count gate doesn't introduce an
+/// end-to-end correctness regression for the currently-published sizes.
+#[test]
+fn fusion_matches_unoptimized_below_threshold() {
+    let circuit = vqe_shaped_circuit(16, 0.83);
+
+    let optimized_sim = Simulator::new(SimulatorConfig::default().with_optimization_level(2));
+    let unoptimized_sim = Simulator::new(SimulatorConfig::default().with_optimization(false));
+
+    let optimized = optimized_sim.run(&circuit).unwrap();
+    let unoptimized = unoptimized_sim.run(&circuit).unwrap();
+
+    assert_states_close(&optimized.state.to_dense_vec(), &unoptimized.state.to_dense_vec(), 1e-9);
+}
+
+/// The critical safety test for the persistent fusion-structure cache
+/// (`Simulator::fusion_cache`): running the *same-shaped* circuit twice
+/// through one `Simulator` with *different* rotation angles must produce
+/// results matching each angle's own unoptimized baseline — not a stale
+/// result reused from the first call. This is exactly the scenario a naive
+/// "cache the compiled circuit" approach (like
+/// `simq_compiler::cached_compiler::CachedCompiler`, which caches baked-in
+/// matrices) would get wrong; `Simulator`'s cache only ever stores fusion
+/// *block structure*, so it must stay correct here.
+#[test]
+fn fusion_cache_stays_correct_across_different_angles() {
+    let sim = Simulator::new(SimulatorConfig::default().with_optimization_level(2));
+    let unopt_sim = Simulator::new(SimulatorConfig::default().with_optimization(false));
+
+    for theta in [0.2, 1.7, -0.9] {
+        let circuit = vqe_shaped_circuit(20, theta);
+        let cached_run = sim.run(&circuit).unwrap();
+        let baseline = unopt_sim.run(&circuit).unwrap();
+        assert_states_close(&cached_run.state.to_dense_vec(), &baseline.state.to_dense_vec(), 1e-9);
+    }
+}
+
+/// End-to-end proof that the cache wiring actually engages through
+/// `Simulator::run` (not just that the underlying `FusionStructureCache`
+/// type works in isolation, which `simq-compiler`'s own tests already
+/// cover): three same-shaped, differently-parametrized circuits run
+/// through one `Simulator` should produce more cache hits than misses.
+#[test]
+fn fusion_cache_hits_across_repeated_same_shape_runs() {
+    let sim = Simulator::new(SimulatorConfig::default().with_optimization_level(2));
+
+    for theta in [0.11, 0.42, -1.3, 2.5, 0.9] {
+        let circuit = vqe_shaped_circuit(20, theta);
+        sim.run(&circuit).unwrap();
+    }
+
+    // First run is necessarily a miss (nothing cached yet); the remaining
+    // four calls compile the exact same circuit *shape* and must hit.
+    assert!(
+        sim.fusion_cache_hits() >= 4,
+        "expected at least 4 fusion-structure cache hits across 5 same-shaped runs, got {}",
+        sim.fusion_cache_hits()
+    );
 }

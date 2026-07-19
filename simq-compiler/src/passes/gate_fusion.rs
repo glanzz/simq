@@ -3,9 +3,11 @@
 //! This pass combines adjacent single-qubit gates operating on the same qubit
 //! into a single composite gate. This reduces circuit depth and gate count.
 
-use crate::fusion::{fuse_single_qubit_gates, FusionConfig};
+use crate::fusion::{fuse_gates_with_cache, FusionConfig};
+use crate::fusion_cache::FusionStructureCache;
 use crate::passes::OptimizationPass;
 use simq_core::{Circuit, Result};
+use std::sync::Arc;
 
 /// Gate fusion optimization pass
 ///
@@ -25,6 +27,16 @@ use simq_core::{Circuit, Result};
 #[derive(Debug, Clone)]
 pub struct GateFusion {
     config: FusionConfig,
+    /// Optional shared cache of multi-qubit fusion block *structure*, keyed
+    /// by circuit shape (see `crate::fusion_cache` for why this is exact,
+    /// not approximate, across repeated compiles of a same-shaped circuit
+    /// with different gate parameters). `None` by default: a fresh
+    /// `GateFusion::new()` (what `create_compiler` uses) has no cache and
+    /// behaves exactly as before this existed. `simq-sim`'s `Simulator`
+    /// wires one in via `with_cache` (through
+    /// `pipeline::create_compiler_with_fusion_cache`) so the cache persists
+    /// across repeated `Simulator::run()` calls.
+    cache: Option<Arc<FusionStructureCache>>,
 }
 
 impl GateFusion {
@@ -32,12 +44,23 @@ impl GateFusion {
     pub fn new() -> Self {
         Self {
             config: FusionConfig::default(),
+            cache: None,
         }
     }
 
     /// Create a gate fusion pass with custom configuration
     pub fn with_config(config: FusionConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            cache: None,
+        }
+    }
+
+    /// Attach a shared fusion-structure cache. See [`GateFusion::cache`]
+    /// field docs for what is (and isn't) cached.
+    pub fn with_cache(mut self, cache: Arc<FusionStructureCache>) -> Self {
+        self.cache = Some(cache);
+        self
     }
 
     /// Set the minimum number of gates required for fusion
@@ -80,7 +103,8 @@ impl OptimizationPass for GateFusion {
         let original_len = circuit.len();
 
         // Apply fusion using existing implementation
-        let optimized = fuse_single_qubit_gates(circuit, Some(self.config.clone()))?;
+        let optimized =
+            fuse_gates_with_cache(circuit, Some(self.config.clone()), self.cache.as_deref())?;
 
         // Check if circuit was modified
         let modified = optimized.len() != original_len;
