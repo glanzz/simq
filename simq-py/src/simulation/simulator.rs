@@ -262,10 +262,8 @@ impl PySimulator {
                         if r < p01 {
                             bit = 1;
                         }
-                    } else {
-                        if r < p10 {
-                            bit = 0;
-                        }
+                    } else if r < p10 {
+                        bit = 0;
                     }
                 }
             }
