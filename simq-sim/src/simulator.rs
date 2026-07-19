@@ -63,7 +63,10 @@ impl Simulator {
         config.validate().expect("Invalid simulator configuration");
 
         let fusion_cache = Arc::new(FusionStructureCache::new(config.fusion_cache_size));
-        Self { config, fusion_cache }
+        Self {
+            config,
+            fusion_cache,
+        }
     }
 
     /// Get the simulator configuration

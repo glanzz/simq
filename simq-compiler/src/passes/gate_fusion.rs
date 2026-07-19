@@ -50,7 +50,10 @@ impl GateFusion {
 
     /// Create a gate fusion pass with custom configuration
     pub fn with_config(config: FusionConfig) -> Self {
-        Self { config, cache: None }
+        Self {
+            config,
+            cache: None,
+        }
     }
 
     /// Attach a shared fusion-structure cache. See [`GateFusion::cache`]
@@ -100,11 +103,8 @@ impl OptimizationPass for GateFusion {
         let original_len = circuit.len();
 
         // Apply fusion using existing implementation
-        let optimized = fuse_gates_with_cache(
-            circuit,
-            Some(self.config.clone()),
-            self.cache.as_deref(),
-        )?;
+        let optimized =
+            fuse_gates_with_cache(circuit, Some(self.config.clone()), self.cache.as_deref())?;
 
         // Check if circuit was modified
         let modified = optimized.len() != original_len;

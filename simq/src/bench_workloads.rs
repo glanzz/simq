@@ -12,8 +12,7 @@
 
 use simq_core::{Circuit, QubitId};
 use simq_gates::standard::{
-    CNot, CPhase, CZ, Hadamard, PauliX, RotationX, RotationY, RotationZ, SGate, SXGate, Swap,
-    TGate,
+    CNot, CPhase, Hadamard, PauliX, RotationX, RotationY, RotationZ, SGate, SXGate, Swap, TGate, CZ,
 };
 use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::{

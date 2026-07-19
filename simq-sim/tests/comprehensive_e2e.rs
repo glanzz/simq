@@ -775,11 +775,7 @@ fn multi_qubit_fusion_matches_unoptimized_above_threshold() {
     let optimized = optimized_sim.run(&circuit).unwrap();
     let unoptimized = unoptimized_sim.run(&circuit).unwrap();
 
-    assert_states_close(
-        &optimized.state.to_dense_vec(),
-        &unoptimized.state.to_dense_vec(),
-        1e-9,
-    );
+    assert_states_close(&optimized.state.to_dense_vec(), &unoptimized.state.to_dense_vec(), 1e-9);
 }
 
 /// Below the fusion-width gate (16 qubits, matching BENCHMARKS.md's largest
@@ -798,11 +794,7 @@ fn fusion_matches_unoptimized_below_threshold() {
     let optimized = optimized_sim.run(&circuit).unwrap();
     let unoptimized = unoptimized_sim.run(&circuit).unwrap();
 
-    assert_states_close(
-        &optimized.state.to_dense_vec(),
-        &unoptimized.state.to_dense_vec(),
-        1e-9,
-    );
+    assert_states_close(&optimized.state.to_dense_vec(), &unoptimized.state.to_dense_vec(), 1e-9);
 }
 
 /// The critical safety test for the persistent fusion-structure cache
@@ -823,11 +815,7 @@ fn fusion_cache_stays_correct_across_different_angles() {
         let circuit = vqe_shaped_circuit(20, theta);
         let cached_run = sim.run(&circuit).unwrap();
         let baseline = unopt_sim.run(&circuit).unwrap();
-        assert_states_close(
-            &cached_run.state.to_dense_vec(),
-            &baseline.state.to_dense_vec(),
-            1e-9,
-        );
+        assert_states_close(&cached_run.state.to_dense_vec(), &baseline.state.to_dense_vec(), 1e-9);
     }
 }
 

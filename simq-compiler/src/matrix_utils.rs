@@ -278,8 +278,14 @@ mod tests {
         // X * H via multiply_square(dim=2) should match multiply_2x2(X, H)
         let x = [[ZERO, ONE], [ONE, ZERO]];
         let h = [
-            [Complex64::new(INV_SQRT2, 0.0), Complex64::new(INV_SQRT2, 0.0)],
-            [Complex64::new(INV_SQRT2, 0.0), Complex64::new(-INV_SQRT2, 0.0)],
+            [
+                Complex64::new(INV_SQRT2, 0.0),
+                Complex64::new(INV_SQRT2, 0.0),
+            ],
+            [
+                Complex64::new(INV_SQRT2, 0.0),
+                Complex64::new(-INV_SQRT2, 0.0),
+            ],
         ];
         let expected = multiply_2x2(&x, &h);
 

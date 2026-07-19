@@ -396,12 +396,8 @@ fn fuse_gates(gates: &[&GateOp], config: &FusionConfig) -> Option<Arc<dyn Gate>>
         .collect();
 
     let qubit = gates[0].qubits()[0];
-    let flat: FlatMatrix = FlatMatrix::from_slice(&[
-        result[0][0],
-        result[0][1],
-        result[1][0],
-        result[1][1],
-    ]);
+    let flat: FlatMatrix =
+        FlatMatrix::from_slice(&[result[0][0], result[0][1], result[1][0], result[1][1]]);
     let qubits: SmallVec<[QubitId; 4]> = SmallVec::from_slice(&[qubit]);
 
     Some(Arc::new(FusedGate::new(qubits, flat, component_gates)))
@@ -558,16 +554,26 @@ pub(crate) fn find_fusion_blocks(circuit: &Circuit, config: &FusionConfig) -> Ve
         let qubits = op.qubits();
 
         if op.gate().matrix().is_none() {
-            let touched: AHashSet<usize> =
-                qubits.iter().filter_map(|q| qubit_owner[q.index()]).collect();
+            let touched: AHashSet<usize> = qubits
+                .iter()
+                .filter_map(|q| qubit_owner[q.index()])
+                .collect();
             for block_idx in touched {
-                close_block(&mut blocks, &mut qubit_owner, &mut finished, block_idx, config.min_fusion_size);
+                close_block(
+                    &mut blocks,
+                    &mut qubit_owner,
+                    &mut finished,
+                    block_idx,
+                    config.min_fusion_size,
+                );
             }
             continue;
         }
 
-        let touched: AHashSet<usize> =
-            qubits.iter().filter_map(|q| qubit_owner[q.index()]).collect();
+        let touched: AHashSet<usize> = qubits
+            .iter()
+            .filter_map(|q| qubit_owner[q.index()])
+            .collect();
 
         let mut merged = false;
         if touched.len() == 1 {
@@ -593,11 +599,23 @@ pub(crate) fn find_fusion_blocks(circuit: &Circuit, config: &FusionConfig) -> Ve
                 }
                 merged = true;
             } else {
-                close_block(&mut blocks, &mut qubit_owner, &mut finished, block_idx, config.min_fusion_size);
+                close_block(
+                    &mut blocks,
+                    &mut qubit_owner,
+                    &mut finished,
+                    block_idx,
+                    config.min_fusion_size,
+                );
             }
         } else if touched.len() > 1 {
             for block_idx in touched {
-                close_block(&mut blocks, &mut qubit_owner, &mut finished, block_idx, config.min_fusion_size);
+                close_block(
+                    &mut blocks,
+                    &mut qubit_owner,
+                    &mut finished,
+                    block_idx,
+                    config.min_fusion_size,
+                );
             }
         }
 
@@ -619,7 +637,13 @@ pub(crate) fn find_fusion_blocks(circuit: &Circuit, config: &FusionConfig) -> Ve
     }
 
     for block_idx in 0..blocks.len() {
-        close_block(&mut blocks, &mut qubit_owner, &mut finished, block_idx, config.min_fusion_size);
+        close_block(
+            &mut blocks,
+            &mut qubit_owner,
+            &mut finished,
+            block_idx,
+            config.min_fusion_size,
+        );
     }
 
     finished
@@ -693,11 +717,7 @@ fn compose_block_matrix(
         .map(|&idx| operations[idx].gate().name().to_string())
         .collect();
 
-    Some(Arc::new(FusedGate::new(
-        block.qubits.clone(),
-        result,
-        component_gates,
-    )))
+    Some(Arc::new(FusedGate::new(block.qubits.clone(), result, component_gates)))
 }
 
 /// Multi-qubit block fusion pass body. Reconstructs the circuit by
@@ -740,8 +760,7 @@ fn fuse_multi_qubit_blocks(
         .flat_map(|b| b.operation_indices.iter().copied())
         .collect();
 
-    let mut fused_gates: AHashMap<usize, (Arc<dyn Gate>, SmallVec<[QubitId; 4]>)> =
-        AHashMap::new();
+    let mut fused_gates: AHashMap<usize, (Arc<dyn Gate>, SmallVec<[QubitId; 4]>)> = AHashMap::new();
     for block in blocks.iter() {
         if let Some(fused) = compose_block_matrix(block, &operations, config) {
             let start_idx = block.operation_indices[0];
@@ -1243,7 +1262,10 @@ mod tests {
         let via_legacy_directly = fuse_single_qubit_chains(&circuit, &config).unwrap();
 
         assert_eq!(via_dispatch.len(), via_legacy_directly.len());
-        for (a, b) in via_dispatch.operations().zip(via_legacy_directly.operations()) {
+        for (a, b) in via_dispatch
+            .operations()
+            .zip(via_legacy_directly.operations())
+        {
             assert_eq!(a.gate().name(), b.gate().name());
             assert_eq!(a.qubits(), b.qubits());
         }
@@ -1257,14 +1279,15 @@ mod tests {
         let mut circuit = Circuit::new(18);
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
         circuit
-            .add_gate(
-                Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
-                &[q0, q1],
-            )
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
             .unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
 
         let config = FusionConfig::default();
         assert!(circuit.num_qubits() >= config.parallel_threshold_qubits);
@@ -1285,14 +1308,15 @@ mod tests {
         let mut circuit = Circuit::new(18);
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
         circuit
-            .add_gate(
-                Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
-                &[q0, q1],
-            )
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
             .unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
 
         let config = FusionConfig {
             max_block_width: 1,
@@ -1322,14 +1346,15 @@ mod tests {
         let mut circuit = Circuit::new(2);
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
         circuit
-            .add_gate(
-                Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
-                &[q0, q1],
-            )
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
             .unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
 
         let optimized = fuse_single_qubit_gates(&circuit, Some(wide_circuit_config())).unwrap();
         assert_eq!(optimized.len(), 1);
@@ -1348,7 +1373,9 @@ mod tests {
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
         let q2 = QubitId::new(2);
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
         circuit
             .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
             .unwrap();
@@ -1379,10 +1406,18 @@ mod tests {
         let mut circuit = Circuit::new(2);
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1]).unwrap();
-        circuit.add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q1])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliZ) as Arc<dyn Gate>, &[q1])
+            .unwrap();
         circuit
             .add_gate(Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>, &[q0, q1])
             .unwrap();
@@ -1419,11 +1454,21 @@ mod tests {
         let mut circuit = Circuit::new(2);
         let q0 = QubitId::new(0);
         let q1 = QubitId::new(1);
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(MockMeasure) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0]).unwrap();
-        circuit.add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q0]).unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliX) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(MockMeasure) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[q0])
+            .unwrap();
+        circuit
+            .add_gate(Arc::new(PauliY) as Arc<dyn Gate>, &[q0])
+            .unwrap();
         let _ = q1;
 
         let optimized = fuse_single_qubit_gates(&circuit, Some(wide_circuit_config())).unwrap();
@@ -1458,7 +1503,9 @@ mod tests {
 
             let build = || -> Circuit {
                 let mut circuit = Circuit::new(3);
-                circuit.add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qa]).unwrap();
+                circuit
+                    .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[qa])
+                    .unwrap();
                 circuit
                     .add_gate(Arc::new(RotationY::new(0.7)) as Arc<dyn Gate>, &[qa])
                     .unwrap();
