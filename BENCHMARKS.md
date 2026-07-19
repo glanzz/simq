@@ -20,58 +20,84 @@ qsim/Cirq and qulacs legs are each optional (`pip install cirq qsimcirq` /
 
 Machine: Intel Xeon @ 2.10 GHz, 4 vCPUs, 15 GiB RAM (cloud container), Linux.
 Toolchain: rustc 1.94.1 (release profile), Python 3 with Qiskit 2.5.0 /
-qiskit-aer 0.17.2. Cross-validation: worst deviation across the 12 checked
-values was **1.45e-14** (tolerance 1e-12). Medians; `ratio` = Qiskit time ÷
-SimQ time, so ratio > 1 means SimQ is faster.
+qiskit-aer 0.17.2. Cross-validation: worst deviation across the 30 checked
+values (12 base + 8 QFT/random-circuit + 5 VQE-multi-instance, see
+"Closing a benchmark-methodology gap" below) was **1.51e-14** (tolerance
+1e-12). Medians; `ratio` = Qiskit time ÷ SimQ time, so ratio > 1 means SimQ
+is faster.
 
 | Workload | SimQ (ms) | Statevector (ms) | ratio | Aer (ms) | ratio |
 |----------|----------:|------------------:|------:|---------:|------:|
-| vqe_energy/4q    | 0.039 |   2.056 |  52.2× |  1.137 | 28.9× |
-| vqe_energy/8q    | 0.085 |   3.339 |  39.4× |  1.854 | 21.9× |
-| vqe_energy/12q   | 0.557 |   7.794 |  14.0× |  3.836 |  6.9× |
-| vqe_energy/16q   | 9.655 |  81.407 |   8.4× | 11.835 |  1.2× |
-| qaoa_maxcut/4q   | 0.029 |   1.571 |  55.0× |  1.398 | 48.9× |
-| qaoa_maxcut/8q   | 0.063 |   2.953 |  47.2× |  2.102 | 33.6× |
-| qaoa_maxcut/12q  | 0.641 |   6.635 |  10.3× |  4.251 |  6.6× |
-| qaoa_maxcut/16q  | 8.049 |  73.579 |   9.1× | 10.001 |  1.2× |
-| ghz_sampling/4q  | 0.033 |   1.065 |  32.3× |  1.000 | 30.3× |
-| ghz_sampling/8q  | 0.036 |   2.408 |  67.4× |  1.601 | 44.8× |
-| ghz_sampling/12q | 0.050 |  17.243 | 347.9× |  2.022 | 40.8× |
-| ghz_sampling/16q | 0.265 | 508.933 |1922.0× |  4.588 | 17.3× |
+| vqe_energy/4q       |  0.035 |   1.960 |   56.2× |  1.377 |  39.5× |
+| vqe_energy/8q       |  0.082 |   3.635 |   44.3× |  2.064 |  25.2× |
+| vqe_energy/12q      |  0.555 |   8.331 |   15.0× |  4.121 |   7.4× |
+| vqe_energy/16q      |  9.846 |  75.294 |    7.6× | 14.390 |   1.5× |
+| qaoa_maxcut/4q      |  0.027 |   1.625 |   60.1× |  1.389 |  51.4× |
+| qaoa_maxcut/8q      |  0.057 |   4.010 |   70.2× |  2.606 |  45.6× |
+| qaoa_maxcut/12q     |  0.637 |   7.248 |   11.4× |  5.122 |   8.0× |
+| qaoa_maxcut/16q     |  8.593 |  68.928 |    8.0× | 13.156 |   1.5× |
+| ghz_sampling/4q     |  0.035 |   0.979 |   28.0× |  1.169 |  33.5× |
+| ghz_sampling/8q     |  0.036 |   2.584 |   71.9× |  1.656 |  46.1× |
+| ghz_sampling/12q    |  0.049 |  17.186 |  348.0× |  2.057 |  41.7× |
+| ghz_sampling/16q    |  0.258 | 653.578 | 2533.8× |  4.129 |  16.0× |
+| qft_probe/4q        |  0.017 |   0.768 |   45.1× |  1.237 |  72.6× |
+| qft_probe/8q        |  0.065 |   2.398 |   36.9× |  2.427 |  37.4× |
+| qft_probe/12q       |  0.957 |   7.027 |    7.3× |  6.230 |   6.5× |
+| **qft_probe/16q**   | **25.986** | 69.171 |   2.7× | 15.563 | **1/1.7×** |
+| random_circuit/4q   |  0.039 |   1.595 |   41.0× |  1.706 |  43.8× |
+| random_circuit/8q   |  0.080 |   3.522 |   43.9× |  2.707 |  33.8× |
+| random_circuit/12q  |  0.528 |   8.203 |   15.5× |  4.928 |   9.3× |
+| random_circuit/16q  |  7.258 |  76.723 |   10.6× | 15.170 |   2.1× |
 
-**SimQ is faster on all 12 workloads against both Qiskit backends** —
-1.2–48.9× vs Aer and 8.4–1922.0× vs exact Statevector. Before the issue #76
-fixes (see below) SimQ *lost* these 16-qubit rows by 22–30×; the same suite
-produced both sets of numbers, so the turnaround is measured, not asserted.
+**SimQ is faster on 19 of 20 workloads against Aer** (1.5–72.6×) **and all 20
+against exact Statevector** (2.7–2533.8×). The one Aer loss —
+`qft_probe/16q` at 1/1.7× — is the direct, structural consequence of this
+codebase's gate-fusion pass being local and width-bounded against QFT's
+long-range controlled-phase gates; see "Closing a benchmark-methodology gap"
+below for the full analysis. Before the issue #76 fixes (see below) SimQ
+*lost* the original 16-qubit rows by 22–30×; the same suite produced both
+sets of numbers, so the turnaround is measured, not asserted.
 
 ## Results: SimQ vs qsim (Google)
 
 Same machine and circuits as above. Toolchain: Python 3 with `cirq` 1.7.0 /
-`qsimcirq` 0.22.0. Cross-validation: worst deviation across the 12 checked
-values was **3.28e-06** (tolerance 5e-6, loosened from Qiskit's 1e-12 because
-qsim's Python wheel carries no fp64 option — see Fairness notes). Medians;
-`ratio` = qsim/Cirq time ÷ SimQ time.
+`qsimcirq` 0.22.0. Cross-validation: worst deviation across the 30 checked
+values was **2.29e-06** (tolerance 5e-6, loosened from Qiskit's 1e-12
+because qsim's Python wheel carries no fp64 option — see Fairness notes).
+Medians; `ratio` = qsim/Cirq time ÷ SimQ time.
 
 | Workload | SimQ (ms) | Cirq (ms) | ratio | qsim (ms) | ratio |
 |----------|----------:|----------:|------:|----------:|------:|
-| vqe_energy/4q    | 0.039 |  2.820 |  71.6× | 0.687 |  17.5× |
-| vqe_energy/8q    | 0.085 |  5.332 |  62.9× | 1.610 |  19.0× |
-| vqe_energy/12q   | 0.557 |  9.525 |  17.1× | 2.200 |   3.9× |
-| vqe_energy/16q   | 9.655 | 29.903 |   3.1× | 5.647 | 1/1.7× |
-| qaoa_maxcut/4q   | 0.029 |  2.745 |  96.1× | 0.696 |  24.3× |
-| qaoa_maxcut/8q   | 0.063 |  5.705 |  91.2× | 1.442 |  23.0× |
-| qaoa_maxcut/12q  | 0.641 |  9.349 |  14.6× | 2.115 |   3.3× |
-| qaoa_maxcut/16q  | 8.049 | 27.665 |   3.4× | 4.525 | 1/1.8× |
-| ghz_sampling/4q  | 0.033 |  2.304 |  69.8× | 0.911 |  27.6× |
-| ghz_sampling/8q  | 0.036 |  3.801 | 106.5× | 1.440 |  40.3× |
-| ghz_sampling/12q | 0.050 |  5.514 | 111.2× | 2.073 |  41.8× |
-| ghz_sampling/16q | 0.265 |  8.209 |  31.0× | 3.048 |  11.5× |
+| vqe_energy/4q       |  0.035 |  3.194 |   91.6× | 0.810 |   23.2× |
+| vqe_energy/8q       |  0.082 |  6.240 |   76.1× | 1.555 |   19.0× |
+| vqe_energy/12q      |  0.555 | 10.213 |   18.4× | 2.394 |    4.3× |
+| vqe_energy/16q      |  9.846 | 29.536 |    3.0× | 5.775 |  1/1.7× |
+| qaoa_maxcut/4q      |  0.027 |  3.168 |  117.2× | 0.802 |   29.7× |
+| qaoa_maxcut/8q      |  0.057 |  6.327 |  110.8× | 1.517 |   26.6× |
+| qaoa_maxcut/12q     |  0.637 | 10.194 |   16.0× | 2.282 |    3.6× |
+| qaoa_maxcut/16q     |  8.593 | 31.802 |    3.7× | 4.776 |  1/1.8× |
+| ghz_sampling/4q     |  0.035 |  2.692 |   77.1× | 1.079 |   30.9× |
+| ghz_sampling/8q     |  0.036 |  4.307 |  119.7× | 1.599 |   44.5× |
+| ghz_sampling/12q    |  0.049 |  6.367 |  128.9× | 2.171 |   43.9× |
+| ghz_sampling/16q    |  0.258 |  9.094 |   35.3× | 3.346 |   13.0× |
+| qft_probe/4q        |  0.017 |  1.186 |   69.6× | 0.309 |   18.1× |
+| qft_probe/8q        |  0.065 |  2.815 |   43.4× | 0.785 |   12.1× |
+| qft_probe/12q       |  0.957 |  5.615 |    5.9× | 1.603 |    1.7× |
+| **qft_probe/16q**   | **25.986** | 12.303 | **1/2.1×** | 5.203 | **1/5.0×** |
+| random_circuit/4q   |  0.039 |  3.005 |   77.2× | 0.802 |   20.6× |
+| random_circuit/8q   |  0.080 |  5.720 |   71.3× | 1.516 |   18.9× |
+| random_circuit/12q  |  0.528 |  9.593 |   18.2× | 2.405 |    4.6× |
+| **random_circuit/16q** | **7.258** | 31.274 |  4.3× | 4.702 | **1/1.5×** |
 
-**SimQ is faster on all 12 workloads against Cirq's pure-Python reference
-simulator** (3.1–111.2×) **and on 10 of 12 against qsim's optimized AVX/SSE
-C++ core**, losing only `vqe_energy/16q` (1.7×) and `qaoa_maxcut/16q` (1.8×).
-qsim is a much stronger competitor than Aer at 16 qubits — but see the
-qulacs section below, which is stronger still.
+**SimQ is faster on 18 of 20 workloads against Cirq's pure-Python reference
+simulator** (1.7–128.9×; the two losses are both `qft_probe`, discussed
+below) **and on 16 of 20 against qsim's optimized AVX/SSE C++ core**. The
+four qsim losses are all at 16 qubits: `vqe_energy` (1/1.7×), `qaoa_maxcut`
+(1/1.8×), `qft_probe` (1/5.0×), and — the more interesting one —
+`random_circuit` (1/1.5×). qsim is the strongest of the three Qiskit/Cirq/qsim
+backends everywhere it's measured; see "Closing a benchmark-methodology gap"
+for why `random_circuit`'s loss specifically revises this document's earlier
+(machine-dependent) claim that it "wins comfortably at every size."
 
 ## Results: SimQ vs qulacs
 
@@ -79,36 +105,43 @@ Same machine and circuits as above. Toolchain: Python 3 with `qulacs` 0.6.13
 (a single execution path — unlike Qiskit/Cirq, qulacs does not ship a
 separate pure-Python reference simulator alongside its optimized core, so
 there is one timing column here, not two). Cross-validation: worst deviation
-across the 12 checked values was **8.44e-15** (tolerance 1e-12 — qulacs, like
+across the 12 base values was **8.44e-15** (tolerance 1e-12 — qulacs, like
 SimQ and Qiskit, is a float64 core, so it gets the tight tolerance, not
-qsim's loosened one). Medians; `ratio` = qulacs time ÷ SimQ time.
+qsim's loosened one); `qulacs_baseline.py` does not yet cover
+`qft_probe`/`random_circuit`/the multi-instance workloads (18 of the 30
+values checked against Qiskit/qsim), so those are not cross-validated or
+timed against qulacs below — a tracked gap, not an oversight (see Honest
+limitations). Medians; `ratio` = qulacs time ÷ SimQ time.
 
 | Workload | SimQ (ms) | qulacs (ms) | ratio |
 |----------|----------:|------------:|------:|
-| vqe_energy/4q    | 0.039 |  0.040 |    1.0× |
-| vqe_energy/8q    | 0.085 |  0.083 | 1/1.0× |
-| vqe_energy/12q   | 0.557 |  0.924 |    1.7× |
-| vqe_energy/16q   | 9.655 | 12.817 |    1.3× |
-| qaoa_maxcut/4q   | 0.029 |  0.040 |    1.4× |
-| qaoa_maxcut/8q   | 0.063 |  0.076 |    1.2× |
-| qaoa_maxcut/12q  | 0.641 |  0.893 |    1.4× |
-| qaoa_maxcut/16q  | 8.049 |  8.193 |    1.0× |
-| ghz_sampling/4q  | 0.033 |  0.044 |    1.3× |
-| ghz_sampling/8q  | 0.036 |  0.049 |    1.4× |
-| ghz_sampling/12q | 0.050 |  0.084 |    1.7× |
-| ghz_sampling/16q | 0.265 |  0.462 |    1.7× |
+| vqe_energy/4q    | 0.035 |  0.053 |    1.5× |
+| vqe_energy/8q    | 0.082 |  0.089 |    1.1× |
+| vqe_energy/12q   | 0.555 |  0.962 |    1.7× |
+| vqe_energy/16q   | 9.846 | 14.070 |    1.4× |
+| qaoa_maxcut/4q   | 0.027 |  0.047 |    1.7× |
+| qaoa_maxcut/8q   | 0.057 |  0.078 |    1.4× |
+| qaoa_maxcut/12q  | 0.637 |  0.857 |    1.3× |
+| qaoa_maxcut/16q  | 8.593 |  8.639 |    1.0× |
+| ghz_sampling/4q  | 0.035 |  0.064 |    1.8× |
+| ghz_sampling/8q  | 0.036 |  0.055 |    1.5× |
+| ghz_sampling/12q | 0.049 |  0.093 |    1.9× |
+| ghz_sampling/16q | 0.258 |  0.302 |    1.2× |
 
-**SimQ is now faster on all 12 workloads against qulacs**, the strongest of
-the three published competitors — where Aer/Cirq/qsim lose by 1.2–1922.0×,
-qulacs stays within roughly 1–1.7× of SimQ everywhere. That "now" is load
-bearing: qulacs *won* `ghz_sampling/16q` (0.462 ms vs 0.790 ms, 1.7× ahead)
-the first time this table was measured. Chasing that one loss down — at the
-suggestion that memory allocation was the likely culprit — found and fixed a
-real O(2^n) inefficiency in SimQ's own sampling path; see the next section
-for the full story. This is the most instructive result in this document,
-not the embarrassing one: a competitor benchmark exposed a genuine defect
-that pure unit testing hadn't caught, and fixing it was a net win for every
-sampling-heavy workload at every qubit count, not just this one row.
+**SimQ is faster on all 12 covered workloads against qulacs**, the strongest
+of the three published competitors on the base suite — where Aer/Cirq/qsim
+lose 19/18/16 of 20 workloads, qulacs stays within roughly 1.0–1.9× of SimQ
+everywhere covered, with `qaoa_maxcut/16q` essentially a dead heat (1.0×).
+That "all 12" is a recent result, not a given: qulacs *won*
+`ghz_sampling/16q` (0.462 ms vs 0.790 ms, 1.7× ahead) the first time this
+table was measured. Chasing that one loss down — at the suggestion that
+memory allocation was the likely culprit — found and fixed a real O(2^n)
+inefficiency in SimQ's own sampling path (see the next section), closing
+today's `ghz_sampling/16q` gap to 1.2× in SimQ's favor. This is the most
+instructive result in this document, not the embarrassing one: a competitor
+benchmark exposed a genuine defect that pure unit testing hadn't caught, and
+fixing it was a net win for every sampling-heavy workload at every qubit
+count, not just this one row.
 
 A genuine surprise found while wiring qulacs up, not something assumed from
 its docs: **qulacs's `add_RX_gate`/`add_RY_gate`/`add_RZ_gate` use the
@@ -127,10 +160,10 @@ failed cross-check) had it gone unnoticed.
 **The circuit is nearly free; the measurement wasn't.** A GHZ state has
 exactly 2 nonzero amplitudes — `|00…0⟩` and `|11…1⟩` — no matter how many
 qubits it spans. Simulating H + a CNOT chain is trivial even at 16 qubits.
-So a 0.790 ms result for `ghz_sampling/16q` (vs. 8.702 ms for `vqe_energy/16q`'s
-much deeper circuit, measured in the same session) was itself a clue that
-almost all of that time had to be going somewhere other than gate
-application.
+So a 0.790 ms result for `ghz_sampling/16q` (vs. several milliseconds for
+`vqe_energy/16q`'s much deeper circuit, measured in the same investigation)
+was itself a clue that almost all of that time had to be going somewhere
+other than gate application.
 
 Profiling `simq-state`'s `ComputationalBasis::sample` (the function
 `ghz_sample` in `simq/src/bench_workloads.rs` calls to draw the 1024 shots)
@@ -166,34 +199,32 @@ structure) sees no asymptotic loss either: the compacted array is the same
 size as before, plus one cheap linear filter pass.
 
 **Result:** `sample(1024 shots)` on the 16-qubit GHZ state dropped from 813
-µs to **97 µs** (8.4×) in isolation, and the full `ghz_sampling/16q`
-benchmark dropped from 0.790 ms to **0.265 ms** (3.0×) — enough to flip that
-row from a 1.7× qulacs win to a 1.7× SimQ win, and it also sped up
-`ghz_sampling/12q` (0.062 ms → 0.050 ms). `vqe_energy` and `qaoa_maxcut`
-never call this sampling path, so they're unaffected (their small
-run-to-run drift between measurement sessions, ~10-20%, is ordinary
-machine-load noise, not a regression). All 378 `simq-state` unit/e2e tests
-pass unchanged; the fix only changes *which* entries `AliasTable` is built
-from, not the sampling distribution itself, and the existing test that
+µs to **97 µs** (8.4×) in isolation — a controlled, isolated A/B measurement
+on this same machine, unaffected by cross-run noise — and the full
+`ghz_sampling/16q` benchmark dropped from 0.790 ms to a range of
+**0.258–0.302 ms** across the sessions this document draws from (still 2.6–3×
+faster than the pre-fix number). `vqe_energy` and `qaoa_maxcut` never call
+this sampling path, so they're unaffected. All 378 `simq-state` unit/e2e
+tests pass unchanged; the fix only changes *which* entries `AliasTable` is
+built from, not the sampling distribution itself, and the existing test that
 samples a 2-of-4 support state (`test_batch_sampling`) covers exactly this
 "already-sparse `DenseState`" path.
 
 ## Closing a benchmark-methodology gap: QFT, random circuits, multi-instance
 
-The 36 workload/backend combinations above (12 workloads × Qiskit/Aer, qsim,
-and qulacs) are all built from the same three circuit shapes — VQE,
-QAOA-MaxCut, GHZ — and all three share two properties:
-every two-qubit gate acts on **adjacent qubits** in a **fixed pattern that
-repeats every layer** (a linear chain for VQE, a ring for QAOA, a chain for
-GHZ), and each is timed against **one fixed, hand-picked, deterministic
-circuit instance** per qubit count. Neither property is unique to this
-project's methodology — but a locality-exploiting compiler optimization was
-added to SimQ's fusion pass in this repo (see "Issue #76 follow-up" above:
-gate fusion collapses adjacent local gates into width-bounded blocks), which
-means a benchmark suite containing *only* local, fixed-pattern circuits risks
-making that specific optimization look better than it generalizes, and never
-tests whether the published numbers are an artifact of the one circuit
-instance each workload happens to use.
+The 12 base workload/backend combinations in the tables above are all built
+from three circuit shapes — VQE, QAOA-MaxCut, GHZ — and all three share two
+properties: every two-qubit gate acts on **adjacent qubits** in a **fixed
+pattern that repeats every layer** (a linear chain for VQE, a ring for QAOA,
+a chain for GHZ), and each is timed against **one fixed, hand-picked,
+deterministic circuit instance** per qubit count. Neither property is unique
+to this project's methodology — but a locality-exploiting compiler
+optimization was added to SimQ's fusion pass in this repo (see "Issue #76
+follow-up" below: gate fusion collapses adjacent local gates into
+width-bounded blocks), which means a benchmark suite containing *only*
+local, fixed-pattern circuits risks making that specific optimization look
+better than it generalizes, and never tests whether the published numbers
+are an artifact of the one circuit instance each workload happens to use.
 
 This is a recognized methodology concern, not a project-specific worry:
 QED-C's application-oriented benchmarking guidance (arXiv:2110.03137)
@@ -204,7 +235,9 @@ arXiv:2401.09076, which benchmarks Aer/qsim-class simulators using exactly
 Trotter circuits, **random circuit sampling**, and **QFT**) consistently
 include non-local, structure-agnostic, and analytically-checkable circuit
 families alongside application-specific ansätze — categories this repo's
-suite didn't have. Three additions close that gap:
+suite didn't have. Three additions close that gap; their results are folded
+into the "Results" tables above (rows are labeled `qft_probe`,
+`random_circuit`, and the "Multi-instance results" section further down):
 
 - **`qft_probe`** — textbook QFT. Its controlled-phase gates are **long-range**
   (qubit `i` connects to every qubit `j > i`, gate count O(n²)) — the direct
@@ -230,86 +263,74 @@ suite didn't have. Three additions close that gap:
   deterministic index-based formulas for gate choice, not a seeded PRNG —
   a seeded PRNG's bit-level output isn't guaranteed to match across the
   Rust/Qiskit/Cirq runtimes, which this suite's cross-validation needs.
-- **Multi-instance VQE/QAOA** (`{vqe_energy,qaoa_maxcut}_multi/8q_i0..4`) —
-  the same ansätze, run at 5 deterministically-offset parameter sets, at one
-  representative qubit count (8; not swept across all four sizes, to bound
-  how much slower this makes `benchmarks/run.sh`, which re-runs the full
-  Rust/Qiskit/qsim pipeline per instance). GHZ has no continuous parameter
-  to perturb this way (it's parameter-free), so its multi-instance variant
-  instead varies the shot-sampling seed and is timing-only, not a new
+- **Multi-instance VQE/QAOA/GHZ** (`{vqe_energy,qaoa_maxcut}_multi/8q_i0..4`,
+  `ghz_sampling_multi_instance/8q`) — the same ansätze, run at 5
+  deterministically-offset parameter sets, at one representative qubit
+  count (8; not swept across all four sizes, to bound how much slower this
+  makes `benchmarks/run.sh`). GHZ has no continuous parameter to perturb
+  this way (it's parameter-free), so its multi-instance variant instead
+  varies the shot-sampling seed and is timing-only, not a new
   cross-checked value.
 
-All of the above were designed and implemented in a single session together
-with the deeper gate-fusion work in "Issue #76 follow-up," specifically to
-test whether that work's own benchmarking was representative — see the
-results and the honest finding below.
-
-### Results (this session, NOT the reference machine — see caveat)
-
-Machine: 8 GiB Apple Silicon (the same machine used for the "Issue #76
-follow-up" scaling numbers above, **not** the 15 GiB Intel Xeon cloud
-container the rest of this document's numbers come from). Cross-validation:
-worst deviation **3.19e-14** vs Qiskit exact `Statevector` (tolerance
-1e-12, unchanged from before this work) and **2.10e-06** vs qsim (tolerance
-5e-6). All 30 checked values passed, including every new `qft_probe`,
-`random_circuit`, and multi-instance entry.
-
-| Workload | SimQ (ms) | Statevector | ratio | Aer | ratio | Cirq | ratio | qsim | ratio |
-|----------|----------:|------------:|------:|----:|------:|-----:|------:|-----:|------:|
-| qft_probe/4q          |  0.006 |  0.251 |  39.4× | 0.336 |  52.7× |  0.503 |  78.9× | 0.157 |  24.6× |
-| qft_probe/8q          |  0.032 |  0.875 |  27.5× | 0.959 |  30.1× |  1.233 |  38.7× | 0.413 |  12.9× |
-| qft_probe/12q         |  0.513 |  3.815 |   7.4× | 2.318 |   4.5× |  2.495 |   4.9× | 1.319 |   2.6× |
-| **qft_probe/16q**     | **13.790** | 26.792 |   1.9× | 7.938 | **1/1.7×** | 6.338 | **1/2.2×** | 16.681 |   1.2× |
-| random_circuit/4q     |  0.020 |  0.603 |  30.7× | 0.420 |  21.4× |  1.292 |  65.8× | 0.425 |  21.6× |
-| random_circuit/8q     |  0.043 |  1.401 |  32.3× | 0.791 |  18.2× |  2.563 |  59.1× | 0.830 |  19.1× |
-| random_circuit/12q    |  0.327 |  4.940 |  15.1× | 1.738 |   5.3× |  4.639 |  14.2× | 1.544 |   4.7× |
-| random_circuit/16q    |  4.678 | 30.170 |   6.4× | 7.519 |   1.6× | 18.127 |   3.9× | 8.618 |   1.8× |
-| vqe_energy_multi_instance/8q (5 instances) | 0.219 | 7.257 | 33.2× | 2.985 | 13.6× | 14.289 | 65.3× | 4.469 | 20.4× |
-| qaoa_cost_multi_instance/8q (5 instances)  | 0.148 | 6.328 | 42.7× | 3.474 | 23.4× | 13.769 | 92.9× | 4.271 | 28.8× |
-| ghz_sampling_multi_instance/8q (5 instances) | 0.093 | 5.495 | 59.1× | 2.659 | 28.6× | 13.065 | 140.6× | 5.101 | 54.9× |
-
 **The honest finding this exercise was for: `qft_probe/16q` is a loss for
-SimQ** — 1/1.7× vs Aer, 1/2.2× vs Cirq (still ahead of the float32 qsim
-backend at 1.2×, and still ahead of both exact-statevector references). This
-is not noise or a machine artifact: it is the direct, structural consequence
-of this session's own fusion work being width-bounded and *local* —
-QFT's controlled-phase gates connect qubits up to 15 apart at n=16, far
-outside any 3-qubit local block, so fusion simply doesn't engage for most of
-the circuit, while Aer's and Cirq's own fusion/optimization evidently
-handles the long-range case better. `random_circuit`, by contrast, wins
-comfortably at every size including 16q (6.4×/1.6×/3.9×/1.8×) — its
-brickwork connectivity *alternates* which pairs are adjacent each layer, but
-every individual two-qubit gate is still local within that layer, so the
-width-bounded fusion still engages. **The gap between these two results is
-the actual, now-measured boundary of what this session's fusion work
-helps with: locally-structured circuits (including ones whose local
-structure changes over time, like `random_circuit`), not genuinely
-long-range ones like QFT.** The VQE/QAOA/GHZ-only suite could not have
-shown this, because none of its circuits are non-local.
+SimQ against every backend** — 1/1.7× vs Aer, 1/2.1× vs Cirq, 1/5.0× vs
+qsim (only exact-statevector references, which do no fusion/optimization of
+their own, still lose to SimQ: 2.7× vs Statevector). This is not noise or a
+machine artifact: it is the direct, structural consequence of this
+project's own fusion work being width-bounded and *local* — QFT's
+controlled-phase gates connect qubits up to 15 apart at n=16, far outside
+any 3-qubit local block, so fusion simply doesn't engage for most of the
+circuit, while Aer's, Cirq's, and (especially) qsim's own
+fusion/optimization evidently handles the long-range case better. Note that
+the width-bounded multi-qubit fusion pass doesn't even *activate* below 18
+qubits (see "Issue #76 follow-up"), so this 16-qubit loss is not really
+about that pass at all — it reflects how far a plain local
+single-qubit-chain fusion (the pre-existing, unmodified code path at this
+size) can carry a fundamentally non-local circuit, which is "not very far."
 
-The multi-instance results show the opposite finding — a reassuring one:
-all 5 VQE and 5 QAOA instances cross-validated cleanly against both Qiskit
-and qsim (see the cross-validation log this session produced), so the
-headline VQE/QAOA numbers earlier in this document are not an artifact of
-the one parameter set each workload happens to use.
+**`random_circuit` is a more nuanced finding than first measured, and this
+document's earlier claim needs a correction.** On an 8 GiB Apple Silicon
+machine (where these workloads were first measured, before being folded
+into the reference-machine tables above), `random_circuit` won at every
+size including 16q, against all four backends. Re-measured here on the 15
+GiB Intel Xeon reference machine, that holds against Statevector (10.6×),
+Aer (2.1×), and Cirq (4.3×) — **but `random_circuit/16q` loses to qsim,
+1/1.5×**, the same pattern as `qft_probe`. `random_circuit`'s brickwork
+connectivity alternates which pairs are adjacent each layer, but every
+individual two-qubit gate is still local within that layer, so unlike QFT
+this isn't a locality story — it looks instead like qsim's C++ core simply
+being the strongest backend measured at 16 qubits across multiple workload
+shapes on this specific machine, a finding the Apple Silicon run's
+otherwise-clean sweep didn't surface. **The corrected, honest picture:**
+`random_circuit` generalizes SimQ's advantage over Aer/Cirq/Statevector
+cleanly; it does not generalize SimQ's advantage over qsim at 16 qubits,
+and neither did this document's original claim that it did — that was a
+measurement artifact of using a different machine, now fixed by remeasuring
+on the reference box this document's other numbers all come from.
 
-**What this section does not do:** it does not update the main "Results:
-SimQ vs Qiskit" / "Results: SimQ vs qsim" tables above, or the "Where it
-actually fails" scaling table — those stay as the historical record of the
-one reference-machine run this document's own opening paragraph promises.
-Re-running `benchmarks/run.sh` on that reference machine and merging these
-five new workload rows into the main tables (including, honestly, the
-16-qubit QFT loss) is the concrete next step, not done here.
+The multi-instance results (see "Multi-instance results" below) show a
+reassuring finding: all 5 VQE and 5 QAOA instances cross-validated cleanly
+against both Qiskit and qsim, so the headline VQE/QAOA numbers in the main
+tables are not an artifact of the one parameter set each workload happens
+to use.
 
-**One more staleness note, discovered merging this section together with
-"Why qulacs won `ghz_sampling/16q`, and the fix" above:** that fix (compact
-the alias table to the distribution's actual support instead of the full
-2^n Hilbert space) postdates this section's measurements. The
-`ghz_sampling_multi_instance/8q` number in the table above (0.093 ms) was
-captured on the old, unfixed sampling path, so it understates current
-performance — the fix only makes things faster, never slower, so this is a
-stale-low number, not a wrong one, but it should be re-measured before
-being treated as current.
+### Multi-instance results
+
+Same machine, same cross-validation run as the main tables above (30
+checked values total; see their headers for the worst-deviation numbers).
+Each row times the **whole 5-instance batch** as one unit, not one instance
+— see `simq::bench_workloads::NUM_INSTANCES` docs.
+
+| Workload (5 instances) | SimQ (ms) | Statevector | ratio | Aer | ratio | Cirq | ratio | qsim | ratio |
+|----------|----------:|------------:|------:|----:|------:|-----:|------:|-----:|------:|
+| vqe_energy_multi_instance/8q  | 0.415 | 18.059 | 43.5× | 10.096 | 24.3× | 31.461 | 75.9× | 8.400 | 20.3× |
+| qaoa_cost_multi_instance/8q   | 0.290 | 16.660 | 57.4× | 13.011 | 44.8× | 32.189 |111.0× | 8.148 | 28.1× |
+| ghz_sampling_multi_instance/8q| 0.179 |  9.803 | 54.9× |  7.907 | 44.3× | 22.400 |125.4× | 8.543 | 47.8× |
+
+SimQ wins every multi-instance row against every backend, by margins in
+line with the corresponding single-instance 8q rows above — consistent with
+the reassuring finding above that the single-instance numbers generalize
+across parameter sets.
 
 ## Workloads
 
@@ -328,7 +349,7 @@ three rows exist.
 | `ghz_sampling/Nq` | H(0) + CNOT chain | 1024 measurement shots |
 | `qft_probe/Nq` | Textbook QFT (H + controlled-phase ladder + swaps) applied to \|k=1⟩ | Re(amplitude at basis state \|1⟩) |
 | `random_circuit/Nq` | 8 layers alternating {H,S,T,SX,RY} (deterministic per (layer,qubit)) with brickwork CZ, pairing alternating each layer | p(\|0...0⟩) |
-| `{vqe_energy,qaoa_maxcut}_multi/8q_i{0..5}` | Same ansatz as above, 5 deterministic parameter offsets | same as above, per instance |
+| `{vqe_energy,qaoa_maxcut}_multi/8q_i{0..4}` | Same ansatz as above, 5 deterministic parameter offsets | same as above, per instance |
 
 One benchmark iteration = one full cost-function evaluation, i.e. what a
 variational optimizer pays per step.
@@ -382,6 +403,17 @@ python3 benchmarks/compare.py                   # cross-check (1e-12 Qiskit/qula
 cargo run --release -p simq --example xcheck_bench  # SimQ observable values as JSON
 ```
 
+The 18–30q scaling probes in "Where it actually fails" are separate,
+manually-run scripts (not part of `run.sh`, since they can take minutes per
+qubit count and the higher sizes need multiple GiB of free RAM) — run
+individual sizes to bound memory, e.g. `... 20 22 24`:
+
+```bash
+cargo run --release -p simq-sim --example scaling_probe -- 20 22 24 26 28 30
+python3 benchmarks/aer_scaling_probe.py 20 22 24 26 28 30
+python3 benchmarks/qulacs_scaling_probe.py 20 22 24 26 28   # 30q not attempted, see Honest limitations
+```
+
 ## How the ≥12-qubit gap was closed (issue #76)
 
 The first run of this suite showed SimQ **losing 22–30×** to Aer at 16 qubits
@@ -428,44 +460,48 @@ large circuits.
 ## Where it actually fails: 18–30 qubits
 
 We pushed the same 1-layer VQE circuit (H + RY + CNOT-chain + RZ, built by
-`simq-sim/examples/scaling_probe.rs` and, for qulacs, its Python port
-`benchmarks/qulacs_scaling_probe.py`) beyond the published table to find the
-edges. Same machine class (15 GiB RAM, 4 vCPUs); SimQ at default settings
-including its optimizer in the timed run, Aer timed on a once-transpiled
-circuit including final statevector retrieval, qulacs timed on state
-creation + `update_quantum_state` (its equivalent of a full run).
+`simq-sim/examples/scaling_probe.rs`, and its Python ports
+`benchmarks/aer_scaling_probe.py` and `benchmarks/qulacs_scaling_probe.py`)
+beyond the published table to find the edges. Same machine as every other
+number in this document (15 GiB RAM, 4 vCPUs, this session); SimQ at default
+settings including its optimizer in the timed run, Aer timed on a
+once-transpiled circuit including final statevector retrieval, qulacs timed
+on state creation + `update_quantum_state` (its equivalent of a full run).
 
-**Update:** the SimQ and qulacs columns below were freshly measured in this
-same sitting (SimQ after merging `scaling_30q`, persistent multi-qubit
-fusion, issue #76's tracked follow-up — see below); the Aer column is
-retained from an earlier measurement session on the same machine class
-(Aer/Qiskit's own scaling probe was not rerun this time, only the SimQ and
-qulacs ones). Each SimQ/qulacs value is the median of 3 fresh-process runs
-(a cold first run at 28q was ~2.3× slower than steady state for SimQ and
-~20% slower for qulacs — see note below the table):
+**All three columns below — SimQ, Aer, and qulacs — were measured together
+in this same sitting, on this same machine**, closing a gap this document
+used to flag explicitly: earlier versions carried the Aer column over from a
+different measurement session on a different instance of the same machine
+class (2.80 GHz vs. this session's 2.10 GHz), because no Aer-side scaling
+probe existed yet. `benchmarks/aer_scaling_probe.py` now exists specifically
+to close that gap. Each value is the median of 3 fresh-process runs (a cold
+first run at 28q was ~2.3× slower than steady state for SimQ, ~1.9× slower
+for qulacs, and unaffected for Aer — see note below the table):
 
 | Qubits | State | SimQ | Aer | qulacs | Verdict (vs Aer) |
 |-------:|------:|-----:|----:|-------:|---------|
-| 20 | 16 MiB | 23.8 ms | 53 ms | 32.1 ms | **SimQ 2.2× faster** |
-| 22 | 64 MiB | 100.8 ms | 240 ms | 147.5 ms | **SimQ 2.4× faster** |
-| 24 | 256 MiB | 542.7 ms | 1.03 s | 767.7 ms | **SimQ 1.9× faster** |
-| 26 | 1 GiB | 2.76 s | 4.3 s | 4.84 s | **SimQ 1.6× faster** |
-| 28 | 4 GiB | 11.1 s | 17.2 s | 20.7 s | **SimQ 1.55× faster** |
-| 30 | 16 GiB | rejected: "max supported is 29" | rejected: "maximum (29)" | not attempted (see below) | physics: state > RAM |
+| 20 | 16 MiB | 17.9 ms | 37.2 ms | 30.3 ms | **SimQ 2.1× faster** |
+| 22 | 64 MiB | 88.3 ms | 170.1 ms | 141.8 ms | **SimQ 1.9× faster** |
+| 24 | 256 MiB | 580.9 ms | 783.5 ms | 855.2 ms | **SimQ 1.35× faster** |
+| 26 | 1 GiB | 2.86 s | 3.16 s | 4.55 s | **SimQ 1.1× faster** |
+| 28 | 4 GiB | 11.85 s | 13.46 s | 19.54 s | **SimQ 1.14× faster** |
+| 30 | 16 GiB | rejected: "max supported is 29" | rejected: "maximum (29) in the coupling_map" | not attempted (see below) | physics: state > RAM |
 
-So: **SimQ now leads at every measured size from 20 through 28 qubits**
-against both Aer and qulacs, and 30 remains a hard wall for SimQ and Aer on
-this box (16 GiB state, 15 GiB RAM). This reverses the previous finding of
-parity through 26q and a 3.4× Aer win at 28q. Unlike the 4–16q range — where
-qulacs was the closest competitor by far, even beating SimQ once — at
-20–28q SimQ's fusion advantage widens rather than closes: SimQ leads qulacs
-by 1.35–1.87× across this range (1.35× at 20q, growing to 1.87× at 28q),
-the opposite trend from the small-qubit table. qulacs was **not** run at 30
-qubits: unlike SimQ/Aer, it has no built-in memory-aware qubit cap (see the
-30-qubit bullet below) and would have simply attempted the 16 GiB
-allocation on a 15 GiB box, risking an OOM kill of the whole container
-rather than a clean error — not worth the risk to confirm a result the
-physics already answers.
+So: **SimQ leads at every measured size from 20 through 28 qubits against
+both Aer and qulacs**, and 30 remains a hard wall on this box (16 GiB state,
+15 GiB RAM) for both simulators that attempt it. The margin against Aer
+narrows steadily with qubit count (2.1× → 1.14×) rather than staying flat or
+widening — a more modest, and now fully machine-consistent, picture than
+this document's previous carried-over Aer numbers implied (which showed a
+1.55× SimQ win at 28q using an Aer figure from a faster-for-Aer instance).
+Against qulacs the margin is roughly flat at 1.4–2.1× throughout 20–28q — the
+opposite trend from the 4–16q table, where qulacs was the closest
+competitor by far and briefly beat SimQ outright (see "Why qulacs won
+`ghz_sampling/16q`" above). qulacs was **not** run at 30 qubits: unlike
+SimQ/Aer, it has no built-in memory-aware qubit cap and would have simply
+attempted the 16 GiB allocation on a 15 GiB box, risking an OOM kill of the
+whole container rather than a clean error — not worth the risk to confirm a
+result the physics already answers.
 
 What the probing found (and what got fixed along the way):
 
@@ -489,9 +525,12 @@ What the probing found (and what got fixed along the way):
   structure* (which operation indices group into which block — never the
   concrete matrix, which is always recomputed from that step's angles) keyed
   by a structural circuit fingerprint, so repeated evaluations skip
-  re-deriving the same block partition. Net effect: 28q went from 58.6 s to
-  a steady-state 11.1 s (5.3×), enough to flip the 28q verdict from a 3.4×
-  Aer win to a 1.55× SimQ win.
+  re-deriving the same block partition. Net effect: 28q went from 58.6 s
+  (measured before this work) to a steady-state 11.85 s (4.9×), enough to
+  flip the 28q verdict from an Aer win to a SimQ win — 1.14× on this
+  session's own fresh Aer measurement, larger still (3.4×) against the
+  carried-over Aer figure this document used before `aer_scaling_probe.py`
+  existed.
 - **30-qubit failure mode (fixed, unchanged by this update).** A 30q dense
   state is 16 GiB; with 15 GiB of RAM both simulators must refuse — but SimQ
   used to *abort the process* inside an infallible `Vec` allocation (and,
@@ -499,7 +538,9 @@ What the probing found (and what got fixed along the way):
   hash map itself blew up at ~234M entries). `Simulator::run` now derives the
   qubit cap from `MemAvailable` when no memory limit is configured and
   rejects upfront with `TooManyQubits`, exactly like Aer's clean "circuit too
-  wide" error. Dense conversion also allocates once (null-checked) instead of
+  wide" error (independently reconfirmed this session: Aer raises
+  `CircuitTooWideForTarget` at transpile time with the same "maximum (29)"
+  message). Dense conversion also allocates once (null-checked) instead of
   twice. 30 qubits is a fundamental memory ceiling on a 15 GiB box (a
   double-precision statevector needs 16 GiB just for the amplitudes, before
   any working memory), not something deeper fusion can move — fusion cuts
@@ -566,79 +607,66 @@ be. Two additional pieces ride on top of the core fusion change:
   1834.3 ms on that machine), confirming no crashes or correctness issues at
   those sizes, but those absolute numbers aren't comparable to the
   reference-machine table and were never merged into it.
-- **Reference-machine re-run: since done, in a separate session** (see
-  "Where it actually fails: 18–30 qubits" above, "Update" note) — this is
-  no longer an open item. That run confirmed the 28q flip directly: 58.6 s
-  → 11.1 s steady-state (5.3×), turning a 3.4× Aer loss into a 1.55× SimQ
-  win, with SimQ now leading at every measured size from 20–28 qubits.
+- **Reference-machine re-run: since done, in a later session** (see "Where
+  it actually fails: 18–30 qubits" above) — this is no longer an open item.
+  That run confirmed the 28q flip directly: 58.6 s → 11.85 s steady-state
+  (4.9×), turning an Aer loss into a SimQ win, with SimQ now leading at
+  every measured size from 20–28 qubits. A further session closed the last
+  remaining gap here too: Aer's own scaling probe (`aer_scaling_probe.py`)
+  didn't exist yet at the time of the first reference-machine re-run, so
+  that run's Aer column was itself carried over from an even earlier,
+  different-instance measurement (2.80 GHz vs. 2.10 GHz) — this is now
+  fixed, and the 28q verdict on today's fully same-session numbers is a
+  more modest 1.14× SimQ win, not 1.55×.
 
 ## Honest limitations
 
-- **SimQ loses `qft_probe/16q`** — 1/1.7× vs Aer, 1/2.2× vs Cirq — because
-  this session's gate-fusion work is local and width-bounded, and QFT's
-  controlled-phase gates are not local. See "Closing a benchmark-methodology
-  gap" above for the full result and why it's the direct structural
-  consequence of that design choice, not noise.
+- Results above are from a 4-vCPU cloud container; ratios will differ on
   wider machines (more cores help Aer's and qulacs's threading too). Run
   `run.sh` on your own hardware — that is what it is for.
-- The main 4–16q tables (Qiskit/Aer, Cirq/qsim, qulacs) were all measured
-  together in this session, on this box, so they're directly comparable to
-  each other. The 18–30q scaling table is not fully consistent with them:
-  its SimQ and qulacs columns are from this same session, but its **Aer
-  column was not rerun** — Aer's own scaling probe (20–30q) was not part of
-  this update — so it is carried over from an earlier measurement session on
-  a different instance of the same machine class (2.80 GHz vs. this
-  session's 2.10 GHz, see below). A full rerun of Aer's scaling probe would
-  be needed to confirm that gap holds beyond noise, though the 5.3× SimQ
-  speedup at 28q (58.6 s → 11.1 s steady state) is far larger than plausible
-  run-to-run variance.
-- The 20–28q SimQ and qulacs numbers are medians of 3 fresh-process runs
-  each. The very first 28q run measured after the merge was ~25.8 s for
-  SimQ — a ~2.3× cold-start outlier from first-touch page faults on a fresh
-  4 GiB allocation — while three subsequent runs were tightly clustered at
-  10.9–11.2 s; qulacs showed the same effect more mildly (25.3 s cold vs.
-  ~20.7 s steady, ~20% high). The table reports steady-state medians, not
-  the cold numbers. Real workloads that allocate a 28q state once and reuse
-  it should expect the steady-state figure; a one-shot cold allocation (e.g.
-  a script run once) should expect something closer to the cold number.
-- The scaling table's Aer column was measured on a different instance of
-  the same machine class than everything else in this document: 2.80 GHz
-  vs. this session's 2.10 GHz. That affects absolute times but not the
-  order of magnitude of the SimQ/Aer ratios.
+- **SimQ loses `qft_probe/16q`** against every backend measured — 1/1.7×
+  vs Aer, 1/2.1× vs Cirq, 1/5.0× vs qsim (still 2.7× ahead of exact
+  Statevector, which does no optimization of its own) — because this
+  project's gate-fusion work is local and width-bounded, and QFT's
+  controlled-phase gates are not. See "Closing a benchmark-methodology gap"
+  above for the full result and why it's the direct structural consequence
+  of that design choice, not noise.
+- **SimQ also loses `random_circuit/16q` against qsim specifically**
+  (1/1.5×), while still beating Statevector/Aer/Cirq there (10.6×/2.1×/4.3×).
+  This corrects an earlier version of this document, which measured these
+  workloads on a different machine (8 GiB Apple Silicon) and reported
+  `random_circuit` winning at every size against all four backends —
+  re-measured on this document's actual reference machine, that claim does
+  not hold against qsim at 16q. See "Closing a benchmark-methodology gap"
+  for the full analysis of why this isn't a locality story the way
+  `qft_probe` is.
 - GHZ sampling vs `Statevector` overstates SimQ's advantage at 16q because
   `Statevector.sample_counts` is known to be slow for wide registers; the Aer
   column is the meaningful one there.
-- The qsim/Cirq and qulacs scaling numbers only cover 4–16q (qulacs) or
-  aren't measured at all beyond 16q (qsim/Cirq); the 18–30q scaling probe's
-  qulacs column exists (see above) but qsim/Cirq's does not, so no claim is
-  made about SimQ vs qsim beyond 16 qubits.
-- qsim was not pushed to find its own crossover point the way Aer and qulacs
-  were (no 18–30-qubit qsim probe exists yet); qsim's C++ core is expected to
-  close the gap at larger qubit counts the same way Aer/qulacs do, this just
-  has not been measured here.
-- qulacs was not tested at 30 qubits (see the scaling section above) because
-  it has no built-in memory-aware qubit cap the way SimQ and Aer do; running
-  it there risked an OOM kill rather than a clean refusal, for a result
-  (state doesn't fit in RAM) the other two simulators already establish.
-- **The QFT/random-circuit/multi-instance results** (see "Closing a
-  benchmark-methodology gap" above) were measured in a separate session on a
-  *different* machine (8 GiB Apple Silicon) than everything else in this
-  document, and are not merged into any of the tables above — see the
-  caveat at the end of that section. That same session's `benchmarks/run.sh`
-  run also produced 4–16q criterion timings for the original three
-  workloads; those are **not** included anywhere in this document. Criterion
-  reported those numbers as several-percent faster than its stored local
-  baseline, but that baseline predated the change by days with unknown run
-  conditions, and the change's own dispatch logic provably routes every
-  4–16q circuit through the unmodified pre-existing fusion code path — so
-  that apparent speedup is measurement noise from an uncontrolled
-  comparison, not a real effect. Only that run's correctness
-  cross-validation (worst deviation 3.19e-14 vs Qiskit) is machine-
-  independent and meaningful on its own.
 - qulacs coverage does not yet extend to `qft_probe`/`random_circuit`/the
   multi-instance workloads — only Qiskit and qsim mirror those (see "Closing
   a benchmark-methodology gap"). Given qulacs is the strongest competitor
   found in the 4–16q base table, its performance on QFT's long-range gate
-  structure specifically (where SimQ already loses to Aer and Cirq at 16q)
-  is an open, likely-unflattering-for-SimQ question this document does not
-  yet answer.
+  structure specifically (where SimQ already loses to Aer, Cirq, and qsim
+  at 16q) is an open, likely-unflattering-for-SimQ question this document
+  does not yet answer.
+- The 18–30q scaling table's SimQ, Aer, and qulacs numbers are each medians
+  of 3 fresh-process runs. The very first 28q run measured after merging
+  `scaling_30q` was ~25.8 s for SimQ — a ~2.3× cold-start outlier from
+  first-touch page faults on a fresh 4 GiB allocation — while three
+  subsequent runs were tightly clustered at 10.9–11.85 s across sessions;
+  qulacs showed the same effect more mildly (~1.9× high on the first run,
+  ~19.0–20.7 s steady). Aer showed no comparable cold-start effect. The
+  table reports steady-state medians, not the cold numbers. Real workloads
+  that allocate a 28q state once and reuse it should expect the
+  steady-state figure; a one-shot cold allocation (e.g. a script run once)
+  should expect something closer to the cold number.
+- The qsim/Cirq scaling numbers only cover 4–16 qubits; no 18–30-qubit qsim
+  probe exists yet (unlike Aer and qulacs, which now both have one — see
+  "Where it actually fails"), so no claim is made about SimQ vs qsim beyond
+  16 qubits. qsim's C++ core is expected to close the gap at larger qubit
+  counts the same way Aer/qulacs do, this just has not been measured here.
+- qulacs was not tested at 30 qubits (see "Where it actually fails") because
+  it has no built-in memory-aware qubit cap the way SimQ and Aer do; running
+  it there risked an OOM kill rather than a clean refusal, for a result
+  (state doesn't fit in RAM) the other two simulators already establish.

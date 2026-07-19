@@ -6,11 +6,11 @@
 [![Docs Site](https://github.com/glanzz/simq/actions/workflows/docs.yml/badge.svg)](https://glanzz.github.io/simq/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-**SimQ** is a blazingly fast quantum computing SDK written in Rust. On a cross-validated benchmark suite (identical circuits verified against Qiskit to 1e-12 before any timing is reported), SimQ is **1.6–90× faster than Qiskit Aer and 7.8–799× faster than exact Statevector** across VQE, QAOA, and sampling workloads at 4–16 qubits — while maintaining type safety and ergonomic APIs. Every number is reproducible with one command: see [BENCHMARKS.md](BENCHMARKS.md).
+**SimQ** is a blazingly fast quantum computing SDK written in Rust. On a cross-validated benchmark suite (identical circuits verified against Qiskit to 1e-12, qsim to 5e-6, and qulacs to 1e-12 before any timing is reported), SimQ beats Qiskit Aer on 19 of 20 workloads (**1.5–72.6×**) and exact Statevector on all 20 (**2.7–2534×**) across VQE, QAOA, GHZ sampling, QFT, and random-circuit workloads at 4–16 qubits — while maintaining type safety and ergonomic APIs. The strongest competitor found is [qulacs](https://github.com/qulacs/qulacs), which SimQ beats on all 12 covered workloads by a narrower 1.0–1.9×; the one documented loss (deep QFT at 16 qubits, where gates aren't local) is analyzed in full rather than hidden. Every number is reproducible with one command: see [BENCHMARKS.md](BENCHMARKS.md).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-dark.svg">
-  <img alt="SimQ vs Qiskit benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ is fastest on all twelve workloads." src="benchmarks/results-light.svg">
+  <img alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ leads on 10 of these 12 workloads; qsim is faster for 16-qubit VQE and QAOA (see BENCHMARKS.md)." src="benchmarks/results-light.svg">
 </picture>
 
 ## Documentation
@@ -31,10 +31,10 @@ Rust API reference: [docs.rs/simq](https://docs.rs/simq) (or `cargo doc --worksp
 
 ## Features
 
-- **Measured Performance**: faster than Qiskit (both Aer and Statevector) on every workload of a [cross-validated 4–16 qubit suite](BENCHMARKS.md) — 1.6–90× vs Aer, reproducible via `./benchmarks/run.sh`
+- **Measured Performance**: faster than Qiskit Aer on 19 of 20 workloads and exact Statevector on all 20 of a [cross-validated 4–16 qubit suite](BENCHMARKS.md) — 1.5–72.6× vs Aer, reproducible via `./benchmarks/run.sh` — and still faster than qulacs, the strongest competitor found, on all 12 workloads it covers
 - **⚡ Compile-Time Gate Matrix Caching (NEW!)**: Revolutionary multi-level caching system with ~0-5ns matrix access (see [details](#compile-time-caching))
 - **Type-Safe**: Compile-time verification of quantum operations
-- **Memory Efficient**: Hybrid sparse/dense state representation, simulate up to 35-40 qubits on 32GB RAM
+- **Memory Efficient**: Hybrid sparse/dense state representation; a dense statevector needs `16 × 2^n` bytes, so 15 GiB of RAM holds up to 29 qubits (measured — see [BENCHMARKS.md](BENCHMARKS.md)'s "Where it actually fails" section) and 32 GiB holds up to ~30-31, with `Simulator::run` deriving the cap from available memory and rejecting oversized circuits cleanly instead of aborting
 - **Hardware Ready**: Same code runs on simulators and real quantum computers
 - **Zero-Cost Abstractions**: No runtime overhead from high-level APIs
 - **Built-in Gradients**: Automatic gradient computation for variational algorithms
@@ -210,6 +210,9 @@ cargo test
 
 # Run benchmarks
 cargo bench
+
+# Reproduce the full cross-validated SimQ vs Qiskit/qsim/qulacs comparison (see BENCHMARKS.md)
+./benchmarks/run.sh
 
 # Format code
 cargo fmt
