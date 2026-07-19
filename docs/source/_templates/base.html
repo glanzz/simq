@@ -3,5 +3,12 @@
 
 {%- block extrahead -%}
     <meta name="google-site-verification" content="rSCd8L7c12hK2D7XNJlp-kua_GQ0skLVawjB0T3bVzo" />
+    {#- Inter for body/headings: a clean, highly-legible UI typeface. Loaded
+        with preconnect + display=swap so it never blocks rendering; custom.css
+        falls back to the theme's default system-font stack if it fails to
+        load, so the site is never left without a usable font. -#}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     {{ super() }}
 {%- endblock -%}

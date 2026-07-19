@@ -68,14 +68,15 @@ the one documented loss are in
 [BENCHMARKS.md](https://github.com/glanzz/simq/blob/main/BENCHMARKS.md);
 `./benchmarks/run.sh` reproduces it.
 
-```{image} /_static/benchmarks/results-light.svg
-:class: only-light
-:alt: SimQ vs Qiskit vs qsim vs qulacs benchmark results, median time per full evaluation, log scale.
+```{raw} html
+<div class="simq-chart-wrap">
+  <img class="only-light simq-chart-img" src="_static/benchmarks/results-light.svg"
+       alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results, median time per full evaluation, log scale.">
+  <img class="only-dark simq-chart-img" src="_static/benchmarks/results-dark.svg"
+       alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results, median time per full evaluation, log scale.">
+</div>
 ```
-```{image} /_static/benchmarks/results-dark.svg
-:class: only-dark
-:alt: SimQ vs Qiskit vs qsim vs qulacs benchmark results, median time per full evaluation, log scale.
-```
+<p class="simq-chart-hint">Scroll to see the full chart &rarr;</p>
 
 *4–16 qubits, VQE / QAOA / GHZ sampling. SimQ beats Qiskit Aer on 19 of 20
 workloads in the full suite (1.5–72.6×) and exact Statevector on all 20
@@ -83,14 +84,15 @@ workloads in the full suite (1.5–72.6×) and exact Statevector on all 20
 [qulacs](https://github.com/qulacs/qulacs) — SimQ still leads it on every
 covered workload, by 1.0–1.9×.*
 
-```{image} /_static/benchmarks/results-scaling-light.svg
-:class: only-light
-:alt: SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale, with the 30-qubit memory wall shown as a rejected marker.
+```{raw} html
+<div class="simq-chart-wrap">
+  <img class="only-light simq-chart-img--wide" src="_static/benchmarks/results-scaling-light.svg"
+       alt="SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale, with the 30-qubit memory wall shown as a rejected marker.">
+  <img class="only-dark simq-chart-img--wide" src="_static/benchmarks/results-scaling-dark.svg"
+       alt="SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale, with the 30-qubit memory wall shown as a rejected marker.">
+</div>
 ```
-```{image} /_static/benchmarks/results-scaling-dark.svg
-:class: only-dark
-:alt: SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale, with the 30-qubit memory wall shown as a rejected marker.
-```
+<p class="simq-chart-hint">Scroll to see the full chart &rarr;</p>
 
 *Same machine, pushed to the edge: 20–30 qubits. SimQ still leads at 28
 qubits (4 GiB state), and every simulator hits the same wall at 30 — a dense
