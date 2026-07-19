@@ -75,7 +75,16 @@ def cross_validate(name, simq, other_values, tolerance):
     print(f"== Cross-validation (SimQ vs {name}) ==")
     worst = 0.0
     failed = False
+    skipped = []
     for key, sv in sorted(simq.items()):
+        if key not in other_values:
+            # Not every backend mirrors every workload (e.g. qulacs_baseline.py
+            # only covers the original 12 vqe_energy/qaoa_maxcut/ghz_p0 values,
+            # not qft_probe/random_circuit/the multi-instance keys added later)
+            # -- skip rather than crash, and say so explicitly rather than
+            # silently under-counting what was actually checked.
+            skipped.append(key)
+            continue
         ov = other_values[key]
         diff = abs(sv - ov)
         worst = max(worst, diff)
@@ -84,6 +93,8 @@ def cross_validate(name, simq, other_values, tolerance):
         if diff > tolerance:
             failed = True
     print(f"  worst deviation: {worst:.2e} (tolerance {tolerance:.0e})")
+    if skipped:
+        print(f"  skipped (not covered by {name}): {', '.join(skipped)}")
     if failed:
         sys.exit(f"\nCROSS-VALIDATION FAILED against {name} - timings withheld. The "
                   "suites are not simulating the same circuits; fix that before "
