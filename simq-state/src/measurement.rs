@@ -175,14 +175,39 @@ impl ComputationalBasis {
         // Get probability distribution
         let probabilities = state.get_all_probabilities();
 
-        // Build alias table for O(1) sampling
-        let alias_table = AliasTable::new(&probabilities)?;
+        // Compact to the actual support before building the alias table.
+        // Many circuits concentrate probability on a tiny fraction of the
+        // 2^n basis states (a GHZ state has exactly 2 nonzero amplitudes
+        // regardless of qubit count); building a full O(2^n) alias table
+        // for those wastes time and memory on entries that can never be
+        // sampled. This is one linear pass over the already-SIMD-computed
+        // probabilities (`state.get_all_probabilities()` above), so it never
+        // costs more than computing them did -- the payoff is that
+        // `AliasTable::new`, which allocates several more full-size buffers
+        // and does non-vectorizable stack-based partitioning, now scales
+        // with the support size instead of the full Hilbert space dimension.
+        // The 1e-14 cutoff matches this crate's existing negligible-amplitude
+        // convention (see `dense_state.rs`/`sparse_state.rs`).
+        let mut support_indices = Vec::new();
+        let mut support_probs = Vec::new();
+        for (idx, &p) in probabilities.iter().enumerate() {
+            if p > 1e-14 {
+                support_indices.push(idx as u64);
+                support_probs.push(p);
+            }
+        }
+        if support_indices.is_empty() {
+            return Err(StateError::InvalidDimension { dimension: 0 });
+        }
 
-        // Sample using alias method
+        // Build alias table for O(1) sampling over the compacted support
+        let alias_table = AliasTable::new(&support_probs)?;
+
+        // Sample using alias method, mapping compacted indices back to basis states
         let mut result = SamplingResult::new(shots);
         for _ in 0..shots {
             let outcome = alias_table.sample(rng);
-            result.add_outcome(outcome as u64);
+            result.add_outcome(support_indices[outcome]);
         }
 
         Ok(result)

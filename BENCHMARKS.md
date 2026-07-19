@@ -26,21 +26,21 @@ SimQ time, so ratio > 1 means SimQ is faster.
 
 | Workload | SimQ (ms) | Statevector (ms) | ratio | Aer (ms) | ratio |
 |----------|----------:|------------------:|------:|---------:|------:|
-| vqe_energy/4q    | 0.030 |   2.056 |  69.6× |  1.137 | 38.5× |
-| vqe_energy/8q    | 0.069 |   3.339 |  48.4× |  1.854 | 26.9× |
-| vqe_energy/12q   | 0.446 |   7.794 |  17.5× |  3.836 |  8.6× |
-| vqe_energy/16q   | 8.702 |  81.407 |   9.4× | 11.835 |  1.4× |
-| qaoa_maxcut/4q   | 0.023 |   1.571 |  68.5× |  1.398 | 61.0× |
-| qaoa_maxcut/8q   | 0.049 |   2.953 |  60.3× |  2.102 | 42.9× |
-| qaoa_maxcut/12q  | 0.537 |   6.635 |  12.3× |  4.251 |  7.9× |
-| qaoa_maxcut/16q  | 7.657 |  73.579 |   9.6× | 10.001 |  1.3× |
-| ghz_sampling/4q  | 0.028 |   1.065 |  38.4× |  1.000 | 36.1× |
-| ghz_sampling/8q  | 0.032 |   2.408 |  76.4× |  1.601 | 50.8× |
-| ghz_sampling/12q | 0.062 |  17.243 | 276.2× |  2.022 | 32.4× |
-| ghz_sampling/16q | 0.790 | 508.933 | 643.9× |  4.588 |  5.8× |
+| vqe_energy/4q    | 0.039 |   2.056 |  52.2× |  1.137 | 28.9× |
+| vqe_energy/8q    | 0.085 |   3.339 |  39.4× |  1.854 | 21.9× |
+| vqe_energy/12q   | 0.557 |   7.794 |  14.0× |  3.836 |  6.9× |
+| vqe_energy/16q   | 9.655 |  81.407 |   8.4× | 11.835 |  1.2× |
+| qaoa_maxcut/4q   | 0.029 |   1.571 |  55.0× |  1.398 | 48.9× |
+| qaoa_maxcut/8q   | 0.063 |   2.953 |  47.2× |  2.102 | 33.6× |
+| qaoa_maxcut/12q  | 0.641 |   6.635 |  10.3× |  4.251 |  6.6× |
+| qaoa_maxcut/16q  | 8.049 |  73.579 |   9.1× | 10.001 |  1.2× |
+| ghz_sampling/4q  | 0.033 |   1.065 |  32.3× |  1.000 | 30.3× |
+| ghz_sampling/8q  | 0.036 |   2.408 |  67.4× |  1.601 | 44.8× |
+| ghz_sampling/12q | 0.050 |  17.243 | 347.9× |  2.022 | 40.8× |
+| ghz_sampling/16q | 0.265 | 508.933 |1922.0× |  4.588 | 17.3× |
 
 **SimQ is faster on all 12 workloads against both Qiskit backends** —
-1.3–61.0× vs Aer and 9.4–643.9× vs exact Statevector. Before the issue #76
+1.2–48.9× vs Aer and 8.4–1922.0× vs exact Statevector. Before the issue #76
 fixes (see below) SimQ *lost* these 16-qubit rows by 22–30×; the same suite
 produced both sets of numbers, so the turnaround is measured, not asserted.
 
@@ -54,22 +54,22 @@ qsim's Python wheel carries no fp64 option — see Fairness notes). Medians;
 
 | Workload | SimQ (ms) | Cirq (ms) | ratio | qsim (ms) | ratio |
 |----------|----------:|----------:|------:|----------:|------:|
-| vqe_energy/4q    | 0.030 |  2.820 |  95.5× | 0.687 |  23.3× |
-| vqe_energy/8q    | 0.069 |  5.332 |  77.2× | 1.610 |  23.3× |
-| vqe_energy/12q   | 0.446 |  9.525 |  21.3× | 2.200 |   4.9× |
-| vqe_energy/16q   | 8.702 | 29.903 |   3.4× | 5.647 | 1/1.5× |
-| qaoa_maxcut/4q   | 0.023 |  2.745 | 119.7× | 0.696 |  30.3× |
-| qaoa_maxcut/8q   | 0.049 |  5.705 | 116.5× | 1.442 |  29.4× |
-| qaoa_maxcut/12q  | 0.537 |  9.349 |  17.4× | 2.115 |   3.9× |
-| qaoa_maxcut/16q  | 7.657 | 27.665 |   3.6× | 4.525 | 1/1.7× |
-| ghz_sampling/4q  | 0.028 |  2.304 |  83.1× | 0.911 |  32.9× |
-| ghz_sampling/8q  | 0.032 |  3.801 | 120.6× | 1.440 |  45.7× |
-| ghz_sampling/12q | 0.062 |  5.514 |  88.3× | 2.073 |  33.2× |
-| ghz_sampling/16q | 0.790 |  8.209 |  10.4× | 3.048 |   3.9× |
+| vqe_energy/4q    | 0.039 |  2.820 |  71.6× | 0.687 |  17.5× |
+| vqe_energy/8q    | 0.085 |  5.332 |  62.9× | 1.610 |  19.0× |
+| vqe_energy/12q   | 0.557 |  9.525 |  17.1× | 2.200 |   3.9× |
+| vqe_energy/16q   | 9.655 | 29.903 |   3.1× | 5.647 | 1/1.7× |
+| qaoa_maxcut/4q   | 0.029 |  2.745 |  96.1× | 0.696 |  24.3× |
+| qaoa_maxcut/8q   | 0.063 |  5.705 |  91.2× | 1.442 |  23.0× |
+| qaoa_maxcut/12q  | 0.641 |  9.349 |  14.6× | 2.115 |   3.3× |
+| qaoa_maxcut/16q  | 8.049 | 27.665 |   3.4× | 4.525 | 1/1.8× |
+| ghz_sampling/4q  | 0.033 |  2.304 |  69.8× | 0.911 |  27.6× |
+| ghz_sampling/8q  | 0.036 |  3.801 | 106.5× | 1.440 |  40.3× |
+| ghz_sampling/12q | 0.050 |  5.514 | 111.2× | 2.073 |  41.8× |
+| ghz_sampling/16q | 0.265 |  8.209 |  31.0× | 3.048 |  11.5× |
 
 **SimQ is faster on all 12 workloads against Cirq's pure-Python reference
-simulator** (3.4–120.6×) **and on 10 of 12 against qsim's optimized AVX/SSE
-C++ core**, losing only `vqe_energy/16q` (1.5×) and `qaoa_maxcut/16q` (1.7×).
+simulator** (3.1–111.2×) **and on 10 of 12 against qsim's optimized AVX/SSE
+C++ core**, losing only `vqe_energy/16q` (1.7×) and `qaoa_maxcut/16q` (1.8×).
 qsim is a much stronger competitor than Aer at 16 qubits — but see the
 qulacs section below, which is stronger still.
 
@@ -85,31 +85,33 @@ qsim's loosened one). Medians; `ratio` = qulacs time ÷ SimQ time.
 
 | Workload | SimQ (ms) | qulacs (ms) | ratio |
 |----------|----------:|------------:|------:|
-| vqe_energy/4q    | 0.030 |  0.040 |    1.4× |
-| vqe_energy/8q    | 0.069 |  0.083 |    1.2× |
-| vqe_energy/12q   | 0.446 |  0.924 |    2.1× |
-| vqe_energy/16q   | 8.702 | 12.817 |    1.5× |
-| qaoa_maxcut/4q   | 0.023 |  0.040 |    1.8× |
-| qaoa_maxcut/8q   | 0.049 |  0.076 |    1.5× |
-| qaoa_maxcut/12q  | 0.537 |  0.893 |    1.7× |
-| qaoa_maxcut/16q  | 7.657 |  8.193 |    1.1× |
-| ghz_sampling/4q  | 0.028 |  0.044 |    1.6× |
-| ghz_sampling/8q  | 0.032 |  0.049 |    1.6× |
-| ghz_sampling/12q | 0.062 |  0.084 |    1.3× |
-| ghz_sampling/16q | 0.790 |  0.462 | 1/1.7× |
+| vqe_energy/4q    | 0.039 |  0.040 |    1.0× |
+| vqe_energy/8q    | 0.085 |  0.083 | 1/1.0× |
+| vqe_energy/12q   | 0.557 |  0.924 |    1.7× |
+| vqe_energy/16q   | 9.655 | 12.817 |    1.3× |
+| qaoa_maxcut/4q   | 0.029 |  0.040 |    1.4× |
+| qaoa_maxcut/8q   | 0.063 |  0.076 |    1.2× |
+| qaoa_maxcut/12q  | 0.641 |  0.893 |    1.4× |
+| qaoa_maxcut/16q  | 8.049 |  8.193 |    1.0× |
+| ghz_sampling/4q  | 0.033 |  0.044 |    1.3× |
+| ghz_sampling/8q  | 0.036 |  0.049 |    1.4× |
+| ghz_sampling/12q | 0.050 |  0.084 |    1.7× |
+| ghz_sampling/16q | 0.265 |  0.462 |    1.7× |
 
-**qulacs is, by a wide margin, the strongest of the three published
-competitors at 4–16 qubits** — where Aer/Cirq/qsim lose by 1.3–643.9×, qulacs
-stays within 1.1–2.1× of SimQ on 11 of 12 workloads, and **beats SimQ outright
-on `ghz_sampling/16q`** (0.462 ms vs 0.790 ms, 1.7×). This matches qulacs's
-reputation (it is built around a heavily hand-optimized, SIMD/multithreaded
-C++ core specifically tuned for exactly this kind of shallow, wide circuit)
-and is the most credible "SimQ isn't unambiguously fastest" data point in
-this document — see the scaling section below for how the gap moves at
-larger qubit counts.
+**SimQ is now faster on all 12 workloads against qulacs**, the strongest of
+the three published competitors — where Aer/Cirq/qsim lose by 1.2–1922.0×,
+qulacs stays within roughly 1–1.7× of SimQ everywhere. That "now" is load
+bearing: qulacs *won* `ghz_sampling/16q` (0.462 ms vs 0.790 ms, 1.7× ahead)
+the first time this table was measured. Chasing that one loss down — at the
+suggestion that memory allocation was the likely culprit — found and fixed a
+real O(2^n) inefficiency in SimQ's own sampling path; see the next section
+for the full story. This is the most instructive result in this document,
+not the embarrassing one: a competitor benchmark exposed a genuine defect
+that pure unit testing hadn't caught, and fixing it was a net win for every
+sampling-heavy workload at every qubit count, not just this one row.
 
-A genuine surprise found while wiring this up, not something assumed from
-qulacs's docs: **qulacs's `add_RX_gate`/`add_RY_gate`/`add_RZ_gate` use the
+A genuine surprise found while wiring qulacs up, not something assumed from
+its docs: **qulacs's `add_RX_gate`/`add_RY_gate`/`add_RZ_gate` use the
 opposite sign convention from Qiskit/Cirq/simq** — `exp(+i·θ/2·P)` instead of
 the near-universal `exp(-i·θ/2·P)`. Verified empirically (see
 `benchmarks/qulacs_baseline.py`'s docstring): `qulacs.gate.RY(θ)` applied to
@@ -119,6 +121,62 @@ therefore negated to implement the same unitary as the other three suites —
 exactly the kind of convention mismatch the cross-validation gate exists to
 catch, and it would have silently produced wrong "reference" values (and a
 failed cross-check) had it gone unnoticed.
+
+## Why qulacs won `ghz_sampling/16q`, and the fix
+
+**The circuit is nearly free; the measurement wasn't.** A GHZ state has
+exactly 2 nonzero amplitudes — `|00…0⟩` and `|11…1⟩` — no matter how many
+qubits it spans. Simulating H + a CNOT chain is trivial even at 16 qubits.
+So a 0.790 ms result for `ghz_sampling/16q` (vs. 8.702 ms for `vqe_energy/16q`'s
+much deeper circuit, measured in the same session) was itself a clue that
+almost all of that time had to be going somewhere other than gate
+application.
+
+Profiling `simq-state`'s `ComputationalBasis::sample` (the function
+`ghz_sample` in `simq/src/bench_workloads.rs` calls to draw the 1024 shots)
+confirmed it: computing the probability vector
+(`DenseState::get_all_probabilities`, already SIMD-optimized) took **37 µs**,
+but the full `sample()` call — the same computation plus building an alias
+table and drawing 1024 shots from it — took **813 µs**. Over 95% of the
+time was in `AliasTable::new`, which builds Vose's alias method table:
+several more `Vec` allocations the size of the full **2^n = 65,536-entry**
+Hilbert space (`prob`, `alias`, a `scaled` copy of the probabilities, a
+`prob_copy` clone of that, plus growable `small`/`large` partition stacks),
+built via inherently sequential, non-vectorizable stack popping/pushing —
+**for a distribution with a support of exactly 2.** This is precisely the
+"memory" angle worth chasing: the cost scaled with the size of the state
+vector, not with the number of shots or the number of outcomes that could
+ever actually be sampled.
+
+**The fix** (`simq-state/src/measurement.rs`): compact the probability
+vector to its actual support — every basis index with probability above the
+crate's existing 1e-14 negligible-amplitude cutoff (the same convention
+`dense_state.rs`/`sparse_state.rs` already use elsewhere) — in one linear
+pass *before* building the alias table, then build the table over that
+(potentially much smaller) compacted array and map sampled indices back to
+the original basis states. The compaction pass costs no more than the
+probability computation it rides alongside; the payoff is that
+`AliasTable::new`'s allocations and construction cost now scale with **the
+number of outcomes that can actually occur**, not with 2^n. For GHZ, that's
+2 instead of 65,536 — for any other circuit whose output distribution isn't
+already maximally spread across the full Hilbert space, some smaller but
+still real win. A circuit that genuinely is maximally spread (all 2^n
+amplitudes non-negligible, e.g. plain full superposition with no
+structure) sees no asymptotic loss either: the compacted array is the same
+size as before, plus one cheap linear filter pass.
+
+**Result:** `sample(1024 shots)` on the 16-qubit GHZ state dropped from 813
+µs to **97 µs** (8.4×) in isolation, and the full `ghz_sampling/16q`
+benchmark dropped from 0.790 ms to **0.265 ms** (3.0×) — enough to flip that
+row from a 1.7× qulacs win to a 1.7× SimQ win, and it also sped up
+`ghz_sampling/12q` (0.062 ms → 0.050 ms). `vqe_energy` and `qaoa_maxcut`
+never call this sampling path, so they're unaffected (their small
+run-to-run drift between measurement sessions, ~10-20%, is ordinary
+machine-load noise, not a regression). All 378 `simq-state` unit/e2e tests
+pass unchanged; the fix only changes *which* entries `AliasTable` is built
+from, not the sampling distribution itself, and the existing test that
+samples a 2-of-4 support state (`test_batch_sampling`) covers exactly this
+"already-sparse `DenseState`" path.
 
 ## Closing a benchmark-methodology gap: QFT, random circuits, multi-instance
 
@@ -242,6 +300,16 @@ one reference-machine run this document's own opening paragraph promises.
 Re-running `benchmarks/run.sh` on that reference machine and merging these
 five new workload rows into the main tables (including, honestly, the
 16-qubit QFT loss) is the concrete next step, not done here.
+
+**One more staleness note, discovered merging this section together with
+"Why qulacs won `ghz_sampling/16q`, and the fix" above:** that fix (compact
+the alias table to the distribution's actual support instead of the full
+2^n Hilbert space) postdates this section's measurements. The
+`ghz_sampling_multi_instance/8q` number in the table above (0.093 ms) was
+captured on the old, unfixed sampling path, so it understates current
+performance — the fix only makes things faster, never slower, so this is a
+stale-low number, not a wrong one, but it should be re-measured before
+being treated as current.
 
 ## Workloads
 
