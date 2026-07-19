@@ -14,7 +14,7 @@ Every number below comes from a cross-validated suite: SimQ's output is checked 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-dark.svg">
-  <img alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ leads on 10 of these 12 workloads; qsim is faster for 16-qubit VQE and QAOA (see BENCHMARKS.md)." src="benchmarks/results-light.svg">
+  <img alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ leads on 10 of these 12 workloads; qsim is faster for 16-qubit VQE and QAOA (see BENCHMARKS.md)." src="benchmarks/results-dark.svg">
 </picture>
 
 *4-16 qubits, VQE / QAOA / GHZ sampling. SimQ beats Qiskit Aer on 19 of 20 workloads in the full suite (1.5-72.6x) and exact Statevector on all 20 (2.7-2534x). The strongest competitor found is [qulacs](https://github.com/qulacs/qulacs); SimQ still leads it on every covered workload, by 1.0-1.9x.*
