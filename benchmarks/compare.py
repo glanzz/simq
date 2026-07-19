@@ -30,7 +30,22 @@ QISKIT_TOLERANCE = 1e-12
 QSIM_TOLERANCE = 5e-6  # qsim's Python wheel is float32-only, see module docstring
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = [4, 8, 12, 16]
-GROUPS = ["vqe_energy", "qaoa_maxcut", "ghz_sampling"]
+# vqe_energy/qaoa_maxcut/ghz_sampling: the original local (nearest-neighbor,
+# fixed linear chain) workloads. qft_probe/random_circuit: added to cover
+# the standard non-local and structure-agnostic benchmark categories this
+# suite was missing -- see BENCHMARKS.md's methodology notes.
+GROUPS = ["vqe_energy", "qaoa_maxcut", "ghz_sampling", "qft_probe", "random_circuit"]
+# Multi-instance groups: (value-key prefix, timing-group name). Value keys
+# are per-instance (`{value_prefix}/{size}q_i{0..NUM_INSTANCES}`) and get
+# cross-validated by the same `cross_validate` used for GROUPS above (it
+# doesn't care about key structure); timing is measured once per group as
+# the cost of the whole NUM_INSTANCES-instance batch, under a differently-
+# named criterion group -- see `simq::bench_workloads::NUM_INSTANCES` docs.
+MULTI_INSTANCE_GROUPS = [
+    ("vqe_energy_multi", "vqe_energy_multi_instance"),
+    ("qaoa_maxcut_multi", "qaoa_cost_multi_instance"),
+]
+GHZ_MULTI_INSTANCE_TIMING_GROUP = "ghz_sampling_multi_instance"
 
 
 def simq_values():
@@ -140,6 +155,50 @@ def main():
     if missing:
         print("\n(some SimQ rows missing - run: cargo bench -p simq --bench end_to_end)")
     print("\nratio > 1x means SimQ is faster; 1/Nx means SimQ is N times slower.")
+
+    # ---- Multi-instance timing (see MULTI_INSTANCE_GROUPS docstring) --------
+    n = qiskit.get("multi_instance_size")
+    if n is not None:
+        num_instances = qiskit.get("num_instances")
+        print(
+            f"\n== Multi-instance timing (median ms for all {num_instances} instances, "
+            f"{n}q) =="
+        )
+        print(header)
+        print("-" * len(header))
+        timing_groups = [g for _, g in MULTI_INSTANCE_GROUPS] + [
+            GHZ_MULTI_INSTANCE_TIMING_GROUP
+        ]
+        for group in timing_groups:
+            key = f"{group}/{n}q"
+            simq_ms = criterion_median_ms(group, f"{n}q")
+            if simq_ms is None:
+                print(f"{key:<18} {'(run cargo bench)':>11}")
+                continue
+            values = {
+                "qiskit-sv": qiskit["timings_ms"]["statevector"].get(key),
+                "qiskit-aer": qiskit["timings_ms"]["aer"].get(key),
+            }
+            if qsim is not None:
+                values["cirq-sv"] = qsim["timings_ms"]["cirq"].get(key)
+                values["qsim"] = qsim["timings_ms"]["qsim"].get(key)
+
+            def ratio(other):
+                if other is None:
+                    return "-"
+                r = other / simq_ms
+                return f"{r:.1f}x" if r >= 1 else f"1/{1 / r:.1f}x"
+
+            row = f"{key:<18} {simq_ms:>11.3f}"
+            for name, tag in cols[1:]:
+                ms = values.get(tag)
+                ms_s = f"{ms:.3f}" if ms is not None else "-"
+                row += f" {ms_s:>11} {ratio(ms):>7}"
+            print(row)
+        print(
+            "\n(these time the whole batch of instances per iteration, not one "
+            "instance -- see simq::bench_workloads::NUM_INSTANCES docs)"
+        )
 
 
 if __name__ == "__main__":

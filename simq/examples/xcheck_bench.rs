@@ -11,6 +11,11 @@
 use simq::bench_workloads as wl;
 use simq::state::AdaptiveState;
 
+/// Qubit count for the multi-instance cross-check entries -- must match
+/// `end_to_end.rs`'s `MULTI_INSTANCE_SIZE` and the Python baselines'
+/// `MULTI_INSTANCE_SIZE`.
+const MULTI_INSTANCE_SIZE: usize = 8;
+
 fn ghz_p0(sim: &simq::sim::Simulator, n: usize) -> f64 {
     let circuit = wl::ghz_circuit(n);
     let result = sim.run(&circuit).unwrap();
@@ -30,6 +35,20 @@ fn main() {
         entries.push(format!("    \"vqe_energy/{}q\": {:.15e}", n, wl::vqe_energy(&sim, n)));
         entries.push(format!("    \"qaoa_maxcut/{}q\": {:.15e}", n, wl::qaoa_cost(&sim, n)));
         entries.push(format!("    \"ghz_p0/{}q\": {:.15e}", n, ghz_p0(&sim, n)));
+        entries.push(format!("    \"qft_probe/{}q\": {:.15e}", n, wl::qft_probe(&sim, n)));
+        entries.push(format!(
+            "    \"random_circuit/{}q\": {:.15e}",
+            n,
+            wl::random_circuit_p0(&sim, n)
+        ));
+    }
+
+    let n = MULTI_INSTANCE_SIZE;
+    for (i, energy) in wl::vqe_energy_instances(&sim, n).into_iter().enumerate() {
+        entries.push(format!("    \"vqe_energy_multi/{n}q_i{i}\": {:.15e}", energy));
+    }
+    for (i, cost) in wl::qaoa_cost_instances(&sim, n).into_iter().enumerate() {
+        entries.push(format!("    \"qaoa_maxcut_multi/{n}q_i{i}\": {:.15e}", cost));
     }
 
     println!("{{\n{}\n}}", entries.join(",\n"));
