@@ -17,16 +17,16 @@ Every number below comes from a cross-validated suite: SimQ's output is checked 
   <img alt="SimQ vs Qiskit vs qsim vs qulacs benchmark results: median time per full energy evaluation / 1024-shot sampling run, log scale. SimQ leads on 10 of these 12 workloads; qsim is faster for 16-qubit VQE and QAOA (see BENCHMARKS.md)." src="benchmarks/results-light.svg">
 </picture>
 
-*4-16 qubits, VQE / QAOA / GHZ sampling. SimQ beats Qiskit Aer on 19 of 20 workloads in the full suite (1.5-72.6x) and exact Statevector on all 20 (2.7-2534x). The strongest competitor found is [qulacs](https://github.com/qulacs/qulacs) — SimQ still leads it on every covered workload, by 1.0-1.9x.*
+*4-16 qubits, VQE / QAOA / GHZ sampling. SimQ beats Qiskit Aer on 19 of 20 workloads in the full suite (1.5-72.6x) and exact Statevector on all 20 (2.7-2534x). The strongest competitor found is [qulacs](https://github.com/qulacs/qulacs); SimQ still leads it on every covered workload, by 1.0-1.9x.*
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-scaling-dark.svg">
   <img alt="SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale. SimQ leads through 28 qubits; all three simulators hit a hard wall at 30 qubits (16 GiB state vs. 15 GiB RAM), shown as a dashed 'rejected / not attempted' marker rather than a bar." src="benchmarks/results-scaling-light.svg">
 </picture>
 
-*Same machine, pushed to the edge: 20-30 qubits. SimQ still leads at 28 qubits (4 GiB state), and every simulator hits the same wall at 30 — a dense statevector needs 16 GiB, more than the 15 GiB box has. That's physics, not a bug: SimQ fails cleanly with a clear error instead of aborting.*
+*Same machine, pushed to the edge: 20-30 qubits. SimQ still leads at 28 qubits (4 GiB state), and every simulator hits the same wall at 30: a dense statevector needs 16 GiB, more than the 15 GiB box has. That's physics, not a bug: SimQ fails cleanly with a clear error instead of aborting.*
 
-This isn't cherry-picked. The suite also loses one workload — deep QFT at 16 qubits, where the gate structure is long-range and SimQ's fusion pass is local — and BENCHMARKS.md documents that loss and why it happens, not just the wins.
+This isn't cherry-picked. The suite also loses one workload (deep QFT at 16 qubits, where the gate structure is long-range and SimQ's fusion pass is local), and BENCHMARKS.md documents that loss and why it happens, not just the wins.
 
 ## Quick Start
 
@@ -55,10 +55,10 @@ fn main() {
 
 Gate methods chain fluently and never panic: the first invalid operation
 (e.g. an out-of-range qubit) is recorded and returned as an error from
-`build()` or `simulate()`. The full standard gate set is available —
+`build()` or `simulate()`. The full standard gate set is available:
 `h`, `x`, `y`, `z`, `s`, `t`, `sx` (and daggers), `rx`, `ry`, `rz`, `p`,
 `u1`/`u2`/`u3`, `cnot`/`cx`, `cy`, `cz`, `cp`, `swap`, `iswap`, `ecr`,
-`rxx`/`ryy`/`rzz`, `toffoli`/`ccx`, `cswap` — plus a `gate(...)` escape
+`rxx`/`ryy`/`rzz`, `toffoli`/`ccx`, `cswap`, plus a `gate(...)` escape
 hatch for custom gates.
 
 For lower-level control, the subcrate APIs are available through the same dependency:
@@ -99,20 +99,20 @@ optimizers and gradient methods (`vqe_h2_molecule`, `qaoa_maxcut`, ...).
 
 ## Why SimQ
 
-- **Measured, not claimed, performance** — see Benchmarks above; every number is reproducible with `./benchmarks/run.sh`.
-- **Type-safe by construction** — the const-generic `CircuitBuilder<N>` catches an out-of-range qubit at the call site, not at runtime:
+- **Measured, not claimed, performance**: see Benchmarks above; every number is reproducible with `./benchmarks/run.sh`.
+- **Type-safe by construction**: the const-generic `CircuitBuilder<N>` catches an out-of-range qubit at the call site, not at runtime:
   ```rust
   let mut builder = simq::prelude::CircuitBuilder::<4>::new();
-  builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist — caught immediately
+  builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist, caught immediately
   ```
-- **Memory-aware, not just memory-efficient** — a hybrid sparse/dense state representation, and `Simulator::run` derives its qubit cap from actual available memory (`16 x 2^n` bytes per state), refusing an oversized circuit cleanly instead of aborting. Measured cap: 29 qubits on 15 GiB of RAM (see BENCHMARKS.md).
-- **Hardware ready** — the same circuit code runs on the simulator or against IBM Quantum / AWS Braket backends.
-- **Built-in gradients** — automatic gradient computation for VQE/QAOA-style variational algorithms.
-- **Compile-time gate matrix caching** — common rotation angles resolve in 0-5ns instead of computing a matrix at runtime; see [`simq-gates/COMPILE_TIME_CACHING.md`](simq-gates/COMPILE_TIME_CACHING.md) for the full design and its accuracy guarantee (cache hits are exact-match only, to 1e-12 — never approximated).
+- **Memory-aware, not just memory-efficient**: a hybrid sparse/dense state representation, and `Simulator::run` derives its qubit cap from actual available memory (`16 x 2^n` bytes per state), refusing an oversized circuit cleanly instead of aborting. Measured cap: 29 qubits on 15 GiB of RAM (see BENCHMARKS.md).
+- **Hardware ready**: the same circuit code runs on the simulator or against IBM Quantum / AWS Braket backends.
+- **Built-in gradients**: automatic gradient computation for VQE/QAOA-style variational algorithms.
+- **Compile-time gate matrix caching**: common rotation angles resolve in 0-5ns instead of computing a matrix at runtime; see [`simq-gates/COMPILE_TIME_CACHING.md`](simq-gates/COMPILE_TIME_CACHING.md) for the full design and its accuracy guarantee (cache hits are exact-match only, to 1e-12; never approximated).
 
 ## Architecture
 
-- **simq**: Umbrella crate — the fluent `QuantumCircuit` builder plus re-exports of everything below
+- **simq**: Umbrella crate, the fluent `QuantumCircuit` builder plus re-exports of everything below
 - **simq-core**: Core types and traits
 - **simq-state**: Quantum state representations (sparse/dense)
 - **simq-gates**: Gate library with SIMD optimizations and compile-time caching

@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "SimQ Python quickstart — build and simulate quantum circuits from Python using the Rust-powered simq package."
+    description: "SimQ Python quickstart: build and simulate quantum circuits from Python using the Rust-powered simq package."
 ---
 
 # Quickstart (Python)

@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "SimQ Rust quickstart — build and simulate your first quantum circuit with the fluent QuantumCircuit API in five minutes."
+    description: "SimQ Rust quickstart: build and simulate your first quantum circuit with the fluent QuantumCircuit API in five minutes."
 ---
 
 # Quickstart (Rust)
@@ -46,7 +46,7 @@ Run it:
 cargo run
 ```
 
-Only `000` and `111` appear — the three qubits are entangled in a GHZ state.
+Only `000` and `111` appear: the three qubits are entangled in a GHZ state.
 
 ### Error handling without panics
 
@@ -76,7 +76,7 @@ All common gates are available as chainable methods:
 
 ## 3. Exact quantities, not just shots
 
-You don't need sampling to inspect a state — probabilities and expectation
+You don't need sampling to inspect a state: probabilities and expectation
 values are exact:
 
 ```rust
@@ -122,13 +122,13 @@ use simq::prelude::*;
 let mut builder = CircuitBuilder::<4>::new(); // 4-qubit circuit
 let [q0, q1, q2, q3] = builder.qubits();      // typed qubit references
 builder.apply_gate(Arc::new(Hadamard), &[q0]).unwrap();
-builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist — caught immediately
+builder.qubit(5).unwrap_err(); // qubit 5 doesn't exist, caught immediately
 let circuit = builder.build();
 ```
 
 ## Where to next?
 
-- [Circuits in depth](../guide/circuits.md) — builders, validation, visualization
-- [Simulation](../guide/simulation.md) — configuration, sparse vs dense, statistics
-- [Observables & VQE](../guide/observables-vqe.md) — variational workflows
-- [Examples](../examples/index.md) — full runnable programs
+- [Circuits in depth](../guide/circuits.md): builders, validation, visualization
+- [Simulation](../guide/simulation.md): configuration, sparse vs dense, statistics
+- [Observables & VQE](../guide/observables-vqe.md): variational workflows
+- [Examples](../examples/index.md): full runnable programs

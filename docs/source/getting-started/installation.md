@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "Install the SimQ quantum computing SDK — add the Rust crate to Cargo.toml or build the Python bindings with maturin."
+    description: "Install the SimQ quantum computing SDK: add the Rust crate to Cargo.toml or build the Python bindings with maturin."
 ---
 
 # Installation
@@ -25,7 +25,7 @@ dependency is all you need.
 ### Requirements
 
 - Rust **1.75** or newer (`rustup update` to get the latest stable)
-- No system dependencies — everything builds with `cargo`
+- No system dependencies: everything builds with `cargo`
 
 ### Building from source
 
@@ -37,7 +37,7 @@ cargo test  --workspace --exclude simq-py
 ```
 
 ```{note}
-`simq-py` is a PyO3 *extension module* — it can only be linked when loaded
+`simq-py` is a PyO3 *extension module*; it can only be linked when loaded
 by a Python interpreter, so it is excluded from plain `cargo build`/`cargo
 test` runs and built separately with maturin (see below).
 ```
@@ -80,5 +80,5 @@ pytest
 
 ## Next steps
 
-- [Quickstart (Rust)](quickstart-rust.md) — your first circuit in Rust
-- [Quickstart (Python)](quickstart-python.md) — your first circuit in Python
+- [Quickstart (Rust)](quickstart-rust.md): your first circuit in Rust
+- [Quickstart (Python)](quickstart-python.md): your first circuit in Python

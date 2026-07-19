@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "SimQ Python API reference — circuits, gates, simulator, noise models, compiler, backends, and visualization from the simq package."
+    description: "SimQ Python API reference: circuits, gates, simulator, noise models, compiler, backends, and visualization from the simq package."
 ---
 
 # Python API reference
@@ -31,16 +31,16 @@ Gate classes and lowercase factory functions, mirroring the Rust standard
 gate set:
 
 - **Single-qubit**: `HGate`, `XGate`, `YGate`, `ZGate`, `SGate`, `SdgGate`,
-  `TGate`, `TdgGate`, `SXGate`, `SXdgGate` — factories `h(q)`, `x(q)`, ...
+  `TGate`, `TdgGate`, `SXGate`, `SXdgGate`; factories `h(q)`, `x(q)`, ...
 - **Parameterized single-qubit**: `RXGate`, `RYGate`, `RZGate`,
-  `PhaseGate`, `U3Gate` — factories `rx(q, theta)`, `u3(q, θ, φ, λ)`, ...
-- **Two-qubit**: `CXGate`, `CZGate`, `SwapGate`, `iSwapGate`, `ECRGate` —
+  `PhaseGate`, `U3Gate`; factories `rx(q, theta)`, `u3(q, θ, φ, λ)`, ...
+- **Two-qubit**: `CXGate`, `CZGate`, `SwapGate`, `iSwapGate`, `ECRGate`;
   factories `cx(c, t)`, `swap(a, b)`, ...
 - **Parameterized two-qubit**: `RXXGate`, `RYYGate`, `RZZGate`,
-  `CPhaseGate` — factories `rxx(a, b, theta)`, `cphase(c, t, theta)`, ...
-- **Three-qubit**: `ToffoliGate`, `FredkinGate` — factories
+  `CPhaseGate`; factories `rxx(a, b, theta)`, `cphase(c, t, theta)`, ...
+- **Three-qubit**: `ToffoliGate`, `FredkinGate`; factories
   `toffoli(c1, c2, t)`, `fredkin(c, t1, t2)`
-- **Custom**: `CustomGate` / `custom(qubits, matrix, name=None)` — any
+- **Custom**: `CustomGate` / `custom(qubits, matrix, name=None)`, for any
   unitary from a NumPy matrix
 
 ## Simulation (`simq.simulation`, re-exported at top level)
@@ -59,7 +59,7 @@ the [noise guide](../guide/noise.md).
 
 ## Compiler
 
-`Compiler`, `OptimizationLevel`, `CircuitAnalysis` — run optimization
+`Compiler`, `OptimizationLevel`, `CircuitAnalysis`: run optimization
 passes and inspect circuit metrics from Python.
 
 ## Backends

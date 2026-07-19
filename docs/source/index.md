@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "SimQ is a high-performance quantum computing SDK written in Rust with Python bindings — cross-validated against Qiskit, qsim, and qulacs, beating Qiskit Aer on 19 of 20 benchmarked workloads and qulacs (the strongest competitor found) on all 12 it covers. Type-safe, memory efficient."
+    description: "SimQ is a high-performance quantum computing SDK written in Rust with Python bindings: cross-validated against Qiskit, qsim, and qulacs, beating Qiskit Aer on 19 of 20 benchmarked workloads and qulacs (the strongest competitor found) on all 12 it covers. Type-safe, memory efficient."
     keywords: "quantum computing, quantum simulator, Rust, Python, VQE, QAOA, SDK, quantum circuits, SimQ"
 ---
 
@@ -11,10 +11,10 @@ myst:
 <div class="simq-hero">
   <h1>Quantum computing at Rust speed</h1>
   <p class="simq-tagline">
-    SimQ is a high-performance quantum computing SDK written in Rust —
+    SimQ is a high-performance quantum computing SDK written in Rust,
     cross-validated against Qiskit, qsim, and qulacs, beating Qiskit Aer on
     19 of 20 benchmarked workloads and qulacs, the strongest competitor
-    found, on all 12 it covers — with type-safe circuit construction and
+    found, on all 12 it covers, with type-safe circuit construction and
     first-class Python bindings.
   </p>
   <div class="simq-buttons">
@@ -81,7 +81,7 @@ the one documented loss are in
 *4–16 qubits, VQE / QAOA / GHZ sampling. SimQ beats Qiskit Aer on 19 of 20
 workloads in the full suite (1.5–72.6×) and exact Statevector on all 20
 (2.7–2534×). The strongest competitor found is
-[qulacs](https://github.com/qulacs/qulacs) — SimQ still leads it on every
+[qulacs](https://github.com/qulacs/qulacs); SimQ still leads it on every
 covered workload, by 1.0–1.9×.*
 
 ```{raw} html
@@ -95,14 +95,14 @@ covered workload, by 1.0–1.9×.*
 <p class="simq-chart-hint">Scroll to see the full chart &rarr;</p>
 
 *Same machine, pushed to the edge: 20–30 qubits. SimQ still leads at 28
-qubits (4 GiB state), and every simulator hits the same wall at 30 — a dense
+qubits (4 GiB state), and every simulator hits the same wall at 30: a dense
 statevector needs 16 GiB, more than the 15 GiB reference box has. That's
 physics, not a bug: SimQ fails cleanly with a clear error instead of
 aborting.*
 
-This isn't cherry-picked: the suite also loses one workload — deep QFT at 16
+This isn't cherry-picked: the suite also loses one workload (deep QFT at 16
 qubits, where the gate structure is long-range and SimQ's fusion pass is
-local — and BENCHMARKS.md documents that loss and why it happens, not just
+local), and BENCHMARKS.md documents that loss and why it happens, not just
 the wins.
 
 ## Why SimQ?
@@ -111,13 +111,13 @@ the wins.
 :gutter: 3
 
 :::{grid-item-card} Measured performance
-Beats Qiskit Aer on 19 of 20 benchmarked workloads and qulacs — the
-strongest competitor found — on all 12 it covers. See Benchmarks above.
+Beats Qiskit Aer on 19 of 20 benchmarked workloads and qulacs (the
+strongest competitor found) on all 12 it covers. See Benchmarks above.
 :::
 
 :::{grid-item-card} Type-safe by construction
 Compile-time verification of quantum operations. Invalid circuits are caught
-before they ever run — often before they even compile.
+before they ever run, often before they even compile.
 :::
 
 :::{grid-item-card} Memory-aware, not just memory-efficient
@@ -137,7 +137,7 @@ the backend abstraction (IBM Quantum and more).
 :::
 
 :::{grid-item-card} First-class Python bindings
-A familiar, Qiskit-like Python API backed by the full-speed Rust core —
+A familiar, Qiskit-like Python API backed by the full-speed Rust core,
 including noise models and visualization.
 :::
 
@@ -172,7 +172,7 @@ VQE, MaxCut QAOA, and more.
 :::{grid-item-card} Architecture
 :link: architecture/index
 :link-type: doc
-How the eight workspace crates fit together — for contributors and the
+How the eight workspace crates fit together, for contributors and the
 curious.
 :::
 
