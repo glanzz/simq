@@ -414,6 +414,14 @@ python3 benchmarks/aer_scaling_probe.py 20 22 24 26 28 30
 python3 benchmarks/qulacs_scaling_probe.py 20 22 24 26 28   # 30q not attempted, see Honest limitations
 ```
 
+Update `benchmarks/scaling_results.json` with any new numbers, then regenerate
+both charts:
+
+```bash
+python3 benchmarks/make_chart.py            # results-{light,dark}.svg (4-16q workloads)
+python3 benchmarks/make_scaling_chart.py     # results-scaling-{light,dark}.svg (18-30q)
+```
+
 ## How the ≥12-qubit gap was closed (issue #76)
 
 The first run of this suite showed SimQ **losing 22–30×** to Aer at 16 qubits
@@ -458,6 +466,11 @@ itself applies [cache-blocking remaps](https://arxiv.org/pdf/2604.12256) for
 large circuits.
 
 ## Where it actually fails: 18–30 qubits
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/results-scaling-dark.svg">
+  <img alt="SimQ vs Aer vs qulacs scaling from 20 to 30 qubits, log scale. SimQ leads through 28 qubits; all three simulators hit a hard wall at 30 qubits (16 GiB state vs. 15 GiB RAM), shown as a dashed 'rejected / not attempted' marker rather than a bar." src="benchmarks/results-scaling-light.svg">
+</picture>
 
 We pushed the same 1-layer VQE circuit (H + RY + CNOT-chain + RZ, built by
 `simq-sim/examples/scaling_probe.rs`, and its Python ports
