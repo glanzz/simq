@@ -72,6 +72,8 @@ use smallvec::SmallVec;
 use std::fmt;
 use std::sync::Arc;
 
+type FusedGateEntry = (Arc<dyn Gate>, SmallVec<[QubitId; 4]>);
+
 /// Configuration for gate fusion optimization
 #[derive(Debug, Clone)]
 pub struct FusionConfig {
@@ -760,7 +762,7 @@ fn fuse_multi_qubit_blocks(
         .flat_map(|b| b.operation_indices.iter().copied())
         .collect();
 
-    let mut fused_gates: AHashMap<usize, (Arc<dyn Gate>, SmallVec<[QubitId; 4]>)> = AHashMap::new();
+    let mut fused_gates: AHashMap<usize, FusedGateEntry> = AHashMap::new();
     for block in blocks.iter() {
         if let Some(fused) = compose_block_matrix(block, &operations, config) {
             let start_idx = block.operation_indices[0];
