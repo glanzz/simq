@@ -1082,6 +1082,7 @@ mod tests {
         assert!(!ascii2.is_empty());
     }
 
+    #[cfg(feature = "serialization")]
     #[test]
     fn test_from_bytes_unknown_gate_errors() {
         // Covers line 460: create_gate_op fails for an unrecognized gate name
@@ -1104,6 +1105,7 @@ mod tests {
         assert!(matches!(result, Err(QuantumError::DeserializationError(_))));
     }
 
+    #[cfg(feature = "serialization")]
     #[test]
     fn test_from_json_unknown_gate_errors() {
         // Covers line 572: create_gate_op fails for an unrecognized gate name
