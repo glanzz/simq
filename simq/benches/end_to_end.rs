@@ -76,11 +76,20 @@ fn bench_ghz_sampling(c: &mut Criterion) {
 /// circuits like GHZ preparation. See `simq_sim::stabilizer`.
 const STABILIZER_QUBIT_SIZES: [usize; 4] = [16, 50, 100, 200];
 
+/// Fewer shots than `GHZ_SHOTS`: this group's point is demonstrating the
+/// tableau backend scales to qubit counts a statevector cannot reach at
+/// all, not precisely timing shot throughput -- and each shot clones and
+/// collapses a full `O(n^2)`-bit tableau, so cost scales with both.
+const STABILIZER_SHOTS: usize = 128;
+
 fn bench_ghz_sampling_stabilizer(c: &mut Criterion) {
     let mut group = c.benchmark_group("ghz_sampling_stabilizer");
     for &n in &STABILIZER_QUBIT_SIZES {
+        if n >= 50 {
+            group.sample_size(10);
+        }
         group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
-            b.iter(|| black_box(wl::ghz_sample_stabilizer(n, GHZ_SHOTS, 0xB1A2)));
+            b.iter(|| black_box(wl::ghz_sample_stabilizer(n, STABILIZER_SHOTS, 0xB1A2)));
         });
     }
     group.finish();
