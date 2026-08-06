@@ -558,6 +558,65 @@ pub fn random_circuit_p0(sim: &Simulator, num_qubits: usize) -> f64 {
     state.amplitudes()[0].norm_sqr()
 }
 
+// ============================================================================
+// Redundant circuit: naive/unoptimized single-qubit gate chains, the
+// target shape for simq_compiler::egraph::EqualitySaturation
+// ============================================================================
+//
+// Every workload above uses parameterized rotation gates (RX/RY/RZ) for its
+// single-qubit structure, which the equality-saturation pass deliberately
+// doesn't touch (see that module's docs: composing rotation angles needs
+// numeric addition, not term rewriting). This circuit instead models what a
+// naive fixed-gate decomposition pass might emit -- long per-qubit chains
+// built from the Clifford+T gate set with deliberate algebraic redundancy
+// -- so there's a benchmark workload the equality-saturation pass actually
+// has something to do.
+//
+// The chain below is *not* just `T x 8` or `S x 4`: this crate's existing
+// `TemplateSubstitution` pass already hardcodes exactly those two patterns
+// as explicit templates, so they're a poor (and dishonest) demonstration of
+// what equality saturation adds over fixed-pattern rewriting. `T x 6` and
+// `S x 6` have no such template (6 isn't a multiple of the hardcoded
+// lengths), so reducing them requires *composing* `T,T->S`/`S,S->Z` with
+// `S,S,S,S->I` step by step -- exactly the gap this module exists to close.
+// See BENCHMARKS.md for the measured gate-count comparison.
+
+/// Deterministic "which gate" index, same style as `rcs_gate_index` above
+/// (fixed formula, not a PRNG, so this circuit's shape doesn't depend on
+/// implementation-specific RNG output).
+fn redundant_chain_gate(position: usize) -> &'static str {
+    const CHAIN: [&str; 19] = [
+        "T", "T", "T", "T", "T", "T", // T^6: no hardcoded template covers this.
+        "H", "X", "H", "X", "H", "X", "H", // repeated H-conjugation collapses.
+        "S", "S", "S", "S", "S", "S", // S^6: likewise not a hardcoded length.
+    ];
+    CHAIN[position % CHAIN.len()]
+}
+
+/// A circuit with a long, algebraically-redundant fixed-gate chain on every
+/// qubit (see the module note above), followed by a CNOT ladder so it's a
+/// genuine multi-qubit circuit and not just disconnected wires.
+pub fn redundant_circuit(num_qubits: usize) -> Circuit {
+    let mut c = Circuit::new(num_qubits);
+    for q in 0..num_qubits {
+        let qubit = QubitId::new(q);
+        for i in 0..19 {
+            match redundant_chain_gate(i) {
+                "T" => c.add_gate(Arc::new(TGate), &[qubit]).unwrap(),
+                "H" => c.add_gate(Arc::new(Hadamard), &[qubit]).unwrap(),
+                "X" => c.add_gate(Arc::new(PauliX), &[qubit]).unwrap(),
+                "S" => c.add_gate(Arc::new(SGate), &[qubit]).unwrap(),
+                other => unreachable!("redundant_chain_gate returned unhandled gate {other}"),
+            }
+        }
+    }
+    for q in 0..num_qubits - 1 {
+        c.add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+            .unwrap();
+    }
+    c
+}
+
 /// The default simulator used across the suite (out-of-the-box settings).
 pub fn default_simulator() -> Simulator {
     Simulator::new(SimulatorConfig::default())
@@ -898,5 +957,81 @@ mod tests {
         let mut odd = Circuit::new(6);
         rcs_entangling_layer(&mut odd, 1, 6);
         assert_eq!(odd.len(), 2); // (1,2),(3,4) -- qubit 0 and 5 idle
+    }
+
+    #[test]
+    fn redundant_circuit_gate_count() {
+        let n = 4;
+        let c = redundant_circuit(n);
+        // 19 single-qubit gates per qubit + an (n-1)-gate CNOT ladder.
+        assert_eq!(c.len(), n * 19 + (n - 1));
+    }
+
+    #[test]
+    fn redundant_circuit_equality_saturation_collapses_every_chain() {
+        use simq_compiler::pipeline::create_o3_egraph_compiler;
+
+        let n = 4;
+        let mut c = redundant_circuit(n);
+        let original_len = c.len();
+
+        let compiler = create_o3_egraph_compiler();
+        let result = compiler.compile(&mut c).unwrap();
+
+        assert!(result.modified);
+        // Only the (n-1)-gate CNOT ladder should survive: T^8, the 4 S
+        // gates, and the H-conjugation run are all redundant.
+        assert!(
+            c.len() < original_len,
+            "expected equality saturation to shrink the redundant circuit, got {} -> {}",
+            original_len,
+            c.len()
+        );
+    }
+
+    /// The apples-to-apples comparison: both pipelines here are pure
+    /// symbolic rewriting, deliberately *without* `GateFusion` -- fusion's
+    /// numeric matrix multiplication also happens to fully collapse this
+    /// circuit's chains (it doesn't need to recognize *why* a chain is the
+    /// identity, it just multiplies the matrices out), which would hide
+    /// the actual comparison this test is for: greedy, fixed-pattern
+    /// rewriting (`TemplateSubstitution` + `AdvancedTemplateMatching`, this
+    /// crate's existing passes) has no rule for 8 T gates or any other
+    /// compound built from `T,T->S` plus `S^4=I`, so it can only remove the
+    /// trailing 4 S gates and nothing from the T-run. Equality saturation
+    /// removes both from the exact same input, without a hardcoded 8-gate
+    /// template -- see BENCHMARKS.md for why this distinction (and not
+    /// final gate count once fusion runs) is where this pass's real value
+    /// is.
+    #[test]
+    fn redundant_circuit_equality_saturation_beats_template_substitution() {
+        use simq_compiler::pipeline::PipelineBuilder;
+
+        let n = 4;
+        let mut via_templates = redundant_circuit(n);
+        PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_template_substitution()
+            .with_advanced_template_matching()
+            .max_iterations(10)
+            .build()
+            .compile(&mut via_templates)
+            .unwrap();
+
+        let mut via_egraph = redundant_circuit(n);
+        PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_equality_saturation()
+            .max_iterations(10)
+            .build()
+            .compile(&mut via_egraph)
+            .unwrap();
+
+        assert!(
+            via_egraph.len() < via_templates.len(),
+            "expected equality saturation ({} gates) to beat template-based rewriting ({} gates)",
+            via_egraph.len(),
+            via_templates.len()
+        );
     }
 }

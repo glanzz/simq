@@ -715,6 +715,90 @@ random gates x 4 qubits x all 16 basis-state probabilities, `simq-sim`'s
 `matches_statevector_probabilities_on_random_clifford_circuits` test),
 matching to 1e-9 everywhere expected and zero elsewhere.
 
+## Equality-saturation optimization (`simq_compiler::egraph`)
+
+`TemplateSubstitution` matches a fixed list of gate-name patterns with one
+greedy, left-to-right, no-backtrack scan: it can rewrite `S,S,S,S` to
+nothing because that exact 4-gate pattern is in its table, but it has no
+way to discover that, say, `T,T,T,T,T,T` (six T gates — not a multiple of
+any of its hardcoded lengths) reduces at all, because doing so requires
+*composing* two different rules (`T,T -> S`, then `S,S -> Z`) rather than
+matching one fixed pattern. `simq_compiler::egraph::EqualitySaturation` is
+a new, opt-in pass (via `PipelineBuilder::with_equality_saturation()`, or
+the `create_o3_egraph_compiler()` convenience constructor — **not** part of
+the `O2`/`O3` presets) that runs real equality saturation, via the `egg`
+crate, over single-qubit gate chains (the same "chain" concept
+`fusion::find_fusion_chains` uses) to find these compound reductions
+without hand-writing a template for every one.
+
+**A real pitfall, caught before it shipped:** the first implementation
+included a bidirectional associativity rewrite rule
+(`(seq (seq a b) c) <=> (seq a (seq b c))`) so saturation could explore
+every parenthesization of a chain. This is a textbook e-graph blowup — the
+number of parenthesizations of an n-element chain is `Catalan(n-1)`, which
+for a 19-gate chain is ~4.77e8 — and it measured accordingly: **626 ms for
+one 19-gate chain, 9.2 s for a 16-qubit circuit's worth of them.** The fix
+was to drop general associativity entirely and fix the chain into one
+right-associated tree, writing every rule to match a window at the front of
+a `?rest` tail-variable instead of a bare adjacent pair — e-graphs match
+patterns against every e-class, not just the root, so this still finds a
+match at any position without ever re-parenthesizing anything. That dropped
+the same 19-gate chain to **1.1 ms** (~570x) and the 16-qubit circuit to
+**3.8 ms** (~2400x). The regression is now a dedicated test
+(`optimize_chain_is_fast_on_a_long_chain`, budgeted at 50 ms — generous
+headroom over the actual low-millisecond runtime) so this can't silently
+come back.
+
+**Gate-count comparison**, on `bench_workloads::redundant_circuit` (a
+per-qubit chain of `T^6`, a repeated H-conjugation run, and `S^6` —
+deliberately *not* `T^8`/`S^4`, which `TemplateSubstitution` already
+hardcodes; see that function's docs) — pure rewriting, no `GateFusion` in
+either pipeline, the fair comparison for what this pass adds over
+fixed-pattern matching:
+
+| qubits | original | `TemplateSubstitution` (+ `AdvancedTemplateMatching`) | `EqualitySaturation` |
+|---:|---:|---:|---:|
+| 4 | 79 | 23 | **11** |
+| 8 | 159 | 47 | **23** |
+| 12 | 239 | 71 | **35** |
+| 16 | 319 | 95 | **47** |
+
+Equality saturation roughly halves the gate count template-based rewriting
+alone achieves, consistently across sizes (2.09x at 4q, 2.02x at 16q) —
+without ever stating `T,T,T,T,T,T -> S,S,S -> Z,S` (or any of the dozens of
+other compound reductions a longer or differently-mixed chain would need)
+as an explicit rule.
+
+**The honest complication: this gap disappears once `GateFusion` runs.**
+`GateFusion`'s single-qubit-chain fusion multiplies a chain's gate matrices
+out numerically and drops the result if it's the identity — it doesn't need
+to know *why* a chain is redundant, it just computes the product. Compiling
+the same circuit through the full `O3` pipeline with and without
+`EqualitySaturation` added lands on the **exact same final gate count**
+(31 at 16q: one fused gate per qubit plus the 15-gate CNOT ladder) either
+way, because fusion alone already reaches the numeric minimum regardless of
+whether the chain was symbolically shortened first. Compile-time wall clock
+in that configuration (this session, same machine):
+
+| qubits | O3 alone | O3 + `EqualitySaturation` |
+|---:|---:|---:|
+| 4 | 57.8 µs | 473 µs |
+| 16 | 221 µs | 1.88 ms |
+
+Adding the pass to a fusion-equipped pipeline costs real compile time
+(~8-9x here) for zero additional gate-count reduction on this benchmark.
+This is *why* the pass stays opt-in rather than joining `O2`/`O3`: its
+genuine, distinctive value — a **named, interpretable gate sequence**
+(relevant when gate count is measured in a fixed hardware/fault-tolerant
+basis, e.g. T-count, where an opaque fused matrix has no such count at
+all) discovered **without hand-enumerating compound identities** — is real
+and demonstrated above, but it is not "beats the existing fixed-point
+pipeline on end-to-end simulation speed," which is this repository's own
+stated bar for promoting an optimizer to a default. Reporting the null
+result here (not just the favorable one) is deliberate — see the qulacs
+section above for why that's this document's general policy, not an
+exception made for this pass.
+
 ## Honest limitations
 
 - Results above are from a 4-vCPU cloud container; ratios will differ on

@@ -156,6 +156,86 @@ fn bench_multi_instance(c: &mut Criterion) {
     group.finish();
 }
 
+/// Compiler-only comparison (no simulation), on `wl::redundant_circuit` --
+/// the one workload in this suite with redundant fixed-gate chains for
+/// `simq_compiler::egraph::EqualitySaturation` to reduce (VQE/QAOA/GHZ/QFT/
+/// random_circuit all use parameterized rotations, out of that pass's
+/// scope; see its module docs).
+///
+/// Two pairs, deliberately kept separate -- see BENCHMARKS.md for why:
+/// `rewrite_only` compares pure symbolic rewriting (this crate's existing
+/// `TemplateSubstitution`+`AdvancedTemplateMatching` vs. equality
+/// saturation) with no `GateFusion` in either pipeline, which is the fair,
+/// apples-to-apples comparison for what this pass actually adds.
+/// `full_o3` compares the complete default O3 pipeline with and without
+/// the pass added -- included for transparency: `GateFusion`'s numeric
+/// matrix multiplication already collapses this benchmark's chains to
+/// their minimum regardless of how they got shortened first, so this pair
+/// mostly measures the pass's added compile-time overhead, not a gate-count
+/// win, once fusion is already in the pipeline.
+fn bench_redundant_circuit_compile(c: &mut Criterion) {
+    use simq::compiler::pipeline::{
+        create_compiler, create_o3_egraph_compiler, OptimizationLevel, PipelineBuilder,
+    };
+
+    let mut group = c.benchmark_group("redundant_circuit_compile_rewrite_only");
+    for &n in &QUBIT_SIZES {
+        let circuit = wl::redundant_circuit(n);
+
+        let templates = PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_template_substitution()
+            .with_advanced_template_matching()
+            .max_iterations(10)
+            .build();
+        group.bench_with_input(BenchmarkId::new("templates", format!("{n}q")), &n, |b, _| {
+            b.iter(|| {
+                let mut circuit = circuit.clone();
+                templates.compile(&mut circuit).unwrap();
+                black_box(circuit.len())
+            });
+        });
+
+        let egraph = PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_equality_saturation()
+            .max_iterations(10)
+            .build();
+        group.bench_with_input(BenchmarkId::new("egraph", format!("{n}q")), &n, |b, _| {
+            b.iter(|| {
+                let mut circuit = circuit.clone();
+                egraph.compile(&mut circuit).unwrap();
+                black_box(circuit.len())
+            });
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("redundant_circuit_compile_full_o3");
+    for &n in &QUBIT_SIZES {
+        let circuit = wl::redundant_circuit(n);
+
+        let o3 = create_compiler(OptimizationLevel::O3);
+        group.bench_with_input(BenchmarkId::new("o3", format!("{n}q")), &n, |b, _| {
+            b.iter(|| {
+                let mut circuit = circuit.clone();
+                o3.compile(&mut circuit).unwrap();
+                black_box(circuit.len())
+            });
+        });
+
+        let o3_egraph = create_o3_egraph_compiler();
+        group.bench_with_input(BenchmarkId::new("o3_egraph", format!("{n}q")), &n, |b, _| {
+            b.iter(|| {
+                let mut circuit = circuit.clone();
+                o3_egraph.compile(&mut circuit).unwrap();
+                black_box(circuit.len())
+            });
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_vqe_energy,
@@ -164,6 +244,7 @@ criterion_group!(
     bench_ghz_sampling_stabilizer,
     bench_qft_probe,
     bench_random_circuit,
+    bench_redundant_circuit_compile,
     bench_multi_instance
 );
 criterion_main!(benches);
