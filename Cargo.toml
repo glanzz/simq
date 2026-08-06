@@ -25,6 +25,7 @@ num-complex = "0.4"
 ndarray = "0.15"
 rayon = "1.8"
 ahash = "0.8"
+foldhash = "0.1"
 parking_lot = "0.12"
 bytemuck = { version = "1.14", features = ["derive"] }
 smallvec = { version = "1.11", features = ["union", "const_generics"] }

@@ -1,4 +1,3 @@
-use ahash::AHashMap;
 use num_complex::Complex64;
 use simq_sim::execution_engine::kernels::controlled::apply_controlled_gate;
 use simq_sim::execution_engine::kernels::diagonal::{apply_diagonal_gate, apply_phase_gate};
@@ -13,6 +12,7 @@ use simq_sim::execution_engine::kernels::two_qubit::{
     apply_cnot, apply_cz, apply_swap, apply_two_qubit_dense,
 };
 use simq_sim::execution_engine::kernels::Matrix4x4;
+use simq_state::SparseAmplitudeMap as AHashMap;
 
 fn c(re: f64, im: f64) -> Complex64 {
     Complex64::new(re, im)
@@ -345,17 +345,17 @@ fn diagonal_gate_preserves_norm() {
 #[test]
 fn sparse_single_qubit_x_gate() {
     let x = common::pauli_x();
-    let mut amps: AHashMap<u64, Complex64> = AHashMap::new();
+    let mut amps: AHashMap = AHashMap::default();
     amps.insert(0, one()); // |0⟩
     apply_single_qubit_sparse(&x, 0, &mut amps, 1).unwrap();
-    assert!(amps.get(&1).is_some());
+    assert!(amps.contains_key(&1));
     assert_close(*amps.get(&1).unwrap(), one(), 1e-12);
 }
 
 #[test]
 fn sparse_single_qubit_preserves_norm() {
     let h = common::hadamard();
-    let mut amps: AHashMap<u64, Complex64> = AHashMap::new();
+    let mut amps: AHashMap = AHashMap::default();
     amps.insert(0, one());
     apply_single_qubit_sparse(&h, 0, &mut amps, 1).unwrap();
     let total: f64 = amps.values().map(|a| a.norm_sqr()).sum();
@@ -365,7 +365,7 @@ fn sparse_single_qubit_preserves_norm() {
 #[test]
 fn sparse_single_qubit_hadamard_twice() {
     let h = common::hadamard();
-    let mut amps: AHashMap<u64, Complex64> = AHashMap::new();
+    let mut amps: AHashMap = AHashMap::default();
     amps.insert(0, one());
     apply_single_qubit_sparse(&h, 0, &mut amps, 1).unwrap();
     apply_single_qubit_sparse(&h, 0, &mut amps, 1).unwrap();
@@ -381,7 +381,7 @@ fn sparse_two_qubit_cnot() {
         [zero(), zero(), zero(), one()],
         [zero(), zero(), one(), zero()],
     ];
-    let mut amps: AHashMap<u64, Complex64> = AHashMap::new();
+    let mut amps: AHashMap = AHashMap::default();
     amps.insert(2, one()); // |10⟩
     apply_two_qubit_sparse(&cnot_matrix, 1, 0, &mut amps, 2).unwrap();
     // |10⟩ → |11⟩
@@ -392,7 +392,7 @@ fn sparse_two_qubit_cnot() {
 #[test]
 fn sparse_two_qubit_preserves_norm() {
     let h = common::hadamard();
-    let mut amps: AHashMap<u64, Complex64> = AHashMap::new();
+    let mut amps: AHashMap = AHashMap::default();
     amps.insert(0, one());
     apply_single_qubit_sparse(&h, 0, &mut amps, 2).unwrap();
 

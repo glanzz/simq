@@ -46,6 +46,7 @@ pub mod statistics;
 
 pub mod gradient;
 pub mod qaoa;
+pub mod stabilizer;
 pub mod vqe_qaoa_helpers;
 
 mod autodiff;
@@ -59,3 +60,4 @@ pub use simulator::Simulator;
 pub use statistics::ExecutionStatistics;
 
 pub use autodiff::{compute_gradients_ad, DifferentiableParameter};
+pub use stabilizer::{is_clifford_circuit, sample_bitstrings, StabilizerError, StabilizerTableau};

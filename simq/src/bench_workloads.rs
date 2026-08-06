@@ -317,6 +317,21 @@ pub fn ghz_sample(sim: &Simulator, num_qubits: usize, shots: usize, seed: u64) -
     result.sorted_outcomes().len()
 }
 
+/// Same workload as [`ghz_sample`] (H + CNOT chain, `shots` computational
+/// basis samples), but run on the Clifford/stabilizer tableau backend
+/// (`simq_sim::stabilizer`) instead of the statevector simulator. GHZ
+/// preparation is entirely Clifford (H, CNOT), so this is exact, and its
+/// `O(n^2)`-bit tableau state means it stays cheap far past the ~30-qubit
+/// statevector wall `run_to_dense` hits — see BENCHMARKS.md.
+pub fn ghz_sample_stabilizer(num_qubits: usize, shots: usize, seed: u64) -> usize {
+    let circuit = ghz_circuit(num_qubits);
+    let mut seen = simq_sim::stabilizer::sample_bitstrings(&circuit, shots, seed)
+        .expect("GHZ circuit must be Clifford");
+    seen.sort_unstable();
+    seen.dedup();
+    seen.len()
+}
+
 /// xorshift* PRNG: deterministic and dependency-free. Only used for
 /// *sampling* (shot draws, which are inherently stochastic and not
 /// cross-validated bit-exactly against Qiskit/qsim) — never for circuit
@@ -694,6 +709,29 @@ mod tests {
         let a = ghz_sample(&sim, 3, 500, 7);
         let b = ghz_sample(&sim, 3, 500, 7);
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn ghz_sample_stabilizer_returns_two_outcomes_for_ghz_state() {
+        let distinct = ghz_sample_stabilizer(3, 2000, 42);
+        assert_eq!(distinct, 2);
+    }
+
+    #[test]
+    fn ghz_sample_stabilizer_is_deterministic_given_seed() {
+        let a = ghz_sample_stabilizer(3, 500, 7);
+        let b = ghz_sample_stabilizer(3, 500, 7);
+        assert_eq!(a, b);
+    }
+
+    /// The whole point of the stabilizer backend: qubit counts far past
+    /// the statevector wall (BENCHMARKS.md documents 30 qubits as the
+    /// reference-machine ceiling) run in a blink, exactly, since GHZ prep
+    /// is pure Clifford.
+    #[test]
+    fn ghz_sample_stabilizer_handles_qubit_counts_past_statevector_wall() {
+        let distinct = ghz_sample_stabilizer(200, 100, 123);
+        assert_eq!(distinct, 2);
     }
 
     #[test]

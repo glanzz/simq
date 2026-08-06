@@ -46,6 +46,15 @@
 //! simq::prelude::*;` pulls in everything needed for typical usage,
 //! including the full standard gate set.
 
+// Opt-in (`mimalloc` feature) global allocator swap. A `#[global_allocator]`
+// is process-wide, so this stays off by default -- a library shouldn't
+// force an allocator choice on every binary that links it -- but is
+// available for applications (and this crate's own benchmarks) that want
+// it. See BENCHMARKS.md for the measured effect.
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub use simq_backend as backend;
 pub use simq_compiler as compiler;
 pub use simq_core as core;

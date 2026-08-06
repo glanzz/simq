@@ -17,9 +17,16 @@
 //! - Never convert Dense→Sparse
 
 use crate::error::{Result, StateError};
-use ahash::AHashMap;
 use num_complex::Complex64;
 use std::fmt;
+
+/// Map from basis state index to amplitude. `foldhash` (Qiskit 2.5 made the
+/// same swap for its own hot hash maps) measurably outperforms `ahash` here
+/// specifically because keys are `u64` basis indices: foldhash's mixing is
+/// tuned for integer-heavy workloads, which is exactly this map's key type.
+/// Public so `simq-sim`'s sparse-state kernels (which take/return this map
+/// directly) share the exact same concrete hasher type.
+pub type AHashMap = std::collections::HashMap<u64, Complex64, foldhash::fast::RandomState>;
 
 /// Default density threshold for automatic Sparse→Dense conversion
 /// When density exceeds this, conversion to dense representation is triggered
@@ -49,7 +56,7 @@ pub struct SparseState {
     max_basis_idx: u64,
 
     /// Map from basis state index to amplitude
-    amplitudes: AHashMap<u64, Complex64>,
+    amplitudes: AHashMap,
 
     /// Density: fraction of non-zero amplitudes (non-zero entries / 2^num_qubits)
     density: f32,
@@ -86,7 +93,7 @@ impl SparseState {
         }
 
         let max_basis_idx = ((1u64) << num_qubits) - 1;
-        let mut amplitudes = AHashMap::new();
+        let mut amplitudes = AHashMap::default();
 
         // Initialize to |0...0⟩
         amplitudes.insert(0, Complex64::new(1.0, 0.0));
@@ -167,7 +174,7 @@ impl SparseState {
             });
         }
 
-        let mut amplitudes = AHashMap::new();
+        let mut amplitudes = AHashMap::default();
         amplitudes.insert(basis_idx, Complex64::new(1.0, 0.0));
 
         Ok(Self {
@@ -263,13 +270,13 @@ impl SparseState {
     /// Directly modifying the amplitudes map will not update density.
     /// Call `update_density()` after bulk modifications.
     #[inline]
-    pub fn amplitudes_mut(&mut self) -> &mut AHashMap<u64, Complex64> {
+    pub fn amplitudes_mut(&mut self) -> &mut AHashMap {
         &mut self.amplitudes
     }
 
     /// Get a reference to the amplitudes map
     #[inline]
-    pub fn amplitudes(&self) -> &AHashMap<u64, Complex64> {
+    pub fn amplitudes(&self) -> &AHashMap {
         &self.amplitudes
     }
 
@@ -356,7 +363,7 @@ impl SparseState {
             });
         }
 
-        let mut new_amplitudes = AHashMap::new();
+        let mut new_amplitudes = AHashMap::default();
         let qubit_mask = 1u64 << qubit;
 
         // For each non-zero amplitude, compute contributions to both basis states
@@ -441,7 +448,7 @@ impl SparseState {
         let mask0 = 1u64 << qubit0;
         let mask1 = 1u64 << qubit1;
 
-        let mut new_amplitudes = AHashMap::new();
+        let mut new_amplitudes = AHashMap::default();
 
         // For each non-zero amplitude, compute contributions
         for (&basis_idx, &amp) in &self.amplitudes {
@@ -547,7 +554,7 @@ impl SparseState {
         }
 
         let mut prob = 0.0;
-        let mut collapsed = AHashMap::new();
+        let mut collapsed = AHashMap::default();
 
         for (&basis_idx, &amp) in &self.amplitudes {
             let bit = ((basis_idx >> qubit) & 1) as u32;

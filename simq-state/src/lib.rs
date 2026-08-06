@@ -53,5 +53,5 @@ pub use measurement::{
 };
 pub use monte_carlo_simulator::{MonteCarloConfig, MonteCarloSimulator, MonteCarloStats};
 pub use observable::{Pauli, PauliObservable, PauliString};
-pub use sparse_state::SparseState;
+pub use sparse_state::{AHashMap as SparseAmplitudeMap, SparseState};
 pub use state_vector::StateVector;

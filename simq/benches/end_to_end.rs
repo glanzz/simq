@@ -69,6 +69,23 @@ fn bench_ghz_sampling(c: &mut Criterion) {
     group.finish();
 }
 
+/// Same GHZ workload as `bench_ghz_sampling`, but on the Clifford/stabilizer
+/// tableau backend and at qubit counts a statevector cannot reach (past the
+/// ~30-qubit wall documented in BENCHMARKS.md) -- demonstrating the new
+/// backend's whole point: `O(n^2)`, not `O(2^n)`, for Clifford-only
+/// circuits like GHZ preparation. See `simq_sim::stabilizer`.
+const STABILIZER_QUBIT_SIZES: [usize; 4] = [16, 50, 100, 200];
+
+fn bench_ghz_sampling_stabilizer(c: &mut Criterion) {
+    let mut group = c.benchmark_group("ghz_sampling_stabilizer");
+    for &n in &STABILIZER_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::ghz_sample_stabilizer(n, GHZ_SHOTS, 0xB1A2)));
+        });
+    }
+    group.finish();
+}
+
 /// QFT: long-range (non-nearest-neighbor) entangling structure, the
 /// counterpoint to the three local workloads above -- see
 /// `wl::qft_circuit`'s docs and BENCHMARKS.md's methodology notes.
@@ -135,6 +152,7 @@ criterion_group!(
     bench_vqe_energy,
     bench_qaoa_maxcut,
     bench_ghz_sampling,
+    bench_ghz_sampling_stabilizer,
     bench_qft_probe,
     bench_random_circuit,
     bench_multi_instance

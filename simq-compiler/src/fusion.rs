@@ -113,7 +113,38 @@ pub struct FusionConfig {
     /// for itself. `simq-compiler` has no dependency on `simq-sim`, so this
     /// is a separately-defined constant kept in sync by convention, not by
     /// a shared type.
+    ///
+    /// This qubit-count gate is bypassed early for circuits with a
+    /// non-local (long-range) entangling structure — see
+    /// `long_range_min_qubits` / `long_range_gate_multiplier` below.
     pub parallel_threshold_qubits: usize,
+
+    /// Circuit qubit count below which the long-range bypass (below) never
+    /// applies, even if the circuit is structurally non-local (default:
+    /// 14). Keeps small circuits — already well served by the legacy path,
+    /// see BENCHMARKS.md's `qft_probe/4q`..`/12q` rows — untouched, and
+    /// limits the new heuristic's blast radius to sizes where the legacy
+    /// path's "never fuses a 2-qubit gate" behavior actually costs enough
+    /// to matter.
+    pub long_range_min_qubits: usize,
+
+    /// A circuit at or above `long_range_min_qubits` bypasses
+    /// `parallel_threshold_qubits` and uses the multi-qubit block path
+    /// when its count of *long-range* two-qubit gates (qubit index
+    /// distance > 1 — e.g. QFT's controlled-phase ladder) exceeds
+    /// `long_range_gate_multiplier * num_qubits` (default: 1.0).
+    ///
+    /// *Why this signal:* the legacy chain path ([`find_fusion_chains`])
+    /// only ever fuses adjacent *single*-qubit gates on one wire, so it
+    /// fuses nothing at all in a circuit built almost entirely from 2-qubit
+    /// gates — exactly QFT's shape, and the documented cause of this
+    /// crate's one benchmark loss (`qft_probe/16q` vs Aer/qsim, see
+    /// BENCHMARKS.md). Gating on long-range gate *count* rather than raw
+    /// two-qubit density avoids also redirecting local, dense circuits
+    /// like the GHZ chain (n-1 adjacent CNOTs) or QAOA's ring ansatz (all
+    /// but one edge per layer adjacent) onto the block path, where they
+    /// already perform well on the legacy path.
+    pub long_range_gate_multiplier: f64,
 }
 
 impl Default for FusionConfig {
@@ -125,8 +156,36 @@ impl Default for FusionConfig {
             max_fusion_size: None,
             max_block_width: 3,
             parallel_threshold_qubits: 18,
+            long_range_min_qubits: 14,
+            long_range_gate_multiplier: 1.0,
         }
     }
+}
+
+/// Count 2-qubit gates whose qubit indices are not adjacent (`|q0 - q1| >
+/// 1`) — the structural signature of a non-local circuit like QFT's
+/// controlled-phase ladder, as opposed to a linear-chain or ring ansatz
+/// (VQE/QAOA/GHZ) where every entangling gate acts on neighboring wires.
+fn long_range_two_qubit_gate_count(circuit: &Circuit) -> usize {
+    circuit
+        .operations()
+        .filter(|op| {
+            let qubits = op.qubits();
+            qubits.len() == 2 && qubits[0].index().abs_diff(qubits[1].index()) > 1
+        })
+        .count()
+}
+
+/// Whether a circuit below `parallel_threshold_qubits` should still use the
+/// multi-qubit block path because it is structurally non-local — see
+/// `FusionConfig::long_range_min_qubits` / `long_range_gate_multiplier`.
+fn has_long_range_structure(circuit: &Circuit, config: &FusionConfig) -> bool {
+    let num_qubits = circuit.num_qubits();
+    if num_qubits < config.long_range_min_qubits {
+        return false;
+    }
+    let long_range = long_range_two_qubit_gate_count(circuit);
+    (long_range as f64) > config.long_range_gate_multiplier * (num_qubits as f64)
 }
 
 /// A fused quantum gate representing the composition of multiple gates
@@ -836,7 +895,14 @@ pub fn fuse_gates_with_cache(
 ) -> Result<Circuit> {
     let config = config.unwrap_or_default();
 
-    if circuit.num_qubits() < config.parallel_threshold_qubits || config.max_block_width <= 1 {
+    if config.max_block_width <= 1 {
+        return fuse_single_qubit_chains(circuit, &config);
+    }
+
+    let use_block_path = circuit.num_qubits() >= config.parallel_threshold_qubits
+        || has_long_range_structure(circuit, &config);
+
+    if !use_block_path {
         return fuse_single_qubit_chains(circuit, &config);
     }
 
@@ -1227,12 +1293,16 @@ mod tests {
     // §6-0 / §8: the <16q structural non-regression guarantee, made checkable
     // -----------------------------------------------------------------------
 
-    /// Below `parallel_threshold_qubits`, `fuse_single_qubit_gates` must
-    /// produce byte-identical output to calling `fuse_single_qubit_chains`
-    /// (the legacy path) directly — i.e. the new multi-qubit machinery is
-    /// provably never reached, not just "equivalent." This is the check
-    /// that makes the "<16q is unaffected" claim in the implementation plan
-    /// checkable rather than argued.
+    /// Below `parallel_threshold_qubits`, on a *local* circuit (no
+    /// long-range 2-qubit gates), `fuse_single_qubit_gates` must produce
+    /// byte-identical output to calling `fuse_single_qubit_chains` (the
+    /// legacy path) directly — i.e. the multi-qubit block machinery is
+    /// provably never reached for this shape, not just "equivalent." Since
+    /// `FusionConfig::long_range_gate_multiplier`, the block path can also
+    /// be reached below this threshold for structurally non-local circuits
+    /// (see `test_long_range_circuit_bypasses_qubit_threshold` below) —
+    /// this test's circuit (a CNOT chain, all adjacent) has zero long-range
+    /// gates, so it stays on the legacy path either way.
     #[test]
     fn test_below_threshold_dispatches_to_legacy_path_exactly() {
         // 16 qubits: matches BENCHMARKS.md's largest published row, and is
@@ -1328,6 +1398,95 @@ mod tests {
         // Legacy behavior: CNOT breaks fusion, H gates on either side are
         // singletons (below min_fusion_size), so nothing fuses at all.
         assert_eq!(optimized.len(), 3);
+    }
+
+    /// A QFT-shaped circuit (every qubit's controlled-phase ladder reaches
+    /// every later qubit) below `parallel_threshold_qubits` (18) must still
+    /// reach the multi-qubit block path, via the long-range bypass — this
+    /// is the direct regression guard for the documented `qft_probe/16q`
+    /// benchmark loss (see BENCHMARKS.md and `FusionConfig` docs).
+    #[test]
+    fn test_long_range_circuit_bypasses_qubit_threshold() {
+        use simq_gates::standard::CPhase;
+
+        let n = 16;
+        let mut circuit = Circuit::new(n);
+        for i in (0..n).rev() {
+            circuit
+                .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[QubitId::new(i)])
+                .unwrap();
+            for j in (0..i).rev() {
+                let theta = std::f64::consts::PI / (1u64 << (i - j)) as f64;
+                circuit
+                    .add_gate(
+                        Arc::new(CPhase::new(theta)) as Arc<dyn Gate>,
+                        &[QubitId::new(j), QubitId::new(i)],
+                    )
+                    .unwrap();
+            }
+        }
+
+        let config = FusionConfig::default();
+        assert!(circuit.num_qubits() < config.parallel_threshold_qubits);
+        assert!(has_long_range_structure(&circuit, &config));
+
+        // The legacy path fuses nothing here (no adjacent single-qubit
+        // chains exist in a QFT ladder), so a shorter optimized circuit is
+        // only possible if the block path actually ran.
+        let optimized = fuse_single_qubit_gates(&circuit, Some(config)).unwrap();
+        assert!(
+            optimized.len() < circuit.len(),
+            "expected block fusion to reduce a QFT-shaped circuit's gate count"
+        );
+    }
+
+    /// A local circuit (linear CNOT chain, like GHZ/VQE) at the same qubit
+    /// count must NOT be redirected by the long-range heuristic — it has no
+    /// long-range gates at all, so it should keep using the legacy path.
+    #[test]
+    fn test_local_chain_circuit_stays_on_legacy_path_at_16q() {
+        let n = 16;
+        let mut circuit = Circuit::new(n);
+        circuit
+            .add_gate(Arc::new(Hadamard) as Arc<dyn Gate>, &[QubitId::new(0)])
+            .unwrap();
+        for q in 0..n - 1 {
+            circuit
+                .add_gate(
+                    Arc::new(simq_gates::standard::CNot) as Arc<dyn Gate>,
+                    &[QubitId::new(q), QubitId::new(q + 1)],
+                )
+                .unwrap();
+        }
+
+        let config = FusionConfig::default();
+        assert!(!has_long_range_structure(&circuit, &config));
+    }
+
+    /// `long_range_min_qubits` must gate the bypass off for small circuits
+    /// even when every gate is long-range — protects the already-winning
+    /// small `qft_probe` rows (4q/8q/12q) from an unproven path switch.
+    #[test]
+    fn test_long_range_bypass_respects_min_qubits_floor() {
+        use simq_gates::standard::CPhase;
+
+        let n = 4;
+        let mut circuit = Circuit::new(n);
+        // All-to-all long-range phase gates on a tiny circuit.
+        for i in 0..n {
+            for j in 0..i {
+                circuit
+                    .add_gate(
+                        Arc::new(CPhase::new(0.5)) as Arc<dyn Gate>,
+                        &[QubitId::new(j), QubitId::new(i)],
+                    )
+                    .unwrap();
+            }
+        }
+
+        let config = FusionConfig::default();
+        assert!(n < config.long_range_min_qubits);
+        assert!(!has_long_range_structure(&circuit, &config));
     }
 
     // -----------------------------------------------------------------------
