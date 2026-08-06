@@ -632,6 +632,89 @@ be. Two additional pieces ride on top of the core fusion change:
   fixed, and the 28q verdict on today's fully same-session numbers is a
   more modest 1.14× SimQ win, not 1.55×.
 
+## Closing the remaining `qft_probe/16q` gap, plus a stabilizer backend
+
+Three further changes, all pure software (no GPU), targeting the specific
+gaps this document had already identified above:
+
+**1. Long-range circuits now reach multi-qubit fusion below 18 qubits.**
+The width-bounded block-fusion path from the previous section only ever
+activated at/above `parallel_threshold_qubits` (18) — so `qft_probe/16q`,
+whose controlled-phase ladder is almost entirely 2-qubit gates, never fused
+anything at all below that line (the legacy path only fuses adjacent
+*single*-qubit chains, and QFT has none). `simq-compiler/src/fusion.rs` now
+also routes a circuit to the block-fusion path below the qubit threshold
+when it is structurally non-local: `long_range_gate_multiplier` and
+`long_range_min_qubits` on `FusionConfig` gate this on the count of 2-qubit
+gates whose qubit indices are *not* adjacent (`|q0 - q1| > 1`) — QFT's
+ladder is almost all long-range, while VQE/QAOA/GHZ's chain/ring ansätze are
+almost all adjacent, so this reaches QFT without redirecting the local
+workloads the legacy path already serves well. `long_range_min_qubits`
+(default 14) additionally keeps the already-winning `qft_probe/4q`–`/12q`
+rows on the untouched legacy path.
+
+Measured on this session's run (same 4-vCPU/15 GiB machine as the rest of
+this document):
+
+| | before | after | vs Aer | vs qsim | vs Cirq |
+|---|---:|---:|---:|---:|---:|
+| `qft_probe/16q` (SimQ, ms) | 25.986 | 15.697 | 1/1.7x → 1/1.0x | 1/5.0x → 1/2.9x | 1/2.1x → 1/1.2x |
+
+A ~1.7x absolute speedup that turns the one documented Aer loss into an
+effective tie, and roughly halves the qsim/Cirq gap. `qft_probe/4q`–`/12q`
+and all of VQE/QAOA/GHZ/random-circuit are unaffected — those shapes are
+either below `long_range_min_qubits` or have too few long-range gates to
+trip the new dispatch, so they take the exact same code path as before
+(verified by `simq-compiler`'s `test_local_chain_circuit_stays_on_legacy_path_at_16q`
+and the full cross-validation run above, worst deviation still 1.40e-14 vs
+Qiskit / 2.29e-06 vs qsim).
+
+**2. `foldhash` for sparse-state hashing; `mimalloc` as an opt-in allocator.**
+`simq-state`'s sparse amplitude map now hashes with `foldhash` instead of
+`ahash` (Qiskit 2.5 made the same swap for the same reason: faster mixing
+for integer-keyed maps). `simq` also gained an opt-in `mimalloc` feature —
+opt-in, not default, because a `#[global_allocator]` is a process-wide
+choice a library shouldn't impose on every downstream binary that links it.
+Measured with `--features mimalloc` vs. without, on this machine: most rows
+improved 5–13% (largest at small/medium qubit counts, where allocation
+overhead is proportionally larger), a few were flat or within run-to-run
+noise. Net positive and worth keeping as an opt-in, but not dramatic enough
+to justify forcing it on by default.
+
+**3. New Clifford/stabilizer tableau backend (`simq_sim::stabilizer`).**
+An Aaronson-Gottesman CHP tableau simulator for circuits built entirely from
+Clifford gates (H, X, Y, Z, S, S†, CNOT, CZ, SWAP) — exact, and `O(n^2)`-bit
+state instead of `O(2^n)` amplitudes, so it simulates far past the ~30-qubit
+statevector wall documented below. `is_clifford_circuit` lets a caller check
+before dispatching; `sample_bitstrings` runs the circuit once and clones the
+resulting tableau per shot for independent measurement collapse. Not wired
+into `Simulator::run`'s automatic dispatch (that would touch a heavily-used,
+already-tested code path for a capability most circuits can't use); it's an
+additive module callers opt into explicitly.
+
+GHZ preparation (H + CNOT chain) is exactly Clifford, so this is the natural
+benchmark — `ghz_sampling_stabilizer/{16,50,100,200}q`, 128 shots each, this
+session:
+
+| qubits | time (median) |
+|---:|---:|
+| 16 | 1.22 ms |
+| 50 | 16.3 ms |
+| 100 | 121 ms |
+| 200 | 854 ms |
+
+For comparison, `ghz_sampling/16q` on the statevector path is already
+essentially free (0.27 ms, per the table above) because GHZ has only 2
+nonzero amplitudes — the stabilizer backend isn't competing on speed there.
+The point is qubit count: 200 qubits is not a circuit any `2^n`-amplitude
+statevector could represent at all (`2^200` is not a number of amplitudes
+any computer will ever hold), and the tableau backend runs it in under a
+second. Correctness: cross-validated against this crate's own dense-state
+circuit-matrix simulator on random small Clifford circuits (12 seeds x 15
+random gates x 4 qubits x all 16 basis-state probabilities, `simq-sim`'s
+`matches_statevector_probabilities_on_random_clifford_circuits` test),
+matching to 1e-9 everywhere expected and zero elsewhere.
+
 ## Honest limitations
 
 - Results above are from a 4-vCPU cloud container; ratios will differ on
