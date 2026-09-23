@@ -44,6 +44,7 @@ pub mod result;
 pub mod simulator;
 pub mod statistics;
 
+pub mod batch_eval;
 pub mod gradient;
 pub mod mps;
 pub mod pauli_propagation;
@@ -62,6 +63,7 @@ pub use simulator::Simulator;
 pub use statistics::ExecutionStatistics;
 
 pub use autodiff::{compute_gradients_ad, DifferentiableParameter};
+pub use batch_eval::{run_batch, run_batch_expectation};
 pub use mps::{
     is_1d_candidate as mps_is_1d_candidate, MpsConfig, MpsError, MpsExpectationResult, MpsState,
 };
