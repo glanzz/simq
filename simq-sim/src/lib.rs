@@ -45,6 +45,7 @@ pub mod simulator;
 pub mod statistics;
 
 pub mod gradient;
+pub mod mps;
 pub mod pauli_propagation;
 pub mod qaoa;
 pub mod stabilizer;
@@ -61,6 +62,9 @@ pub use simulator::Simulator;
 pub use statistics::ExecutionStatistics;
 
 pub use autodiff::{compute_gradients_ad, DifferentiableParameter};
+pub use mps::{
+    is_1d_candidate as mps_is_1d_candidate, MpsConfig, MpsError, MpsExpectationResult, MpsState,
+};
 pub use pauli_propagation::{
     expectation_value as pauli_propagation_expectation_value, PauliPropagationError,
     PropagationConfig, PropagationResult, RecommendedBackend,

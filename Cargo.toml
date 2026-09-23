@@ -27,6 +27,7 @@ rayon = "1.8"
 ahash = "0.8"
 foldhash = "0.1"
 egg = "0.11"
+nalgebra = "0.35"
 parking_lot = "0.12"
 bytemuck = { version = "1.14", features = ["derive"] }
 smallvec = { version = "1.11", features = ["union", "const_generics"] }
