@@ -16,7 +16,8 @@ use simq_gates::standard::{
 };
 use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::{
-    measurement::ComputationalBasis, AdaptiveState, DenseState, Pauli, PauliObservable, PauliString,
+    measurement::ComputationalBasis, AdaptiveState, DenseState, Pauli, PauliObservable,
+    PauliString, SinglePrecisionState,
 };
 use std::sync::Arc;
 
@@ -279,6 +280,22 @@ pub fn vqe_energy_instances(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Same values as [`vqe_energy_instances`], computed via
+/// `simq_sim::batch_eval::run_batch_expectation` instead of a serial loop:
+/// the `NUM_INSTANCES` instances (same circuit shape, different angles) run
+/// across CPU cores in parallel, sharing `sim`'s fusion-structure cache
+/// (see `Simulator`'s docs) rather than each instance paying full
+/// compilation cost independently.
+pub fn vqe_energy_instances_batched(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
+    simq_sim::batch_eval::run_batch_expectation(
+        sim,
+        NUM_INSTANCES,
+        |i| vqe_circuit_instance(num_qubits, i),
+        &vqe_observable(num_qubits),
+    )
+    .expect("batch evaluation failed")
+}
+
 /// One full QAOA cost evaluation: simulate the p=2 circuit and take the cut value.
 pub fn qaoa_cost(sim: &Simulator, num_qubits: usize) -> f64 {
     let circuit = qaoa_circuit(num_qubits);
@@ -304,6 +321,56 @@ pub fn qaoa_cost_instances(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
     (0..NUM_INSTANCES)
         .map(|i| qaoa_cost_instance(sim, num_qubits, i))
         .collect()
+}
+
+/// Same values as [`qaoa_cost_instances`], computed via the parallel batch
+/// executor — see [`vqe_energy_instances_batched`]'s docs.
+pub fn qaoa_cost_instances_batched(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
+    let zz_values = simq_sim::batch_eval::run_batch_expectation(
+        sim,
+        NUM_INSTANCES,
+        |i| qaoa_circuit_instance(num_qubits, i),
+        &qaoa_zz_observable(num_qubits),
+    )
+    .expect("batch evaluation failed");
+    zz_values
+        .into_iter()
+        .map(|zz| qaoa_cost_from_zz(num_qubits, zz))
+        .collect()
+}
+
+/// O2-compile `circuit` before handing it to [`SinglePrecisionState`] —
+/// `SinglePrecisionState::run_circuit` applies each gate one at a time with
+/// no gate-fusion pass of its own (see that module's docs), so an
+/// uncompiled circuit compares fused-and-cached `f64` gate counts against
+/// un-fused `f32` ones, not a fair precision-only comparison. `O2` matches
+/// `SimulatorConfig::default`'s `optimization_level`, the level
+/// `vqe_energy`/`qaoa_cost` actually run at.
+fn compiled(circuit: &Circuit) -> Circuit {
+    use simq_compiler::pipeline::{create_compiler, OptimizationLevel};
+    let mut c = circuit.clone();
+    create_compiler(OptimizationLevel::O2)
+        .compile(&mut c)
+        .expect("compilation failed");
+    c
+}
+
+/// Same VQE energy as [`vqe_energy`], computed on the single-precision
+/// (`Complex32`) statevector (`simq_state::SinglePrecisionState`) instead of
+/// the default `f64` one — half the memory per amplitude, at `f32`
+/// accuracy. See that module's docs for why `f32`, not literal `f16`.
+pub fn vqe_energy_single_precision(num_qubits: usize) -> f64 {
+    let circuit = compiled(&vqe_circuit(num_qubits));
+    let state = SinglePrecisionState::run_circuit(&circuit).expect("single-precision run failed");
+    state.expectation_value(&vqe_observable(num_qubits)) as f64
+}
+
+/// Same QAOA MaxCut cost as [`qaoa_cost`], computed at single precision.
+pub fn qaoa_cost_single_precision(num_qubits: usize) -> f64 {
+    let circuit = compiled(&qaoa_circuit(num_qubits));
+    let state = SinglePrecisionState::run_circuit(&circuit).expect("single-precision run failed");
+    let zz = state.expectation_value(&qaoa_zz_observable(num_qubits)) as f64;
+    qaoa_cost_from_zz(num_qubits, zz)
 }
 
 /// Same VQE energy as [`vqe_energy`], computed via the Pauli-propagation
@@ -902,6 +969,24 @@ mod tests {
     }
 
     #[test]
+    fn vqe_energy_single_precision_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = vqe_energy(&sim, n);
+        let single = vqe_energy_single_precision(n);
+        assert!((exact - single).abs() < 1e-3, "exact={exact} single={single}");
+    }
+
+    #[test]
+    fn qaoa_cost_single_precision_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = qaoa_cost(&sim, n);
+        let single = qaoa_cost_single_precision(n);
+        assert!((exact - single).abs() < 1e-3, "exact={exact} single={single}");
+    }
+
+    #[test]
     fn near_clifford_pauli_propagation_matches_statevector() {
         let n = 8;
         let circuit = near_clifford_circuit(n);
@@ -1005,6 +1090,13 @@ mod tests {
     }
 
     #[test]
+    fn vqe_energy_instances_batched_matches_serial() {
+        let sim = default_simulator();
+        let n = 6;
+        assert_eq!(vqe_energy_instances_batched(&sim, n), vqe_energy_instances(&sim, n));
+    }
+
+    #[test]
     fn qaoa_params_instance_zero_matches_base() {
         assert_eq!(qaoa_params_instance(0, 0), (QAOA_GAMMA[0], QAOA_BETA[0]));
         assert_ne!(qaoa_params_instance(0, 1), qaoa_params_instance(0, 0));
@@ -1017,6 +1109,13 @@ mod tests {
         assert_eq!(costs.len(), NUM_INSTANCES);
         assert!(costs.iter().all(|c| c.is_finite()));
         assert!(costs.windows(2).any(|w| (w[0] - w[1]).abs() > 1e-9));
+    }
+
+    #[test]
+    fn qaoa_cost_instances_batched_matches_serial() {
+        let sim = default_simulator();
+        let n = 6;
+        assert_eq!(qaoa_cost_instances_batched(&sim, n), qaoa_cost_instances(&sim, n));
     }
 
     #[test]

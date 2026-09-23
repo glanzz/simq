@@ -96,6 +96,37 @@ fn bench_ghz_sampling_stabilizer(c: &mut Criterion) {
 }
 
 /// Same VQE/QAOA workloads as `bench_vqe_energy`/`bench_qaoa_maxcut`, computed
+/// on `simq_state::SinglePrecisionState` (`Complex32`, half the memory of the
+/// default `Complex64` statevector) instead of the default `f64` one. Same
+/// `QUBIT_SIZES` as those two groups, so the comparison isolates the
+/// precision/memory tradeoff from any qubit-count effect.
+fn bench_vqe_energy_single_precision(c: &mut Criterion) {
+    let mut group = c.benchmark_group("vqe_energy_single_precision");
+    for &n in &QUBIT_SIZES {
+        if n >= 12 {
+            group.sample_size(20);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_single_precision(n)));
+        });
+    }
+    group.finish();
+}
+
+fn bench_qaoa_cost_single_precision(c: &mut Criterion) {
+    let mut group = c.benchmark_group("qaoa_cost_single_precision");
+    for &n in &QUBIT_SIZES {
+        if n >= 12 {
+            group.sample_size(20);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_single_precision(n)));
+        });
+    }
+    group.finish();
+}
+
+/// Same VQE/QAOA workloads as `bench_vqe_energy`/`bench_qaoa_maxcut`, computed
 /// via the Pauli-propagation observable engine (`simq_sim::pauli_propagation`)
 /// instead of the statevector simulator, at the *same* `QUBIT_SIZES` as those
 /// two groups -- a correctness/overhead comparison, not a scaling claim.
@@ -239,6 +270,52 @@ fn bench_multi_instance(c: &mut Criterion) {
     group.finish();
 }
 
+/// Same VQE/QAOA multi-instance workloads as `bench_multi_instance`, but
+/// computed via `simq_sim::batch_eval`'s parallel batch executor instead of
+/// a serial loop over instances -- see `wl::vqe_energy_instances_batched`'s
+/// docs. `BATCH_QUBIT_SIZES` includes both `MULTI_INSTANCE_SIZE` (8q, below
+/// the fusion-structure cache's 18-qubit engagement threshold, so any win
+/// here is pure CPU parallelism) and 20q (above it, so a win there also
+/// reflects the batch sharing one instance's compiled fusion structure with
+/// the rest -- see `FusionStructureCache`'s docs).
+const BATCH_QUBIT_SIZES: [usize; 2] = [MULTI_INSTANCE_SIZE, 20];
+
+fn bench_multi_instance_batched(c: &mut Criterion) {
+    let sim = wl::default_simulator();
+
+    let mut group = c.benchmark_group("vqe_energy_multi_instance_serial");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_instances(&sim, n)));
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("vqe_energy_multi_instance_batched");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_instances_batched(&sim, n)));
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("qaoa_cost_multi_instance_serial");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_instances(&sim, n)));
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("qaoa_cost_multi_instance_batched");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_instances_batched(&sim, n)));
+        });
+    }
+    group.finish();
+}
+
 /// Compiler-only comparison (no simulation), on `wl::redundant_circuit` --
 /// the one workload in this suite with redundant fixed-gate chains for
 /// `simq_compiler::egraph::EqualitySaturation` to reduce (VQE/QAOA/GHZ/QFT/
@@ -325,6 +402,8 @@ criterion_group!(
     bench_qaoa_maxcut,
     bench_ghz_sampling,
     bench_ghz_sampling_stabilizer,
+    bench_vqe_energy_single_precision,
+    bench_qaoa_cost_single_precision,
     bench_vqe_energy_pauli_propagation,
     bench_qaoa_cost_pauli_propagation,
     bench_near_clifford_pauli_propagation,
@@ -333,6 +412,7 @@ criterion_group!(
     bench_qft_probe,
     bench_random_circuit,
     bench_redundant_circuit_compile,
-    bench_multi_instance
+    bench_multi_instance,
+    bench_multi_instance_batched
 );
 criterion_main!(benches);
