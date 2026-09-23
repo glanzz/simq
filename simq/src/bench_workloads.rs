@@ -306,6 +306,117 @@ pub fn qaoa_cost_instances(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Same VQE energy as [`vqe_energy`], computed via the Pauli-propagation
+/// observable engine (`simq_sim::pauli_propagation`) instead of the
+/// statevector simulator, at the same (small) qubit counts as the other
+/// `QUBIT_SIZES` workloads: this is a correctness cross-check, not a
+/// scaling claim. `vqe_circuit`'s ansatz puts one non-Clifford `RY`/`RZ`
+/// rotation on *every* qubit in *every* layer (`O(n)` non-Clifford gates
+/// total), which is exactly the regime `pauli_propagation::recommend_backend`
+/// flags as a poor fit -- measured directly, this workload's term count
+/// saturates `PropagationConfig::default`'s cap and stays there, so it is
+/// *not* faster than the statevector path here. [`near_clifford_circuit`]
+/// below is this engine's actual sweet spot; see its docs.
+pub fn vqe_energy_pauli_propagation(num_qubits: usize) -> f64 {
+    let circuit = vqe_circuit(num_qubits);
+    simq_sim::pauli_propagation::expectation_value(&circuit, &vqe_observable(num_qubits))
+        .expect("propagation failed")
+        .expectation
+}
+
+/// Same QAOA MaxCut cost as [`qaoa_cost`], computed via Pauli propagation —
+/// see [`vqe_energy_pauli_propagation`]'s docs on why this is a small-qubit
+/// correctness check, not a scaling benchmark.
+pub fn qaoa_cost_pauli_propagation(num_qubits: usize) -> f64 {
+    let circuit = qaoa_circuit(num_qubits);
+    let zz =
+        simq_sim::pauli_propagation::expectation_value(&circuit, &qaoa_zz_observable(num_qubits))
+            .expect("propagation failed")
+            .expectation;
+    qaoa_cost_from_zz(num_qubits, zz)
+}
+
+/// Number of non-Clifford (`RZ`) rotations in [`near_clifford_circuit`],
+/// deliberately *fixed* regardless of qubit count.
+pub const NEAR_CLIFFORD_ROTATIONS: usize = 4;
+
+/// A GHZ-shaped Clifford backbone (H + CNOT chain, exactly [`ghz_circuit`])
+/// with [`NEAR_CLIFFORD_ROTATIONS`] `RZ` rotations added on the first few
+/// qubits — a fixed, small non-Clifford gate count independent of
+/// `num_qubits`, unlike [`vqe_circuit`]'s one-rotation-per-qubit-per-layer
+/// ansatz (see [`vqe_energy_pauli_propagation`]'s docs for why that
+/// distinction matters). This is the near-Clifford regime the Pauli
+/// propagation literature targets: [`near_clifford_expectation_pauli_propagation`]'s
+/// live term count is bounded by `2^NEAR_CLIFFORD_ROTATIONS` however large
+/// `num_qubits` gets, so it stays cheap far past the statevector's
+/// `2^num_qubits` wall.
+pub fn near_clifford_circuit(num_qubits: usize) -> Circuit {
+    let mut c = Circuit::new(num_qubits);
+    c.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    let k = NEAR_CLIFFORD_ROTATIONS.min(num_qubits);
+    for q in 0..k {
+        c.add_gate(Arc::new(RotationZ::new(0.3 + 0.1 * q as f64)), &[QubitId::new(q)])
+            .unwrap();
+    }
+    for q in 0..num_qubits - 1 {
+        c.add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+            .unwrap();
+    }
+    c
+}
+
+/// Observable for [`near_clifford_circuit`]: `X` on the last qubit — the one
+/// furthest from the fixed non-Clifford rotations, so propagating it
+/// backward genuinely walks the whole CNOT chain before reaching them.
+pub fn near_clifford_observable(num_qubits: usize) -> PauliObservable {
+    let mut paulis = vec![Pauli::I; num_qubits];
+    paulis[num_qubits - 1] = Pauli::X;
+    PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), 1.0)
+}
+
+/// `<X_last>` on [`near_clifford_circuit`], via Pauli propagation — the
+/// workload [`vqe_energy_pauli_propagation`]'s docs point to as this
+/// engine's actual scaling showcase.
+pub fn near_clifford_expectation_pauli_propagation(num_qubits: usize) -> f64 {
+    let circuit = near_clifford_circuit(num_qubits);
+    simq_sim::pauli_propagation::expectation_value(&circuit, &near_clifford_observable(num_qubits))
+        .expect("propagation failed")
+        .expectation
+}
+
+/// Same VQE energy as [`vqe_energy`], computed on the matrix-product-state
+/// backend (`simq_sim::mps`) instead of the statevector simulator. The VQE
+/// ansatz's CNOT chain is exactly the 1D connectivity MPS compresses well
+/// (see `simq_sim::mps::is_1d_candidate`), so this is exact at a large
+/// enough bond dimension and viable far past the ~30-qubit statevector
+/// wall documented in BENCHMARKS.md.
+pub fn vqe_energy_mps(num_qubits: usize) -> f64 {
+    let circuit = vqe_circuit(num_qubits);
+    simq_sim::mps::expectation_value(
+        &circuit,
+        &vqe_observable(num_qubits),
+        simq_sim::MpsConfig::default(),
+    )
+    .expect("mps run failed")
+    .expectation
+}
+
+/// Same QAOA MaxCut cost as [`qaoa_cost`], computed on the MPS backend. The
+/// ring ansatz's one wraparound edge exercises `simq_sim::mps`'s swap
+/// network (see that module's docs) rather than pure nearest-neighbor
+/// contraction.
+pub fn qaoa_cost_mps(num_qubits: usize) -> f64 {
+    let circuit = qaoa_circuit(num_qubits);
+    let zz = simq_sim::mps::expectation_value(
+        &circuit,
+        &qaoa_zz_observable(num_qubits),
+        simq_sim::MpsConfig::default(),
+    )
+    .expect("mps run failed")
+    .expectation;
+    qaoa_cost_from_zz(num_qubits, zz)
+}
+
 /// GHZ shot sampling: simulate and draw `shots` samples.
 pub fn ghz_sample(sim: &Simulator, num_qubits: usize, shots: usize, seed: u64) -> usize {
     let circuit = ghz_circuit(num_qubits);
@@ -752,6 +863,67 @@ mod tests {
         let c2 = qaoa_cost(&sim, 4);
         assert!(c1.is_finite());
         assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn vqe_energy_pauli_propagation_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = vqe_energy(&sim, n);
+        let propagated = vqe_energy_pauli_propagation(n);
+        assert!((exact - propagated).abs() < 1e-8, "exact={exact} propagated={propagated}");
+    }
+
+    #[test]
+    fn qaoa_cost_pauli_propagation_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = qaoa_cost(&sim, n);
+        let propagated = qaoa_cost_pauli_propagation(n);
+        assert!((exact - propagated).abs() < 1e-8, "exact={exact} propagated={propagated}");
+    }
+
+    #[test]
+    fn vqe_energy_mps_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = vqe_energy(&sim, n);
+        let mps = vqe_energy_mps(n);
+        assert!((exact - mps).abs() < 1e-6, "exact={exact} mps={mps}");
+    }
+
+    #[test]
+    fn qaoa_cost_mps_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = qaoa_cost(&sim, n);
+        let mps = qaoa_cost_mps(n);
+        assert!((exact - mps).abs() < 1e-6, "exact={exact} mps={mps}");
+    }
+
+    #[test]
+    fn near_clifford_pauli_propagation_matches_statevector() {
+        let n = 8;
+        let circuit = near_clifford_circuit(n);
+        let sim = default_simulator();
+        let state = run_to_dense(&sim, &circuit);
+        let exact = near_clifford_observable(n)
+            .expectation_value(&state)
+            .unwrap();
+
+        let propagated = near_clifford_expectation_pauli_propagation(n);
+        assert!((exact - propagated).abs() < 1e-9, "exact={exact} propagated={propagated}");
+    }
+
+    #[test]
+    fn near_clifford_pauli_propagation_stays_cheap_far_past_the_statevector_wall() {
+        // A statevector can't run at 60 qubits at all; this just needs to
+        // finish (fast, within the normal test suite) and return a sane
+        // value, demonstrating the fixed-non-Clifford-count term bound in
+        // `near_clifford_circuit`'s docs actually holds in practice.
+        let value = near_clifford_expectation_pauli_propagation(60);
+        assert!(value.is_finite());
+        assert!((-1.0..=1.0).contains(&value));
     }
 
     #[test]

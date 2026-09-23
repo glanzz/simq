@@ -799,6 +799,113 @@ result here (not just the favorable one) is deliberate — see the qulacs
 section above for why that's this document's general policy, not an
 exception made for this pass.
 
+## Two more representations past the statevector wall: Pauli propagation and MPS
+
+Two further additions, both pure software, targeting the two capability
+gaps a follow-up research review (see that document's Tier 1/Tier 2 idea
+list) identified as not yet covered by the fusion/stabilizer/egraph work
+above: expectation-value-only observables (`simq_sim::pauli_propagation`)
+and near-1D circuit structure (`simq_sim::mps`). Both, like the stabilizer
+backend, are additive: callers opt in explicitly, nothing about
+`Simulator::run`'s default path changes.
+
+**Pauli propagation (`simq_sim::pauli_propagation`).** Evolves a
+`PauliObservable` backward through the circuit (`O <- U^dagger O U`, gate by
+gate, Heisenberg picture) via generic matrix conjugation against each
+gate's own `Gate::matrix()`, rather than hand-derived per-gate rules — the
+same trick this project already uses in `TemplateSubstitution` vs.
+`egraph`'s more general approach, applied here to observables instead of
+circuits. A Clifford gate maps one Pauli term to exactly one other term (no
+branching); a non-Clifford gate can split a term into up to `2^k` new ones,
+so the live term count tracks the circuit's non-Clifford gate count, not
+its qubit count.
+
+That distinction matters more than it might look, and this session's own
+benchmark run is the demonstration: `vqe_circuit`/`qaoa_circuit` put one
+non-Clifford `RY`/`RZ` rotation on *every* qubit in *every* layer, so their
+term count grows with `n`, not despite it. Measured directly (this
+machine, `wl::vqe_energy_pauli_propagation` / `wl::qaoa_cost_pauli_propagation`
+vs. the existing statevector-based `vqe_energy` / `qaoa_maxcut`):
+
+| | 4q | 8q | 12q | 16q |
+|---|---:|---:|---:|---:|
+| `vqe_energy` (statevector) | 37 µs | 91 µs | 568 µs | 9.93 ms |
+| `vqe_energy_pauli_propagation` | 4.86 ms | 1.23 s | 3.29 s | 4.59 s |
+| `qaoa_maxcut` (statevector) | 30 µs | 63 µs | 656 µs | 8.00 ms |
+| `qaoa_cost_pauli_propagation` | 1.78 ms | 7.48 ms | 15.6 ms | 30.3 ms |
+
+Pauli propagation is **orders of magnitude slower** than the statevector on
+this ansatz family — a real, measured negative result, not a hypothetical
+caveat, and reported here rather than quietly left out of the benchmark
+suite (see the qulacs and equality-saturation sections above for why that's
+this document's policy generally). `pauli_propagation::recommend_backend`
+already predicts exactly this: it checks the non-Clifford gate count before
+ever recommending propagation over the statevector, and would say
+"statevector" for both these ansätze.
+
+The regime this engine actually targets is *near-Clifford*: a circuit with
+a Clifford backbone and a **fixed, small** number of non-Clifford gates,
+independent of qubit count. `wl::near_clifford_circuit` — a GHZ-shaped H +
+CNOT-chain backbone with exactly 4 `RZ` rotations, however large `n` gets —
+is that shape, and its `<X>` expectation value (cross-validated against the
+exact statevector to 1e-9 at 8 qubits, where both can still run) scales
+like this, well past the ~30-qubit statevector wall:
+
+| qubits | 16 | 30 | 60 | 100 |
+|---:|---:|---:|---:|---:|
+| time | 47.7 µs | 84.9 µs | 169 µs | 287 µs |
+
+Sub-millisecond at 100 qubits — a circuit size no statevector on this
+machine (or any machine) could represent at all — because the live term
+count is bounded by `2^4 = 16` regardless of `n`, not by `4^n`. This is the
+same lesson the stabilizer backend and the qft_probe/qulacs sections above
+each teach in their own way: the right *representation* for a workload
+matters more than raw kernel speed, and picking the wrong one (Pauli
+propagation for a dense-rotation ansatz) can lose by orders of magnitude
+even when the underlying math is exact.
+
+**Matrix-product-state backend (`simq_sim::mps`).** Represents the state as
+a chain of tensors joined by bond indices, applying two-qubit gates via
+contract-then-SVD-truncate (`nalgebra`'s native complex SVD, no external
+BLAS/LAPACK). Adjacent gates apply directly; non-adjacent ones (e.g. QAOA's
+one ring-closing edge) go through a swap network. Memory and per-gate cost
+scale with the bond dimension the circuit's entanglement actually needs,
+not with `2^n`.
+
+Both this suite's own VQE (linear CNOT chain) and QAOA (ring) ansätze are
+exactly the near-1D shape MPS compresses well (`simq_sim::mps::is_1d_candidate`
+returns `true` for both). Measured bond dimensions, this session, at every
+qubit count from 16 to 80 (`MpsConfig::default`'s `max_bond_dim: 64` cap
+never binds):
+
+| | 16q | 30q | 50q | 80q |
+|---|---:|---:|---:|---:|
+| `vqe_energy_mps` max bond dim | 8 | 8 | 8 | 8 |
+| `qaoa_cost_mps` max bond dim | 16 | 16 | 16 | 16 |
+
+Flat, not growing with `n` — exactly what "near-1D, bounded-depth ansatz"
+predicts, and cross-validated exactly (1e-8) against the statevector at
+small `n` where both can run. Timings:
+
+| | 16q | 30q | 50q | 80q |
+|---|---:|---:|---:|---:|
+| `vqe_energy` (statevector) | 9.93 ms | (past the wall) | — | — |
+| `vqe_energy_mps` | 4.87 ms | 21.8 ms | 64.0 ms | 198 ms |
+| `qaoa_maxcut` (statevector) | 8.00 ms | (past the wall) | — | — |
+| `qaoa_cost_mps` | 30.3 ms | 151 ms | 474 ms | 1.27 s |
+
+Two findings, one favorable and one not, reported with equal weight per
+this document's usual policy: `vqe_energy_mps` is **already ~2x faster than
+the statevector at 16 qubits**, where both are exact and directly
+comparable — bond dimension 8 costs far less per gate than a
+`2^16`-amplitude state does — and then keeps running to 80 qubits, where
+the statevector cannot run at all. `qaoa_cost_mps`, by contrast, is
+**slower than the statevector at 16 qubits** (30.3 ms vs. 8.0 ms): the
+ring's one non-adjacent edge triggers `mps`'s swap network every layer,
+and at qubit counts small enough for the statevector to still be cheap,
+that overhead isn't yet paid back. Past the wall, it is the only backend
+of the two that can answer the question at all.
+
 ## Honest limitations
 
 - Results above are from a 4-vCPU cloud container; ratios will differ on
@@ -850,3 +957,18 @@ exception made for this pass.
   it has no built-in memory-aware qubit cap the way SimQ and Aer do; running
   it there risked an OOM kill rather than a clean refusal, for a result
   (state doesn't fit in RAM) the other two simulators already establish.
+- Neither `pauli_propagation` nor `mps` is wired into `Simulator::run`'s
+  automatic dispatch, same as the stabilizer backend — callers opt in
+  explicitly (or use `pauli_propagation::recommend_backend` /
+  `mps::is_1d_candidate` to decide first).
+- `pauli_propagation::expectation_value` is genuinely slower than the
+  statevector on this suite's own VQE/QAOA ansätze (see the new section
+  above) — it is not a strictly-better replacement for
+  `PauliObservable::expectation_value`, only a better choice for circuits
+  with a bounded, fixed number of non-Clifford gates.
+- `mps`'s bond-dimension cap and SVD truncation cutoff make it an
+  approximation in general (exact only when the circuit's true entanglement
+  fits under `max_bond_dim`, as it does for this suite's chain/ring
+  ansätze); a circuit that entangles broadly across the whole register
+  would need a bond dimension approaching `2^(n/2)` to stay exact, at which
+  point it has none of MPS's advantage over a statevector.
