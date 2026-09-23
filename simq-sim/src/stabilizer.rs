@@ -269,7 +269,7 @@ impl StabilizerTableau {
 /// Gate names this backend can execute exactly. Anything outside this set
 /// (rotations, T, Toffoli, ...) is not a Clifford gate in general and must
 /// fall back to statevector simulation.
-fn is_clifford_gate_name(name: &str) -> bool {
+pub(crate) fn is_clifford_gate_name(name: &str) -> bool {
     matches!(name, "H" | "X" | "Y" | "Z" | "S" | "S†" | "CNOT" | "CX" | "CZ" | "SWAP")
 }
 

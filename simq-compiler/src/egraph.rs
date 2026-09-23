@@ -488,9 +488,13 @@ mod tests {
 
     /// Regression guard for the exact blowup `rules()`'s docs describe: a
     /// bidirectional associativity rule once made this take >600ms per
-    /// chain (Catalan-many parenthesizations). A generous 50ms budget for
+    /// chain (Catalan-many parenthesizations). A generous 500ms budget for
     /// a 19-gate chain leaves ample margin over the low-microsecond times
-    /// this module actually runs at while still catching a real regression.
+    /// this module actually runs at while still catching a real regression
+    /// back to that behavior. (Raised from an initial 50ms after a shared
+    /// CI runner measured 200ms on an otherwise-passing run -- a real
+    /// regression back to the associativity bug reproduces at >600ms on
+    /// this exact chain shape, so 500ms still catches it with margin.)
     #[test]
     fn optimize_chain_is_fast_on_a_long_chain() {
         let mut names = vec!["T"; 6];
@@ -502,7 +506,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         assert!(
-            elapsed < std::time::Duration::from_millis(50),
+            elapsed < std::time::Duration::from_millis(500),
             "optimize_chain took {elapsed:?} on a 19-gate chain, expected low milliseconds"
         );
         assert!(optimized.len() < names.len());

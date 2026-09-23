@@ -191,9 +191,7 @@ impl QubitTimeTracker {
     /// After calling this, all qubits will have zero idle time.
     /// Useful after applying idle noise to bring all qubits up to date.
     pub fn synchronize_all_qubits(&mut self) {
-        for qubit_time in &mut self.qubit_times {
-            *qubit_time = self.total_time;
-        }
+        self.qubit_times.fill(self.total_time);
     }
 
     /// Synchronize specific qubits to the current total time

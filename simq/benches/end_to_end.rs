@@ -95,6 +95,120 @@ fn bench_ghz_sampling_stabilizer(c: &mut Criterion) {
     group.finish();
 }
 
+/// Same VQE/QAOA workloads as `bench_vqe_energy`/`bench_qaoa_maxcut`, computed
+/// on `simq_state::SinglePrecisionState` (`Complex32`, half the memory of the
+/// default `Complex64` statevector) instead of the default `f64` one. Same
+/// `QUBIT_SIZES` as those two groups, so the comparison isolates the
+/// precision/memory tradeoff from any qubit-count effect.
+fn bench_vqe_energy_single_precision(c: &mut Criterion) {
+    let mut group = c.benchmark_group("vqe_energy_single_precision");
+    for &n in &QUBIT_SIZES {
+        if n >= 12 {
+            group.sample_size(20);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_single_precision(n)));
+        });
+    }
+    group.finish();
+}
+
+fn bench_qaoa_cost_single_precision(c: &mut Criterion) {
+    let mut group = c.benchmark_group("qaoa_cost_single_precision");
+    for &n in &QUBIT_SIZES {
+        if n >= 12 {
+            group.sample_size(20);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_single_precision(n)));
+        });
+    }
+    group.finish();
+}
+
+/// Same VQE/QAOA workloads as `bench_vqe_energy`/`bench_qaoa_maxcut`, computed
+/// via the Pauli-propagation observable engine (`simq_sim::pauli_propagation`)
+/// instead of the statevector simulator, at the *same* `QUBIT_SIZES` as those
+/// two groups -- a correctness/overhead comparison, not a scaling claim.
+/// Both ansätze put one non-Clifford rotation on every qubit in every layer,
+/// which is exactly the regime `pauli_propagation::recommend_backend` (and
+/// `wl::vqe_energy_pauli_propagation`'s docs) flag as a poor fit; see
+/// `bench_near_clifford_pauli_propagation` below for this engine's actual
+/// scaling showcase.
+fn bench_vqe_energy_pauli_propagation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("vqe_energy_pauli_propagation");
+    for &n in &QUBIT_SIZES {
+        if n >= 12 {
+            group.sample_size(10);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_pauli_propagation(n)));
+        });
+    }
+    group.finish();
+}
+
+fn bench_qaoa_cost_pauli_propagation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("qaoa_cost_pauli_propagation");
+    for &n in &QUBIT_SIZES {
+        if n >= 12 {
+            group.sample_size(10);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_pauli_propagation(n)));
+        });
+    }
+    group.finish();
+}
+
+/// `wl::near_clifford_circuit`: a fixed, small non-Clifford gate count
+/// regardless of qubit count -- the regime Pauli propagation actually wins
+/// in. Goes past the ~30-qubit statevector wall documented in
+/// BENCHMARKS.md, same spirit as `bench_ghz_sampling_stabilizer`.
+const NEAR_CLIFFORD_QUBIT_SIZES: [usize; 4] = [16, 30, 60, 100];
+
+fn bench_near_clifford_pauli_propagation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("near_clifford_pauli_propagation");
+    for &n in &NEAR_CLIFFORD_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::near_clifford_expectation_pauli_propagation(n)));
+        });
+    }
+    group.finish();
+}
+
+/// Same VQE/QAOA workloads, computed on the matrix-product-state backend
+/// (`simq_sim::mps`). Both ansätze are near-1D (VQE: linear CNOT chain, QAOA:
+/// a ring) -- see `simq_sim::mps::is_1d_candidate` -- so MPS represents them
+/// at a small bond dimension far past the statevector wall.
+const MPS_QUBIT_SIZES: [usize; 4] = [16, 30, 50, 80];
+
+fn bench_vqe_energy_mps(c: &mut Criterion) {
+    let mut group = c.benchmark_group("vqe_energy_mps");
+    for &n in &MPS_QUBIT_SIZES {
+        if n >= 50 {
+            group.sample_size(10);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_mps(n)));
+        });
+    }
+    group.finish();
+}
+
+fn bench_qaoa_cost_mps(c: &mut Criterion) {
+    let mut group = c.benchmark_group("qaoa_cost_mps");
+    for &n in &MPS_QUBIT_SIZES {
+        if n >= 50 {
+            group.sample_size(10);
+        }
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_mps(n)));
+        });
+    }
+    group.finish();
+}
+
 /// QFT: long-range (non-nearest-neighbor) entangling structure, the
 /// counterpoint to the three local workloads above -- see
 /// `wl::qft_circuit`'s docs and BENCHMARKS.md's methodology notes.
@@ -153,6 +267,52 @@ fn bench_multi_instance(c: &mut Criterion) {
     group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
         b.iter(|| black_box(wl::ghz_sample_instances(&sim, n, GHZ_SHOTS)));
     });
+    group.finish();
+}
+
+/// Same VQE/QAOA multi-instance workloads as `bench_multi_instance`, but
+/// computed via `simq_sim::batch_eval`'s parallel batch executor instead of
+/// a serial loop over instances -- see `wl::vqe_energy_instances_batched`'s
+/// docs. `BATCH_QUBIT_SIZES` includes both `MULTI_INSTANCE_SIZE` (8q, below
+/// the fusion-structure cache's 18-qubit engagement threshold, so any win
+/// here is pure CPU parallelism) and 20q (above it, so a win there also
+/// reflects the batch sharing one instance's compiled fusion structure with
+/// the rest -- see `FusionStructureCache`'s docs).
+const BATCH_QUBIT_SIZES: [usize; 2] = [MULTI_INSTANCE_SIZE, 20];
+
+fn bench_multi_instance_batched(c: &mut Criterion) {
+    let sim = wl::default_simulator();
+
+    let mut group = c.benchmark_group("vqe_energy_multi_instance_serial");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_instances(&sim, n)));
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("vqe_energy_multi_instance_batched");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::vqe_energy_instances_batched(&sim, n)));
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("qaoa_cost_multi_instance_serial");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_instances(&sim, n)));
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("qaoa_cost_multi_instance_batched");
+    for &n in &BATCH_QUBIT_SIZES {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{n}q")), &n, |b, &n| {
+            b.iter(|| black_box(wl::qaoa_cost_instances_batched(&sim, n)));
+        });
+    }
     group.finish();
 }
 
@@ -242,9 +402,17 @@ criterion_group!(
     bench_qaoa_maxcut,
     bench_ghz_sampling,
     bench_ghz_sampling_stabilizer,
+    bench_vqe_energy_single_precision,
+    bench_qaoa_cost_single_precision,
+    bench_vqe_energy_pauli_propagation,
+    bench_qaoa_cost_pauli_propagation,
+    bench_near_clifford_pauli_propagation,
+    bench_vqe_energy_mps,
+    bench_qaoa_cost_mps,
     bench_qft_probe,
     bench_random_circuit,
     bench_redundant_circuit_compile,
-    bench_multi_instance
+    bench_multi_instance,
+    bench_multi_instance_batched
 );
 criterion_main!(benches);
