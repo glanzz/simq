@@ -45,6 +45,7 @@ pub mod simulator;
 pub mod statistics;
 
 pub mod gradient;
+pub mod pauli_propagation;
 pub mod qaoa;
 pub mod stabilizer;
 pub mod vqe_qaoa_helpers;
@@ -60,4 +61,8 @@ pub use simulator::Simulator;
 pub use statistics::ExecutionStatistics;
 
 pub use autodiff::{compute_gradients_ad, DifferentiableParameter};
+pub use pauli_propagation::{
+    expectation_value as pauli_propagation_expectation_value, PauliPropagationError,
+    PropagationConfig, PropagationResult, RecommendedBackend,
+};
 pub use stabilizer::{is_clifford_circuit, sample_bitstrings, StabilizerError, StabilizerTableau};
