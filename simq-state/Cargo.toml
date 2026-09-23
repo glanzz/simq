@@ -23,6 +23,7 @@ rand.workspace = true
 approx.workspace = true
 criterion.workspace = true
 proptest.workspace = true
+simq-gates.workspace = true
 
 [[bench]]
 name = "state_operations"
