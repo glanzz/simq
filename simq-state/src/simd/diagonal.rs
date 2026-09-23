@@ -328,9 +328,7 @@ mod tests {
         let mut state = vec![Complex64::new(0.0, 0.0); dimension];
         // Equal superposition
         let norm = (dimension as f64).sqrt().recip();
-        for amp in &mut state {
-            *amp = Complex64::new(norm, 0.0);
-        }
+        state.fill(Complex64::new(norm, 0.0));
         state
     }
 
