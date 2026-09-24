@@ -369,9 +369,7 @@ impl ReverseTape {
     /// Gradient with respect to all input variables
     pub fn gradient(&mut self, output: usize, num_inputs: usize) -> Vec<f64> {
         // Initialize all adjoints to 0
-        for adj in &mut self.adjoints {
-            *adj = 0.0;
-        }
+        self.adjoints.fill(0.0);
 
         // Seed the output
         self.adjoints[output] = 1.0;

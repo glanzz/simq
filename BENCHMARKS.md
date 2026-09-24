@@ -632,6 +632,360 @@ be. Two additional pieces ride on top of the core fusion change:
   fixed, and the 28q verdict on today's fully same-session numbers is a
   more modest 1.14× SimQ win, not 1.55×.
 
+## Closing the remaining `qft_probe/16q` gap, plus a stabilizer backend
+
+Three further changes, all pure software (no GPU), targeting the specific
+gaps this document had already identified above:
+
+**1. Long-range circuits now reach multi-qubit fusion below 18 qubits.**
+The width-bounded block-fusion path from the previous section only ever
+activated at/above `parallel_threshold_qubits` (18) — so `qft_probe/16q`,
+whose controlled-phase ladder is almost entirely 2-qubit gates, never fused
+anything at all below that line (the legacy path only fuses adjacent
+*single*-qubit chains, and QFT has none). `simq-compiler/src/fusion.rs` now
+also routes a circuit to the block-fusion path below the qubit threshold
+when it is structurally non-local: `long_range_gate_multiplier` and
+`long_range_min_qubits` on `FusionConfig` gate this on the count of 2-qubit
+gates whose qubit indices are *not* adjacent (`|q0 - q1| > 1`) — QFT's
+ladder is almost all long-range, while VQE/QAOA/GHZ's chain/ring ansätze are
+almost all adjacent, so this reaches QFT without redirecting the local
+workloads the legacy path already serves well. `long_range_min_qubits`
+(default 14) additionally keeps the already-winning `qft_probe/4q`–`/12q`
+rows on the untouched legacy path.
+
+Measured on this session's run (same 4-vCPU/15 GiB machine as the rest of
+this document):
+
+| | before | after | vs Aer | vs qsim | vs Cirq |
+|---|---:|---:|---:|---:|---:|
+| `qft_probe/16q` (SimQ, ms) | 25.986 | 15.697 | 1/1.7x → 1/1.0x | 1/5.0x → 1/2.9x | 1/2.1x → 1/1.2x |
+
+A ~1.7x absolute speedup that turns the one documented Aer loss into an
+effective tie, and roughly halves the qsim/Cirq gap. `qft_probe/4q`–`/12q`
+and all of VQE/QAOA/GHZ/random-circuit are unaffected — those shapes are
+either below `long_range_min_qubits` or have too few long-range gates to
+trip the new dispatch, so they take the exact same code path as before
+(verified by `simq-compiler`'s `test_local_chain_circuit_stays_on_legacy_path_at_16q`
+and the full cross-validation run above, worst deviation still 1.40e-14 vs
+Qiskit / 2.29e-06 vs qsim).
+
+**2. `foldhash` for sparse-state hashing; `mimalloc` as an opt-in allocator.**
+`simq-state`'s sparse amplitude map now hashes with `foldhash` instead of
+`ahash` (Qiskit 2.5 made the same swap for the same reason: faster mixing
+for integer-keyed maps). `simq` also gained an opt-in `mimalloc` feature —
+opt-in, not default, because a `#[global_allocator]` is a process-wide
+choice a library shouldn't impose on every downstream binary that links it.
+Measured with `--features mimalloc` vs. without, on this machine: most rows
+improved 5–13% (largest at small/medium qubit counts, where allocation
+overhead is proportionally larger), a few were flat or within run-to-run
+noise. Net positive and worth keeping as an opt-in, but not dramatic enough
+to justify forcing it on by default.
+
+**3. New Clifford/stabilizer tableau backend (`simq_sim::stabilizer`).**
+An Aaronson-Gottesman CHP tableau simulator for circuits built entirely from
+Clifford gates (H, X, Y, Z, S, S†, CNOT, CZ, SWAP) — exact, and `O(n^2)`-bit
+state instead of `O(2^n)` amplitudes, so it simulates far past the ~30-qubit
+statevector wall documented below. `is_clifford_circuit` lets a caller check
+before dispatching; `sample_bitstrings` runs the circuit once and clones the
+resulting tableau per shot for independent measurement collapse. Not wired
+into `Simulator::run`'s automatic dispatch (that would touch a heavily-used,
+already-tested code path for a capability most circuits can't use); it's an
+additive module callers opt into explicitly.
+
+GHZ preparation (H + CNOT chain) is exactly Clifford, so this is the natural
+benchmark — `ghz_sampling_stabilizer/{16,50,100,200}q`, 128 shots each, this
+session:
+
+| qubits | time (median) |
+|---:|---:|
+| 16 | 1.22 ms |
+| 50 | 16.3 ms |
+| 100 | 121 ms |
+| 200 | 854 ms |
+
+For comparison, `ghz_sampling/16q` on the statevector path is already
+essentially free (0.27 ms, per the table above) because GHZ has only 2
+nonzero amplitudes — the stabilizer backend isn't competing on speed there.
+The point is qubit count: 200 qubits is not a circuit any `2^n`-amplitude
+statevector could represent at all (`2^200` is not a number of amplitudes
+any computer will ever hold), and the tableau backend runs it in under a
+second. Correctness: cross-validated against this crate's own dense-state
+circuit-matrix simulator on random small Clifford circuits (12 seeds x 15
+random gates x 4 qubits x all 16 basis-state probabilities, `simq-sim`'s
+`matches_statevector_probabilities_on_random_clifford_circuits` test),
+matching to 1e-9 everywhere expected and zero elsewhere.
+
+## Equality-saturation optimization (`simq_compiler::egraph`)
+
+`TemplateSubstitution` matches a fixed list of gate-name patterns with one
+greedy, left-to-right, no-backtrack scan: it can rewrite `S,S,S,S` to
+nothing because that exact 4-gate pattern is in its table, but it has no
+way to discover that, say, `T,T,T,T,T,T` (six T gates — not a multiple of
+any of its hardcoded lengths) reduces at all, because doing so requires
+*composing* two different rules (`T,T -> S`, then `S,S -> Z`) rather than
+matching one fixed pattern. `simq_compiler::egraph::EqualitySaturation` is
+a new, opt-in pass (via `PipelineBuilder::with_equality_saturation()`, or
+the `create_o3_egraph_compiler()` convenience constructor — **not** part of
+the `O2`/`O3` presets) that runs real equality saturation, via the `egg`
+crate, over single-qubit gate chains (the same "chain" concept
+`fusion::find_fusion_chains` uses) to find these compound reductions
+without hand-writing a template for every one.
+
+**A real pitfall, caught before it shipped:** the first implementation
+included a bidirectional associativity rewrite rule
+(`(seq (seq a b) c) <=> (seq a (seq b c))`) so saturation could explore
+every parenthesization of a chain. This is a textbook e-graph blowup — the
+number of parenthesizations of an n-element chain is `Catalan(n-1)`, which
+for a 19-gate chain is ~4.77e8 — and it measured accordingly: **626 ms for
+one 19-gate chain, 9.2 s for a 16-qubit circuit's worth of them.** The fix
+was to drop general associativity entirely and fix the chain into one
+right-associated tree, writing every rule to match a window at the front of
+a `?rest` tail-variable instead of a bare adjacent pair — e-graphs match
+patterns against every e-class, not just the root, so this still finds a
+match at any position without ever re-parenthesizing anything. That dropped
+the same 19-gate chain to **1.1 ms** (~570x) and the 16-qubit circuit to
+**3.8 ms** (~2400x). The regression is now a dedicated test
+(`optimize_chain_is_fast_on_a_long_chain`, budgeted at 50 ms — generous
+headroom over the actual low-millisecond runtime) so this can't silently
+come back.
+
+**Gate-count comparison**, on `bench_workloads::redundant_circuit` (a
+per-qubit chain of `T^6`, a repeated H-conjugation run, and `S^6` —
+deliberately *not* `T^8`/`S^4`, which `TemplateSubstitution` already
+hardcodes; see that function's docs) — pure rewriting, no `GateFusion` in
+either pipeline, the fair comparison for what this pass adds over
+fixed-pattern matching:
+
+| qubits | original | `TemplateSubstitution` (+ `AdvancedTemplateMatching`) | `EqualitySaturation` |
+|---:|---:|---:|---:|
+| 4 | 79 | 23 | **11** |
+| 8 | 159 | 47 | **23** |
+| 12 | 239 | 71 | **35** |
+| 16 | 319 | 95 | **47** |
+
+Equality saturation roughly halves the gate count template-based rewriting
+alone achieves, consistently across sizes (2.09x at 4q, 2.02x at 16q) —
+without ever stating `T,T,T,T,T,T -> S,S,S -> Z,S` (or any of the dozens of
+other compound reductions a longer or differently-mixed chain would need)
+as an explicit rule.
+
+**The honest complication: this gap disappears once `GateFusion` runs.**
+`GateFusion`'s single-qubit-chain fusion multiplies a chain's gate matrices
+out numerically and drops the result if it's the identity — it doesn't need
+to know *why* a chain is redundant, it just computes the product. Compiling
+the same circuit through the full `O3` pipeline with and without
+`EqualitySaturation` added lands on the **exact same final gate count**
+(31 at 16q: one fused gate per qubit plus the 15-gate CNOT ladder) either
+way, because fusion alone already reaches the numeric minimum regardless of
+whether the chain was symbolically shortened first. Compile-time wall clock
+in that configuration (this session, same machine):
+
+| qubits | O3 alone | O3 + `EqualitySaturation` |
+|---:|---:|---:|
+| 4 | 57.8 µs | 473 µs |
+| 16 | 221 µs | 1.88 ms |
+
+Adding the pass to a fusion-equipped pipeline costs real compile time
+(~8-9x here) for zero additional gate-count reduction on this benchmark.
+This is *why* the pass stays opt-in rather than joining `O2`/`O3`: its
+genuine, distinctive value — a **named, interpretable gate sequence**
+(relevant when gate count is measured in a fixed hardware/fault-tolerant
+basis, e.g. T-count, where an opaque fused matrix has no such count at
+all) discovered **without hand-enumerating compound identities** — is real
+and demonstrated above, but it is not "beats the existing fixed-point
+pipeline on end-to-end simulation speed," which is this repository's own
+stated bar for promoting an optimizer to a default. Reporting the null
+result here (not just the favorable one) is deliberate — see the qulacs
+section above for why that's this document's general policy, not an
+exception made for this pass.
+
+## Two more representations past the statevector wall: Pauli propagation and MPS
+
+Two further additions, both pure software, targeting the two capability
+gaps a follow-up research review (see that document's Tier 1/Tier 2 idea
+list) identified as not yet covered by the fusion/stabilizer/egraph work
+above: expectation-value-only observables (`simq_sim::pauli_propagation`)
+and near-1D circuit structure (`simq_sim::mps`). Both, like the stabilizer
+backend, are additive: callers opt in explicitly, nothing about
+`Simulator::run`'s default path changes.
+
+**Pauli propagation (`simq_sim::pauli_propagation`).** Evolves a
+`PauliObservable` backward through the circuit (`O <- U^dagger O U`, gate by
+gate, Heisenberg picture) via generic matrix conjugation against each
+gate's own `Gate::matrix()`, rather than hand-derived per-gate rules — the
+same trick this project already uses in `TemplateSubstitution` vs.
+`egraph`'s more general approach, applied here to observables instead of
+circuits. A Clifford gate maps one Pauli term to exactly one other term (no
+branching); a non-Clifford gate can split a term into up to `2^k` new ones,
+so the live term count tracks the circuit's non-Clifford gate count, not
+its qubit count.
+
+That distinction matters more than it might look, and this session's own
+benchmark run is the demonstration: `vqe_circuit`/`qaoa_circuit` put one
+non-Clifford `RY`/`RZ` rotation on *every* qubit in *every* layer, so their
+term count grows with `n`, not despite it. Measured directly (this
+machine, `wl::vqe_energy_pauli_propagation` / `wl::qaoa_cost_pauli_propagation`
+vs. the existing statevector-based `vqe_energy` / `qaoa_maxcut`):
+
+| | 4q | 8q | 12q | 16q |
+|---|---:|---:|---:|---:|
+| `vqe_energy` (statevector) | 37 µs | 91 µs | 568 µs | 9.93 ms |
+| `vqe_energy_pauli_propagation` | 4.86 ms | 1.23 s | 3.29 s | 4.59 s |
+| `qaoa_maxcut` (statevector) | 30 µs | 63 µs | 656 µs | 8.00 ms |
+| `qaoa_cost_pauli_propagation` | 1.78 ms | 7.48 ms | 15.6 ms | 30.3 ms |
+
+Pauli propagation is **orders of magnitude slower** than the statevector on
+this ansatz family — a real, measured negative result, not a hypothetical
+caveat, and reported here rather than quietly left out of the benchmark
+suite (see the qulacs and equality-saturation sections above for why that's
+this document's policy generally). `pauli_propagation::recommend_backend`
+already predicts exactly this: it checks the non-Clifford gate count before
+ever recommending propagation over the statevector, and would say
+"statevector" for both these ansätze.
+
+The regime this engine actually targets is *near-Clifford*: a circuit with
+a Clifford backbone and a **fixed, small** number of non-Clifford gates,
+independent of qubit count. `wl::near_clifford_circuit` — a GHZ-shaped H +
+CNOT-chain backbone with exactly 4 `RZ` rotations, however large `n` gets —
+is that shape, and its `<X>` expectation value (cross-validated against the
+exact statevector to 1e-9 at 8 qubits, where both can still run) scales
+like this, well past the ~30-qubit statevector wall:
+
+| qubits | 16 | 30 | 60 | 100 |
+|---:|---:|---:|---:|---:|
+| time | 47.7 µs | 84.9 µs | 169 µs | 287 µs |
+
+Sub-millisecond at 100 qubits — a circuit size no statevector on this
+machine (or any machine) could represent at all — because the live term
+count is bounded by `2^4 = 16` regardless of `n`, not by `4^n`. This is the
+same lesson the stabilizer backend and the qft_probe/qulacs sections above
+each teach in their own way: the right *representation* for a workload
+matters more than raw kernel speed, and picking the wrong one (Pauli
+propagation for a dense-rotation ansatz) can lose by orders of magnitude
+even when the underlying math is exact.
+
+**Matrix-product-state backend (`simq_sim::mps`).** Represents the state as
+a chain of tensors joined by bond indices, applying two-qubit gates via
+contract-then-SVD-truncate (`nalgebra`'s native complex SVD, no external
+BLAS/LAPACK). Adjacent gates apply directly; non-adjacent ones (e.g. QAOA's
+one ring-closing edge) go through a swap network. Memory and per-gate cost
+scale with the bond dimension the circuit's entanglement actually needs,
+not with `2^n`.
+
+Both this suite's own VQE (linear CNOT chain) and QAOA (ring) ansätze are
+exactly the near-1D shape MPS compresses well (`simq_sim::mps::is_1d_candidate`
+returns `true` for both). Measured bond dimensions, this session, at every
+qubit count from 16 to 80 (`MpsConfig::default`'s `max_bond_dim: 64` cap
+never binds):
+
+| | 16q | 30q | 50q | 80q |
+|---|---:|---:|---:|---:|
+| `vqe_energy_mps` max bond dim | 8 | 8 | 8 | 8 |
+| `qaoa_cost_mps` max bond dim | 16 | 16 | 16 | 16 |
+
+Flat, not growing with `n` — exactly what "near-1D, bounded-depth ansatz"
+predicts, and cross-validated exactly (1e-8) against the statevector at
+small `n` where both can run. Timings:
+
+| | 16q | 30q | 50q | 80q |
+|---|---:|---:|---:|---:|
+| `vqe_energy` (statevector) | 9.93 ms | (past the wall) | — | — |
+| `vqe_energy_mps` | 4.87 ms | 21.8 ms | 64.0 ms | 198 ms |
+| `qaoa_maxcut` (statevector) | 8.00 ms | (past the wall) | — | — |
+| `qaoa_cost_mps` | 30.3 ms | 151 ms | 474 ms | 1.27 s |
+
+Two findings, one favorable and one not, reported with equal weight per
+this document's usual policy: `vqe_energy_mps` is **already ~2x faster than
+the statevector at 16 qubits**, where both are exact and directly
+comparable — bond dimension 8 costs far less per gate than a
+`2^16`-amplitude state does — and then keeps running to 80 qubits, where
+the statevector cannot run at all. `qaoa_cost_mps`, by contrast, is
+**slower than the statevector at 16 qubits** (30.3 ms vs. 8.0 ms): the
+ring's one non-adjacent edge triggers `mps`'s swap network every layer,
+and at qubit counts small enough for the statevector to still be cheap,
+that overhead isn't yet paid back. Past the wall, it is the only backend
+of the two that can answer the question at all.
+
+## Single precision and a CPU batch executor
+
+Two further additions, continuing the same follow-up research review's
+idea list: a single-precision statevector (`simq_state::SinglePrecisionState`)
+and a parallel batch executor for parameter sweeps (`simq_sim::batch_eval`).
+Both are additive, same as everything else in this section.
+
+**Single-precision statevector.** Stores amplitudes as `Complex32` (8
+bytes) instead of `DenseState`'s `Complex64` (16 bytes) — the CPU-relevant
+reading of the research review's "half/mixed-precision" idea (real IEEE
+`f16` has no native hardware arithmetic on this target; `f32` already
+delivers the doc's headline "2x memory -> +1 qubit" number without paying
+for `f16` conversion overhead). Gate application is a generic scalar loop
+over each gate's own matrix, the same technique `pauli_propagation`/`mps`
+use, deliberately not a rewrite of `DenseState`'s hand-tuned AVX2 kernels.
+
+The memory claim is unconditional and confirmed directly: a 10-qubit
+`SinglePrecisionState` occupies exactly half the bytes of the equivalent
+`f64` state (8,192 vs 16,384 bytes), and expectation values match the exact
+`f64` statevector to 1e-4–1e-3 (the honest tolerance for `f32`'s
+~7-significant-digit accuracy over a multi-layer circuit, not a loosened
+test). The wall-clock claim is a genuine mixed result, measured directly
+rather than assumed — compiling both paths at the same `O2` level first,
+to isolate precision from optimization level:
+
+| | 4q | 8q | 12q | 16q |
+|---|---:|---:|---:|---:|
+| `vqe_energy` (f64 statevector) | 37.1 µs | 90.9 µs | 568 µs | 9.93 ms |
+| `vqe_energy_single_precision` (f32) | 20.5 µs | 104 µs | 1.53 ms | 31.4 ms |
+| `qaoa_maxcut` (f64 statevector) | 30.3 µs | 63.4 µs | 656 µs | 8.00 ms |
+| `qaoa_cost_single_precision` (f32) | 13.2 µs | 96.9 µs | 1.82 ms | 41.0 ms |
+
+`f32` wins at 4 qubits (less than half the time) and loses by a widening
+margin as qubit count grows, reaching **5x slower at 16 qubits**. The
+reason is visible in the design, not a surprise found after the fact: the
+`f64` path runs on `DenseState`'s hand-tuned AVX2 kernels, while this
+module's scalar per-amplitude loop (see its module docs for that scope
+decision) can't out-vectorize `f64`'s SIMD advantage with `f32`'s raw
+byte-halving alone at these sizes. **The honest conclusion:** this module
+delivers its memory claim unconditionally, but not yet a wall-clock win —
+that would need `f32` AVX2 kernels matching `DenseState`'s, which is
+future work, not something this change set claims to have done. Where it
+is useful today is exactly the memory-bound case the doc named: fitting
+one more qubit into a fixed RAM budget when wall-clock time is secondary
+to fitting at all.
+
+**CPU batch executor (`simq_sim::batch_eval`).** A VQE/QAOA optimizer's
+outer loop calls `Simulator::run` on the same-shaped circuit many times
+(only angles differing) — `Simulator`'s `fusion_cache` field already
+exists to skip re-deriving fusion *structure* across those calls (see its
+docs). `run_batch`/`run_batch_expectation` take that one step further:
+running the sweep itself across CPU cores via rayon, since each instance's
+work is otherwise independent. This is the pure-CPU counterpart to the
+research review's GPU decision-diagram batch backend idea (BQSim-style:
+share structure across a parameter sweep) — it shares the *existing*
+`Mutex`-guarded fusion-structure cache instead of a dedicated batched
+kernel, which is enough on a CPU where the actual gate application per
+instance is already the existing, already-fast path.
+
+Measured directly on this session's 4-vCPU machine, `NUM_INSTANCES = 5`
+instances per batch, serial `.map()` loop vs. `run_batch_expectation`:
+
+| | 8q | 20q |
+|---|---:|---:|
+| `vqe_energy_instances` (serial) | 429 µs | 715 ms |
+| `vqe_energy_instances_batched` | 290 µs (1.5x) | 363 ms (2.0x) |
+| `qaoa_cost_instances` (serial) | 294 µs | 538 ms |
+| `qaoa_cost_instances_batched` | 236 µs (1.2x) | 413 ms (1.3x) |
+
+A real, unconditional 1.2–2.0x on 4 cores for 5 instances (below the
+theoretical ~2.5x ceiling `ceil(5/4)` rounds imply, plausibly from shared
+memory-bandwidth contention across cores rather than any correctness or
+cache-sharing issue — `batch_eval`'s own test confirms the fusion-structure
+cache does register hits across a parallel batch at 20 qubits). Both
+`_batched` variants return results bit-identical to their serial
+counterparts (each instance's work is independent — no cross-instance
+reduction — so this is exact, not approximate), so there is no
+approximation cost to the win, unlike the Pauli propagation/MPS/single-
+precision tradeoffs elsewhere in this document.
+
 ## Honest limitations
 
 - Results above are from a 4-vCPU cloud container; ratios will differ on
@@ -683,3 +1037,28 @@ be. Two additional pieces ride on top of the core fusion change:
   it has no built-in memory-aware qubit cap the way SimQ and Aer do; running
   it there risked an OOM kill rather than a clean refusal, for a result
   (state doesn't fit in RAM) the other two simulators already establish.
+- Neither `pauli_propagation` nor `mps` is wired into `Simulator::run`'s
+  automatic dispatch, same as the stabilizer backend — callers opt in
+  explicitly (or use `pauli_propagation::recommend_backend` /
+  `mps::is_1d_candidate` to decide first).
+- `pauli_propagation::expectation_value` is genuinely slower than the
+  statevector on this suite's own VQE/QAOA ansätze (see the new section
+  above) — it is not a strictly-better replacement for
+  `PauliObservable::expectation_value`, only a better choice for circuits
+  with a bounded, fixed number of non-Clifford gates.
+- `mps`'s bond-dimension cap and SVD truncation cutoff make it an
+  approximation in general (exact only when the circuit's true entanglement
+  fits under `max_bond_dim`, as it does for this suite's chain/ring
+  ansätze); a circuit that entangles broadly across the whole register
+  would need a bond dimension approaching `2^(n/2)` to stay exact, at which
+  point it has none of MPS's advantage over a statevector.
+- `SinglePrecisionState` is not faster than the statevector at any qubit
+  count measured here except 4 — its memory-halving claim is real and
+  unconditional, its wall-clock claim is not, and the section above says so
+  directly rather than only reporting the qubit count where it happens to
+  win.
+- `batch_eval`'s parallel speedup was measured on this session's 4-vCPU
+  container only; the ~1.2–2.0x seen here is below the ~2.5x a naive
+  `ceil(NUM_INSTANCES / cores)` bound would suggest, and neither has been
+  re-measured on a machine with more cores (where the ceiling — and likely
+  the memory-bandwidth contention limiting it here — would both change).

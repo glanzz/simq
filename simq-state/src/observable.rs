@@ -183,6 +183,11 @@ impl PauliString {
         self
     }
 
+    /// Get the overall sign coefficient (+1 or -1)
+    pub fn coeff(&self) -> i32 {
+        self.coeff
+    }
+
     /// Check if this Pauli string is diagonal (all I or Z)
     pub fn is_diagonal(&self) -> bool {
         self.paulis.iter().all(|p| p.is_diagonal())
@@ -381,6 +386,15 @@ impl PauliObservable {
     /// Get the number of terms
     pub fn num_terms(&self) -> usize {
         self.terms.len()
+    }
+
+    /// Get the (Pauli string, coefficient) terms making up this observable.
+    ///
+    /// Exposed for callers (e.g. `simq_sim::pauli_propagation`) that need to
+    /// walk the term list directly instead of going through
+    /// [`Self::expectation_value`]'s statevector-only path.
+    pub fn terms(&self) -> &[(PauliString, f64)] {
+        &self.terms
     }
 
     /// Compute expectation value ⟨ψ|O|ψ⟩
@@ -656,6 +670,19 @@ mod tests {
 
         let positive = PauliString::from_paulis(vec![Pauli::I, Pauli::Z]);
         assert_eq!(positive.to_string(), "IZ");
+    }
+
+    #[test]
+    fn test_pauli_observable_terms_accessor() {
+        let mut obs = PauliObservable::new();
+        obs.add_term(PauliString::from_str("X").unwrap(), 0.5);
+        obs.add_term(PauliString::from_str("Z").unwrap(), 0.25);
+
+        let terms = obs.terms();
+        assert_eq!(terms.len(), 2);
+        assert_eq!(terms[0].0, PauliString::from_str("X").unwrap());
+        assert_eq!(terms[0].1, 0.5);
+        assert_eq!(terms[1].1, 0.25);
     }
 
     #[test]

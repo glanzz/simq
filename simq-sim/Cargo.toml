@@ -15,13 +15,13 @@ simq-state.workspace = true
 simq-gates.workspace = true
 simq-compiler.workspace = true
 num-complex.workspace = true
+nalgebra.workspace = true
 rayon.workspace = true
 parking_lot.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 thread-id = "5.0.0"
 approx.workspace = true
-ahash.workspace = true
 rand.workspace = true
 
 # Classical optimizers for VQE/QAOA

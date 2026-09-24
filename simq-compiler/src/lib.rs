@@ -171,6 +171,7 @@ pub mod cached_compiler;
 pub mod circuit_analysis_pass;
 pub mod compiler;
 pub mod decomposition;
+pub mod egraph;
 pub mod execution_plan;
 pub mod fusion;
 pub mod fusion_cache;
@@ -191,6 +192,7 @@ pub use decomposition::{
     BasisGate, BasisGateSet, Decomposer, DecompositionConfig, DecompositionResult,
     UniversalDecomposer,
 };
+pub use egraph::EqualitySaturation;
 pub use execution_plan::{ExecutionLayer, ExecutionPlan, ExecutionPlanner, ResourceRequirements};
 pub use fusion::{fuse_gates_with_cache, fuse_single_qubit_gates, FusedGate, FusionConfig};
 pub use fusion_cache::FusionStructureCache;
@@ -205,5 +207,6 @@ pub use matrix_computation::{
 };
 pub use passes::{OptimizationPass, OptimizationResult, PassStatistics};
 pub use pipeline::{
-    create_compiler, create_compiler_with_fusion_cache, OptimizationLevel, PipelineBuilder,
+    create_compiler, create_compiler_with_fusion_cache, create_o3_egraph_compiler,
+    OptimizationLevel, PipelineBuilder,
 };

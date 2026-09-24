@@ -13,6 +13,7 @@ description = "Quantum state representations for SimQ"
 simq-core.workspace = true
 num-complex.workspace = true
 ahash.workspace = true
+foldhash.workspace = true
 bytemuck.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
@@ -22,6 +23,7 @@ rand.workspace = true
 approx.workspace = true
 criterion.workspace = true
 proptest.workspace = true
+simq-gates.workspace = true
 
 [[bench]]
 name = "state_operations"

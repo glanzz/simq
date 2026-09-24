@@ -99,6 +99,37 @@ fn create_o3_compiler() -> Compiler {
         .build()
 }
 
+/// O3 plus the opt-in [`crate::egraph::EqualitySaturation`] pass.
+///
+/// Not one of the [`OptimizationLevel`] presets, and not reachable from
+/// [`create_compiler`] — a separate, explicitly-named entry point, per this
+/// crate's own bar for the technique ("keep it opt-in until it matches or
+/// beats the current fixed-point pipeline on the full cross-validated
+/// suite," see BENCHMARKS.md). Runs equality saturation *after* the other
+/// O3 passes so it operates on whatever single-qubit chains commutation/
+/// template-matching/fusion left behind, then those passes' fixed point is
+/// re-checked (`CompilerBuilder`'s own iteration loop already re-runs every
+/// pass to a fixed point, so a chain equality saturation shortens can still
+/// feed back into fusion on a later iteration).
+///
+/// # Example
+/// ```ignore
+/// use simq_compiler::pipeline::create_o3_egraph_compiler;
+///
+/// let compiler = create_o3_egraph_compiler();
+/// ```
+pub fn create_o3_egraph_compiler() -> Compiler {
+    CompilerBuilder::new()
+        .add_pass(Arc::new(DeadCodeElimination::new()))
+        .add_pass(Arc::new(GateCommutation::new()))
+        .add_pass(Arc::new(AdvancedTemplateMatching::new()))
+        .add_pass(Arc::new(crate::egraph::EqualitySaturation::new()))
+        .add_pass(Arc::new(GateFusion::new()))
+        .max_iterations(10)
+        .enable_timing(true)
+        .build()
+}
+
 /// Create a compiler at the given optimization level, wiring `fusion_cache`
 /// into its `GateFusion` pass (levels O2/O3; O0/O1 have no fusion pass and
 /// ignore the cache) so multi-qubit fusion block *structure* persists
@@ -219,6 +250,15 @@ impl PipelineBuilder {
         self
     }
 
+    /// Add the equality-saturation pass (see [`crate::egraph`] for scope
+    /// and why it's opt-in, not part of [`create_compiler`]'s presets).
+    pub fn with_equality_saturation(mut self) -> Self {
+        self.builder = self
+            .builder
+            .add_pass(Arc::new(crate::egraph::EqualitySaturation::new()));
+        self
+    }
+
     /// Set the maximum number of iterations
     pub fn max_iterations(mut self, max_iterations: usize) -> Self {
         self.builder = self.builder.max_iterations(max_iterations);
@@ -325,6 +365,35 @@ mod tests {
             .build();
 
         assert_eq!(compiler.num_passes(), 4);
+    }
+
+    #[test]
+    fn test_pipeline_builder_with_equality_saturation() {
+        let compiler = PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_equality_saturation()
+            .build();
+        assert_eq!(compiler.num_passes(), 2);
+    }
+
+    #[test]
+    fn test_create_o3_egraph_compiler_optimizes_a_redundant_circuit() {
+        use simq_core::{Circuit, QubitId};
+        use simq_gates::standard::TGate;
+        use std::sync::Arc as StdArc;
+
+        let compiler = create_o3_egraph_compiler();
+        assert_eq!(compiler.num_passes(), 5);
+
+        let mut circuit = Circuit::new(1);
+        for _ in 0..8 {
+            circuit
+                .add_gate(StdArc::new(TGate), &[QubitId::new(0)])
+                .unwrap();
+        }
+        let result = compiler.compile(&mut circuit).unwrap();
+        assert!(result.modified);
+        assert_eq!(circuit.len(), 0, "T^8 should fully cancel via the egraph pass");
     }
 
     #[test]

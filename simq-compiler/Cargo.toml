@@ -17,6 +17,7 @@ thiserror.workspace = true
 ahash.workspace = true
 smallvec.workspace = true
 num-complex.workspace = true
+egg.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

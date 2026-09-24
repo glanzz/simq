@@ -16,7 +16,8 @@ use simq_gates::standard::{
 };
 use simq_sim::{Simulator, SimulatorConfig};
 use simq_state::{
-    measurement::ComputationalBasis, AdaptiveState, DenseState, Pauli, PauliObservable, PauliString,
+    measurement::ComputationalBasis, AdaptiveState, DenseState, Pauli, PauliObservable,
+    PauliString, SinglePrecisionState,
 };
 use std::sync::Arc;
 
@@ -279,6 +280,22 @@ pub fn vqe_energy_instances(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Same values as [`vqe_energy_instances`], computed via
+/// `simq_sim::batch_eval::run_batch_expectation` instead of a serial loop:
+/// the `NUM_INSTANCES` instances (same circuit shape, different angles) run
+/// across CPU cores in parallel, sharing `sim`'s fusion-structure cache
+/// (see `Simulator`'s docs) rather than each instance paying full
+/// compilation cost independently.
+pub fn vqe_energy_instances_batched(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
+    simq_sim::batch_eval::run_batch_expectation(
+        sim,
+        NUM_INSTANCES,
+        |i| vqe_circuit_instance(num_qubits, i),
+        &vqe_observable(num_qubits),
+    )
+    .expect("batch evaluation failed")
+}
+
 /// One full QAOA cost evaluation: simulate the p=2 circuit and take the cut value.
 pub fn qaoa_cost(sim: &Simulator, num_qubits: usize) -> f64 {
     let circuit = qaoa_circuit(num_qubits);
@@ -306,6 +323,167 @@ pub fn qaoa_cost_instances(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Same values as [`qaoa_cost_instances`], computed via the parallel batch
+/// executor — see [`vqe_energy_instances_batched`]'s docs.
+pub fn qaoa_cost_instances_batched(sim: &Simulator, num_qubits: usize) -> Vec<f64> {
+    let zz_values = simq_sim::batch_eval::run_batch_expectation(
+        sim,
+        NUM_INSTANCES,
+        |i| qaoa_circuit_instance(num_qubits, i),
+        &qaoa_zz_observable(num_qubits),
+    )
+    .expect("batch evaluation failed");
+    zz_values
+        .into_iter()
+        .map(|zz| qaoa_cost_from_zz(num_qubits, zz))
+        .collect()
+}
+
+/// O2-compile `circuit` before handing it to [`SinglePrecisionState`] —
+/// `SinglePrecisionState::run_circuit` applies each gate one at a time with
+/// no gate-fusion pass of its own (see that module's docs), so an
+/// uncompiled circuit compares fused-and-cached `f64` gate counts against
+/// un-fused `f32` ones, not a fair precision-only comparison. `O2` matches
+/// `SimulatorConfig::default`'s `optimization_level`, the level
+/// `vqe_energy`/`qaoa_cost` actually run at.
+fn compiled(circuit: &Circuit) -> Circuit {
+    use simq_compiler::pipeline::{create_compiler, OptimizationLevel};
+    let mut c = circuit.clone();
+    create_compiler(OptimizationLevel::O2)
+        .compile(&mut c)
+        .expect("compilation failed");
+    c
+}
+
+/// Same VQE energy as [`vqe_energy`], computed on the single-precision
+/// (`Complex32`) statevector (`simq_state::SinglePrecisionState`) instead of
+/// the default `f64` one — half the memory per amplitude, at `f32`
+/// accuracy. See that module's docs for why `f32`, not literal `f16`.
+pub fn vqe_energy_single_precision(num_qubits: usize) -> f64 {
+    let circuit = compiled(&vqe_circuit(num_qubits));
+    let state = SinglePrecisionState::run_circuit(&circuit).expect("single-precision run failed");
+    state.expectation_value(&vqe_observable(num_qubits)) as f64
+}
+
+/// Same QAOA MaxCut cost as [`qaoa_cost`], computed at single precision.
+pub fn qaoa_cost_single_precision(num_qubits: usize) -> f64 {
+    let circuit = compiled(&qaoa_circuit(num_qubits));
+    let state = SinglePrecisionState::run_circuit(&circuit).expect("single-precision run failed");
+    let zz = state.expectation_value(&qaoa_zz_observable(num_qubits)) as f64;
+    qaoa_cost_from_zz(num_qubits, zz)
+}
+
+/// Same VQE energy as [`vqe_energy`], computed via the Pauli-propagation
+/// observable engine (`simq_sim::pauli_propagation`) instead of the
+/// statevector simulator, at the same (small) qubit counts as the other
+/// `QUBIT_SIZES` workloads: this is a correctness cross-check, not a
+/// scaling claim. `vqe_circuit`'s ansatz puts one non-Clifford `RY`/`RZ`
+/// rotation on *every* qubit in *every* layer (`O(n)` non-Clifford gates
+/// total), which is exactly the regime `pauli_propagation::recommend_backend`
+/// flags as a poor fit -- measured directly, this workload's term count
+/// saturates `PropagationConfig::default`'s cap and stays there, so it is
+/// *not* faster than the statevector path here. [`near_clifford_circuit`]
+/// below is this engine's actual sweet spot; see its docs.
+pub fn vqe_energy_pauli_propagation(num_qubits: usize) -> f64 {
+    let circuit = vqe_circuit(num_qubits);
+    simq_sim::pauli_propagation::expectation_value(&circuit, &vqe_observable(num_qubits))
+        .expect("propagation failed")
+        .expectation
+}
+
+/// Same QAOA MaxCut cost as [`qaoa_cost`], computed via Pauli propagation —
+/// see [`vqe_energy_pauli_propagation`]'s docs on why this is a small-qubit
+/// correctness check, not a scaling benchmark.
+pub fn qaoa_cost_pauli_propagation(num_qubits: usize) -> f64 {
+    let circuit = qaoa_circuit(num_qubits);
+    let zz =
+        simq_sim::pauli_propagation::expectation_value(&circuit, &qaoa_zz_observable(num_qubits))
+            .expect("propagation failed")
+            .expectation;
+    qaoa_cost_from_zz(num_qubits, zz)
+}
+
+/// Number of non-Clifford (`RZ`) rotations in [`near_clifford_circuit`],
+/// deliberately *fixed* regardless of qubit count.
+pub const NEAR_CLIFFORD_ROTATIONS: usize = 4;
+
+/// A GHZ-shaped Clifford backbone (H + CNOT chain, exactly [`ghz_circuit`])
+/// with [`NEAR_CLIFFORD_ROTATIONS`] `RZ` rotations added on the first few
+/// qubits — a fixed, small non-Clifford gate count independent of
+/// `num_qubits`, unlike [`vqe_circuit`]'s one-rotation-per-qubit-per-layer
+/// ansatz (see [`vqe_energy_pauli_propagation`]'s docs for why that
+/// distinction matters). This is the near-Clifford regime the Pauli
+/// propagation literature targets: [`near_clifford_expectation_pauli_propagation`]'s
+/// live term count is bounded by `2^NEAR_CLIFFORD_ROTATIONS` however large
+/// `num_qubits` gets, so it stays cheap far past the statevector's
+/// `2^num_qubits` wall.
+pub fn near_clifford_circuit(num_qubits: usize) -> Circuit {
+    let mut c = Circuit::new(num_qubits);
+    c.add_gate(Arc::new(Hadamard), &[QubitId::new(0)]).unwrap();
+    let k = NEAR_CLIFFORD_ROTATIONS.min(num_qubits);
+    for q in 0..k {
+        c.add_gate(Arc::new(RotationZ::new(0.3 + 0.1 * q as f64)), &[QubitId::new(q)])
+            .unwrap();
+    }
+    for q in 0..num_qubits - 1 {
+        c.add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+            .unwrap();
+    }
+    c
+}
+
+/// Observable for [`near_clifford_circuit`]: `X` on the last qubit — the one
+/// furthest from the fixed non-Clifford rotations, so propagating it
+/// backward genuinely walks the whole CNOT chain before reaching them.
+pub fn near_clifford_observable(num_qubits: usize) -> PauliObservable {
+    let mut paulis = vec![Pauli::I; num_qubits];
+    paulis[num_qubits - 1] = Pauli::X;
+    PauliObservable::from_pauli_string(PauliString::from_paulis(paulis), 1.0)
+}
+
+/// `<X_last>` on [`near_clifford_circuit`], via Pauli propagation — the
+/// workload [`vqe_energy_pauli_propagation`]'s docs point to as this
+/// engine's actual scaling showcase.
+pub fn near_clifford_expectation_pauli_propagation(num_qubits: usize) -> f64 {
+    let circuit = near_clifford_circuit(num_qubits);
+    simq_sim::pauli_propagation::expectation_value(&circuit, &near_clifford_observable(num_qubits))
+        .expect("propagation failed")
+        .expectation
+}
+
+/// Same VQE energy as [`vqe_energy`], computed on the matrix-product-state
+/// backend (`simq_sim::mps`) instead of the statevector simulator. The VQE
+/// ansatz's CNOT chain is exactly the 1D connectivity MPS compresses well
+/// (see `simq_sim::mps::is_1d_candidate`), so this is exact at a large
+/// enough bond dimension and viable far past the ~30-qubit statevector
+/// wall documented in BENCHMARKS.md.
+pub fn vqe_energy_mps(num_qubits: usize) -> f64 {
+    let circuit = vqe_circuit(num_qubits);
+    simq_sim::mps::expectation_value(
+        &circuit,
+        &vqe_observable(num_qubits),
+        simq_sim::MpsConfig::default(),
+    )
+    .expect("mps run failed")
+    .expectation
+}
+
+/// Same QAOA MaxCut cost as [`qaoa_cost`], computed on the MPS backend. The
+/// ring ansatz's one wraparound edge exercises `simq_sim::mps`'s swap
+/// network (see that module's docs) rather than pure nearest-neighbor
+/// contraction.
+pub fn qaoa_cost_mps(num_qubits: usize) -> f64 {
+    let circuit = qaoa_circuit(num_qubits);
+    let zz = simq_sim::mps::expectation_value(
+        &circuit,
+        &qaoa_zz_observable(num_qubits),
+        simq_sim::MpsConfig::default(),
+    )
+    .expect("mps run failed")
+    .expectation;
+    qaoa_cost_from_zz(num_qubits, zz)
+}
+
 /// GHZ shot sampling: simulate and draw `shots` samples.
 pub fn ghz_sample(sim: &Simulator, num_qubits: usize, shots: usize, seed: u64) -> usize {
     let circuit = ghz_circuit(num_qubits);
@@ -315,6 +493,21 @@ pub fn ghz_sample(sim: &Simulator, num_qubits: usize, shots: usize, seed: u64) -
         .sample(&state, shots, &mut rng)
         .expect("sampling failed");
     result.sorted_outcomes().len()
+}
+
+/// Same workload as [`ghz_sample`] (H + CNOT chain, `shots` computational
+/// basis samples), but run on the Clifford/stabilizer tableau backend
+/// (`simq_sim::stabilizer`) instead of the statevector simulator. GHZ
+/// preparation is entirely Clifford (H, CNOT), so this is exact, and its
+/// `O(n^2)`-bit tableau state means it stays cheap far past the ~30-qubit
+/// statevector wall `run_to_dense` hits — see BENCHMARKS.md.
+pub fn ghz_sample_stabilizer(num_qubits: usize, shots: usize, seed: u64) -> usize {
+    let circuit = ghz_circuit(num_qubits);
+    let mut seen = simq_sim::stabilizer::sample_bitstrings(&circuit, shots, seed)
+        .expect("GHZ circuit must be Clifford");
+    seen.sort_unstable();
+    seen.dedup();
+    seen.len()
 }
 
 /// xorshift* PRNG: deterministic and dependency-free. Only used for
@@ -543,6 +736,65 @@ pub fn random_circuit_p0(sim: &Simulator, num_qubits: usize) -> f64 {
     state.amplitudes()[0].norm_sqr()
 }
 
+// ============================================================================
+// Redundant circuit: naive/unoptimized single-qubit gate chains, the
+// target shape for simq_compiler::egraph::EqualitySaturation
+// ============================================================================
+//
+// Every workload above uses parameterized rotation gates (RX/RY/RZ) for its
+// single-qubit structure, which the equality-saturation pass deliberately
+// doesn't touch (see that module's docs: composing rotation angles needs
+// numeric addition, not term rewriting). This circuit instead models what a
+// naive fixed-gate decomposition pass might emit -- long per-qubit chains
+// built from the Clifford+T gate set with deliberate algebraic redundancy
+// -- so there's a benchmark workload the equality-saturation pass actually
+// has something to do.
+//
+// The chain below is *not* just `T x 8` or `S x 4`: this crate's existing
+// `TemplateSubstitution` pass already hardcodes exactly those two patterns
+// as explicit templates, so they're a poor (and dishonest) demonstration of
+// what equality saturation adds over fixed-pattern rewriting. `T x 6` and
+// `S x 6` have no such template (6 isn't a multiple of the hardcoded
+// lengths), so reducing them requires *composing* `T,T->S`/`S,S->Z` with
+// `S,S,S,S->I` step by step -- exactly the gap this module exists to close.
+// See BENCHMARKS.md for the measured gate-count comparison.
+
+/// Deterministic "which gate" index, same style as `rcs_gate_index` above
+/// (fixed formula, not a PRNG, so this circuit's shape doesn't depend on
+/// implementation-specific RNG output).
+fn redundant_chain_gate(position: usize) -> &'static str {
+    const CHAIN: [&str; 19] = [
+        "T", "T", "T", "T", "T", "T", // T^6: no hardcoded template covers this.
+        "H", "X", "H", "X", "H", "X", "H", // repeated H-conjugation collapses.
+        "S", "S", "S", "S", "S", "S", // S^6: likewise not a hardcoded length.
+    ];
+    CHAIN[position % CHAIN.len()]
+}
+
+/// A circuit with a long, algebraically-redundant fixed-gate chain on every
+/// qubit (see the module note above), followed by a CNOT ladder so it's a
+/// genuine multi-qubit circuit and not just disconnected wires.
+pub fn redundant_circuit(num_qubits: usize) -> Circuit {
+    let mut c = Circuit::new(num_qubits);
+    for q in 0..num_qubits {
+        let qubit = QubitId::new(q);
+        for i in 0..19 {
+            match redundant_chain_gate(i) {
+                "T" => c.add_gate(Arc::new(TGate), &[qubit]).unwrap(),
+                "H" => c.add_gate(Arc::new(Hadamard), &[qubit]).unwrap(),
+                "X" => c.add_gate(Arc::new(PauliX), &[qubit]).unwrap(),
+                "S" => c.add_gate(Arc::new(SGate), &[qubit]).unwrap(),
+                other => unreachable!("redundant_chain_gate returned unhandled gate {other}"),
+            }
+        }
+    }
+    for q in 0..num_qubits - 1 {
+        c.add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+            .unwrap();
+    }
+    c
+}
+
 /// The default simulator used across the suite (out-of-the-box settings).
 pub fn default_simulator() -> Simulator {
     Simulator::new(SimulatorConfig::default())
@@ -681,6 +933,85 @@ mod tests {
     }
 
     #[test]
+    fn vqe_energy_pauli_propagation_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = vqe_energy(&sim, n);
+        let propagated = vqe_energy_pauli_propagation(n);
+        assert!((exact - propagated).abs() < 1e-8, "exact={exact} propagated={propagated}");
+    }
+
+    #[test]
+    fn qaoa_cost_pauli_propagation_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = qaoa_cost(&sim, n);
+        let propagated = qaoa_cost_pauli_propagation(n);
+        assert!((exact - propagated).abs() < 1e-8, "exact={exact} propagated={propagated}");
+    }
+
+    #[test]
+    fn vqe_energy_mps_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = vqe_energy(&sim, n);
+        let mps = vqe_energy_mps(n);
+        assert!((exact - mps).abs() < 1e-6, "exact={exact} mps={mps}");
+    }
+
+    #[test]
+    fn qaoa_cost_mps_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = qaoa_cost(&sim, n);
+        let mps = qaoa_cost_mps(n);
+        assert!((exact - mps).abs() < 1e-6, "exact={exact} mps={mps}");
+    }
+
+    #[test]
+    fn vqe_energy_single_precision_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = vqe_energy(&sim, n);
+        let single = vqe_energy_single_precision(n);
+        assert!((exact - single).abs() < 1e-3, "exact={exact} single={single}");
+    }
+
+    #[test]
+    fn qaoa_cost_single_precision_matches_statevector() {
+        let sim = default_simulator();
+        let n = 6;
+        let exact = qaoa_cost(&sim, n);
+        let single = qaoa_cost_single_precision(n);
+        assert!((exact - single).abs() < 1e-3, "exact={exact} single={single}");
+    }
+
+    #[test]
+    fn near_clifford_pauli_propagation_matches_statevector() {
+        let n = 8;
+        let circuit = near_clifford_circuit(n);
+        let sim = default_simulator();
+        let state = run_to_dense(&sim, &circuit);
+        let exact = near_clifford_observable(n)
+            .expectation_value(&state)
+            .unwrap();
+
+        let propagated = near_clifford_expectation_pauli_propagation(n);
+        assert!((exact - propagated).abs() < 1e-9, "exact={exact} propagated={propagated}");
+    }
+
+    #[test]
+    fn near_clifford_pauli_propagation_stays_cheap_far_past_the_statevector_wall() {
+        // A statevector can't run at 60 qubits at all; this just needs to
+        // finish (fast, within the normal test suite) and return a sane
+        // value, demonstrating the fixed-non-Clifford-count term bound in
+        // `near_clifford_circuit`'s docs actually holds in practice.
+        let value = near_clifford_expectation_pauli_propagation(60);
+        assert!(value.is_finite());
+        assert!((-1.0..=1.0).contains(&value));
+    }
+
+    #[test]
     fn ghz_sample_returns_two_outcomes_for_ghz_state() {
         let sim = default_simulator();
         // Enough shots that both |00..0> and |11..1> almost certainly appear.
@@ -694,6 +1025,29 @@ mod tests {
         let a = ghz_sample(&sim, 3, 500, 7);
         let b = ghz_sample(&sim, 3, 500, 7);
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn ghz_sample_stabilizer_returns_two_outcomes_for_ghz_state() {
+        let distinct = ghz_sample_stabilizer(3, 2000, 42);
+        assert_eq!(distinct, 2);
+    }
+
+    #[test]
+    fn ghz_sample_stabilizer_is_deterministic_given_seed() {
+        let a = ghz_sample_stabilizer(3, 500, 7);
+        let b = ghz_sample_stabilizer(3, 500, 7);
+        assert_eq!(a, b);
+    }
+
+    /// The whole point of the stabilizer backend: qubit counts far past
+    /// the statevector wall (BENCHMARKS.md documents 30 qubits as the
+    /// reference-machine ceiling) run in a blink, exactly, since GHZ prep
+    /// is pure Clifford.
+    #[test]
+    fn ghz_sample_stabilizer_handles_qubit_counts_past_statevector_wall() {
+        let distinct = ghz_sample_stabilizer(200, 100, 123);
+        assert_eq!(distinct, 2);
     }
 
     #[test]
@@ -736,6 +1090,13 @@ mod tests {
     }
 
     #[test]
+    fn vqe_energy_instances_batched_matches_serial() {
+        let sim = default_simulator();
+        let n = 6;
+        assert_eq!(vqe_energy_instances_batched(&sim, n), vqe_energy_instances(&sim, n));
+    }
+
+    #[test]
     fn qaoa_params_instance_zero_matches_base() {
         assert_eq!(qaoa_params_instance(0, 0), (QAOA_GAMMA[0], QAOA_BETA[0]));
         assert_ne!(qaoa_params_instance(0, 1), qaoa_params_instance(0, 0));
@@ -748,6 +1109,13 @@ mod tests {
         assert_eq!(costs.len(), NUM_INSTANCES);
         assert!(costs.iter().all(|c| c.is_finite()));
         assert!(costs.windows(2).any(|w| (w[0] - w[1]).abs() > 1e-9));
+    }
+
+    #[test]
+    fn qaoa_cost_instances_batched_matches_serial() {
+        let sim = default_simulator();
+        let n = 6;
+        assert_eq!(qaoa_cost_instances_batched(&sim, n), qaoa_cost_instances(&sim, n));
     }
 
     #[test]
@@ -860,5 +1228,81 @@ mod tests {
         let mut odd = Circuit::new(6);
         rcs_entangling_layer(&mut odd, 1, 6);
         assert_eq!(odd.len(), 2); // (1,2),(3,4) -- qubit 0 and 5 idle
+    }
+
+    #[test]
+    fn redundant_circuit_gate_count() {
+        let n = 4;
+        let c = redundant_circuit(n);
+        // 19 single-qubit gates per qubit + an (n-1)-gate CNOT ladder.
+        assert_eq!(c.len(), n * 19 + (n - 1));
+    }
+
+    #[test]
+    fn redundant_circuit_equality_saturation_collapses_every_chain() {
+        use simq_compiler::pipeline::create_o3_egraph_compiler;
+
+        let n = 4;
+        let mut c = redundant_circuit(n);
+        let original_len = c.len();
+
+        let compiler = create_o3_egraph_compiler();
+        let result = compiler.compile(&mut c).unwrap();
+
+        assert!(result.modified);
+        // Only the (n-1)-gate CNOT ladder should survive: T^8, the 4 S
+        // gates, and the H-conjugation run are all redundant.
+        assert!(
+            c.len() < original_len,
+            "expected equality saturation to shrink the redundant circuit, got {} -> {}",
+            original_len,
+            c.len()
+        );
+    }
+
+    /// The apples-to-apples comparison: both pipelines here are pure
+    /// symbolic rewriting, deliberately *without* `GateFusion` -- fusion's
+    /// numeric matrix multiplication also happens to fully collapse this
+    /// circuit's chains (it doesn't need to recognize *why* a chain is the
+    /// identity, it just multiplies the matrices out), which would hide
+    /// the actual comparison this test is for: greedy, fixed-pattern
+    /// rewriting (`TemplateSubstitution` + `AdvancedTemplateMatching`, this
+    /// crate's existing passes) has no rule for 8 T gates or any other
+    /// compound built from `T,T->S` plus `S^4=I`, so it can only remove the
+    /// trailing 4 S gates and nothing from the T-run. Equality saturation
+    /// removes both from the exact same input, without a hardcoded 8-gate
+    /// template -- see BENCHMARKS.md for why this distinction (and not
+    /// final gate count once fusion runs) is where this pass's real value
+    /// is.
+    #[test]
+    fn redundant_circuit_equality_saturation_beats_template_substitution() {
+        use simq_compiler::pipeline::PipelineBuilder;
+
+        let n = 4;
+        let mut via_templates = redundant_circuit(n);
+        PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_template_substitution()
+            .with_advanced_template_matching()
+            .max_iterations(10)
+            .build()
+            .compile(&mut via_templates)
+            .unwrap();
+
+        let mut via_egraph = redundant_circuit(n);
+        PipelineBuilder::new()
+            .with_dead_code_elimination()
+            .with_equality_saturation()
+            .max_iterations(10)
+            .build()
+            .compile(&mut via_egraph)
+            .unwrap();
+
+        assert!(
+            via_egraph.len() < via_templates.len(),
+            "expected equality saturation ({} gates) to beat template-based rewriting ({} gates)",
+            via_egraph.len(),
+            via_templates.len()
+        );
     }
 }

@@ -38,6 +38,7 @@ pub mod measurement;
 pub mod monte_carlo_simulator;
 pub mod observable;
 pub mod simd;
+pub mod single_precision_state;
 pub mod sparse_state;
 pub mod state_vector;
 pub mod validation;
@@ -53,5 +54,6 @@ pub use measurement::{
 };
 pub use monte_carlo_simulator::{MonteCarloConfig, MonteCarloSimulator, MonteCarloStats};
 pub use observable::{Pauli, PauliObservable, PauliString};
-pub use sparse_state::SparseState;
+pub use single_precision_state::{SinglePrecisionError, SinglePrecisionState};
+pub use sparse_state::{AHashMap as SparseAmplitudeMap, SparseState};
 pub use state_vector::StateVector;
