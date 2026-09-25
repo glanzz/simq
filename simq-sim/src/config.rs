@@ -5,9 +5,13 @@
 pub struct SimulatorConfig {
     /// Enable GPU backend (wgpu)
     ///
-    /// **Not implemented**: setting this to `true` fails
-    /// [`validate`](Self::validate) (and thus `Simulator::new`) instead of
-    /// silently executing on the CPU.
+    /// Requires building with the `gpu` Cargo feature — without it, setting
+    /// this to `true` fails [`validate`](Self::validate) (and thus
+    /// `Simulator::new`) instead of silently executing on the CPU. With the
+    /// feature enabled, validation accepts it, but real GPU dispatch can
+    /// still fail at run time (no compatible adapter, an unsupported gate
+    /// width, ...) — see `simq_sim::gpu`'s module docs; that failure is
+    /// likewise never a silent CPU fallback.
     ///
     /// Default: false
     pub use_gpu: bool,
@@ -206,10 +210,12 @@ impl SimulatorConfig {
 
     /// Validate the configuration
     pub fn validate(&self) -> Result<(), String> {
+        #[cfg(not(feature = "gpu"))]
         if self.use_gpu {
             return Err(
-                "use_gpu = true, but GPU acceleration is not implemented: SimQ would silently \
-                 execute on the CPU. Remove the flag until a GPU backend exists."
+                "use_gpu = true, but this build doesn't have the `gpu` Cargo feature enabled: \
+                 SimQ would silently execute on the CPU. Remove the flag, or rebuild with \
+                 `--features gpu`."
                     .to_string(),
             );
         }
@@ -293,14 +299,25 @@ mod tests {
         assert!(invalid.validate().is_err());
     }
 
+    #[cfg(not(feature = "gpu"))]
     #[test]
-    fn test_validate_rejects_unimplemented_gpu() {
+    fn test_validate_rejects_gpu_without_feature() {
         let invalid = SimulatorConfig {
             use_gpu: true,
             ..Default::default()
         };
         let err = invalid.validate().unwrap_err();
-        assert!(err.contains("not implemented"), "got: {}", err);
+        assert!(err.contains("gpu"), "got: {}", err);
+    }
+
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn test_validate_accepts_gpu_with_feature() {
+        let config = SimulatorConfig {
+            use_gpu: true,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
     }
 
     #[test]

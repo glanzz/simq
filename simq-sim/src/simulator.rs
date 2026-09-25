@@ -2,6 +2,7 @@
 
 use simq_compiler::fusion_cache::FusionStructureCache;
 use simq_compiler::pipeline::{create_compiler_with_fusion_cache, OptimizationLevel};
+use simq_compiler::reorder::{self, QubitPermutation};
 use simq_core::Circuit;
 use simq_state::AdaptiveState;
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use std::time::Instant;
 use crate::{
     config::SimulatorConfig,
     error::{Result, SimulatorError},
+    reorder::invert_permutation_on_state,
     result::SimulationResult,
     statistics::ExecutionStatistics,
 };
@@ -135,10 +137,10 @@ impl Simulator {
         };
 
         // 1. Compile circuit
-        let (compiled_circuit, compilation_time) = if self.config.optimize_circuit {
+        let (compiled_circuit, compilation_time, reorder_perm) = if self.config.optimize_circuit {
             self.compile_circuit(circuit)?
         } else {
-            (circuit.clone(), std::time::Duration::ZERO)
+            (circuit.clone(), std::time::Duration::ZERO, QubitPermutation::identity(num_qubits))
         };
 
         if let Some(ref mut s) = stats {
@@ -180,6 +182,19 @@ impl Simulator {
         }
         let gate_time = gate_start.elapsed();
 
+        // 3b. Undo the reorder pre-pass's relabeling (if any) so the
+        // returned state is indexed in the caller's original wire space —
+        // see `crate::reorder`'s module docs for why this must happen here,
+        // after execution completes, and not folded into gate application.
+        if !reorder_perm.is_identity() {
+            state = invert_permutation_on_state(&state, &reorder_perm).map_err(|e| {
+                SimulatorError::GateApplicationFailed {
+                    gate_index: 0,
+                    reason: format!("Failed to invert qubit reorder permutation: {:?}", e),
+                }
+            })?;
+        }
+
         if let Some(ref mut s) = stats {
             s.gate_application_time = gate_time;
             s.final_density = state.density() as f64;
@@ -200,7 +215,19 @@ impl Simulator {
     }
 
     /// Compile and optimize a circuit
-    fn compile_circuit(&self, circuit: &Circuit) -> Result<(Circuit, std::time::Duration)> {
+    ///
+    /// Also runs the long-range qubit reordering pre-pass
+    /// (`simq_compiler::reorder`) when `optimization_level >= 2` — mirroring
+    /// the gate `simq_compiler::fusion` itself already uses — strictly
+    /// *before* handing the (possibly relabeled) circuit to the compiler's
+    /// fusion pass, which is never modified by this. The returned
+    /// [`QubitPermutation`] is the identity unless reordering actually ran;
+    /// callers must invert it on the final execution result — see
+    /// `crate::reorder`.
+    fn compile_circuit(
+        &self,
+        circuit: &Circuit,
+    ) -> Result<(Circuit, std::time::Duration, QubitPermutation)> {
         let start = Instant::now();
 
         let opt_level = match self.config.optimization_level {
@@ -210,8 +237,15 @@ impl Simulator {
             _ => OptimizationLevel::O3,
         };
 
+        let (mut compiled, perm) = if self.config.optimization_level >= 2 {
+            let perm = reorder::compute_reordering(circuit);
+            let relabeled = reorder::apply_permutation(circuit, &perm);
+            (relabeled, perm)
+        } else {
+            (circuit.clone(), QubitPermutation::identity(circuit.num_qubits()))
+        };
+
         let compiler = create_compiler_with_fusion_cache(opt_level, Arc::clone(&self.fusion_cache));
-        let mut compiled = circuit.clone();
 
         compiler
             .compile(&mut compiled)
@@ -219,7 +253,7 @@ impl Simulator {
 
         let compilation_time = start.elapsed();
 
-        Ok((compiled, compilation_time))
+        Ok((compiled, compilation_time, perm))
     }
 
     /// Estimate maximum number of qubits that can be simulated
@@ -410,5 +444,97 @@ mod tests {
             result,
             Err(crate::error::SimulatorError::GateApplicationFailed { .. })
         ));
+    }
+
+    // TC-A4/A7-style cross-validation: on a circuit large enough
+    // (>= simq_compiler::reorder::PARALLEL_THRESHOLD_QUBITS) and structured
+    // enough (a long-range "star" of CNOTs from qubit 0, plus a local
+    // chain) that the reorder pre-pass actually produces a non-identity
+    // permutation, the final measurement probabilities must match a run
+    // with optimization (and therefore reorder) disabled, once the
+    // permutation has been inverted back onto the result — see
+    // `crate::reorder`'s module docs for why this must be exact, not
+    // approximate.
+    #[test]
+    fn test_reorder_pass_preserves_final_probabilities() {
+        use simq_gates::standard::{CNot, Hadamard};
+
+        let n = 20;
+        let mut circuit = Circuit::new(n);
+        for q in 0..n {
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(q)])
+                .unwrap();
+        }
+        // Long-range star from qubit 0 to every other qubit, interleaved
+        // with a local chain, so both the reorder heuristic and fusion's
+        // block path have real structure to work with.
+        for q in 1..n {
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(0), QubitId::new(q)])
+                .unwrap();
+        }
+        for q in 0..n - 1 {
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+                .unwrap();
+        }
+
+        let sim_reordered = Simulator::new(
+            SimulatorConfig::default().with_optimization_level(2), // reorder + fusion active
+        );
+        let sim_baseline = Simulator::new(SimulatorConfig::default().with_optimization(false));
+
+        // Sanity check that this circuit shape actually exercises a
+        // non-identity permutation, so this test would fail loudly instead
+        // of vacuously passing if that ever stopped being true.
+        let perm = simq_compiler::reorder::compute_reordering(&circuit);
+        assert!(
+            !perm.is_identity(),
+            "test circuit should trigger a non-trivial reorder"
+        );
+
+        let result_reordered = sim_reordered.run(&circuit).unwrap();
+        let result_baseline = sim_baseline.run(&circuit).unwrap();
+
+        let dim = 1usize << n;
+        for basis_state in 0..dim {
+            let p_reordered = result_reordered.state.get_probability(basis_state).unwrap();
+            let p_baseline = result_baseline.state.get_probability(basis_state).unwrap();
+            assert!(
+                (p_reordered - p_baseline).abs() < 1e-9,
+                "basis state {basis_state}: reordered={p_reordered}, baseline={p_baseline}"
+            );
+        }
+    }
+
+    // TC-A12 (integration form): a circuit with no long-range structure
+    // (fully local nearest-neighbor CNOT chain) should reorder to the
+    // identity even when it clears PARALLEL_THRESHOLD_QUBITS, so
+    // optimization_level 2 and O0 must agree gate-for-gate, not just
+    // probability-for-probability.
+    #[test]
+    fn test_local_circuit_above_threshold_is_unaffected_by_reorder() {
+        use simq_gates::standard::{CNot, Hadamard};
+
+        let n = 20;
+        let mut circuit = Circuit::new(n);
+        for q in 0..n {
+            circuit
+                .add_gate(Arc::new(Hadamard), &[QubitId::new(q)])
+                .unwrap();
+        }
+        for q in 0..n - 1 {
+            circuit
+                .add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)])
+                .unwrap();
+        }
+
+        let perm = simq_compiler::reorder::compute_reordering(&circuit);
+        assert!(perm.is_identity());
+
+        let sim = Simulator::new(SimulatorConfig::default().with_optimization_level(2));
+        let result = sim.run(&circuit).unwrap();
+        assert_eq!(result.num_qubits(), n);
     }
 }

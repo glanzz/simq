@@ -197,26 +197,98 @@ impl ExecutionEngine {
         Ok(())
     }
 
-    /// Execute circuit on GPU
+    /// Execute circuit on GPU.
     ///
-    /// GPU execution is not implemented. An explicit request for it fails
-    /// loudly instead of silently running on the CPU: a caller who selected
-    /// `ExecutionMode::Gpu` for a 2^20-amplitude state must not discover at
-    /// benchmark time that "GPU" numbers were sequential-CPU numbers.
-    /// (Configs with `use_gpu`/`ExecutionMode::Gpu` are already rejected by
-    /// `ExecutionConfig::validate`; this guards direct calls.)
+    /// Acquires a real [`crate::gpu::GpuContext`] (constructed fresh per
+    /// `execute` call — see that type's docs on why its *internal*
+    /// device/pipeline objects, not this per-call acquisition, are what
+    /// must be reused across gate dispatches) and dispatches each
+    /// operation's dense-gate kernel, densifying `state` first since the
+    /// GPU kernels operate on a full statevector only. Any GPU failure —
+    /// no adapter, unsupported gate width, a dispatch error — is a hard,
+    /// descriptive [`ExecutionError::GpuError`], never a silent fall
+    /// through to the CPU path.
+    ///
+    /// Only 1- and 2-qubit gates are supported (see `crate::gpu`'s module
+    /// docs on why a fused 3+-qubit block kernel is out of scope for now);
+    /// a wider operation is a hard error, not a guess.
     fn execute_gpu(
         &mut self,
-        _circuit: &Circuit,
-        _state: &mut AdaptiveState,
-        _timeout_check: Option<(Instant, std::time::Duration)>,
+        circuit: &Circuit,
+        state: &mut AdaptiveState,
+        timeout_check: Option<(Instant, std::time::Duration)>,
     ) -> Result<()> {
-        self.telemetry.log_event("gpu_unavailable");
-        Err(ExecutionError::GpuError {
-            reason: "GPU execution is not implemented; use Sequential, Parallel, or Adaptive \
-                     mode instead of relying on a silent CPU fallback"
-                .to_string(),
-        })
+        self.telemetry.log_event("gpu_dispatch_start");
+
+        let ctx = crate::gpu::GpuContext::new().map_err(|reason| ExecutionError::GpuError { reason })?;
+
+        state.force_to_dense().map_err(|e| ExecutionError::GpuError {
+            reason: format!("failed to densify state for GPU execution: {e}"),
+        })?;
+
+        for gate_op in circuit.operations() {
+            if let Some((start, limit)) = timeout_check {
+                if start.elapsed() > limit {
+                    return Err(ExecutionError::ExecutionTimeout {
+                        elapsed: start.elapsed(),
+                        limit,
+                    });
+                }
+            }
+
+            let qubits = gate_op.qubits();
+            let gate = gate_op.gate();
+            let matrix_vec = gate.matrix().ok_or_else(|| ExecutionError::InvalidGateMatrix {
+                gate: gate.name().to_string(),
+                reason: "gate has no matrix representation".to_string(),
+            })?;
+
+            let amplitudes = match state {
+                AdaptiveState::Dense(dense) => dense.amplitudes_mut(),
+                AdaptiveState::Sparse { .. } => {
+                    unreachable!("force_to_dense above guarantees a Dense state")
+                },
+            };
+
+            match qubits.len() {
+                1 => {
+                    let CachedMatrix::Single(mat) =
+                        Self::build_cached_matrix(gate.name(), qubits, &matrix_vec)?
+                    else {
+                        unreachable!("build_cached_matrix(width 1) always returns Single")
+                    };
+                    ctx.apply_single_qubit_dense_gpu(mat, qubits[0].index(), amplitudes)
+                        .map_err(|reason| ExecutionError::GpuError { reason })?;
+                },
+                2 => {
+                    let CachedMatrix::Two(mat) =
+                        Self::build_cached_matrix(gate.name(), qubits, &matrix_vec)?
+                    else {
+                        unreachable!("build_cached_matrix(width 2) always returns Two")
+                    };
+                    ctx.apply_two_qubit_dense_gpu(
+                        mat,
+                        qubits[0].index(),
+                        qubits[1].index(),
+                        amplitudes,
+                    )
+                    .map_err(|reason| ExecutionError::GpuError { reason })?;
+                },
+                n => {
+                    return Err(ExecutionError::GpuError {
+                        reason: format!(
+                            "GPU backend supports only 1- and 2-qubit gates; got a {n}-qubit \
+                             gate ({}). Lower optimization_level or max_block_width so fusion \
+                             doesn't produce wider blocks, or use the CPU execution engine.",
+                            gate.name()
+                        ),
+                    });
+                },
+            }
+        }
+
+        self.telemetry.log_event("gpu_dispatch_complete");
+        Ok(())
     }
 
     /// Execute a single gate with retry logic
@@ -838,10 +910,27 @@ mod tests {
         assert!(engine.execute(&circuit, &mut state).is_ok());
     }
 
-    /// GPU mode must be rejected loudly, not silently executed on the CPU.
+    /// Without the `gpu` feature, GPU mode must be rejected loudly at
+    /// construction, not silently executed on the CPU.
+    #[cfg(not(feature = "gpu"))]
     #[test]
     #[should_panic(expected = "Invalid execution config")]
-    fn test_gpu_mode_rejected_at_construction() {
+    fn test_gpu_mode_rejected_at_construction_without_feature() {
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Gpu,
+            validate_state: false,
+            ..ExecutionConfig::default()
+        };
+        let _ = ExecutionEngine::new(config);
+    }
+
+    /// With the `gpu` feature, GPU mode is a valid config (hardware
+    /// availability is a run-time concern — see
+    /// `test_gpu_execution_errors_loudly`, which still holds in this
+    /// environment since it has no wgpu adapter).
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn test_gpu_mode_accepted_at_construction_with_feature() {
         let config = ExecutionConfig {
             mode: ExecutionMode::Gpu,
             validate_state: false,
