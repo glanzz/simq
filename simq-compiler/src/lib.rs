@@ -181,6 +181,7 @@ pub mod matrix_computation;
 pub mod matrix_utils;
 pub mod passes;
 pub mod pipeline;
+pub mod reorder;
 
 pub use adaptive_pipeline::{AdaptiveCompiler, MultiLevelOptimizer};
 pub use analysis::{CircuitAnalysis, GateStatistics, ResourceEstimate};
@@ -210,3 +211,4 @@ pub use pipeline::{
     create_compiler, create_compiler_with_fusion_cache, create_o3_egraph_compiler,
     OptimizationLevel, PipelineBuilder,
 };
+pub use reorder::{apply_permutation, compute_reordering, QubitPermutation};

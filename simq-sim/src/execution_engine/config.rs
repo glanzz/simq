@@ -16,9 +16,12 @@ pub struct ExecutionConfig {
 
     /// Enable GPU acceleration
     ///
-    /// **Not implemented**: setting this to `true` (or selecting
-    /// [`ExecutionMode::Gpu`]) fails validation instead of silently running
-    /// on the CPU.
+    /// Requires building with the `gpu` Cargo feature — without it, setting
+    /// this to `true` (or selecting [`ExecutionMode::Gpu`]) fails
+    /// validation instead of silently running on the CPU. With the feature
+    /// enabled, validation accepts it, but actual GPU dispatch can still
+    /// fail at execution time (no compatible adapter, unsupported gate
+    /// width, ...) — that failure is likewise never a silent CPU fallback.
     pub use_gpu: bool,
 
     /// GPU device index (if multiple GPUs available)
@@ -184,10 +187,12 @@ impl ExecutionConfig {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
+        #[cfg(not(feature = "gpu"))]
         if self.use_gpu || self.mode == ExecutionMode::Gpu {
             return Err(
-                "GPU execution is not implemented: refusing to accept use_gpu/ExecutionMode::Gpu \
-                 and silently run on the CPU. Use Sequential, Parallel, or Adaptive mode."
+                "GPU execution requires building with the `gpu` Cargo feature: refusing to \
+                 accept use_gpu/ExecutionMode::Gpu and silently run on the CPU. Use Sequential, \
+                 Parallel, or Adaptive mode, or rebuild with `--features gpu`."
                     .to_string(),
             );
         }
@@ -230,8 +235,11 @@ pub enum ExecutionMode {
 
     /// GPU-accelerated execution
     ///
-    /// **Not implemented**: selecting this mode fails
-    /// [`ExecutionConfig::validate`] instead of silently executing on the CPU.
+    /// Requires building with the `gpu` Cargo feature — without it,
+    /// selecting this mode fails [`ExecutionConfig::validate`] instead of
+    /// silently executing on the CPU. Never selected automatically by
+    /// [`ExecutionMode::Adaptive`]; it is only ever used on an explicit
+    /// opt-in.
     Gpu,
 }
 
@@ -272,8 +280,9 @@ mod tests {
         assert!(!config.validate_state);
     }
 
+    #[cfg(not(feature = "gpu"))]
     #[test]
-    fn test_gpu_config_rejected() {
+    fn test_gpu_config_rejected_without_feature() {
         let config = ExecutionConfig {
             use_gpu: true,
             ..Default::default()
@@ -285,6 +294,26 @@ mod tests {
             ..Default::default()
         };
         assert!(config.validate().is_err());
+    }
+
+    /// With the `gpu` feature enabled, validation accepts GPU config —
+    /// actual hardware availability is checked at execution time
+    /// (`GpuContext::new()`), never at config-validation time, which stays
+    /// synchronous and hardware-independent.
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn test_gpu_config_accepted_with_feature() {
+        let config = ExecutionConfig {
+            use_gpu: true,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+
+        let config = ExecutionConfig {
+            mode: ExecutionMode::Gpu,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
     }
 
     #[test]
@@ -327,10 +356,12 @@ mod tests {
         assert_eq!(config.mode, ExecutionMode::Parallel);
         assert!(!config.validate_state);
 
-        // Requesting the GPU through the builder is possible, but such a
-        // config must not pass validation while no backend exists.
+        // Requesting the GPU through the builder is possible; whether it
+        // passes validation depends on the `gpu` feature (checked above by
+        // test_gpu_config_rejected_without_feature /
+        // test_gpu_config_accepted_with_feature) — actual hardware
+        // availability is never checked here, only at execution time.
         let gpu_config = ExecutionConfig::new().with_gpu(true);
         assert!(gpu_config.use_gpu);
-        assert!(gpu_config.validate().is_err());
     }
 }

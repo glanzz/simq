@@ -30,6 +30,11 @@ argmin-math = { version = "0.4", features = ["vec"] }
 
 # Optional GPU backend
 wgpu = { version = "0.19", optional = true }
+# Bridges wgpu's async device-request API (request_adapter/request_device)
+# into this crate's synchronous GpuContext::new() — the standard, minimal
+# way to do this (the same crate wgpu's own examples use), not a general
+# async runtime. Only pulled in under the `gpu` feature.
+pollster = { version = "0.3", optional = true }
 bytemuck.workspace = true
 
 [dev-dependencies]
@@ -38,7 +43,7 @@ criterion.workspace = true
 tracing-subscriber.workspace = true
 
 [features]
-gpu = ["wgpu"]
+gpu = ["wgpu", "pollster"]
 
 [[bench]]
 name = "simulator"

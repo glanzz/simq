@@ -40,6 +40,7 @@ pub mod config;
 pub mod error;
 pub mod execution_engine;
 pub mod gpu;
+pub mod reorder;
 pub mod result;
 pub mod simulator;
 pub mod statistics;
@@ -58,6 +59,7 @@ pub use vqe_qaoa_helpers::{qaoa_circuit, vqe_hardware_efficient_ansatz};
 
 pub use config::SimulatorConfig;
 pub use error::{Result, SimulatorError};
+pub use reorder::invert_permutation_on_state;
 pub use result::{MeasurementCounts, SimulationResult};
 pub use simulator::Simulator;
 pub use statistics::ExecutionStatistics;
