@@ -120,9 +120,23 @@ impl GateCommutation {
 
     /// Check if two gates on the same qubit(s) commute
     fn same_qubit_commute(name1: &str, name2: &str) -> bool {
-        // Same gate always commutes with itself (including parameterized gates)
+        // Same unitary always commutes with itself, but same *name* does
+        // not imply same unitary: "FUSED" blocks with different component
+        // matrices and parameterized gates (e.g. U2/U3, RX with different
+        // angles resolved only via the axis checks below) share names while
+        // implementing different unitaries. Only trust the blanket rule for
+        // known non-parameterized gates; everything else must pass the
+        // structural checks below (diagonal/same-axis), which correctly
+        // accept e.g. RX-RX while rejecting FUSED-FUSED.
         if name1 == name2 {
-            return true;
+            const NON_PARAMETRIZED_SELF_COMMUTING: &[&str] = &[
+                "H", "X", "Y", "Z", "S", "T", "S†", "T†", "I", "CNOT", "CZ", "SWAP", "iSWAP",
+                "Pauli-X", "Pauli-Y", "Pauli-Z",
+            ];
+            if NON_PARAMETRIZED_SELF_COMMUTING.contains(&name1) {
+                return true;
+            }
+            // Fall through for parameterized / fused names.
         }
 
         // Diagonal gates commute with each other

@@ -18,11 +18,17 @@ impl CircuitFingerprint {
     ///
     /// The fingerprint is computed from:
     /// - Number of qubits
-    /// - Gate sequence (gate names and qubit targets)
+    /// - Gate sequence (gate names, qubit targets, and gate matrix bits)
     ///
-    /// Note: This is a structural fingerprint that doesn't account for
-    /// parameter values in parameterized gates. For parameter-sensitive
-    /// caching, a more sophisticated approach would be needed.
+    /// Matrix bits are included so parameterized gates with different angles
+    /// (e.g. successive VQE/QAOA iterations of the same shaped circuit) hash
+    /// differently. The previous structural-only fingerprint made
+    /// [`crate::cached_compiler::CachedCompiler`] return a stale compiled
+    /// circuit with baked-in old parameters on a cache hit — silently wrong
+    /// energies/gradients in variational loops. (The fusion-structure cache
+    /// in [`crate::fusion_cache`] intentionally stays structural-only: it
+    /// caches block *grouping*, which provably does not depend on parameter
+    /// values, and recomputes matrices fresh each call.)
     pub fn compute(circuit: &Circuit) -> Self {
         use std::collections::hash_map::DefaultHasher;
 
@@ -42,6 +48,20 @@ impl CircuitFingerprint {
             // Hash qubit targets
             for qubit in op.qubits() {
                 qubit.index().hash(&mut hasher);
+            }
+
+            // Hash gate matrix bits, if any, so parameterized gates with
+            // different angles produce different fingerprints.
+            if let Some(matrix) = op.gate().matrix() {
+                matrix.len().hash(&mut hasher);
+                for amp in &matrix {
+                    amp.re.to_bits().hash(&mut hasher);
+                    amp.im.to_bits().hash(&mut hasher);
+                }
+            } else {
+                // Distinguish matrix-less gates (e.g. measurement) from an
+                // empty/identity matrix.
+                0u8.hash(&mut hasher);
             }
         }
 

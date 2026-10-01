@@ -88,7 +88,7 @@ impl SparseState {
     pub fn new(num_qubits: usize) -> Result<Self> {
         if num_qubits > 30 {
             return Err(StateError::InvalidDimension {
-                dimension: 1 << num_qubits,
+                dimension: 1usize.checked_shl(num_qubits as u32).unwrap_or(usize::MAX),
             });
         }
 
@@ -121,7 +121,7 @@ impl SparseState {
     pub fn from_dense_amplitudes(num_qubits: usize, amplitudes: &[Complex64]) -> Result<Self> {
         if num_qubits > 30 {
             return Err(StateError::InvalidDimension {
-                dimension: 1 << num_qubits,
+                dimension: 1usize.checked_shl(num_qubits as u32).unwrap_or(usize::MAX),
             });
         }
 
@@ -162,7 +162,7 @@ impl SparseState {
     pub fn from_basis_state(num_qubits: usize, basis_idx: u64) -> Result<Self> {
         if num_qubits > 30 {
             return Err(StateError::InvalidDimension {
-                dimension: 1 << num_qubits,
+                dimension: 1usize.checked_shl(num_qubits as u32).unwrap_or(usize::MAX),
             });
         }
 
