@@ -238,17 +238,23 @@ where
                     .map(|(new, old)| new - old)
                     .collect();
 
-                let rho_k = 1.0 / s_k.iter().zip(y_k.iter()).map(|(s, y)| s * y).sum::<f64>();
+                let s_dot_y: f64 = s_k.iter().zip(y_k.iter()).map(|(s, y)| s * y).sum();
+                // Curvature guard: skip the update when sᵀy is non-positive
+                // or tiny, otherwise rho blows up to ±Inf and the search
+                // direction becomes NaN.
+                if s_dot_y > 1e-10 {
+                    let rho_k = 1.0 / s_dot_y;
 
-                // Add to history (maintain fixed size)
-                s_history.push(s_k);
-                y_history.push(y_k);
-                rho_history.push(rho_k);
+                    // Add to history (maintain fixed size)
+                    s_history.push(s_k);
+                    y_history.push(y_k);
+                    rho_history.push(rho_k);
 
-                if s_history.len() > self.config.memory_size {
-                    s_history.remove(0);
-                    y_history.remove(0);
-                    rho_history.remove(0);
+                    if s_history.len() > self.config.memory_size {
+                        s_history.remove(0);
+                        y_history.remove(0);
+                        rho_history.remove(0);
+                    }
                 }
             }
 

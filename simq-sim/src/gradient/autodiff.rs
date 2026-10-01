@@ -374,32 +374,33 @@ impl ReverseTape {
         // Seed the output
         self.adjoints[output] = 1.0;
 
-        // Reverse pass
-        for op in self.operations.iter().rev() {
+        // Reverse pass. operations[i] produced values[i] (each op appends
+        // exactly one value), so the adjoint of op i lives at adjoints[i].
+        for (idx, op) in self.operations.iter().enumerate().rev() {
             match *op {
                 Operation::Input { .. } => {
                     // Nothing to do for inputs
                 },
                 Operation::Add { lhs, rhs } => {
-                    let adj = self.adjoints[self.values.len() - 1];
+                    let adj = self.adjoints[idx];
                     self.adjoints[lhs] += adj;
                     self.adjoints[rhs] += adj;
                 },
                 Operation::Mul { lhs, rhs } => {
-                    let adj = self.adjoints[self.values.len() - 1];
+                    let adj = self.adjoints[idx];
                     self.adjoints[lhs] += adj * self.values[rhs];
                     self.adjoints[rhs] += adj * self.values[lhs];
                 },
                 Operation::Sin { arg } => {
-                    let adj = self.adjoints[self.values.len() - 1];
+                    let adj = self.adjoints[idx];
                     self.adjoints[arg] += adj * self.values[arg].cos();
                 },
                 Operation::Cos { arg } => {
-                    let adj = self.adjoints[self.values.len() - 1];
+                    let adj = self.adjoints[idx];
                     self.adjoints[arg] -= adj * self.values[arg].sin();
                 },
                 Operation::Exp { arg } => {
-                    let adj = self.adjoints[self.values.len() - 1];
+                    let adj = self.adjoints[idx];
                     self.adjoints[arg] += adj * self.values[arg].exp();
                 },
             }

@@ -584,6 +584,9 @@ where
     ) -> crate::error::Result<OptimizationResult> {
         let start_time = Instant::now();
         let mut params = initial_params.to_vec();
+        let mut total_iterations = 0usize;
+        let mut prev_energy = f64::INFINITY;
+        let mut final_status = ConvergenceStatus::MaxIterations;
 
         // Optimize each layer sequentially
         for layer in 0..self.config.num_layers {
@@ -592,8 +595,9 @@ where
 
             // Optimize just this layer's parameters
             for _iteration in 0..self.config.max_iterations {
+                let iter_start = Instant::now();
                 let circuit = (self.circuit_builder)(&params);
-                let _energy = compute_expectation(simulator, &circuit, observable)?;
+                let energy = compute_expectation(simulator, &circuit, observable)?;
                 let grad_result = compute_gradient(
                     simulator,
                     &self.circuit_builder,
@@ -601,6 +605,7 @@ where
                     &params,
                     &self.config.gradient_config,
                 )?;
+                let energy_change = (energy - prev_energy).abs();
 
                 // Update only this layer's parameters
                 let gamma_idx = layer_start_idx;
@@ -612,9 +617,29 @@ where
                     self.config.beta_learning_rate * grad_result.gradients[beta_idx];
 
                 // Simple convergence check for this layer
-                if grad_result.gradients[gamma_idx].abs() < self.config.gradient_tolerance
-                    && grad_result.gradients[beta_idx].abs() < self.config.gradient_tolerance
-                {
+                let layer_converged =
+                    grad_result.gradients[gamma_idx].abs() < self.config.gradient_tolerance
+                        && grad_result.gradients[beta_idx].abs() < self.config.gradient_tolerance;
+                let status = if layer_converged {
+                    ConvergenceStatus::GradientConverged
+                } else {
+                    ConvergenceStatus::NotConverged
+                };
+                self.history.push(OptimizationStep {
+                    iteration: total_iterations,
+                    parameters: params.clone(),
+                    energy,
+                    gradient: grad_result.gradients.clone(),
+                    gradient_norm: grad_result.gradients.iter().map(|g| g * g).sum::<f64>().sqrt(),
+                    energy_change,
+                    step_time: iter_start.elapsed(),
+                    status,
+                });
+                total_iterations += 1;
+                prev_energy = energy;
+
+                if layer_converged {
+                    final_status = ConvergenceStatus::GradientConverged;
                     break;
                 }
             }
@@ -635,8 +660,12 @@ where
             parameters: params,
             energy: final_energy,
             gradient: final_grad.gradients,
-            status: ConvergenceStatus::FullyConverged,
-            num_iterations: self.config.num_layers * self.config.max_iterations,
+            status: if self.history.is_empty() {
+                ConvergenceStatus::MaxIterations
+            } else {
+                final_status
+            },
+            num_iterations: total_iterations,
             total_time: start_time.elapsed(),
             history: self.history.clone(),
         })
@@ -1333,7 +1362,11 @@ mod tests {
         };
         let mut optimizer = QAOAOptimizer::new(circuit_builder, config);
         let result = optimizer.optimize(&sim, &obs, &[0.5, 0.5]).unwrap();
-        assert_eq!(result.status, ConvergenceStatus::FullyConverged);
+        // Layer-wise records one history entry per inner iteration and
+        // reports actual iterations (previously it returned an empty history
+        // with a hard-coded FullyConverged status).
+        assert_eq!(result.history.len(), result.num_iterations);
+        assert!(result.num_iterations <= 5);
     }
 
     /// Issue #39 regression: doubled-angle circuits (the shape produced by
