@@ -18,6 +18,13 @@ pub fn qaoa_circuit(
     depth: usize,
     params: &[f64],
 ) -> Circuit {
+    assert_eq!(
+        params.len(),
+        2 * depth,
+        "qaoa_circuit: expected 2*depth={} params [gamma_1, beta_1, ...], got {}",
+        2 * depth,
+        params.len()
+    );
     let mut circuit = Circuit::new(num_qubits);
     let mut param_idx = 0;
     // Initial state: apply Hadamard to all qubits
@@ -26,11 +33,17 @@ pub fn qaoa_circuit(
     }
     // QAOA layers
     for _layer in 0..depth {
-        // Cost Hamiltonian: exp(-i gamma C)
+        // Cost Hamiltonian: exp(-i gamma C), C = sum coeff * Z_q.
+        // RZ(θ) = exp(-i θ Z/2), so exp(-i γ·coeff·Z) needs θ = 2·coeff·γ
+        // (matches QAOACircuitBuilder::apply_z_product; the mixer below
+        // already uses 2.0*beta for the same reason).
         let gamma = params[param_idx];
         param_idx += 1;
         for &(q, coeff) in cost_hamiltonian {
-            let _ = circuit.add_gate(Arc::new(RotationZ::new(coeff * gamma)), &[QubitId::new(q)]);
+            let _ = circuit.add_gate(
+                Arc::new(RotationZ::new(2.0 * coeff * gamma)),
+                &[QubitId::new(q)],
+            );
         }
         // Mixer Hamiltonian: exp(-i beta X)
         let beta = params[param_idx];
@@ -46,6 +59,13 @@ pub fn qaoa_circuit(
 /// Each qubit gets a Ry(θ) rotation, then entangling CNOTs in a chain.
 /// `params` should have length equal to `num_qubits`.
 pub fn vqe_hardware_efficient_ansatz(num_qubits: usize, params: &[f64]) -> Circuit {
+    assert_eq!(
+        params.len(),
+        num_qubits,
+        "vqe_hardware_efficient_ansatz: expected num_qubits={} params, got {}",
+        num_qubits,
+        params.len()
+    );
     let mut circuit = Circuit::new(num_qubits);
     // Initial Hadamard layer
     for q in 0..num_qubits {
@@ -55,8 +75,10 @@ pub fn vqe_hardware_efficient_ansatz(num_qubits: usize, params: &[f64]) -> Circu
     for (q, &theta) in params.iter().enumerate() {
         let _ = circuit.add_gate(Arc::new(RotationY::new(theta)), &[QubitId::new(q)]);
     }
-    // Entangling CNOTs (linear chain)
-    for q in 0..(num_qubits - 1) {
+    // Entangling CNOTs (linear chain). saturating_sub avoids usize
+    // underflow when num_qubits == 0 (0..(0-1) would panic in debug /
+    // wrap to usize::MAX in release and OOM).
+    for q in 0..num_qubits.saturating_sub(1) {
         let _ = circuit.add_gate(Arc::new(CNot), &[QubitId::new(q), QubitId::new(q + 1)]);
     }
     circuit
