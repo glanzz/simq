@@ -20,12 +20,22 @@ rand.workspace = true
 mimalloc = { version = "0.1", optional = true }
 
 [features]
-# Swaps the process global allocator to mimalloc -- see the
-# `#[global_allocator]` note in src/lib.rs for why this is opt-in rather
-# than a default: it's a process-wide choice a library shouldn't impose on
-# downstream binaries that link it. Off by default; benchmarks enable it
-# explicitly to measure the effect (see BENCHMARKS.md).
+# Swaps the process global allocator to mimalloc
 mimalloc = ["dep:mimalloc"]
+
+# Simulator features
+gpu = ["simq-sim/gpu"]
+vqe = ["simq-sim/vqe"]
+
+# Backend features
+local-simulator = ["simq-backend/local-simulator"]
+ibm-quantum = ["simq-backend/ibm-quantum"]
+async = ["simq-backend/async"]
+
+# Core features
+serde = ["simq-core/serde"]
+serialization = ["simq-core/serialization"]
+cache = ["simq-core/cache"]
 
 [dev-dependencies]
 approx.workspace = true

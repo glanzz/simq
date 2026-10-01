@@ -25,8 +25,8 @@ approx.workspace = true
 rand.workspace = true
 
 # Classical optimizers for VQE/QAOA
-argmin = "0.10"
-argmin-math = { version = "0.4", features = ["vec"] }
+argmin = { version = "0.10", optional = true }
+argmin-math = { version = "0.4", features = ["vec"], optional = true }
 
 # Optional GPU backend
 wgpu = { version = "0.19", optional = true }
@@ -39,6 +39,7 @@ tracing-subscriber.workspace = true
 
 [features]
 gpu = ["wgpu"]
+vqe = ["argmin", "argmin-math"]
 
 [[bench]]
 name = "simulator"
