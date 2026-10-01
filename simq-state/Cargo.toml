@@ -12,9 +12,10 @@ description = "Quantum state representations for SimQ"
 [dependencies]
 simq-core.workspace = true
 num-complex.workspace = true
-ahash.workspace = true
+# Sparse state uses `foldhash::fast::RandomState` for its u64-keyed amplitude
+# map (measurably faster than ahash here; see sparse_state.rs). No `ahash`
+# or `sprs` dependency needed by design.
 foldhash.workspace = true
-bytemuck.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 rand.workspace = true

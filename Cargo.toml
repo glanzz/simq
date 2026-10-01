@@ -15,14 +15,18 @@ version = "0.1.0"
 edition = "2021"
 authors = ["SimQ Contributors"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/simq"
-homepage = "https://github.com/yourusername/simq"
+repository = "https://github.com/glanzz/simq"
+homepage = "https://github.com/glanzz/simq"
 rust-version = "1.75"
 
 [workspace.dependencies]
 # Core dependencies
+# NOTE: no `ndarray` here by design — no first-party code uses it
+# (numpy pulls its own copy transitively for simq-py). No `sprs`/`faer`
+# either: sparse statevectors are hash-map based (see simq-state), not CSR
+# matrices. No `cudarc`: the `gpu` feature is wgpu (Vulkan/Metal/DX12),
+# cross-platform rather than CUDA-only.
 num-complex = "0.4"
-ndarray = "0.15"
 rayon = "1.8"
 ahash = "0.8"
 foldhash = "0.1"
