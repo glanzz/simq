@@ -373,10 +373,10 @@ impl GateCommutation {
             // Single-qubit gates: try to move closer to last gate on same qubit
             if op_qubits.len() == 1 {
                 let qubit = op_qubits[0];
+                let mut current_idx = i;
 
                 if let Some(&last_idx) = qubit_last_op.get(&qubit) {
                     // Try to bubble this gate backward toward the last gate on this qubit
-                    let mut current_idx = i;
                     while current_idx > last_idx + 1 {
                         if self.try_swap_gates(ops, current_idx - 1) {
                             current_idx -= 1;
@@ -391,7 +391,7 @@ impl GateCommutation {
                     }
                 }
 
-                qubit_last_op.insert(qubit, i);
+                qubit_last_op.insert(qubit, current_idx);
             } else {
                 // Multi-qubit gate: update all involved qubits
                 for qubit in op_qubits {
