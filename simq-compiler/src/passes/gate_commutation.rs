@@ -120,9 +120,23 @@ impl GateCommutation {
 
     /// Check if two gates on the same qubit(s) commute
     fn same_qubit_commute(name1: &str, name2: &str) -> bool {
-        // Same gate always commutes with itself (including parameterized gates)
+        // Same unitary always commutes with itself, but same *name* does
+        // not imply same unitary: "FUSED" blocks with different component
+        // matrices and parameterized gates (e.g. U2/U3, RX with different
+        // angles resolved only via the axis checks below) share names while
+        // implementing different unitaries. Only trust the blanket rule for
+        // known non-parameterized gates; everything else must pass the
+        // structural checks below (diagonal/same-axis), which correctly
+        // accept e.g. RX-RX while rejecting FUSED-FUSED.
         if name1 == name2 {
-            return true;
+            const NON_PARAMETRIZED_SELF_COMMUTING: &[&str] = &[
+                "H", "X", "Y", "Z", "S", "T", "S†", "T†", "I", "CNOT", "CZ", "SWAP", "iSWAP",
+                "Pauli-X", "Pauli-Y", "Pauli-Z",
+            ];
+            if NON_PARAMETRIZED_SELF_COMMUTING.contains(&name1) {
+                return true;
+            }
+            // Fall through for parameterized / fused names.
         }
 
         // Diagonal gates commute with each other
@@ -359,10 +373,10 @@ impl GateCommutation {
             // Single-qubit gates: try to move closer to last gate on same qubit
             if op_qubits.len() == 1 {
                 let qubit = op_qubits[0];
+                let mut current_idx = i;
 
                 if let Some(&last_idx) = qubit_last_op.get(&qubit) {
                     // Try to bubble this gate backward toward the last gate on this qubit
-                    let mut current_idx = i;
                     while current_idx > last_idx + 1 {
                         if self.try_swap_gates(ops, current_idx - 1) {
                             current_idx -= 1;
@@ -377,7 +391,7 @@ impl GateCommutation {
                     }
                 }
 
-                qubit_last_op.insert(qubit, i);
+                qubit_last_op.insert(qubit, current_idx);
             } else {
                 // Multi-qubit gate: update all involved qubits
                 for qubit in op_qubits {

@@ -59,8 +59,11 @@ impl StateVector {
     /// ```
     pub fn new(num_qubits: usize) -> Result<Self> {
         if num_qubits > 30 {
+            // NB: do NOT compute `1 << num_qubits` here — it overflows for
+            // large inputs (panics in debug, wraps in release) while
+            // constructing the very error that should report them.
             return Err(StateError::InvalidDimension {
-                dimension: 1 << num_qubits,
+                dimension: 1usize.checked_shl(num_qubits as u32).unwrap_or(usize::MAX),
             });
         }
 
@@ -109,6 +112,11 @@ impl StateVector {
     /// # Errors
     /// Returns error if dimension doesn't match or allocation fails
     pub fn from_amplitudes(num_qubits: usize, amplitudes: &[Complex64]) -> Result<Self> {
+        if num_qubits > 30 {
+            return Err(StateError::InvalidDimension {
+                dimension: 1usize.checked_shl(num_qubits as u32).unwrap_or(usize::MAX),
+            });
+        }
         let dimension = 1 << num_qubits;
 
         if amplitudes.len() != dimension {
